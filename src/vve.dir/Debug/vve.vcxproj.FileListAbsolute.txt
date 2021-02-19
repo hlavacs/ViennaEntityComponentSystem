@@ -1,0 +1,2 @@
+D:\data\Vulkan\ViennaVulkanEngine\bin\Debug\vve.pdb
+D:\data\Vulkan\ViennaVulkanEngine\src\vve.dir\Debug\vve.pdb
