@@ -24,3 +24,5 @@ include_directories (${CMAKE_HOME_DIRECTORY}/external/glm)
 include_directories (${INCLUDE})
 
 add_subdirectory (examples/basic_test)
+add_subdirectory (examples/test)
+add_subdirectory (examples/performance)

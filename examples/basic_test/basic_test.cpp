@@ -43,7 +43,7 @@ int main() {
     using entity_types = typename vtll::filter_have_all_types< VeEntityTypeList, vtll::type_list<VeComponentPosition> >::type;
     std::cout << typeid(entity_types).name() << std::endl;
 
-    vecs::for_each<VeComponentPosition, VeComponentOrientation>( [&]( auto& iter) {
+    for_each<VeComponentPosition, VeComponentOrientation>( [&]( auto& iter) {
 
         auto [handle, pos, orient] = *iter;
 
@@ -58,7 +58,6 @@ int main() {
     auto data1c = et.entity<VeEntityNode>(h1);
     et.erase(h2);
 
-    std::cout << "Hello world\n";
     return 0;
 }
 
