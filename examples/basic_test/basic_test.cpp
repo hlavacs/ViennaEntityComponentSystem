@@ -10,12 +10,12 @@ using namespace vecs;
 
 int main() {
     
-    VeEntityTable et;
+    registry_t et;
 
-    std::cout << sizeof(VeHandle) << " " << sizeof(index_t) << std::endl;
-    std::cout << vtll::size<VeEntityTypeList>::value << std::endl;
+    std::cout << sizeof(handle_t) << " " << sizeof(index_t) << std::endl;
+    std::cout << vtll::size<VecsEntityTypeList>::value << std::endl;
 
-    VeHandle h1 = et.insert(VeComponentPosition{ glm::vec3{9.0f, 2.0f, 3.0f} }, VeComponentOrientation{}, VeComponentTransform{});
+    handle_t h1 = et.insert(VeComponentPosition{ glm::vec3{9.0f, 2.0f, 3.0f} }, VeComponentOrientation{}, VeComponentTransform{});
     std::cout << typeid(VeEntityNode).hash_code() << " " << typeid(VeEntityNode).name() << std::endl;
 
     auto data1  = et.entity(h1);
@@ -32,7 +32,7 @@ int main() {
     et.update(h1, data1b);
     auto comp1_5 = et.component<VeComponentPosition>(h1);
 
-    VeHandle h2 = et.insert(VeComponentMaterial{ 99 }, VeComponentGeometry{});
+    handle_t h2 = et.insert(VeComponentMaterial{ 99 }, VeComponentGeometry{});
     std::cout << typeid(VeEntityDraw).hash_code() << " " << typeid(VeEntityDraw).name() << std::endl;
 
     auto data2 = et.entity(h2);
@@ -40,7 +40,7 @@ int main() {
     auto comp2_1 = data2b.value().component<VeComponentMaterial>();
     auto comp2_2 = et.component<VeComponentMaterial>(h2);
 
-    using entity_types = typename vtll::filter_have_all_types< VeEntityTypeList, vtll::type_list<VeComponentPosition> >::type;
+    using entity_types = typename vtll::filter_have_all_types< VecsEntityTypeList, vtll::type_list<VeComponentPosition> >::type;
     std::cout << typeid(entity_types).name() << std::endl;
 
     for_each<VeComponentPosition, VeComponentOrientation>( [&]( auto& iter) {

@@ -54,18 +54,18 @@ namespace vecs {
 	//https://www.fluentcpp.com/2017/05/19/crtp-helper/
 
 	template <typename T, template<typename...> class crtpType>
-	struct VeCRTP {
+	struct VecsCRTP {
 		T& underlying() { return static_cast<T&>(*this); }
 		T const& underlying() const { return static_cast<T const&>(*this); }
 
 	protected:
-		VeCRTP() {};
+		VecsCRTP() {};
 		friend crtpType<T>;
 	};
 
 
 	template<typename T>
-	class VeMonostate : VeCRTP<T,VeMonostate> {
+	class VecsMonostate : VecsCRTP<T,VecsMonostate> {
 	protected:
 		static inline std::atomic<uint32_t> m_init_counter = 0;
 
