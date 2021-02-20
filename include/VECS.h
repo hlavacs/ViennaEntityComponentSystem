@@ -32,6 +32,18 @@ namespace vecs {
 
 	using VeEntityTypeList = vtll::cat< VeEntityTypeListSystem, VeEntityTypeListUser >;
 
+	//-------------------------------------------------------------------------
+	//definition of the types used in VECS
+
+	struct VeHandle;
+
+	template <typename E>
+	struct VeEntity_t;
+
+	class VeEntityTableBaseClass;
+
+	template<typename E>
+	class VeEntityTable;
 
 	//-------------------------------------------------------------------------
 	//entity handle
@@ -87,15 +99,9 @@ namespace vecs {
 	using VeEntityPtr = vtll::variant_type<vtll::to_ptr<vtll::transform<VeEntityTypeList, VeEntity_t>>>;
 
 
-
-
 	//-------------------------------------------------------------------------
 	//component vector - each entity type has them
 
-	class VeEntityTableBaseClass;
-
-	template<typename E>
-	class VeEntityTable;
 
 	/**
 	* \brief This class stores all components of entities of type E
