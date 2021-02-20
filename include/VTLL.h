@@ -110,23 +110,17 @@ namespace vtll {
 		"The implementation of back is bad");
 
 	//-------------------------------------------------------------------------
-	//index_of: index of a type within a type list
+	//index_of: index of first occurrence of a type within a type list
 
 	namespace detail {
 		template<typename, typename>
-		struct index_of_impl {};
+		struct index_of_impl;
 
-		// Index Of base case: found the type we're looking for.
 		template <typename T, template <typename...> typename Seq, typename... Ts>
-		struct index_of_impl<Seq<T, Ts...>,T> : std::integral_constant<std::size_t, 0> {
-			using type = std::integral_constant<std::size_t, 0>;
-		};
+		struct index_of_impl<Seq<T, Ts...>,T> : std::integral_constant<std::size_t, 0> {};
 
-		// Index Of recursive case: 1 + Index Of the rest of the types.
 		template <typename T, typename TOther, template <typename...> typename Seq, typename... Ts>
-		struct index_of_impl<Seq<TOther, Ts...>,T> : std::integral_constant<std::size_t, 1 + index_of_impl<Seq<Ts...>,T>::value> {
-			using type = std::integral_constant<std::size_t, 1 + index_of_impl<Seq<Ts...>,T>::value>;
-		};
+		struct index_of_impl<Seq<TOther, Ts...>,T> : std::integral_constant<std::size_t, 1 + index_of_impl<Seq<Ts...>,T>::value> {};
 	}
 
 	template <typename Seq, typename T>
@@ -189,24 +183,24 @@ namespace vtll {
 		"The implementation of to_ptr is bad");
 
 	//-------------------------------------------------------------------------
-	//variant_type: make a summary variant type of all elements in a list
+	//to_variant: make a summary variant type of all elements in a list
 
 	namespace detail {
 		template <typename Seq>
-		struct variant_type_impl;
+		struct to_variant_impl;
 
 		template <template <typename...> typename Seq, typename... Ts>
-		struct variant_type_impl<Seq<Ts...>> {
+		struct to_variant_impl<Seq<Ts...>> {
 			using type = std::variant<Ts...>;
 		};
 	}
 
 	template <typename Seq>
-	using variant_type = typename detail::variant_type_impl<Seq>::type;
+	using to_variant = typename detail::to_variant_impl<Seq>::type;
 
 	static_assert(
-		std::is_same_v< variant_type< type_list<double, int, char> >, std::variant<double, int, char> >,
-		"The implementation of variant_type is bad");
+		std::is_same_v< to_variant< type_list<double, int, char> >, std::variant<double, int, char> >,
+		"The implementation of to_variant is bad");
 
 	//-------------------------------------------------------------------------
 	//transform: transform list<types> into list<Function<types>>
@@ -531,7 +525,7 @@ namespace vtll {
 
 
 	//-------------------------------------------------------------------------
-	//filter_have_all_type: keep only those type lists Ts<...> that have ALL specified type Cs from another list Seq2<Cs...> as member
+	//filter_have_all_types: keep only those type lists Ts<...> that have ALL specified type Cs from another list Seq2<Cs...> as member
 
 	namespace detail {
 		template<typename Seq1, typename Seq2>
@@ -565,6 +559,39 @@ namespace vtll {
 
 
 	//-------------------------------------------------------------------------
+	//filter_have_any_type: keep only those type lists Ts<...> that have ANY specified type Cs from another list Seq2<Cs...> as member
+
+	namespace detail {
+		template<typename Seq1, typename Seq2>
+		struct filter_have_any_type_impl;
+
+		template<template <typename...> typename Seq1, template <typename...> typename Seq2, typename... Cs >
+		struct filter_have_any_type_impl<Seq1<>, Seq2<Cs...>> {
+			using type = Seq1<>;
+		};
+
+		template<template <typename...> typename Seq1, typename T, typename... Ts, template <typename...> typename Seq2, typename... Cs>
+		struct filter_have_any_type_impl<Seq1<T, Ts...>, Seq2<Cs...>> {
+			using type1 = cat< Seq1<T>, typename filter_have_any_type_impl<Seq1<Ts...>, Seq2<Cs...>>::type  >;
+			using type2 = typename filter_have_any_type_impl<Seq1<Ts...>, Seq2<Cs...>>::type;
+
+			using type = typename std::conditional< has_any_type<T, Seq2<Cs...>>::value, type1, type2 >::type;
+		};
+	}
+	template <typename Seq1, typename Seq2>
+	struct filter_have_any_type {
+		using type = typename detail::filter_have_any_type_impl<Seq1, Seq2>::type;
+	};
+
+	static_assert(
+		std::is_same_v<
+			typename filter_have_any_type< type_list< type_list<char, int>, type_list<bool, double>, type_list<float, double, char> >
+				, type_list<char, float>  >::type
+			, type_list< type_list<char, int>, type_list<float, double, char> > >,
+		"The implementation of filter_have_any_type is bad");
+
+
+	//-------------------------------------------------------------------------
 	//N_tuple: make a tuple containing a type T N times
 
 	template <typename T, size_t N>
@@ -594,7 +621,7 @@ namespace vtll {
 	//static for: with this compile time for loop you can loop over any tuple, type list, or variadic argument list
 
 	namespace detail {
-		template <typename T, T Begin, class Func, T ...Is>
+		template <typename T, T Begin, class Func, T... Is>
 		constexpr void static_for_impl(Func&& f, std::integer_sequence<T, Is...>) {
 			(f(std::integral_constant<T, Begin + Is>{ }), ...);
 		}
@@ -610,7 +637,7 @@ namespace vtll {
 			using list = type_list<int, double, bool, float >;
 			static_for< int, 0, size<list>::value >([&](auto i) {
 				using type = Nth_type<list, i>;
-				std::cout << i << " " << typeid(type).name(); }
+				std::cout << i << " " << typeid(type).name() << std::endl; }
 			);
 		}
 	}
