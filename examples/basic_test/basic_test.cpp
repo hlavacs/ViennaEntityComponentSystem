@@ -10,35 +10,30 @@ using namespace vecs;
 
 int main() {
     
-    registry_t et;
-
     std::cout << sizeof(handle_t) << " " << sizeof(index_t) << std::endl;
     std::cout << vtll::size<VecsEntityTypeList>::value << std::endl;
 
-    handle_t h1 = et.insert(VeComponentPosition{ glm::vec3{9.0f, 2.0f, 3.0f} }, VeComponentOrientation{}, VeComponentTransform{});
+    handle_t h1 = registry_t().insert(VeComponentPosition{ glm::vec3{9.0f, 2.0f, 3.0f} }, VeComponentOrientation{}, VeComponentTransform{});
     std::cout << typeid(VeEntityNode).hash_code() << " " << typeid(VeEntityNode).name() << std::endl;
 
-    auto data1  = et.entity(h1);
-    auto data1b = et.entity<VeEntityNode>(h1).value();
+    auto data1b = h1.entity<VeEntityNode>().value();
     auto comp1_1 = data1b.component<VeComponentPosition>();
 
-    auto comp1_2 = et.component<VeComponentPosition>(h1);
-    auto comp1_3 = et.component<VeComponentMaterial>(h1);
+    auto comp1_2 = h1.component<VeComponentPosition>();
+    auto comp1_3 = h1.component<VeComponentMaterial>();
 
-    et.update<VeComponentPosition>(h1, VeComponentPosition{ glm::vec3{-9.0f, -2.0f, -3.0f} });
-    auto comp1_4 = et.component<VeComponentPosition>(h1);
+    h1.update<VeComponentPosition>(VeComponentPosition{ glm::vec3{-9.0f, -2.0f, -3.0f} });
+    auto comp1_4 = h1.component<VeComponentPosition>();
 
     data1b.update<VeComponentPosition>(VeComponentPosition{ glm::vec3{-999.0f, -2.0f, -3.0f} });
-    et.update(h1, data1b);
-    auto comp1_5 = et.component<VeComponentPosition>(h1);
+    auto comp1_5 = h1.component<VeComponentPosition>();
 
-    handle_t h2 = et.insert(VeComponentMaterial{ 99 }, VeComponentGeometry{});
+    handle_t h2 = registry_t().insert(VeComponentMaterial{ 99 }, VeComponentGeometry{});
     std::cout << typeid(VeEntityDraw).hash_code() << " " << typeid(VeEntityDraw).name() << std::endl;
 
-    auto data2 = et.entity(h2);
-    auto data2b = et.entity<VeEntityDraw>(h2);
-    auto comp2_1 = data2b.value().component<VeComponentMaterial>();
-    auto comp2_2 = et.component<VeComponentMaterial>(h2);
+    auto data2b = h2.entity<VeEntityDraw>().value();
+    auto comp2_1 = data2b.component<VeComponentMaterial>();
+    auto comp2_2 = h2.component<VeComponentMaterial>();
 
     using entity_types = typename vtll::filter_have_all_types< VecsEntityTypeList, vtll::type_list<VeComponentPosition> >::type;
     std::cout << typeid(entity_types).name() << std::endl;
@@ -52,11 +47,11 @@ int main() {
         std::cout << "entity\n";
     });
 
-    auto comp1_6 = et.component<VeComponentPosition>(h1).value();
+    auto comp1_6 = h1.component<VeComponentPosition>().value();
 
-    et.erase(h1);
-    auto data1c = et.entity<VeEntityNode>(h1);
-    et.erase(h2);
+    h1.erase();
+    auto data1c = h1.entity<VeEntityNode>();
+    h2.erase();
 
     return 0;
 }
