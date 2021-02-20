@@ -44,11 +44,10 @@ namespace vecs {
 		}
 	};
 
-
 	using index_t = int_type<uint32_t, struct P0, std::numeric_limits<uint32_t>::max()>;
 	using index16_t = int_type<uint16_t, struct P1, std::numeric_limits<uint16_t>::max()>;
 
-	using counter_t = int_type<uint16_t, struct P2, std::numeric_limits<uint16_t>::max()>;
+	using counter_t = int_type<uint32_t, struct P2, std::numeric_limits<uint32_t>::max()>;
 	using counter16_t = int_type<uint16_t, struct P3, std::numeric_limits<uint16_t>::max()>;
 
 

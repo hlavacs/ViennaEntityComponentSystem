@@ -55,7 +55,7 @@ namespace vecs {
 
 	struct VeHandle {
 		index_t		m_entity_index{};			//the slot of the entity in the entity list
-		counter_t	m_generation_counter{};		//generation counter
+		counter16_t	m_generation_counter{};		//generation counter
 		index16_t	m_index{};					//type index
 		uint32_t index() const { return static_cast<uint32_t>(m_index.value); };
 	};
@@ -310,9 +310,9 @@ namespace vecs {
 	protected:
 
 		struct entry_t {
-			counter_t			m_generation_counter{ 0 };		//generation counter starts with 0
 			index_t				m_next_free_or_comp_index{};	//next free slot or index of component table
 			VeReadWriteMutex	m_mutex;						//per entity synchronization
+			counter16_t			m_generation_counter{ 0 };		//generation counter starts with 0
 
 			entry_t() {};
 			entry_t(const entry_t& other) {};
