@@ -12,7 +12,7 @@ int main() {
     
     VeEntityTable et;
 
-    std::cout << sizeof(VeHandle) << " "  << sizeof(VeHandle_t<VeEntityType<>>) << " " << sizeof(index_t) << std::endl;
+    std::cout << sizeof(VeHandle) << " " << sizeof(index_t) << std::endl;
     std::cout << vtll::size<VeEntityTypeList>::value << std::endl;
 
     VeHandle h1 = et.insert(VeComponentPosition{ glm::vec3{9.0f, 2.0f, 3.0f} }, VeComponentOrientation{}, VeComponentTransform{});

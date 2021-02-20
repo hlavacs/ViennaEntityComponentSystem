@@ -38,20 +38,16 @@ namespace vecs {
 
 	/**
 	* \brief Handles are IDs of entities. Use them to access entitites.
-	* VeHandle_t<E> are used to ID entities opf type E.
+	* VeHandle are used to ID entities of type E by storing their type as an index
 	*/
 
-	template<typename E>
-	struct VeHandle_t {
+	struct VeHandle {
 		index_t		m_entity_index{};			//the slot of the entity in the entity list
 		counter_t	m_generation_counter{};		//generation counter
+		index16_t	m_index{};					//type index
+		uint32_t index() const { return static_cast<uint32_t>(m_index.value); };
 	};
 
-	/**
-	* \brief A summary handle type that can be used to ID any entity type.
-	*/
-
-	using VeHandle = vtll::variant_type<vtll::transform<VeEntityTypeList, VeHandle_t>>;
 
 	/**
 	* \brief This struct can hold the data of an entity of type E. This includes its handle
@@ -61,10 +57,10 @@ namespace vecs {
 	template <typename E>
 	struct VeEntity_t {
 		using tuple_type = typename vtll::to_tuple<E>::type;
-		VeHandle_t<E>	m_handle;
-		tuple_type		m_component_data;
+		VeHandle	m_handle;
+		tuple_type	m_component_data;
 
-		VeEntity_t(const VeHandle_t<E>& h, const tuple_type& tup) noexcept : m_handle{ h }, m_component_data{ tup } {};
+		VeEntity_t(const VeHandle& h, const tuple_type& tup) noexcept : m_handle{ h }, m_component_data{ tup } {};
 
 		template<typename C>
 		std::optional<C> component() noexcept {
@@ -89,6 +85,8 @@ namespace vecs {
 
 	using VeEntity = vtll::variant_type<vtll::transform<VeEntityTypeList, VeEntity_t>>;
 	using VeEntityPtr = vtll::variant_type<vtll::to_ptr<vtll::transform<VeEntityTypeList, VeEntity_t>>>;
+
+
 
 
 	//-------------------------------------------------------------------------
@@ -117,7 +115,7 @@ namespace vecs {
 
 	protected:
 		struct entry_t {
-			VeHandle_t<E>	 m_handle;
+			VeHandle m_handle;
 		};
 
 		static inline std::vector<entry_t>	m_handles;
@@ -136,7 +134,7 @@ namespace vecs {
 	public:
 		VeComponentVector(size_t r = 1 << 10);
 
-		index_t			insert(VeHandle_t<E>& handle, tuple_type&& tuple);
+		index_t			insert(VeHandle& handle, tuple_type&& tuple);
 		tuple_type		values(const index_t index);
 		tuple_type_ref	references(const index_t index);
 		VeHandle		handle(const index_t index);
@@ -150,11 +148,11 @@ namespace vecs {
 		bool			update(const index_t index, VeEntity_t<E>&& ent);
 		size_t			size() { return m_handles.size(); };
 
-		std::tuple<VeHandle_t<E>, index_t> erase(const index_t idx);
+		std::tuple<VeHandle, index_t> erase(const index_t idx);
 	};
 
 	template<typename E>
-	inline index_t VeComponentVector<E>::insert(VeHandle_t<E>& handle, tuple_type&& tuple) {
+	inline index_t VeComponentVector<E>::insert(VeHandle& handle, tuple_type&& tuple) {
 		m_handles.emplace_back(handle);
 
 		vtll::static_for<size_t, 0, vtll::size<E>::value >(
@@ -223,7 +221,7 @@ namespace vecs {
 	}
 
 	template<typename E>
-	inline std::tuple<VeHandle_t<E>, index_t> VeComponentVector<E>::erase(const index_t index) {
+	inline std::tuple<VeHandle, index_t> VeComponentVector<E>::erase(const index_t index) {
 		assert(index.value < m_handles.size());
 		if (index.value < m_handles.size() - 1) {
 			std::swap(m_handles[index.value], m_handles[m_handles.size() - 1]);
@@ -231,7 +229,7 @@ namespace vecs {
 			return std::make_pair(m_handles[index.value].m_handle, index);
 		}
 		m_handles.pop_back();
-		return std::make_tuple(VeHandle_t<E>{}, index_t{});
+		return std::make_tuple(VeHandle{}, index_t{});
 	}
 
 
@@ -477,21 +475,19 @@ namespace vecs {
 	
 	template<typename E>
 	inline bool VeEntityTable<E>::updateE(const VeHandle& handle, VeEntity&& ent) {
-		return update( std::get<VeHandle_t<E>>(handle), std::get<VeEntity_t<E>>(std::forward<VeEntity>(ent)));
+		return update( handle, std::get<VeEntity_t<E>>(std::forward<VeEntity>(ent)));
 	}
 
 	template<typename E>
 	inline bool VeEntityTable<E>::updateC(const VeHandle& handle, size_t compidx, void* ptr, size_t size) {
 		if (!contains(handle)) return {};
-		VeHandle_t<E> h = std::get<VeHandle_t<E>>(handle);
-		return VeComponentVector<E>().updateC(m_entity_table[h.m_entity_index.value].m_next_free_or_comp_index, compidx, ptr, size);
+		return VeComponentVector<E>().updateC(m_entity_table[handle.m_entity_index.value].m_next_free_or_comp_index, compidx, ptr, size);
 	}
 
 	template<typename E>
 	inline bool VeEntityTable<E>::componentE(const VeHandle& handle, size_t compidx, void* ptr, size_t size) {
 		if (!contains(handle)) return {};
-		VeHandle_t<E> h = std::get<VeHandle_t<E>>(handle);
-		return VeComponentVector<E>().componentE( m_entity_table[h.m_entity_index.value].m_next_free_or_comp_index, compidx, ptr, size );
+		return VeComponentVector<E>().componentE( m_entity_table[handle.m_entity_index.value].m_next_free_or_comp_index, compidx, ptr, size );
 	}
 
 	template<typename E>
@@ -508,7 +504,7 @@ namespace vecs {
 			m_entity_table.emplace_back();		//start with counter 0
 		}
 
-		VeHandle_t<E> handle{ idx, m_entity_table[idx.value].m_generation_counter };
+		VeHandle handle{ idx, m_entity_table[idx.value].m_generation_counter, index16_t{ vtll::index_of<VeEntityTypeList, E>::value } };
 		index_t compidx = VeComponentVector<E>().insert(handle, std::make_tuple(args...));	//add data as tuple
 		m_entity_table[idx.value].m_next_free_or_comp_index = compidx;						//index in component vector 
 		return { handle };
@@ -516,16 +512,14 @@ namespace vecs {
 
 	template<typename E>
 	inline bool VeEntityTable<E>::contains(const VeHandle& handle) {
-		VeHandle_t<E> h = std::get<VeHandle_t<E>>(handle);
-		if (h.m_generation_counter != m_entity_table[h.m_entity_index.value].m_generation_counter) return false;
+		if (handle.m_generation_counter != m_entity_table[handle.m_entity_index.value].m_generation_counter) return false;
 		return true;
 	}
 
 	template<typename E>
 	inline std::optional<VeEntity_t<E>> VeEntityTable<E>::entity(const VeHandle& handle) {
 		if (!contains(handle)) return {};
-		VeHandle_t<E> h = std::get<VeHandle_t<E>>(handle);
-		VeEntity_t<E> res( h, VeComponentVector<E>().values(m_entity_table[h.m_entity_index.value].m_next_free_or_comp_index) );
+		VeEntity_t<E> res( handle, VeComponentVector<E>().values(m_entity_table[handle.m_entity_index.value].m_next_free_or_comp_index) );
 		return { res };
 	}
 
@@ -534,17 +528,14 @@ namespace vecs {
 	inline std::optional<C> VeEntityTable<E>::component(const VeHandle& handle) {
 		if constexpr (!vtll::has_type<E,C>::value) { return {}; }
 		if (!contains(handle)) return {};
-		VeHandle_t<E> h = std::get<VeHandle_t<E>>(handle);
-
-		auto compidx = m_entity_table[h.m_entity_index.value].m_next_free_or_comp_index;
+		auto compidx = m_entity_table[handle.m_entity_index.value].m_next_free_or_comp_index;
 		return { VeComponentVector<E>().component<C>(compidx) };
 	}
 
 	template<typename E>
 	inline bool VeEntityTable<E>::update(const VeHandle& handle, VeEntity_t<E>&& ent) {
 		if (!contains(handle)) return false;
-		VeHandle_t<E> h = std::get<VeHandle_t<E>>(handle);
-		VeComponentVector<E>().update(h.m_entity_index, std::forward<VeEntity_t<E>>(ent));
+		VeComponentVector<E>().update(handle.m_entity_index, std::forward<VeEntity_t<E>>(ent));
 		return true;
 	}
 
@@ -554,23 +545,22 @@ namespace vecs {
 	inline bool VeEntityTable<E>::update(const VeHandle& handle, C&& comp) {
 		if constexpr (!vtll::has_type<E, C>::value) { return false; }
 		if (!contains(handle)) return false;
-		VeHandle_t<E> h = std::get<VeHandle_t<E>>(handle);
-		VeComponentVector<E>().update<C>(h.m_entity_index, std::forward<C>(comp));
+		VeComponentVector<E>().update<C>(handle.m_entity_index, std::forward<C>(comp));
 		return true;
 	}
 
 	template<typename E>
 	inline void VeEntityTable<E>::erase(const VeHandle& handle) {
 		if (!contains(handle)) return;
-		VeHandle_t<E> h = std::get<VeHandle_t<E>>(handle);
-		auto hidx = h.m_entity_index.value;
+		auto hidx = handle.m_entity_index.value;
 
 		auto [corr_hndl, corr_index] = VeComponentVector<E>().erase(m_entity_table[hidx].m_next_free_or_comp_index);
 		if (!corr_index.is_null()) { m_entity_table[corr_hndl.m_entity_index.value].m_next_free_or_comp_index = corr_index; }
 
-		m_entity_table[hidx].m_generation_counter.value++;				//>invalidate the entity handle
-		m_entity_table[hidx].m_next_free_or_comp_index = m_first_free;	//>put old entry into free list
-		m_first_free = h.m_entity_index;
+		m_entity_table[hidx].m_generation_counter.value++;															 //>invalidate the entity handle
+		if( m_entity_table[hidx].m_generation_counter.is_null() ) { m_entity_table[hidx].m_generation_counter.value = 0; } //wrap to zero
+		m_entity_table[hidx].m_next_free_or_comp_index = m_first_free;												 //>put old entry into free list
+		m_first_free = handle.m_entity_index;
 	}
 
 
