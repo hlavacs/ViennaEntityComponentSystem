@@ -107,6 +107,10 @@ namespace vecs {
 
 		VecsEntity(const VecsHandle& h, const tuple_type& tup) noexcept : m_handle{ h }, m_component_data{ tup } {};
 
+		bool is_valid() {
+			return m_handle.is_valid();
+		}
+
 		template<typename C>
 		std::optional<C> component() noexcept {
 			if constexpr (vtll::has_type<E,C>::value) {

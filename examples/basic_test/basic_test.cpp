@@ -22,10 +22,10 @@ int main() {
     auto comp1_2 = h1.component<VeComponentPosition>();
     auto comp1_3 = h1.component<VeComponentMaterial>();
 
-    h1.update<VeComponentPosition>(VeComponentPosition{ glm::vec3{-9.0f, -2.0f, -3.0f} });
+    h1.update(VeComponentPosition{ glm::vec3{-9.0f, -2.0f, -3.0f} });
     auto comp1_4 = h1.component<VeComponentPosition>();
 
-    data1b.local_update<VeComponentPosition>(VeComponentPosition{ glm::vec3{-999.0f, -2.0f, -3.0f} });
+    data1b.local_update(VeComponentPosition{ glm::vec3{-999.0f, -2.0f, -3.0f} });
     data1b.update();
     auto comp1_5 = h1.component<VeComponentPosition>();
 
