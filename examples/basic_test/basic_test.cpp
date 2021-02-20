@@ -10,10 +10,10 @@ using namespace vecs;
 
 int main() {
     
-    std::cout << sizeof(handle_t) << " " << sizeof(index_t) << std::endl;
+    std::cout << sizeof(VecsHandle) << " " << sizeof(index_t) << std::endl;
     std::cout << vtll::size<VecsEntityTypeList>::value << std::endl;
 
-    auto h1 = vecs_registry<>().insert(VeComponentPosition{ glm::vec3{9.0f, 2.0f, 3.0f} }, VeComponentOrientation{}, VeComponentTransform{});
+    auto h1 = VecsRegistry().insert(VeComponentPosition{ glm::vec3{9.0f, 2.0f, 3.0f} }, VeComponentOrientation{}, VeComponentTransform{});
     std::cout << typeid(VeEntityNode).hash_code() << " " << typeid(VeEntityNode).name() << std::endl;
 
     auto data1b = h1.entity<VeEntityNode>().value();
@@ -25,11 +25,11 @@ int main() {
     h1.update<VeComponentPosition>(VeComponentPosition{ glm::vec3{-9.0f, -2.0f, -3.0f} });
     auto comp1_4 = h1.component<VeComponentPosition>();
 
-    data1b.update<VeComponentPosition>(VeComponentPosition{ glm::vec3{-999.0f, -2.0f, -3.0f} });
-    h1.update(data1b);
+    data1b.local_update<VeComponentPosition>(VeComponentPosition{ glm::vec3{-999.0f, -2.0f, -3.0f} });
+    data1b.update();
     auto comp1_5 = h1.component<VeComponentPosition>();
 
-    auto h2 = vecs_registry<>().insert(VeComponentMaterial{ 99 }, VeComponentGeometry{});
+    auto h2 = VecsRegistry().insert(VeComponentMaterial{ 99 }, VeComponentGeometry{});
     std::cout << typeid(VeEntityDraw).hash_code() << " " << typeid(VeEntityDraw).name() << std::endl;
 
     auto data2b = h2.entity<VeEntityDraw>().value();
