@@ -87,6 +87,9 @@ namespace vecs {
 	};
 
 
+	using handle_t = VecsHandle;
+
+
 	/**
 	* \brief This struct can hold the data of an entity of type E. This includes its handle
 	* and all components.
@@ -426,7 +429,6 @@ namespace vecs {
 		return sum;
 	}
 
-	using VecsRegistry = VecsEntityTableBaseClass;
 
 
 	//-------------------------------------------------------------------------
@@ -584,7 +586,6 @@ namespace vecs {
 	public:
 		VecsEntityTable(size_t r = 1 << 10) : VecsEntityTableBaseClass(r) {};
 	};
-
 
 
 	//-------------------------------------------------------------------------
