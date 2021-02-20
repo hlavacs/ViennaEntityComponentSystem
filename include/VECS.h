@@ -68,15 +68,16 @@ namespace vecs {
 
 		uint32_t index() const { return static_cast<uint32_t>(m_type_index.value); };
 
+		bool is_valid();
+
 		template<typename E>
 		std::optional<VecsEntity<E>> entity();
 
 		template<typename C>
 		std::optional<C> component();
 
-		template<typename E>
-		requires vtll::has_type<VecsEntityTypeList, E>::value
-		bool update(VecsEntity<E>&& ent);
+		template<typename ET>
+		bool update(ET&& ent);
 
 		template<typename C>
 		requires vtll::has_type<VecsComponentTypeList, C>::value
@@ -85,7 +86,6 @@ namespace vecs {
 		bool erase();
 	};
 
-	using handle_t = VecsHandle;
 
 	/**
 	* \brief This struct can hold the data of an entity of type E. This includes its handle
@@ -174,7 +174,9 @@ namespace vecs {
 		template<typename C>
 		C&				component_ref(const index_t index);
 
-		bool			update(const index_t index, VecsEntity<E>&& ent);
+		template<typename ET>
+		bool			update(const index_t index, ET&& ent);
+
 		size_t			size() { return m_handles.size(); };
 
 		std::tuple<VecsHandle, index_t> erase(const index_t idx);
@@ -192,7 +194,6 @@ namespace vecs {
 
 		return index_t{ static_cast<typename index_t::type_name>(m_handles.size() - 1) };
 	};
-
 
 	template<typename E>
 	inline typename VecsComponentVector<E>::tuple_type VecsComponentVector<E>::values(const index_t index) {
@@ -216,13 +217,11 @@ namespace vecs {
 		return f(m_components);
 	}
 
-
 	template<typename E>
 	inline VecsHandle VecsComponentVector<E>::handle(const index_t index) {
 		assert(index.value < m_handles.size());
 		return { m_handles[index.value].m_handle };
 	}
-
 
 	template<typename E>
 	template<typename C>
@@ -239,7 +238,8 @@ namespace vecs {
 	}
 
 	template<typename E>
-	inline bool VecsComponentVector<E>::update(const index_t index, VecsEntity<E>&& ent) {
+	template<typename ET>
+	inline bool VecsComponentVector<E>::update(const index_t index, ET&& ent) {
 		vtll::static_for<size_t, 0, vtll::size<E>::value >(
 			[&](auto i) {
 				using type = vtll::Nth_type<E, i>;
@@ -380,9 +380,8 @@ namespace vecs {
 		//-------------------------------------------------------------------------
 		//update data
 
-		template<typename E>
-		requires vtll::has_type<VecsEntityTypeList, E>::value
-		bool update(const VecsHandle& handle, VecsEntity<E>&& ent);
+		template<typename ET>
+		bool update(const VecsHandle& handle, ET&& ent);
 
 		template<typename C>
 		requires vtll::has_type<VecsComponentTypeList, C>::value
@@ -427,7 +426,7 @@ namespace vecs {
 		return sum;
 	}
 
-	using registry_t = VecsEntityTableBaseClass;
+	using VecsRegistry = VecsEntityTableBaseClass;
 
 
 	//-------------------------------------------------------------------------
@@ -464,7 +463,8 @@ namespace vecs {
 		//-------------------------------------------------------------------------
 		//update data
 
-		bool update(const VecsHandle& handle, VecsEntity<E>&& ent);
+		template<typename ET>
+		bool update(const VecsHandle& handle, ET&& ent);
 
 		template<typename C>
 		requires (vtll::has_type<VecsComponentTypeList, C>::value)
@@ -539,9 +539,10 @@ namespace vecs {
 	}
 
 	template<typename E>
-	inline bool VecsEntityTable<E>::update(const VecsHandle& handle, VecsEntity<E>&& ent) {
+	template<typename ET>
+	inline bool VecsEntityTable<E>::update(const VecsHandle& handle, ET&& ent) {
 		if (!contains(handle)) return false;
-		VecsComponentVector<E>().update(handle.m_entity_index, std::forward<VecsEntity<E>>(ent));
+		VecsComponentVector<E>().update(handle.m_entity_index, std::forward<ET>(ent));
 		return true;
 	}
 
@@ -761,10 +762,9 @@ namespace vecs {
 		return VecsEntityTable<E>().entity(handle);
 	}
 
-	template<typename E>
-	requires vtll::has_type<VecsEntityTypeList, E>::value
-	bool VecsEntityTableBaseClass::update(const VecsHandle& handle, VecsEntity<E>&& ent) {
-		return VecsEntityTable<E>().update({ handle }, std::forward<VecsEntity<E>>(ent));
+	template<typename ET>
+	bool VecsEntityTableBaseClass::update(const VecsHandle& handle, ET&& ent) {
+		return VecsEntityTable<vtll::front<ET>>().update({ handle }, std::forward<ET>(ent));
 	}
 
 	//-------------------------------------------------------------------------
@@ -784,6 +784,10 @@ namespace vecs {
 	//-------------------------------------------------------------------------
 	//VecsHandle
 
+	bool VecsHandle::is_valid() {
+		return VecsEntityTableBaseClass().contains(*this);
+	}
+
 	template<typename E>
 	std::optional<VecsEntity<E>> VecsHandle::entity() {
 		return VecsEntityTable<E>().entity(*this);
@@ -794,10 +798,10 @@ namespace vecs {
 		return VecsEntityTableBaseClass().component<C>(*this);
 	}
 
-	template<typename E>
-	requires vtll::has_type<VecsEntityTypeList, E>::value
-	bool VecsHandle::update(VecsEntity<E>&& ent) {
-		return VecsEntityTable<E>().update(*this, std::forward<VecsEntity<E>>(ent));
+	template<typename ET>
+	bool VecsHandle::update(ET&& ent) {
+		using type = vtll::front<std::decay_t<ET>>;
+		return VecsEntityTable<type>().update(*this, std::forward<ET>(ent));
 	}
 
 	template<typename C>
