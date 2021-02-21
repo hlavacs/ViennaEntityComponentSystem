@@ -101,7 +101,7 @@ namespace vecs {
 
 	template <typename E>
 	struct VecsEntity {
-		using tuple_type = typename vtll::to_tuple<E>::type;
+		using tuple_type = vtll::to_tuple<E>;
 		VecsHandle	m_handle;
 		tuple_type	m_component_data;
 
@@ -158,9 +158,9 @@ namespace vecs {
 		friend class VecsRegistry;
 
 	public:
-		using tuple_type	 = typename vtll::to_tuple<E>::type;
-		using tuple_type_ref = typename vtll::to_ref_tuple<E>::type;
-		using tuple_type_vec = typename vtll::to_tuple<vtll::transform<E,std::pmr::vector>>::type;
+		using tuple_type	 = vtll::to_tuple<E>;
+		using tuple_type_ref = vtll::to_ref_tuple<E>;
+		using tuple_type_vec = vtll::to_tuple<vtll::transform<E,std::pmr::vector>>;
 
 	protected:
 		struct entry_t {
@@ -616,7 +616,7 @@ namespace vecs {
 	template<typename... Cs>
 	class VecsIterator {
 	protected:
-		using entity_types = typename vtll::filter_have_all_types< VecsEntityTypeList, vtll::type_list<Cs...> >::type;
+		using entity_types = vtll::filter_have_all_types< VecsEntityTypeList, vtll::type_list<Cs...> >;
 
 		std::array<std::unique_ptr<VecsIterator<Cs...>>, vtll::size<entity_types>::value> m_dispatch;
 		index_t m_current_iterator{ 0 };

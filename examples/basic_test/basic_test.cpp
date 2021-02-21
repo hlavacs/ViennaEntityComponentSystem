@@ -36,7 +36,7 @@ int main() {
     auto comp2_1 = data2b.component<VeComponentMaterial>();
     auto comp2_2 = h2.component<VeComponentMaterial>();
 
-    using entity_types = typename vtll::filter_have_all_types< VecsEntityTypeList, vtll::type_list<VeComponentPosition> >::type;
+    using entity_types = vtll::filter_have_all_types< VecsEntityTypeList, vtll::type_list<VeComponentPosition> >;
     std::cout << typeid(entity_types).name() << std::endl;
 
     for_each<VeComponentPosition, VeComponentOrientation>( [&]( auto& iter) {

@@ -303,12 +303,10 @@ namespace vtll {
 		};
 	}
 	template <typename Seq>
-	struct to_tuple {
-		using type = typename detail::to_tuple_impl<Seq>::type;
-	};
+	using to_tuple = typename detail::to_tuple_impl<Seq>::type;
 
 	static_assert(
-		std::is_same_v< to_tuple<type_list<double, int>>::type, std::tuple<double, int> >,
+		std::is_same_v< to_tuple<type_list<double, int>>, std::tuple<double, int> >,
 		"The implementation of to_tuple is bad");
 
 	//-------------------------------------------------------------------------
@@ -329,12 +327,10 @@ namespace vtll {
 		};
 	}
 	template <typename Seq>
-	struct to_ref_tuple {
-		using type = typename detail::to_ref_tuple_impl<Seq>::type;
-	};
+	using to_ref_tuple = typename detail::to_ref_tuple_impl<Seq>::type;
 
 	static_assert(
-		std::is_same_v< typename to_ref_tuple<type_list<double, int>>::type, std::tuple<double&, int&> >,
+		std::is_same_v< to_ref_tuple<type_list<double, int>>, std::tuple<double&, int&> >,
 		"The implementation of to_ref_tuple is bad");
 
 
@@ -356,12 +352,10 @@ namespace vtll {
 		};
 	}
 	template <typename Seq>
-	struct to_ptr_tuple {
-		using type = typename detail::to_ptr_tuple_impl<Seq>::type;
-	};
+	using to_ptr_tuple = typename detail::to_ptr_tuple_impl<Seq>::type;
 
 	static_assert(
-		std::is_same_v< to_ptr_tuple<type_list<double, int>>::type, std::tuple<double*, int*> >,
+		std::is_same_v< to_ptr_tuple<type_list<double, int>>, std::tuple<double*, int*> >,
 		"The implementation of to_ptr_tuple is bad");
 
 	//-------------------------------------------------------------------------
@@ -409,11 +403,9 @@ namespace vtll {
 		};
 	}
 	template <typename Seq, typename C>
-	struct erase_type {
-		using type = typename detail::erase_type_impl<Seq, C>::type;
-	};
+	using erase_type = typename detail::erase_type_impl<Seq, C>::type;
 
-	static_assert( std::is_same_v< typename erase_type< type_list<double, int, char, double>, double>::type, type_list<int, char> >,
+	static_assert( std::is_same_v< erase_type< type_list<double, int, char, double>, double>, type_list<int, char> >,
 		"The implementation of erase is bad");
 
 	//-------------------------------------------------------------------------
@@ -438,7 +430,7 @@ namespace vtll {
 	using erase_Nth = typename detail::erase_Nth_impl<Seq, N>::type;
 
 	static_assert( std::is_same_v< erase_Nth< type_list<double, char, bool, double>, 1>, type_list<double, bool, double > > );
-	static_assert(std::is_same_v< erase_Nth< type_list<double, char, bool, double>, 0>, type_list<char, bool, double > >);
+	static_assert( std::is_same_v< erase_Nth< type_list<double, char, bool, double>, 0>, type_list<char, bool, double > >);
 
 	namespace detail {
 		using example_list = type_list<double, char, bool, double>;
@@ -510,19 +502,19 @@ namespace vtll {
 		};
 	}
 	template <typename Seq, typename C>
-	struct filter_have_type {
-		using type = typename detail::filter_have_type_impl<Seq, C>::type;
-	};
+	using filter_have_type = typename detail::filter_have_type_impl<Seq, C>::type;
 
 	static_assert(std::is_same_v<
-		typename filter_have_type< type_list< type_list<char, float>, type_list<char, int, double> >, float >::type, type_list< type_list<char, float> > >,
+		filter_have_type< 
+			type_list< type_list<char, float>, type_list<char, int, double> >, float >
+			, type_list< type_list<char, float> > >,
 		"The implementation of filter_have_type is bad");
 
 	static_assert(	std::is_same_v<
-		typename filter_have_type<	type_list< type_list<char, float>, type_list<bool, double>, type_list<float, double> >, float >::type,
-							type_list< type_list<char, float>, type_list<float, double>> >,
+		filter_have_type<	
+			type_list< type_list<char, float>, type_list<bool, double>, type_list<float, double> >, float >
+			, type_list< type_list<char, float>, type_list<float, double>> >,
 		"The implementation of filter_have_type is bad");
-
 
 	//-------------------------------------------------------------------------
 	//filter_have_all_types: keep only those type lists Ts<...> that have ALL specified type Cs from another list Seq2<Cs...> as member
@@ -545,16 +537,15 @@ namespace vtll {
 		};
 	}
 	template <typename Seq1, typename Seq2>
-	struct filter_have_all_types {
-		using type = typename detail::filter_have_all_types_impl<Seq1, Seq2>::type;
-	};
+	using filter_have_all_types = typename detail::filter_have_all_types_impl<Seq1, Seq2>::type;
 
 	static_assert(
 		std::is_same_v<
-			typename filter_have_all_types< type_list< type_list<char, float, int>, type_list<char, bool, double>, type_list<float, double, char> >
-							, type_list< char, float>  >::type,
-
-					 type_list< type_list<char, float, int>, type_list<float, double, char> > >,
+			filter_have_all_types< 
+				type_list< type_list<char, float, int>, type_list<char, bool, double>, type_list<float, double, char> >
+				, type_list< char, float>  >
+		
+		, type_list< type_list<char, float, int>, type_list<float, double, char> > >,
 		"The implementation of filter_have_all_types is bad");
 
 
@@ -579,17 +570,16 @@ namespace vtll {
 		};
 	}
 	template <typename Seq1, typename Seq2>
-	struct filter_have_any_type {
-		using type = typename detail::filter_have_any_type_impl<Seq1, Seq2>::type;
-	};
+	using filter_have_any_type = typename detail::filter_have_any_type_impl<Seq1, Seq2>::type;
 
 	static_assert(
 		std::is_same_v<
-			typename filter_have_any_type< type_list< type_list<char, int>, type_list<bool, double>, type_list<float, double, char> >
-				, type_list<char, float>  >::type
-			, type_list< type_list<char, int>, type_list<float, double, char> > >,
-		"The implementation of filter_have_any_type is bad");
+			filter_have_any_type< 
+				type_list< type_list<char, int>, type_list<bool, double>, type_list<float, double, char> >
+				, type_list<char, float>  >
 
+		, type_list< type_list<char, int>, type_list<float, double, char> > >,
+		"The implementation of filter_have_any_type is bad");
 
 	//-------------------------------------------------------------------------
 	//N_tuple: make a tuple containing a type T N times
