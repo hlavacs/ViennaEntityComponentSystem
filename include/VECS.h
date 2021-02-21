@@ -537,7 +537,6 @@ namespace vecs {
 
 	template<typename E>
 	inline bool VecsRegistry<E>::contains(const VecsHandle& handle) {
-		if (handle.m_type_index.is_null()) return false;
 		if (handle.m_entity_index.is_null() || handle.m_entity_index.value>= m_entity_table.size() ) return false;
 		if (handle.m_generation_counter != m_entity_table[handle.m_entity_index.value].m_generation_counter) return false;
 		return true;
