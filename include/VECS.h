@@ -354,7 +354,7 @@ namespace vecs {
 
 		struct entry_t {
 			index_t				m_next_free_or_comp_index{};	//next free slot or index of component table
-			VeReadWriteMutex	m_mutex;						//per entity synchronization
+			VecsReadWriteMutex	m_mutex;						//per entity synchronization
 			counter16_t			m_generation_counter{ 0 };		//generation counter starts with 0
 
 			entry_t() {};
@@ -537,6 +537,8 @@ namespace vecs {
 
 	template<typename E>
 	inline bool VecsRegistry<E>::contains(const VecsHandle& handle) {
+		if (handle.m_type_index.is_null()) return false;
+		if (handle.m_entity_index.is_null() || handle.m_entity_index.value>= m_entity_table.size() ) return false;
 		if (handle.m_generation_counter != m_entity_table[handle.m_entity_index.value].m_generation_counter) return false;
 		return true;
 	}
@@ -634,6 +636,11 @@ namespace vecs {
 			for (int i = 0; i < m_dispatch.size(); ++i) { m_dispatch[i]->m_current_index = v.m_dispatch[i]->m_current_index; }
 		};
 
+		virtual bool is_valid() {
+			if (m_is_end || is_vector_end()) return false;
+			return m_dispatch[m_current_iterator.value]->is_valid();
+		}
+
 		VecsIterator<Cs...>& operator=(const VecsIterator& v) {
 			m_current_iterator = v.m_current_iterator;
 			for (int i = 0; i < m_dispatch.size(); ++i) { m_dispatch[i]->m_current_index = v.m_dispatch[i]->m_current_index; }
@@ -707,6 +714,10 @@ namespace vecs {
 			if (is_end) this->m_current_index.value = static_cast<decltype(this->m_current_index.value)>(VecsComponentVector<E>().size());
 		};
 
+		bool is_valid() {
+			return VecsComponentVector<E>().handle(this->m_current_index).is_valid();
+		}
+
 		typename VecsIterator<Cs...>::value_type operator*() {
 			return std::make_tuple(VecsComponentVector<E>().handle(this->m_current_index), std::ref(VecsComponentVector<E>().component_ref<Cs>(this->m_current_index))...);
 		};
@@ -742,7 +753,7 @@ namespace vecs {
 	template<typename... Cs>
 	void for_each(VecsIterator<Cs...>& b, VecsIterator<Cs...>& e, std::function<Functor<Cs...>> f) {
 		for (; b != e; b++) {
-			f(b);
+			if(b.is_valid()) f(b);
 		}
 		return; 
 	}
@@ -803,6 +814,7 @@ namespace vecs {
 	//VecsHandle
 
 	bool VecsHandle::is_valid() {
+		if (m_entity_index.is_null() || m_generation_counter.is_null() || m_type_index.is_null()) return false;
 		return VecsRegistryBaseClass().contains(*this);
 	}
 

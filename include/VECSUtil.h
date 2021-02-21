@@ -39,17 +39,19 @@ namespace vecs {
 			constexpr bool operator()(const T& lhs, const T& rhs) const { return lhs == rhs; };
 		};
 
-		bool is_null() {
+		bool is_null() const {
 			return value == null;
 		}
 	};
 
-	using index_t = int_type<uint32_t, struct P0, std::numeric_limits<uint32_t>::max()>;
 	using index16_t = int_type<uint16_t, struct P1, std::numeric_limits<uint16_t>::max()>;
+	using index32_t = int_type<uint32_t, struct P2, std::numeric_limits<uint32_t>::max()>;
+	using index64_t = int_type<uint64_t, struct P3, std::numeric_limits<uint64_t>::max()>;
+	using index_t = index32_t;
 
-	using counter_t = int_type<uint32_t, struct P2, std::numeric_limits<uint32_t>::max()>;
-	using counter16_t = int_type<uint16_t, struct P3, std::numeric_limits<uint16_t>::max()>;
-
+	using counter16_t = int_type<uint16_t, struct P4, std::numeric_limits<uint16_t>::max()>;
+	using counter32_t = int_type<uint32_t, struct P5, std::numeric_limits<uint32_t>::max()>;
+	using counter_t = counter32_t;
 
 	//https://www.fluentcpp.com/2017/05/19/crtp-helper/
 
@@ -79,28 +81,28 @@ namespace vecs {
 	};
 
 
-	class VeSpinLockRead;
-	class VeSpinLockWrite;
+	class VecsSpinLockRead;
+	class VecsSpinLockWrite;
 
-	class VeReadWriteMutex {
-		friend class VeSpinLockRead;
-		friend class VeSpinLockWrite;
+	class VecsReadWriteMutex {
+		friend class VecsSpinLockRead;
+		friend class VecsSpinLockWrite;
 
 	protected:
 		std::atomic<uint32_t> m_read = 0;
 		std::atomic<uint32_t> m_write = 0;
 	public:
-		VeReadWriteMutex() = default;
+		VecsReadWriteMutex() = default;
 	};
 
 
-	class VeSpinLockWrite {
+	class VecsSpinLockWrite {
 	protected:
 		static const uint32_t m_max_cnt = 1 << 10;
-		VeReadWriteMutex& m_spin_mutex;
+		VecsReadWriteMutex& m_spin_mutex;
 
 	public:
-		VeSpinLockWrite(VeReadWriteMutex& spin_mutex) : m_spin_mutex(spin_mutex) {
+		VecsSpinLockWrite(VecsReadWriteMutex& spin_mutex) : m_spin_mutex(spin_mutex) {
 			uint32_t cnt = 0;
 			uint32_t w;
 
@@ -128,19 +130,19 @@ namespace vecs {
 			}
 		}
 
-		~VeSpinLockWrite() {
+		~VecsSpinLockWrite() {
 			m_spin_mutex.m_write--;
 		}
 	};
 
 
-	class VeSpinLockRead {
+	class VecsSpinLockRead {
 	protected:
 		static const uint32_t m_max_cnt = 1 << 10;
-		VeReadWriteMutex& m_spin_mutex;
+		VecsReadWriteMutex& m_spin_mutex;
 
 	public:
-		VeSpinLockRead(VeReadWriteMutex& spin_mutex) : m_spin_mutex(spin_mutex) {
+		VecsSpinLockRead(VecsReadWriteMutex& spin_mutex) : m_spin_mutex(spin_mutex) {
 			uint32_t cnt = 0;
 
 			do {
@@ -166,7 +168,7 @@ namespace vecs {
 			} while (true);
 		}
 
-		~VeSpinLockRead() {
+		~VecsSpinLockRead() {
 			m_spin_mutex.m_read--;
 		}
 	};

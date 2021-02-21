@@ -6,22 +6,21 @@
 #include <shared_mutex>
 #include <optional>
 #include <array>
-#include "VGJS.h"
 #include "VECSUtil.h"
 
 namespace vecs {
 
 	template<typename T, size_t L = 8, int SYNC = 2, bool SHRINK = false>
-	class VeVector {
+	class VecsVector {
 	protected:
 		static const size_t N = 1 << L;
 		const uint64_t BIT_MASK = N - 1;
 
-		struct VeTableSegment {
+		struct VecsTableSegment {
 			std::array<T, N> m_entry;
 		};
 
-		using seg_ptr = std::unique_ptr<VeTableSegment>;
+		using seg_ptr = std::unique_ptr<VecsTableSegment>;
 
 		std::pmr::memory_resource*	m_mr = nullptr;
 		std::pmr::vector<seg_ptr>	m_segment;
@@ -34,7 +33,7 @@ namespace vecs {
 		size_t push_back3(T&&) noexcept;
 
 	public:
-		VeVector(std::pmr::memory_resource* mr = std::pmr::new_delete_resource())  noexcept
+		VecsVector(std::pmr::memory_resource* mr = std::pmr::new_delete_resource())  noexcept
 			: m_mr{ mr }, m_segment{mr}  {};
 		std::optional<T>	at(size_t n) noexcept;
 		void				set(size_t n, T&& v) noexcept;
@@ -49,22 +48,22 @@ namespace vecs {
 	//---------------------------------------------------------------------------
 
 	template<typename T, size_t L = 8, int SYNC = 2, bool SHRINK = false>
-	class VeTable {
+	class VecsTable {
 	protected:
 		static const size_t N = 1 << L;
 		const uint64_t BIT_MASK = N - 1;
 
-		struct VeTableEntry {
+		struct VecsTableEntry {
 			T		m_data;		//the entry data 
 			index_t m_next{};	//use for list of free entries
 		};
 
-		struct VeTableSegment {
-			std::array<VeTableEntry, N> m_entry;
+		struct VecsTableSegment {
+			std::array<VecsTableEntry, N> m_entry;
 			size_t						m_size = 0;
 		};
 
-		using seg_ptr = std::unique_ptr<VeTableSegment>;
+		using seg_ptr = std::unique_ptr<VecsTableSegment>;
 
 		std::pmr::memory_resource*  m_mr = nullptr;
 		std::pmr::vector<seg_ptr>	m_segment;
@@ -78,7 +77,7 @@ namespace vecs {
 		size_t push_back3(T&&) noexcept;
 
 	public:
-		VeTable(std::pmr::memory_resource* mr = std::pmr::new_delete_resource())  noexcept
+		VecsTable(std::pmr::memory_resource* mr = std::pmr::new_delete_resource())  noexcept
 			: m_mr{ mr }, m_segment{ mr }  {};
 		std::optional<T>	at(size_t n) noexcept;
 		void				set(size_t n, T&& v) noexcept;
@@ -92,23 +91,23 @@ namespace vecs {
 	//---------------------------------------------------------------------------
 
 	template<typename T, typename ID, size_t L = 8, int SYNC = 2, bool SHRINK = false>
-	class VeSlotMap {
+	class VecsSlotMap {
 	protected:
 		static const size_t N = 1 << L;
 		const uint64_t BIT_MASK = N - 1;
 
-		struct VeMapEntry {
+		struct VecsMapEntry {
 			index_t	m_entry_index;
 			ID		m_id;
 		};
 
-		VeVector<T, L, 0, SHRINK>			m_entry;
-		VeTable<VeMapEntry, L, 0, SHRINK>	m_map;
+		VecsVector<T, L, 0, SHRINK>			m_entry;
+		VecsTable<VecsMapEntry, L, 0, SHRINK>	m_map;
 		std::shared_timed_mutex 			m_mutex;		//guard reads and writes
 		std::mutex 							m_mutex_append;	//guard appends
 
 	public:
-		VeSlotMap(std::pmr::memory_resource* mr = std::pmr::new_delete_resource())  noexcept
+		VecsSlotMap(std::pmr::memory_resource* mr = std::pmr::new_delete_resource())  noexcept
 			: m_entry{ mr }, m_map{ mr }  {};
 		std::optional<T>	at(size_t n, ID& id) noexcept;
 		void				set(size_t n, ID& id, T&& v) noexcept;
