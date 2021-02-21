@@ -38,7 +38,7 @@ namespace vecs {
 	class VecsHandle;
 
 	template <typename E>
-	struct VecsEntity;
+	class VecsEntity;
 
 	class VecsRegistryBaseClass;
 
@@ -100,12 +100,20 @@ namespace vecs {
 	*/
 
 	template <typename E>
-	struct VecsEntity {
+	class VecsEntity {
+	public:
 		using tuple_type = vtll::to_tuple<E>;
+
+	protected:
 		VecsHandle	m_handle;
 		tuple_type	m_component_data;
 
+	public:
 		VecsEntity(const VecsHandle& h, const tuple_type& tup) noexcept : m_handle{ h }, m_component_data{ tup } {};
+
+		VecsHandle handle() {
+			return m_handle;
+		}
 
 		bool is_valid() {
 			return m_handle.is_valid();
@@ -189,15 +197,12 @@ namespace vecs {
 		VecsHandle				handle(const index_t index);
 
 		template<typename C>
-		C				component(const index_t index);
-
-		template<typename C>
-		C&				component_ref(const index_t index);
+		C&		component(const index_t index);
 
 		template<typename ET>
-		bool			update(const index_t index, ET&& ent);
+		bool	update(const index_t index, ET&& ent);
 
-		size_t			size() { return m_handles.size(); };
+		size_t	size() { return m_handles.size(); };
 
 		std::tuple<VecsHandle, index_t> erase(const index_t idx);
 	};
@@ -245,14 +250,7 @@ namespace vecs {
 
 	template<typename E>
 	template<typename C>
-	inline C VecsComponentVector<E>::component(const index_t index) {
-		assert(index.value < m_handles.size());
-		return std::get<vtll::index_of<E, C>::value>(m_components)[index.value];
-	}
-
-	template<typename E>
-	template<typename C>
-	inline C& VecsComponentVector<E>::component_ref(const index_t index) {
+	inline C& VecsComponentVector<E>::component(const index_t index) {
 		assert(index.value < m_handles.size());
 		return std::get<vtll::index_of<E, C>::value>(m_components)[index.value];
 	}
@@ -718,7 +716,7 @@ namespace vecs {
 		}
 
 		typename VecsIterator<Cs...>::value_type operator*() {
-			return std::make_tuple(VecsComponentVector<E>().handle(this->m_current_index), std::ref(VecsComponentVector<E>().component_ref<Cs>(this->m_current_index))...);
+			return std::make_tuple(VecsComponentVector<E>().handle(this->m_current_index), std::ref(VecsComponentVector<E>().component<Cs>(this->m_current_index))...);
 		};
 
 		VecsIterator<Cs...>& operator++() { ++this->m_current_index.value; return *this; };
