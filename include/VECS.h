@@ -464,7 +464,7 @@ namespace vecs {
 		auto componentE(const VecsHandle& handle, size_t compidx, void* ptr, size_t size) noexcept	-> bool;
 
 	public:
-		VecsRegistry(size_t r = 1 << 10) noexcept;
+		VecsRegistry(size_t r = 1 << 10) noexcept : VecsRegistryBaseClass(r) {};
 
 		//-------------------------------------------------------------------------
 		//insert data
@@ -499,9 +499,6 @@ namespace vecs {
 
 
 	template<typename E>
-	inline VecsRegistry<E>::VecsRegistry(size_t r) noexcept : VecsRegistryBaseClass(r) {}
-
-	template<typename E>
 	inline auto VecsRegistry<E>::updateC(const VecsHandle& handle, size_t compidx, void* ptr, size_t size) noexcept -> bool {
 		if (!contains(handle)) return {};
 		return VecsComponentTable<E>().updateC(m_entity_table[handle.m_entity_index.value].m_next_free_or_comp_index, compidx, ptr, size);
@@ -515,7 +512,7 @@ namespace vecs {
 
 	template<typename E> 
 	template<typename... Cs> requires vtll::is_same<E, Cs...>::value [[nodiscard]]
-	inline auto VecsRegistry<E>::insert(Cs&&... args) noexcept -> VecsHandle {
+	inline auto VecsRegistry<E>::insert(Cs&&... args) noexcept							-> VecsHandle {
 		index_t idx{};
 		if (!m_first_free.is_null()) {
 			idx = m_first_free;
@@ -533,14 +530,14 @@ namespace vecs {
 	};
 
 	template<typename E>
-	inline auto VecsRegistry<E>::contains(const VecsHandle& handle) noexcept -> bool {
+	inline auto VecsRegistry<E>::contains(const VecsHandle& handle) noexcept			-> bool {
 		if (handle.m_entity_index.is_null() || handle.m_entity_index.value>= m_entity_table.size() ) return false;
 		if (handle.m_generation_counter != m_entity_table[handle.m_entity_index.value].m_generation_counter) return false;
 		return true;
 	}
 
 	template<typename E>
-	inline auto VecsRegistry<E>::entity(const VecsHandle& handle) noexcept -> std::optional<VecsEntity<E>> {
+	inline auto VecsRegistry<E>::entity(const VecsHandle& handle) noexcept				-> std::optional<VecsEntity<E>> {
 		if (!contains(handle)) return {};
 		VecsEntity<E> res( handle, VecsComponentTable<E>().values(m_entity_table[handle.m_entity_index.value].m_next_free_or_comp_index) );
 		return { res };
@@ -548,7 +545,7 @@ namespace vecs {
 
 	template<typename E>
 	template<typename C>
-	inline auto VecsRegistry<E>::component(const VecsHandle& handle) noexcept -> std::optional<C> {
+	inline auto VecsRegistry<E>::component(const VecsHandle& handle) noexcept			-> std::optional<C> {
 		if constexpr (!vtll::has_type<E,C>::value) { return {}; }
 		if (!contains(handle)) return {};
 		auto compidx = m_entity_table[handle.m_entity_index.value].m_next_free_or_comp_index;
@@ -557,7 +554,7 @@ namespace vecs {
 
 	template<typename E>
 	template<typename ET>
-	inline auto VecsRegistry<E>::update(const VecsHandle& handle, ET&& ent) noexcept -> bool {
+	inline auto VecsRegistry<E>::update(const VecsHandle& handle, ET&& ent) noexcept	-> bool {
 		if (!contains(handle)) return false;
 		VecsComponentTable<E>().update(handle.m_entity_index, std::forward<ET>(ent));
 		return true;
@@ -565,7 +562,7 @@ namespace vecs {
 
 	template<typename E>
 	template<typename C> requires (vtll::has_type<VecsComponentTypeList, C>::value)
-	inline auto VecsRegistry<E>::update(const VecsHandle& handle, C&& comp) noexcept -> bool {
+	inline auto VecsRegistry<E>::update(const VecsHandle& handle, C&& comp) noexcept	-> bool {
 		if constexpr (!vtll::has_type<E, C>::value) { return false; }
 		if (!contains(handle)) return false;
 		VecsComponentTable<E>().update<C>(handle.m_entity_index, std::forward<C>(comp));
@@ -573,7 +570,7 @@ namespace vecs {
 	}
 
 	template<typename E>
-	inline auto VecsRegistry<E>::erase(const VecsHandle& handle) noexcept -> bool {
+	inline auto VecsRegistry<E>::erase(const VecsHandle& handle) noexcept				-> bool {
 		if (!contains(handle)) return false;
 		auto hidx = handle.m_entity_index.value;
 
@@ -632,24 +629,24 @@ namespace vecs {
 		};
 
 		virtual
-		auto is_valid() noexcept -> bool {
+		auto is_valid() noexcept								-> bool {
 			if (m_is_end || is_vector_end()) return false;
 			return m_dispatch[m_current_iterator.value]->is_valid();
 		}
 
-		auto operator=(const VecsIterator& v) noexcept -> VecsIterator<Cs...>& {
+		auto operator=(const VecsIterator& v) noexcept			-> VecsIterator<Cs...>& {
 			m_current_iterator = v.m_current_iterator;
 			for (int i = 0; i < m_dispatch.size(); ++i) { m_dispatch[i]->m_current_index = v.m_dispatch[i]->m_current_index; }
 			return *this;
 		}
 
 		virtual 
-		auto operator*() noexcept -> value_type {
+		auto operator*() noexcept								-> value_type {
 			return *(*m_dispatch[m_current_iterator.value]);
 		};
 
 		virtual 
-		auto operator++() noexcept -> VecsIterator<Cs...>& {
+		auto operator++() noexcept								-> VecsIterator<Cs...>& {
 			(*m_dispatch[m_current_iterator.value])++;
 			if (m_dispatch[m_current_iterator.value]->is_vector_end() && m_current_iterator.value < m_dispatch.size() - 1) {
 				++m_current_iterator.value;
@@ -658,7 +655,9 @@ namespace vecs {
 		};
 
 		virtual 
-		auto operator++(int) noexcept -> VecsIterator<Cs...>& { return operator++(); return *this; };
+		auto operator++(int) noexcept							-> VecsIterator<Cs...>& { 
+			return operator++(); return *this; 
+		};
 
 		auto operator+=(size_t N) noexcept -> void {
 			size_t left = N;
@@ -674,26 +673,28 @@ namespace vecs {
 			}
 		}
 
-		auto operator+(size_t N) noexcept -> VecsIterator<Cs...>& {
+		auto operator+(size_t N) noexcept							-> VecsIterator<Cs...>& {
 			VecsIterator<Cs...> temp{ *this };
 			temp += N;
 			return temp;
 		}
 
-		auto operator!=(const VecsIterator<Cs...>& v) noexcept -> bool {
+		auto operator!=(const VecsIterator<Cs...>& v) noexcept		-> bool {
 			return !( *this == v );
 		}
 
-		auto operator==(const VecsIterator<Cs...>& v) noexcept -> bool {
+		auto operator==(const VecsIterator<Cs...>& v) noexcept		-> bool {
 			return	v.m_current_iterator == m_current_iterator &&
 					v.m_dispatch[m_current_iterator.value]->m_current_index == m_dispatch[m_current_iterator.value]->m_current_index;
 		}
 
 		virtual 
-		auto is_vector_end() noexcept -> bool { return m_dispatch[m_current_iterator.value]->is_vector_end(); }
+		auto is_vector_end() noexcept								-> bool { 
+			return m_dispatch[m_current_iterator.value]->is_vector_end(); 
+		}
 
 		virtual 
-		auto size() noexcept -> size_t {
+		auto size() noexcept										-> size_t {
 			size_t sum = 0;
 			for (int i = 0; i < m_dispatch.size(); ++i) { sum += m_dispatch[i]->size(); };
 			return sum;
@@ -715,28 +716,28 @@ namespace vecs {
 			if (is_end) this->m_current_index.value = static_cast<decltype(this->m_current_index.value)>(VecsComponentTable<E>().size());
 		};
 
-		auto is_valid() noexcept -> bool {
+		auto is_valid() noexcept		-> bool {
 			return VecsComponentTable<E>().handle(this->m_current_index).is_valid();
 		}
 
-		auto operator*() noexcept -> typename VecsIterator<Cs...>::value_type {
+		auto operator*() noexcept		-> typename VecsIterator<Cs...>::value_type {
 			return std::make_tuple(VecsComponentTable<E>().handle(this->m_current_index), std::ref(VecsComponentTable<E>().component<Cs>(this->m_current_index))...);
 		};
 
-		auto operator++() noexcept -> VecsIterator<Cs...>& { ++this->m_current_index.value; return *this; };
+		auto operator++() noexcept		-> VecsIterator<Cs...>& { ++this->m_current_index.value; return *this; };
 		
-		auto operator++(int) noexcept -> VecsIterator<Cs...>& { ++this->m_current_index.value; return *this; };
+		auto operator++(int) noexcept	-> VecsIterator<Cs...>& { ++this->m_current_index.value; return *this; };
 		
-		auto is_vector_end() noexcept -> bool { return this->m_current_index.value >= VecsComponentTable<E>().size(); };
+		auto is_vector_end() noexcept	-> bool { return this->m_current_index.value >= VecsComponentTable<E>().size(); };
 
 		virtual 
-		auto size() noexcept -> size_t { return VecsComponentTable<E>().size(); }
+		auto size() noexcept			-> size_t { return VecsComponentTable<E>().size(); }
 
 	};
 
 
 	template<typename... Cs>
-	VecsIterator<Cs...>::VecsIterator(bool is_end) noexcept : m_is_end{ is_end } {
+	inline VecsIterator<Cs...>::VecsIterator(bool is_end) noexcept : m_is_end{ is_end } {
 		if (is_end) {
 			m_current_iterator.value = static_cast<decltype(m_current_iterator.value)>(m_dispatch.size() - 1);
 		}
@@ -753,21 +754,18 @@ namespace vecs {
 	using Functor = void(VecsIterator<Cs...>&);
 
 	template<typename... Cs>
-	void for_each(VecsIterator<Cs...>& b, VecsIterator<Cs...>& e, std::function<Functor<Cs...>> f) {
+	inline auto for_each(VecsIterator<Cs...>& b, VecsIterator<Cs...>& e, std::function<Functor<Cs...>> f) -> void {
 		for (; b != e; b++) {
 			if(b.is_valid()) f(b);
 		}
-		return; 
 	}
 
 	template<typename... Cs>
-	void for_each(std::function<Functor<Cs...>> f) {
+	inline auto for_each(std::function<Functor<Cs...>> f) -> void {
 		auto b = VecsRegistry().begin<Cs...>();
 		auto e = VecsRegistry().end<Cs...>();
-
-		return for_each(b, e, f);
+		for_each(b, e, f);
 	}
-
 
 
 	//-------------------------------------------------------------------------
@@ -789,22 +787,22 @@ namespace vecs {
 	}
 
 	template<typename E>
-	inline std::optional<VecsEntity<E>> VecsRegistryBaseClass::entity(const VecsHandle& handle) noexcept {
+	inline auto VecsRegistryBaseClass::entity(const VecsHandle& handle) noexcept			-> std::optional<VecsEntity<E>> {
 		return VecsRegistry<E>().entity(handle);
 	}
 
 	template<typename ET>
-	bool VecsRegistryBaseClass::update(const VecsHandle& handle, ET&& ent) noexcept {
+	inline auto VecsRegistryBaseClass::update(const VecsHandle& handle, ET&& ent) noexcept	-> bool {
 		return VecsRegistry<vtll::front<ET>>().update({ handle }, std::forward<ET>(ent));
 	}
 
 	template<typename... Cs>
-	VecsIterator<Cs...> VecsRegistryBaseClass::begin() noexcept {
+	inline auto VecsRegistryBaseClass::begin() noexcept			-> VecsIterator<Cs...> {
 		return VecsIterator<Cs...>(false);
 	}
 
 	template<typename... Cs>
-	VecsIterator<Cs...> VecsRegistryBaseClass::end() noexcept {
+	inline auto VecsRegistryBaseClass::end() noexcept			-> VecsIterator<Cs...> {
 		return VecsIterator<Cs...>(true);
 	}
 
@@ -812,34 +810,33 @@ namespace vecs {
 	//-------------------------------------------------------------------------
 	//VecsHandle
 
-	bool VecsHandle::is_valid() noexcept {
+	inline auto VecsHandle::is_valid() noexcept					-> bool {
 		if (m_entity_index.is_null() || m_generation_counter.is_null() || m_type_index.is_null()) return false;
 		return VecsRegistryBaseClass().contains(*this);
 	}
 
 	template<typename E>
-	std::optional<VecsEntity<E>> VecsHandle::entity() noexcept {
+	inline auto VecsHandle::entity() noexcept					-> std::optional<VecsEntity<E>> {
 		return VecsRegistry<E>().entity(*this);
 	}
 
 	template<typename C>
-	std::optional<C> VecsHandle::component() noexcept {
+	inline auto VecsHandle::component() noexcept				-> std::optional<C> {
 		return VecsRegistryBaseClass().component<C>(*this);
 	}
 
 	template<typename ET>
-	bool VecsHandle::update(ET&& ent) noexcept {
+	inline auto VecsHandle::update(ET&& ent) noexcept			-> bool {
 		using type = vtll::front<std::decay_t<ET>>;
 		return VecsRegistry<type>().update(*this, std::forward<ET>(ent));
 	}
 
-	template<typename C>
-	requires vtll::has_type<VecsComponentTypeList, C>::value
-	bool VecsHandle::update(C&& comp) noexcept {
+	template<typename C> requires vtll::has_type<VecsComponentTypeList, C>::value
+	inline auto VecsHandle::update(C&& comp) noexcept			-> bool {
 		return VecsRegistryBaseClass().update<C>(*this, std::forward<C>(comp));
 	}
 
-	bool VecsHandle::erase() noexcept {
+	inline auto VecsHandle::erase() noexcept					-> bool {
 		return VecsRegistryBaseClass().erase(*this);
 	}
 
@@ -858,8 +855,6 @@ namespace vecs {
 	public:
 		VecsSystem() = default;
 	};
-
-
 
 
 }
