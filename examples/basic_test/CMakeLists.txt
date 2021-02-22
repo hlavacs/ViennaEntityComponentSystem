@@ -9,9 +9,9 @@ set(HEADERS
   ${INCLUDE}/VECSUtil.h
   ${INCLUDE}/VECSTable.h
   ${INCLUDE}/VECSContainer1.h
-  ${INCLUDE}/VECSComponent.h
+  ${INCLUDE}/VECSCompSystem.h
+  ${INCLUDE}/VECSCompUser.h
   ${INCLUDE}/VECS.h
-  ${INCLUDE}/VECSUser.h
 )
 
 add_executable(${TARGET} ${SOURCE} ${HEADERS})

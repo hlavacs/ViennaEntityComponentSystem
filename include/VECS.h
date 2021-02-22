@@ -11,10 +11,8 @@
 #include <functional>
 #include <chrono>
 #include "VTLL.h"
-#include "VECSComponent.h"
-
-//user defined component types and entity types
-#include "VECSUser.h" 
+#include "VECSCompSystem.h"
+#include "VECSCompUser.h"  //user defined component types and entity types
 
 using namespace std::chrono_literals;
 
@@ -111,17 +109,14 @@ namespace vecs {
 
 	public:
 		VecsEntity(const VecsHandle& h, const tuple_type& tup) noexcept : m_handle{ h }, m_component_data{ tup } {};
-
-		auto handle() const noexcept			-> VecsHandle {
-			return m_handle;
-		}
-
-		auto is_valid() noexcept			-> bool {
-			return m_handle.is_valid();
-		}
+		auto handle() const noexcept -> VecsHandle { return m_handle; }
+		auto is_valid() noexcept	-> bool { return m_handle.is_valid(); }
+		auto update() noexcept		-> bool { return m_handle.update(*this); };
+		auto erase() noexcept		-> bool { return m_handle.erase(*this); };
+		auto name() const noexcept	-> std::string { return typeid(E).name(); };
 
 		template<typename C>
-		auto component() noexcept				-> std::optional<C> {
+		auto component() noexcept -> std::optional<C> {
 			if constexpr (vtll::has_type<E,C>::value) {
 				return { std::get<vtll::index_of<E,C>::value>(m_component_data) };
 			}
@@ -130,23 +125,11 @@ namespace vecs {
 
 		template<typename C>
 		requires vtll::has_type<VecsComponentTypeList, C>::value
-		auto local_update(C&& comp ) noexcept	-> void {
+		auto local_update(C&& comp ) noexcept -> void {
 			if constexpr (vtll::has_type<E,C>::value) {
 				std::get<vtll::index_of<E,C>::value>(m_component_data) = comp;
 			}
 			return;
-		};
-
-		auto update() noexcept		-> bool {
-			return m_handle.update(*this);
-		};
-
-		auto erase() noexcept		-> bool {
-			return m_handle.erase(*this);
-		};
-
-		auto name() const noexcept -> std::string {
-			return typeid(E).name();
 		};
 	};
 
@@ -181,11 +164,13 @@ namespace vecs {
 
 		static inline std::array<std::unique_ptr<VecsComponentTable<E>>, vtll::size<VecsComponentTypeList>::value> m_dispatch; //one for each component type
 
-		virtual auto updateC(index_t entidx, size_t compidx, void* ptr, size_t size) noexcept -> bool {
+		virtual
+		auto updateC(index_t entidx, size_t compidx, void* ptr, size_t size) noexcept -> bool {
 			return m_dispatch[compidx]->updateC(entidx, compidx, ptr, size);
 		}
 
-		virtual auto componentE(index_t entidx, size_t compidx, void* ptr, size_t size)  noexcept -> bool {
+		virtual
+		auto componentE(index_t entidx, size_t compidx, void* ptr, size_t size)  noexcept -> bool {
 			return m_dispatch[compidx]->componentE(entidx, compidx, ptr, size);
 		}
 
@@ -197,15 +182,14 @@ namespace vecs {
 		auto values(const index_t index) noexcept						-> tuple_type;
 		auto references(const index_t index) noexcept					-> tuple_type_ref;
 		auto handle(const index_t index) noexcept						-> VecsHandle;
+		auto size() noexcept											-> size_t { return m_handles.size(); };
+		auto erase(const index_t idx) noexcept							-> std::tuple<VecsHandle, index_t>;
 
 		template<typename C>
-		auto component(const index_t index) noexcept		-> C&;
+		auto component(const index_t index) noexcept					-> C&;
 
 		template<typename ET>
-		auto update(const index_t index, ET&& ent) noexcept	-> bool;
-
-		auto size() noexcept								-> size_t { return m_handles.size(); };
-		auto erase(const index_t idx) noexcept				-> std::tuple<VecsHandle, index_t>;
+		auto update(const index_t index, ET&& ent) noexcept				-> bool;
 	};
 
 

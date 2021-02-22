@@ -71,14 +71,10 @@ namespace vecs {
 		auto info(index_t index) noexcept	 -> INFO&;
 		auto next(index_t index) noexcept	 -> index_t&;
 		auto data(index_t index) noexcept	 -> ref_tuple_t&;
-		auto erase(index_t index) noexcept	 -> void;
+		auto erase(index_t index)			 -> std::tuple<INFO&, index_t>;
 		auto size() const noexcept			 -> size_t { return m_size; };
 		auto reserve(index_t index) noexcept -> void;
-		auto compress_one()					 -> std::tuple<INFO&, index_t>;
 	};
-
-
-
 
 
 
