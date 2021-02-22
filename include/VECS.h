@@ -193,21 +193,21 @@ namespace vecs {
 		VecsComponentTable(size_t r = 1 << 10) noexcept;
 
 		[[nodiscard]]
-		auto insert(VecsHandle& handle, tuple_type&& tuple) noexcept -> index_t;
-		auto values(const index_t index) noexcept -> tuple_type;
-		auto references(const index_t index) noexcept -> tuple_type_ref;
-		auto handle(const index_t index) noexcept -> VecsHandle;
+		auto insert(VecsHandle& handle, tuple_type&& tuple) noexcept	-> index_t;
+		auto values(const index_t index) noexcept						-> tuple_type;
+		auto references(const index_t index) noexcept					-> tuple_type_ref;
+		auto handle(const index_t index) noexcept						-> VecsHandle;
 
 		template<typename C>
-		C&		component(const index_t index) noexcept;
+		auto component(const index_t index) noexcept		-> C&;
 
 		template<typename ET>
-		bool	update(const index_t index, ET&& ent) noexcept;
+		auto update(const index_t index, ET&& ent) noexcept	-> bool;
 
-		size_t	size()  noexcept { return m_handles.size(); };
-
-		std::tuple<VecsHandle, index_t> erase(const index_t idx) noexcept;
+		auto size() noexcept								-> size_t { return m_handles.size(); };
+		auto erase(const index_t idx) noexcept				-> std::tuple<VecsHandle, index_t>;
 	};
+
 
 	template<typename E>
 	inline [[nodiscard]] index_t VecsComponentTable<E>::insert(VecsHandle& handle, tuple_type&& tuple) noexcept {
@@ -366,17 +366,17 @@ namespace vecs {
 
 		static inline std::array<std::unique_ptr<VecsRegistryBaseClass>, vtll::size<VecsEntityTypeList>::value> m_dispatch;
 
-		virtual bool updateC(const VecsHandle& handle, size_t compidx, void* ptr, size_t size) { return false; };
-		virtual bool componentE(const VecsHandle& handle, size_t compidx, void*ptr, size_t size) { return false; };
+		virtual auto updateC(const VecsHandle& handle, size_t compidx, void* ptr, size_t size) noexcept -> bool { return false; };
+		virtual auto componentE(const VecsHandle& handle, size_t compidx, void*ptr, size_t size) noexcept -> bool { return false; };
 
 	public:
-		VecsRegistryBaseClass( size_t r = 1 << 10 );
+		VecsRegistryBaseClass( size_t r = 1 << 10 ) noexcept;
 
 		//-------------------------------------------------------------------------
 		//insert data
 
-		template<typename... Ts>
-		[[nodiscard]] VecsHandle insert(Ts&&... args) {
+		template<typename... Ts> [[nodiscard]] 
+		auto insert(Ts&&... args) noexcept -> VecsHandle {
 			static_assert(vtll::is_same<VeEntityType<Ts...>, Ts...>::value);
 			return VecsRegistry<VeEntityType<Ts...>>().insert(std::forward<Ts>(args)...);
 		}
@@ -385,11 +385,11 @@ namespace vecs {
 		//get data
 
 		template<typename E>
-		std::optional<VecsEntity<E>> entity(const VecsHandle& handle);
+		auto entity(const VecsHandle& handle) noexcept -> std::optional<VecsEntity<E>>;
 
 		template<typename C>
 		requires vtll::has_type<VecsComponentTypeList, C>::value
-		std::optional<C> component(const VecsHandle& handle) {
+		auto component(const VecsHandle& handle) noexcept -> std::optional<C> {
 			C res;
 			if (m_dispatch[handle.index()]->componentE(handle, vtll::index_of<VecsComponentTypeList, C>::value, (void*)&res, sizeof(C))) {
 				return { res };
@@ -401,11 +401,11 @@ namespace vecs {
 		//update data
 
 		template<typename ET>
-		bool update(const VecsHandle& handle, ET&& ent);
+		auto update(const VecsHandle& handle, ET&& ent) noexcept -> bool;
 
 		template<typename C>
 		requires vtll::has_type<VecsComponentTypeList, C>::value
-		bool update(const VecsHandle& handle, C&& comp) {
+		auto update(const VecsHandle& handle, C&& comp) noexcept -> bool {
 			return m_dispatch[handle.index()]->updateC(handle, vtll::index_of<VecsComponentTypeList,C>::value, (void*)&comp, sizeof(C));
 		}
 
@@ -413,29 +413,31 @@ namespace vecs {
 		//utility
 
 		template<typename E = void>
-		size_t size() { return VecsComponentTable<E>().size(); };
+		auto size() noexcept -> size_t { return VecsComponentTable<E>().size(); };
 
 		template<>
-		size_t size<>();
+		auto size<>() noexcept -> size_t;
 
 		template<typename... Cs>
-		VecsIterator<Cs...> begin();
+		auto begin() noexcept -> VecsIterator<Cs...>;
 
 		template<typename... Cs>
-		VecsIterator<Cs...> end();
+		auto end() noexcept -> VecsIterator<Cs...>;
 
-		virtual bool contains(const VecsHandle& handle) {
+		virtual 
+		auto contains(const VecsHandle& handle) noexcept -> bool {
 			return m_dispatch[handle.index()]->contains(handle);
 		}
 
-		virtual bool erase(const VecsHandle& handle) {
+		virtual 
+		auto erase(const VecsHandle& handle) noexcept -> bool {
 			return m_dispatch[handle.index()]->erase(handle);
 		}
 	};
 
 
 	template<>
-	size_t VecsRegistryBaseClass::size<void>() {
+	auto VecsRegistryBaseClass::size<void>() noexcept -> size_t {
 		size_t sum = 0;
 		vtll::static_for<size_t, 0, vtll::size<VecsEntityTypeList>::value >(
 			[&](auto i) {
@@ -458,59 +460,60 @@ namespace vecs {
 	template<typename E = void>
 	class VecsRegistry : public VecsRegistryBaseClass {
 	protected:
-		bool updateC(const VecsHandle& handle, size_t compidx, void* ptr, size_t size);
-		bool componentE(const VecsHandle& handle, size_t compidx, void* ptr, size_t size);
+		bool updateC(const VecsHandle& handle, size_t compidx, void* ptr, size_t size) noexcept;
+		bool componentE(const VecsHandle& handle, size_t compidx, void* ptr, size_t size) noexcept;
 
 	public:
-		VecsRegistry(size_t r = 1 << 10);
+		VecsRegistry(size_t r = 1 << 10) noexcept;
 
 		//-------------------------------------------------------------------------
 		//insert data
 
 		template<typename... Cs>
 		requires vtll::is_same<E, Cs...>::value
-		[[nodiscard]] VecsHandle insert(Cs&&... args);
+		[[nodiscard]] 
+		VecsHandle insert(Cs&&... args) noexcept;
 
 		//-------------------------------------------------------------------------
 		//get data
 
-		std::optional<VecsEntity<E>> entity(const VecsHandle& h);
+		std::optional<VecsEntity<E>> entity(const VecsHandle& h) noexcept;
 
 		template<typename C>
-		std::optional<C> component(const VecsHandle& handle);
+		std::optional<C> component(const VecsHandle& handle) noexcept;
 
 		//-------------------------------------------------------------------------
 		//update data
 
 		template<typename ET>
-		bool update(const VecsHandle& handle, ET&& ent);
+		bool update(const VecsHandle& handle, ET&& ent) noexcept;
 
 		template<typename C>
 		requires (vtll::has_type<VecsComponentTypeList, C>::value)
-		bool update(const VecsHandle& handle, C&& comp);
+		bool update(const VecsHandle& handle, C&& comp) noexcept;
 
 		//-------------------------------------------------------------------------
 		//utility
 
-		size_t size() { return VecsComponentTable<E>().size(); };
+		size_t size()  noexcept { return VecsComponentTable<E>().size(); };
 
-		bool contains(const VecsHandle& handle);
+		bool contains(const VecsHandle& handle) noexcept;
 
-		bool erase(const VecsHandle& handle);
+		bool erase(const VecsHandle& handle) noexcept;
 	};
 
 
 	template<typename E>
-	inline VecsRegistry<E>::VecsRegistry(size_t r) : VecsRegistryBaseClass(r) {}
+	inline VecsRegistry<E>::VecsRegistry(size_t r)  noexcept : VecsRegistryBaseClass(r) {}
 
 	template<typename E>
-	inline bool VecsRegistry<E>::updateC(const VecsHandle& handle, size_t compidx, void* ptr, size_t size) {
+	inline bool VecsRegistry<E>::updateC(const VecsHandle& handle, size_t compidx, void* ptr, size_t size) noexcept {
 		if (!contains(handle)) return {};
 		return VecsComponentTable<E>().updateC(m_entity_table[handle.m_entity_index.value].m_next_free_or_comp_index, compidx, ptr, size);
 	}
 
 	template<typename E>
-	inline bool VecsRegistry<E>::componentE(const VecsHandle& handle, size_t compidx, void* ptr, size_t size) {
+	inline bool VecsRegistry<E>::componentE(const VecsHandle& handle, size_t compidx, void* ptr, size_t size) noexcept {
 		if (!contains(handle)) return {};
 		return VecsComponentTable<E>().componentE( m_entity_table[handle.m_entity_index.value].m_next_free_or_comp_index, compidx, ptr, size );
 	}
@@ -518,7 +521,7 @@ namespace vecs {
 	template<typename E>
 	template<typename... Cs>
 	requires vtll::is_same<E, Cs...>::value
-	inline [[nodiscard]] VecsHandle VecsRegistry<E>::insert(Cs&&... args) {
+	inline [[nodiscard]] VecsHandle VecsRegistry<E>::insert(Cs&&... args) noexcept {
 		index_t idx{};
 		if (!m_first_free.is_null()) {
 			idx = m_first_free;
@@ -536,14 +539,14 @@ namespace vecs {
 	};
 
 	template<typename E>
-	inline bool VecsRegistry<E>::contains(const VecsHandle& handle) {
+	inline bool VecsRegistry<E>::contains(const VecsHandle& handle) noexcept {
 		if (handle.m_entity_index.is_null() || handle.m_entity_index.value>= m_entity_table.size() ) return false;
 		if (handle.m_generation_counter != m_entity_table[handle.m_entity_index.value].m_generation_counter) return false;
 		return true;
 	}
 
 	template<typename E>
-	inline std::optional<VecsEntity<E>> VecsRegistry<E>::entity(const VecsHandle& handle) {
+	inline std::optional<VecsEntity<E>> VecsRegistry<E>::entity(const VecsHandle& handle) noexcept {
 		if (!contains(handle)) return {};
 		VecsEntity<E> res( handle, VecsComponentTable<E>().values(m_entity_table[handle.m_entity_index.value].m_next_free_or_comp_index) );
 		return { res };
@@ -551,7 +554,7 @@ namespace vecs {
 
 	template<typename E>
 	template<typename C>
-	inline std::optional<C> VecsRegistry<E>::component(const VecsHandle& handle) {
+	inline std::optional<C> VecsRegistry<E>::component(const VecsHandle& handle) noexcept {
 		if constexpr (!vtll::has_type<E,C>::value) { return {}; }
 		if (!contains(handle)) return {};
 		auto compidx = m_entity_table[handle.m_entity_index.value].m_next_free_or_comp_index;
@@ -560,7 +563,7 @@ namespace vecs {
 
 	template<typename E>
 	template<typename ET>
-	inline bool VecsRegistry<E>::update(const VecsHandle& handle, ET&& ent) {
+	inline bool VecsRegistry<E>::update(const VecsHandle& handle, ET&& ent) noexcept {
 		if (!contains(handle)) return false;
 		VecsComponentTable<E>().update(handle.m_entity_index, std::forward<ET>(ent));
 		return true;
@@ -569,7 +572,7 @@ namespace vecs {
 	template<typename E>
 	template<typename C>
 	requires (vtll::has_type<VecsComponentTypeList, C>::value)
-	inline bool VecsRegistry<E>::update(const VecsHandle& handle, C&& comp) {
+	inline bool VecsRegistry<E>::update(const VecsHandle& handle, C&& comp) noexcept {
 		if constexpr (!vtll::has_type<E, C>::value) { return false; }
 		if (!contains(handle)) return false;
 		VecsComponentTable<E>().update<C>(handle.m_entity_index, std::forward<C>(comp));
@@ -577,7 +580,7 @@ namespace vecs {
 	}
 
 	template<typename E>
-	inline bool VecsRegistry<E>::erase(const VecsHandle& handle) {
+	inline bool VecsRegistry<E>::erase(const VecsHandle& handle) noexcept {
 		if (!contains(handle)) return false;
 		auto hidx = handle.m_entity_index.value;
 
@@ -602,7 +605,7 @@ namespace vecs {
 	template<>
 	class VecsRegistry<void> : public VecsRegistryBaseClass {
 	public:
-		VecsRegistry(size_t r = 1 << 10) : VecsRegistryBaseClass(r) {};
+		VecsRegistry(size_t r = 1 << 10) noexcept : VecsRegistryBaseClass(r) {};
 	};
 
 
@@ -773,7 +776,7 @@ namespace vecs {
 	//-------------------------------------------------------------------------
 	//VecsRegistryBaseClass
 
-	inline VecsRegistryBaseClass::VecsRegistryBaseClass(size_t r) {
+	inline VecsRegistryBaseClass::VecsRegistryBaseClass(size_t r) noexcept {
 		if (!this->init()) return;
 		m_entity_table.reserve(r);
 
@@ -786,25 +789,22 @@ namespace vecs {
 	}
 
 	template<typename E>
-	inline std::optional<VecsEntity<E>> VecsRegistryBaseClass::entity(const VecsHandle& handle) {
+	inline std::optional<VecsEntity<E>> VecsRegistryBaseClass::entity(const VecsHandle& handle) noexcept {
 		return VecsRegistry<E>().entity(handle);
 	}
 
 	template<typename ET>
-	bool VecsRegistryBaseClass::update(const VecsHandle& handle, ET&& ent) {
+	bool VecsRegistryBaseClass::update(const VecsHandle& handle, ET&& ent) noexcept {
 		return VecsRegistry<vtll::front<ET>>().update({ handle }, std::forward<ET>(ent));
 	}
 
-	//-------------------------------------------------------------------------
-	//VecsIterator
-
 	template<typename... Cs>
-	VecsIterator<Cs...> VecsRegistryBaseClass::begin() {
+	VecsIterator<Cs...> VecsRegistryBaseClass::begin() noexcept {
 		return VecsIterator<Cs...>(false);
 	}
 
 	template<typename... Cs>
-	VecsIterator<Cs...> VecsRegistryBaseClass::end() {
+	VecsIterator<Cs...> VecsRegistryBaseClass::end() noexcept {
 		return VecsIterator<Cs...>(true);
 	}
 
