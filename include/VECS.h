@@ -631,22 +631,25 @@ namespace vecs {
 			for (int i = 0; i < m_dispatch.size(); ++i) { m_dispatch[i]->m_current_index = v.m_dispatch[i]->m_current_index; }
 		};
 
-		virtual bool is_valid() noexcept{
+		virtual
+		auto is_valid() noexcept -> bool {
 			if (m_is_end || is_vector_end()) return false;
 			return m_dispatch[m_current_iterator.value]->is_valid();
 		}
 
-		VecsIterator<Cs...>& operator=(const VecsIterator& v) {
+		auto operator=(const VecsIterator& v) noexcept -> VecsIterator<Cs...>& {
 			m_current_iterator = v.m_current_iterator;
 			for (int i = 0; i < m_dispatch.size(); ++i) { m_dispatch[i]->m_current_index = v.m_dispatch[i]->m_current_index; }
 			return *this;
 		}
 
-		virtual value_type operator*() { 
+		virtual 
+		auto operator*() noexcept -> value_type {
 			return *(*m_dispatch[m_current_iterator.value]);
 		};
 
-		virtual VecsIterator<Cs...>& operator++() {
+		virtual 
+		auto operator++() noexcept -> VecsIterator<Cs...>& {
 			(*m_dispatch[m_current_iterator.value])++;
 			if (m_dispatch[m_current_iterator.value]->is_vector_end() && m_current_iterator.value < m_dispatch.size() - 1) {
 				++m_current_iterator.value;
@@ -654,9 +657,10 @@ namespace vecs {
 			return *this;
 		};
 
-		virtual VecsIterator<Cs...>& operator++(int) { return operator++(); return *this; };
+		virtual 
+		auto operator++(int) noexcept -> VecsIterator<Cs...>& { return operator++(); return *this; };
 
-		void operator+=(size_t N) {
+		auto operator+=(size_t N) noexcept -> void {
 			size_t left = N;
 			while (left > 0) {
 				int num = std::max(m_dispatch[m_current_iterator.value]->size() 
@@ -670,24 +674,26 @@ namespace vecs {
 			}
 		}
 
-		VecsIterator<Cs...>& operator+(size_t N) {
+		auto operator+(size_t N) noexcept -> VecsIterator<Cs...>& {
 			VecsIterator<Cs...> temp{ *this };
 			temp += N;
 			return temp;
 		}
 
-		bool operator!=(const VecsIterator<Cs...>& v) {
+		auto operator!=(const VecsIterator<Cs...>& v) noexcept -> bool {
 			return !( *this == v );
 		}
 
-		bool operator==(const VecsIterator<Cs...>& v) {
+		auto operator==(const VecsIterator<Cs...>& v) noexcept -> bool {
 			return	v.m_current_iterator == m_current_iterator &&
 					v.m_dispatch[m_current_iterator.value]->m_current_index == m_dispatch[m_current_iterator.value]->m_current_index;
 		}
 
-		virtual bool is_vector_end() { return m_dispatch[m_current_iterator.value]->is_vector_end(); }
+		virtual 
+		auto is_vector_end() noexcept -> bool { return m_dispatch[m_current_iterator.value]->is_vector_end(); }
 
-		virtual size_t size() {
+		virtual 
+		auto size() noexcept -> size_t {
 			size_t sum = 0;
 			for (int i = 0; i < m_dispatch.size(); ++i) { sum += m_dispatch[i]->size(); };
 			return sum;
@@ -705,25 +711,26 @@ namespace vecs {
 	protected:
 
 	public:
-		VecsIteratorDerived(bool is_end = false) { //empty constructor does not create new children
+		VecsIteratorDerived(bool is_end = false) noexcept { //empty constructor does not create new children
 			if (is_end) this->m_current_index.value = static_cast<decltype(this->m_current_index.value)>(VecsComponentTable<E>().size());
 		};
 
-		bool is_valid() noexcept {
+		auto is_valid() noexcept -> bool {
 			return VecsComponentTable<E>().handle(this->m_current_index).is_valid();
 		}
 
-		typename VecsIterator<Cs...>::value_type operator*() {
+		auto operator*() noexcept -> typename VecsIterator<Cs...>::value_type {
 			return std::make_tuple(VecsComponentTable<E>().handle(this->m_current_index), std::ref(VecsComponentTable<E>().component<Cs>(this->m_current_index))...);
 		};
 
-		VecsIterator<Cs...>& operator++() { ++this->m_current_index.value; return *this; };
+		auto operator++() noexcept -> VecsIterator<Cs...>& { ++this->m_current_index.value; return *this; };
 		
-		VecsIterator<Cs...>& operator++(int) { ++this->m_current_index.value; return *this; };
+		auto operator++(int) noexcept -> VecsIterator<Cs...>& { ++this->m_current_index.value; return *this; };
 		
-		bool is_vector_end() { return this->m_current_index.value >= VecsComponentTable<E>().size(); };
+		auto is_vector_end() noexcept -> bool { return this->m_current_index.value >= VecsComponentTable<E>().size(); };
 
-		virtual size_t size() { return VecsComponentTable<E>().size(); }
+		virtual 
+		auto size() noexcept -> size_t { return VecsComponentTable<E>().size(); }
 
 	};
 
