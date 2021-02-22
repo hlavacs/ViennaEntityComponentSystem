@@ -11,6 +11,7 @@
 #include <functional>
 #include <chrono>
 #include "VTLL.h"
+#include "VECSTable.h"
 #include "VECSCompSystem.h"
 #include "VECSCompUser.h"  //user defined component types and entity types
 

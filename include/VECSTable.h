@@ -25,13 +25,14 @@ namespace vecs {
 		using array_tuple_t		= vtll::to_tuple<vtll::transform_size_t<E,std::array,N>>;
 		using data_tuple_t		= vtll::to_tuple<E>;
 		using ref_tuple_t		= vtll::to_ref_tuple<E>;
-		using entry_tuple_t		= std::tuple< ID, index_t, data_tuple_t >;
-		using entry_ref_tuple_t	= std::tuple< ID&, index_t&, ref_tuple_t >;
+		using entry_tuple_t		= std::tuple< INFO, index_t, data_tuple_t >;
+		using entry_ref_tuple_t	= std::tuple< INFO&, index_t&, ref_tuple_t >;
 
 	protected:
 
 		struct segment_t {
 			std::array<INFO, N>		m_info;		//entry information (handle, mutex, ...)
+			std::array<index_t, N>	m_prev;		//previous free entry index 
 			std::array<index_t, N>	m_next;		//next free entry index or use as free index
 			array_tuple_t			m_data;		//the entry data organized as arrays
 		};
@@ -42,39 +43,88 @@ namespace vecs {
 		std::pmr::vector<seg_ptr>	m_segment;
 		std::atomic<size_t>			m_size = 0;
 		index_t						m_first_free{};
-		VecsReadWriteMutex			m_delete_mutex;
 
 		/*T* address(size_t) noexcept;
 		size_t add2(T&&) noexcept;
 		size_t push_back3(T&&) noexcept;*/
 
 	public:
-		VecsTable(std::pmr::memory_resource* mr = std::pmr::new_delete_resource())  noexcept
-			: m_mr{ mr }, m_segment{ mr }  {};
+		VecsTable(size_t r, std::pmr::memory_resource* mr = std::pmr::new_delete_resource())  noexcept
+			: m_mr{ mr }, m_segment{ mr }  { reserve(r); };
 
 		template<typename TINFO, typename TNEXT, typename TDATA>
-		requires std::is_same_v<TINFO,INFO> && std::is_same_v<TNEXT,index_t> && std::is_same_v<TDATA,data_tuple_t>
-		auto insert(TINFO&& info, TINDEX&& index, TDATA&& data) noexcept -> index_t;
+		auto insert(TINFO&& info, TNEXT&& index, TDATA&& data) noexcept -> index_t;
+
+		template<typename TINFO, typename TNEXT, typename TDATA>
+		auto update(TINFO&& info, TNEXT&& index, TDATA&& data) noexcept -> index_t;
 
 		template<typename T>
-		requires std::is_same_v<T, TINFO>
 		auto update(index_t index, T&& info) noexcept -> void;
-
-		template<typename T>
-		requires std::is_same_v<T, index_t>
-		auto update(index_t index, T&& next) noexcept -> void;
-
-		template<typename T>
-		requires std::is_same_v<T, data_tuple_t>
-		auto update(index_t index, T&& data) noexcept -> void;
 
 		auto info(index_t index) noexcept	 -> INFO&;
 		auto next(index_t index) noexcept	 -> index_t&;
 		auto data(index_t index) noexcept	 -> ref_tuple_t&;
-		auto erase(index_t index)			 -> std::tuple<INFO&, index_t>;
+
+		auto invaliate(index_t index)		 -> bool;
+		auto erase_one()					 -> std::tuple<INFO&, index_t>;
+
 		auto size() const noexcept			 -> size_t { return m_size; };
-		auto reserve(index_t index) noexcept -> void;
+		auto reserve(size_t r) noexcept		 -> void;
 	};
+
+
+	template<typename INFO, typename E, size_t L> template<typename TINFO, typename TNEXT, typename TDATA>
+	inline auto VecsTable<INFO, E, L>::insert(TINFO&& info, TNEXT&& index, TDATA&& data) noexcept -> index_t {
+		static_assert(	std::is_same_v<TINFO, INFO> &&  std::is_same_v<TNEXT, index_t> 
+						&& std::is_same_v<TDATA, typename VecsTable<INFO, E, L>::data_tuple_t>);
+
+		return index_t{};
+	}
+
+	template<typename INFO, typename E, size_t L> template<typename TINFO, typename TNEXT, typename TDATA>
+	inline auto VecsTable<INFO, E, L>::update(TINFO&& info, TNEXT&& index, TDATA&& data) noexcept -> index_t {
+		static_assert(	std::is_same_v<TINFO, INFO> && std::is_same_v<TNEXT, index_t> 
+						&& std::is_same_v<TDATA, typename VecsTable<INFO, E, L>::data_tuple_t>);
+
+		return index_t{};
+	}
+
+	template<typename INFO, typename E, size_t L> template<typename T>
+	inline auto VecsTable<INFO, E, L>::update(index_t index, T&& info) noexcept -> void {
+		static_assert(std::is_same_v<T, INFO> || std::is_same_v<T, index_t> || std::is_same_v<T, typename VecsTable<INFO, E, L>::data_tuple_t> );
+
+	}
+
+	template<typename INFO, typename E, size_t L>
+	inline auto VecsTable<INFO, E, L>::info(index_t index) noexcept	 -> INFO& {
+
+	}
+
+	template<typename INFO, typename E, size_t L>
+	inline auto VecsTable<INFO, E, L>::next(index_t index) noexcept	 -> index_t& {
+
+	}
+
+	template<typename INFO, typename E, size_t L>
+	inline auto VecsTable<INFO, E, L>::data(index_t index) noexcept	 -> typename VecsTable<INFO, E, L>::ref_tuple_t& {
+
+	}
+
+	template<typename INFO, typename E, size_t L>
+	inline auto VecsTable<INFO, E, L>::invaliate(index_t index)		 -> bool {
+
+	}
+
+	template<typename INFO, typename E, size_t L>
+	inline auto VecsTable<INFO, E, L>::erase_one()->std::tuple<INFO&, index_t> {
+
+	}
+
+
+	template<typename INFO, typename E, size_t L>
+	inline auto VecsTable<INFO,E,L>::reserve(size_t r) noexcept -> void {
+		while (m_segment.size() * N < r) m_segment.push_back({});
+	}
 
 
 

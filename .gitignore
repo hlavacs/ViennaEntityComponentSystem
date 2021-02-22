@@ -23,6 +23,7 @@ CMakeDoxygenDefaults.cmake
 _deps
 **/examples.dir
 **/*.dir
+**/*.dir/*
 **/*.cmake
 **/*.depend
 
@@ -46,6 +47,8 @@ ALL_BUILD.vcxproj.user
 **/*.tlog
 **/*.obj
 
-**/[Dd]ebug/
-**/[Rr]elease/
+**/[Dd]ebug
+**/[Rr]elease
+**/[Dd]ebug/*
+**/[Rr]elease/*
 **/*.ini
