@@ -52,7 +52,7 @@ namespace vecs {
 		VecsTable(std::pmr::memory_resource* mr = std::pmr::new_delete_resource())  noexcept
 			: m_mr{ mr }, m_segment{ mr }  {};
 
-		template<typename TINFO, typename TNEXT, TDATA>
+		template<typename TINFO, typename TNEXT, typename TDATA>
 		requires std::is_same_v<TINFO,INFO> && std::is_same_v<TNEXT,index_t> && std::is_same_v<TDATA,data_tuple_t>
 		auto insert(TINFO&& info, TINDEX&& index, TDATA&& data) noexcept -> index_t;
 
