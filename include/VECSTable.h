@@ -1,5 +1,5 @@
-#ifndef VECSCONTAINER_H
-#define VECSCONTAINER_H
+#ifndef VECSTABLE_H
+#define VECSTABLE_H
 
 #include <assert.h>
 #include <memory_resource>
@@ -9,6 +9,80 @@
 #include "VECSUtil.h"
 
 namespace vecs {
+
+	template<typename E>
+	class VecsComponentTable;
+
+	template<typename INFO, typename E, size_t L = 8>
+	class VecsTable {
+
+		template<typename E>
+		friend class VecsComponentTable;
+
+	public:
+		static const size_t N = 1 << L;
+		const uint64_t BIT_MASK = N - 1;
+		using array_tuple_t		= vtll::to_tuple<vtll::transform_size_t<E,std::array,N>>;
+		using data_tuple_t		= vtll::to_tuple<E>;
+		using ref_tuple_t		= vtll::to_ref_tuple<E>;
+		using entry_tuple_t		= std::tuple< ID, index_t, data_tuple_t >;
+		using entry_ref_tuple_t	= std::tuple< ID&, index_t&, ref_tuple_t >;
+
+	protected:
+
+		struct segment_t {
+			std::array<INFO, N>		m_info;		//entry information (handle, mutex, ...)
+			std::array<index_t, N>	m_next;		//next free entry index or use as free index
+			array_tuple_t			m_data;		//the entry data organized as arrays
+		};
+
+		using seg_ptr = std::unique_ptr<segment_t>;
+
+		std::pmr::memory_resource*	m_mr = nullptr;
+		std::pmr::vector<seg_ptr>	m_segment;
+		std::atomic<size_t>			m_size = 0;
+		index_t						m_first_free{};
+		VecsReadWriteMutex			m_delete_mutex;
+
+		/*T* address(size_t) noexcept;
+		size_t add2(T&&) noexcept;
+		size_t push_back3(T&&) noexcept;*/
+
+	public:
+		VecsTable(std::pmr::memory_resource* mr = std::pmr::new_delete_resource())  noexcept
+			: m_mr{ mr }, m_segment{ mr }  {};
+
+		template<typename TINFO, typename TNEXT, TDATA>
+		requires std::is_same_v<TINFO,INFO> && std::is_same_v<TNEXT,index_t> && std::is_same_v<TDATA,data_tuple_t>
+		auto insert(TINFO&& info, TINDEX&& index, TDATA&& data) noexcept -> index_t;
+
+		template<typename T>
+		requires std::is_same_v<T, TINFO>
+		auto update(index_t index, T&& info) noexcept -> void;
+
+		template<typename T>
+		requires std::is_same_v<T, index_t>
+		auto update(index_t index, T&& next) noexcept -> void;
+
+		template<typename T>
+		requires std::is_same_v<T, data_tuple_t>
+		auto update(index_t index, T&& data) noexcept -> void;
+
+		auto info(index_t index) noexcept	 -> INFO&;
+		auto next(index_t index) noexcept	 -> index_t&;
+		auto data(index_t index) noexcept	 -> ref_tuple_t&;
+		auto erase(index_t index) noexcept	 -> void;
+		auto size() const noexcept			 -> size_t { return m_size; };
+		auto reserve(index_t index) noexcept -> void;
+		auto compress_one()					 -> std::tuple<INFO&, index_t>;
+	};
+
+
+
+
+
+
+	/*
 
 	template<typename T, size_t L = 8, int SYNC = 2, bool SHRINK = false>
 	class VecsVector {
@@ -118,7 +192,7 @@ namespace vecs {
 		void				reserve(size_t n) noexcept { m_entry.reserve(n); m_map.reserve(n); };
 	};
 
-
+	*/
 }
 
 

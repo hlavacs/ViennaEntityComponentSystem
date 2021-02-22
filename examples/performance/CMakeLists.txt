@@ -7,7 +7,7 @@ set(HEADERS
   performance.h
   ${INCLUDE}/VTLL.h
   ${INCLUDE}/VECSUtil.h
-  ${INCLUDE}/VECSContainer.h
+  ${INCLUDE}/VECSTable.h
   ${INCLUDE}/VECSContainer1.h
   ${INCLUDE}/VECSComponent.h
   ${INCLUDE}/VECS.h

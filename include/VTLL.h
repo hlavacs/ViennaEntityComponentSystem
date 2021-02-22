@@ -222,6 +222,25 @@ namespace vtll {
 		"The implementation of transform is bad");
 
 	//-------------------------------------------------------------------------
+	//transform_size_t: transform list<types> into list<Function<types,size_t>>
+
+	namespace detail {
+		template<typename List, template<typename, size_t> typename Fun, size_t N>
+		struct transform_size_t_impl;
+
+		template<template <typename...> typename Seq, typename... Ts, template<typename, size_t> typename Fun, size_t N>
+		struct transform_size_t_impl<Seq<Ts...>, Fun, N> {
+			using type = Seq<Fun<Ts, N>...>;
+		};
+	}
+	template <typename Seq, template<typename, size_t> typename Fun, size_t N>
+	using transform_size_t = typename detail::transform_size_t_impl<Seq, Fun, N>::type;
+
+	static_assert(
+		std::is_same_v< transform_size_t< type_list<double, int>, std::array, 10 >, type_list<std::array<double, 10>, std::array<int,10>> >,
+		"The implementation of transform_size_t is bad");
+
+	//-------------------------------------------------------------------------
 	//substitute: substitute a type list TYPE with another list type
 
 	namespace detail {

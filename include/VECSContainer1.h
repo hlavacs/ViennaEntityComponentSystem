@@ -1,10 +1,10 @@
 
 #include <optional>
-#include "VEContainer.h"
+#include "VECSContainer.h"
 
 namespace vve {
 
-
+	/*
 	//---------------------------------------------------------------------------
 	//VeVector
 
@@ -223,7 +223,7 @@ namespace vve {
 	void VeSlotMap<T, ID, L, SYNC, S>::swap(size_t n1, size_t n2) noexcept {
 		if constexpr (SYNC >= SYNC_ALL) { std::lock_guard<std::shared_timed_mutex> writerLock(m_mutex); }
 	}
-
+	*/
 
 }
 

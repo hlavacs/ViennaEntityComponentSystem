@@ -1,5 +1,5 @@
-#ifndef VECOMPONENT_H
-#define VECOMPONENT_H
+#ifndef VECSCOMPONENT_H
+#define VECSCOMPONENT_H
 
 #include "glm.hpp"
 #include "gtc/quaternion.hpp"
