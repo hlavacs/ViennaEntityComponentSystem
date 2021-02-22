@@ -91,7 +91,8 @@ namespace vecs {
 
 	template<typename INFO, typename E, size_t L> template<typename T>
 	inline auto VecsTable<INFO, E, L>::update(index_t index, T&& info) noexcept -> void {
-		static_assert(std::is_same_v<T, INFO> || std::is_same_v<T, index_t> || std::is_same_v<T, typename VecsTable<INFO, E, L>::data_tuple_t> );
+		static_assert(	std::is_same_v<T, INFO> || std::is_same_v<T, index_t> 
+						|| std::is_same_v<T, typename VecsTable<INFO, E, L>::data_tuple_t> );
 
 	}
 
