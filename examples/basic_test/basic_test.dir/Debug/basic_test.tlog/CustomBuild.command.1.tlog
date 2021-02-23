@@ -1,6 +1,6 @@
-^C:\USERS\HLAVACS\DOCUMENTS\GITHUB\VIENNAENTITYCOMPONENTSYSTEM\EXAMPLES\BASIC_TEST\CMAKELISTS.TXT
+^D:\DATA\VULKAN\VIENNAENTITYCOMPONENTSYSTEM\EXAMPLES\BASIC_TEST\CMAKELISTS.TXT
 setlocal
-"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/hlavacs/Documents/GitHub/ViennaEntityComponentSystem -BC:/Users/hlavacs/Documents/GitHub/ViennaEntityComponentSystem --check-stamp-file C:/Users/hlavacs/Documents/GitHub/ViennaEntityComponentSystem/examples/basic_test/CMakeFiles/generate.stamp
+"C:\Program Files\CMake\bin\cmake.exe" -SD:/data/Vulkan/ViennaEntityComponentSystem -BD:/data/Vulkan/ViennaEntityComponentSystem --check-stamp-file D:/data/Vulkan/ViennaEntityComponentSystem/examples/basic_test/CMakeFiles/generate.stamp
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone

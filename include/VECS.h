@@ -339,8 +339,8 @@ namespace vecs {
 
 		struct entry_t {
 			index_t				m_next_free_or_comp_index{};	//next free slot or index of component table
-			VecsReadWriteMutex	m_mutex;						//per entity synchronization
 			counter16_t			m_generation_counter{ 0 };		//generation counter starts with 0
+			VecsReadWriteMutex	m_mutex;						//per entity synchronization
 
 			entry_t() {};
 			entry_t(const entry_t& other) {};
