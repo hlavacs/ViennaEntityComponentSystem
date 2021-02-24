@@ -59,12 +59,13 @@ namespace vecs {
 		requires std::is_same_v<TDATA, data_tuple_t>
 		inline auto allocate_one() -> index_t {
 			auto idx = m_size.fetch_add(1);
-			reserve(idx);
+			if (!reserve(idx)) return index_t{};
 			return index_t{idx};
 		}
 
 		//Internally synchronized
-		auto reserve(size_t r) noexcept -> bool {
+		auto reserve(size_t r, bool force = false) noexcept -> bool {
+			if (force) max_capacity( r );
 			if (r == 0 || r > m_seg_max * N) return false;
 			if (m_seg_allocated.load() * N < r) {
 				const std::lock_guard<std::mutex> lock(m_mutex);
