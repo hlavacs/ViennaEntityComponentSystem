@@ -25,7 +25,7 @@ _deps
 **/*.dir
 **/*.dir/*
 **/*.cmake
-**/*.depend
+**/*.depend 
 
 # MSVC cmake project files
 ALL_BUILD.vcxproj

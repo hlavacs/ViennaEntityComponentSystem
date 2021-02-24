@@ -63,6 +63,16 @@ namespace vecs {
 			return index_t{idx};
 		}
 
+		//Externally synchronized
+		template<typename TDATA>
+		requires std::is_same_v<TDATA, data_tuple_t>
+		inline auto update(index_t index, TDATA&& data ) -> bool {
+			if (index.value >= m_size) return false;
+			auto ref = ref_data(index);
+			vtll::static_for<size_t, 0, vtll::size<DATA>::value >([&](auto i) { std::get<i>(ref) = std::get<i>(data); } );
+			return true;
+		}
+
 		//Internally synchronized
 		auto reserve(size_t r, bool force = false) noexcept -> bool {
 			if (force) max_capacity( r );
