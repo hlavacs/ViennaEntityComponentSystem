@@ -574,7 +574,7 @@ namespace vecs {
 	template<typename E>
 	inline auto VecsRegistry<E>::erase(const VecsHandle& handle) noexcept				-> bool {
 		if (!contains(handle)) return false;
-		auto hidx = handle.m_entity_index.value;
+		//auto hidx = handle.m_entity_index.value;
 
 		//auto [corr_hndl, corr_index] = VecsComponentTable<E>().erase(m_entity_table[hidx].m_next_free_or_comp_index);
 		auto [corr_hndl, corr_index] = VecsComponentTable<E>().erase( m_entity_table2.comp_ref_idx<m_next>(handle.m_entity_index) );
@@ -583,11 +583,13 @@ namespace vecs {
 		if (!corr_index.is_null()) { m_entity_table2.comp_ref_idx<m_next>(corr_hndl.m_entity_index) = corr_index; }
 
 		//m_entity_table[hidx].m_generation_counter.value++;					//>invalidate the entity handle
-		auto cnt = m_entity_table2.comp_ref_idx<m_counter>(handle.m_entity_index);		//>invalidate the entity handle
-		cnt.value++;
+		m_entity_table2.comp_ref_idx<m_counter>(handle.m_entity_index).value++;		//>invalidate the entity handle
 
-		if( m_entity_table[hidx].m_generation_counter.is_null() ) { m_entity_table[hidx].m_generation_counter.value = 0; } //wrap to zero
-		m_entity_table[hidx].m_next_free_or_comp_index = m_first_free;												 //>put old entry into free list
+		//if( m_entity_table[hidx].m_generation_counter.is_null() ) { m_entity_table[hidx].m_generation_counter.value = 0; } //wrap to zero
+		if (m_entity_table2.comp_ref_idx<m_counter>(handle.m_entity_index).is_null()) { m_entity_table2.comp_ref_idx<m_counter>(handle.m_entity_index).value = 0; } //wrap to zero
+
+		//m_entity_table[hidx].m_next_free_or_comp_index = m_first_free;					 //>put old entry into free list
+		m_entity_table2.comp_ref_idx<m_next>(handle.m_entity_index) = m_first_free;							 //>put old entry into free list
 		m_first_free = handle.m_entity_index;
 		return true;
 	}
