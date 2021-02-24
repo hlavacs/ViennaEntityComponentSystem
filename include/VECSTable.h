@@ -76,8 +76,7 @@ namespace vecs {
 		}
 
 		//Internally synchronized
-		auto reserve(size_t r, bool force = false) noexcept -> bool {
-			if (force) max_capacity( r );
+		auto reserve(size_t r) noexcept -> bool {
 			if (r == 0 || r > m_seg_max * N) return false;
 			if (m_seg_allocated.load() * N < r) {
 				const std::lock_guard<std::mutex> lock(m_mutex);

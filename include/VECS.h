@@ -155,6 +155,16 @@ namespace vecs {
 		using tuple_type_ref = vtll::to_ref_tuple<E>;
 		using tuple_type_vec = vtll::to_tuple<vtll::transform<E,std::pmr::vector>>;
 
+		using info = vtll::type_list<VecsHandle, index_t, index_t>;
+		static const uint32_t c_handle = 0;
+		static const uint32_t c_prev = 1;
+		static const uint32_t c_next = 2;
+		static const uint32_t c_info_size = 3;
+
+		using types = vtll::cat< info, E >;
+		using tuple_type2 = vtll::to_tuple<types>;
+		using tuple_type_ref2 = vtll::to_ref_tuple<types>;
+
 	protected:
 		struct entry_t {
 			VecsHandle m_handle;
@@ -162,6 +172,8 @@ namespace vecs {
 
 		static inline std::vector<entry_t>	m_handles;
 		static inline tuple_type_vec		m_components;
+
+		static inline VecsTable<types>		m_data;
 
 		static inline std::array<std::unique_ptr<VecsComponentTable<E>>, vtll::size<VecsComponentTypeList>::value> m_dispatch; //one for each component type
 
@@ -351,8 +363,8 @@ namespace vecs {
 		static const uint32_t c_counter = 1;
 		static const uint32_t c_mutex = 2;
 
-		static inline VecsTable<types>		m_entity_table;
-		static inline index_t				m_first_free{};
+		static inline VecsTable<types>	m_entity_table;
+		static inline index_t			m_first_free{};
 
 		static inline std::array<std::unique_ptr<VecsRegistryBaseClass>, vtll::size<VecsEntityTypeList>::value> m_dispatch;
 
@@ -509,14 +521,15 @@ namespace vecs {
 			m_first_free = m_entity_table.comp_ref_idx<c_next>(m_first_free);
 		}
 		else {
-			idx = m_entity_table.allocate_one();		//start with counter 0
-			m_entity_table.comp_ref_idx<c_counter>(idx) = counter16_t{0};
+			idx = m_entity_table.allocate_one();	
+			if (idx.is_null()) return {};
+			m_entity_table.comp_ref_idx<c_counter>(idx) = counter16_t{0};		//start with counter 0
 		}
 
 		VecsHandle handle{ idx, m_entity_table.comp_ref_idx<c_counter>(idx), index16_t{ vtll::index_of<VecsEntityTypeList, E>::value } };	
 		index_t compidx = VecsComponentTable<E>().insert(handle, std::make_tuple(args...));	//add data as tuple
 		m_entity_table.comp_ref_idx<c_next>(idx) = compidx;						//index in component vector 
-		return { handle };
+		return handle;
 	};
 
 	template<typename E>
@@ -562,12 +575,23 @@ namespace vecs {
 	template<typename E>
 	inline auto VecsRegistry<E>::erase(const VecsHandle& handle) noexcept				-> bool {
 		if (!contains(handle)) return false;
+		
 		auto [corr_hndl, corr_index] = VecsComponentTable<E>().erase( m_entity_table.comp_ref_idx < c_next>(handle.m_entity_index) );
-		if (!corr_index.is_null()) { m_entity_table.comp_ref_idx<c_next>(corr_hndl.m_entity_index) = corr_index; }
+		
+		if (!corr_index.is_null()) { 
+			m_entity_table.comp_ref_idx<c_next>(corr_hndl.m_entity_index) = corr_index; 
+		}
+
 		m_entity_table.comp_ref_idx<c_counter>(handle.m_entity_index).value++;		//>invalidate the entity handle
-		if (m_entity_table.comp_ref_idx<c_counter>(handle.m_entity_index).is_null()) { m_entity_table.comp_ref_idx<c_counter>(handle.m_entity_index).value = 0; } //wrap to zero
-		m_entity_table.comp_ref_idx<c_next>(handle.m_entity_index) = m_first_free;							 //>put old entry into free list
+		
+		if (m_entity_table.comp_ref_idx<c_counter>(handle.m_entity_index).is_null()) { 
+			m_entity_table.comp_ref_idx<c_counter>(handle.m_entity_index).value = 0;	//wrap to zero
+		}
+		
+		m_entity_table.comp_ref_idx<c_next>(handle.m_entity_index) = m_first_free;		//>put old entry into free list
+		
 		m_first_free = handle.m_entity_index;
+		
 		return true;
 	}
 
@@ -763,7 +787,7 @@ namespace vecs {
 
 	inline VecsRegistryBaseClass::VecsRegistryBaseClass(size_t r) noexcept {
 		if (!this->init()) return;
-		m_entity_table.reserve(r,true);
+		m_entity_table.max_capacity(r);
 
 		vtll::static_for<size_t, 0, vtll::size<VecsEntityTypeList>::value >(
 			[&](auto i) {
