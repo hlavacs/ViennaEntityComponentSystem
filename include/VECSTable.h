@@ -32,10 +32,10 @@ namespace vecs {
 
 		//Externally synchronized
 		template<size_t I>
-		inline decltype(auto) comp_ref_idx(index_t n) noexcept { return std::ref(std::get<I>(*m_segment[n.value >> L])[n.value & BIT_MASK]); };
+		inline auto comp_ref_idx(index_t n) noexcept -> vtll::Nth_type<DATA,I>& { return std::get<I>(*m_segment[n.value >> L])[n.value & BIT_MASK]; };
 
 		template<typename C>
-		inline decltype(auto) comp_ref_type(index_t n) noexcept { return std::ref(std::get<vtll::index_of<DATA,C>::value>(*m_segment[n.value >> L])[n.value & BIT_MASK]); };
+		inline auto comp_ref_type(index_t n) noexcept -> C& { return std::get<vtll::index_of<DATA,C>::value>(*m_segment[n.value >> L])[n.value & BIT_MASK]; };
 
 		//Externally synchronized
 		inline auto tuple_ref(index_t n) noexcept -> ref_tuple_t {
@@ -54,12 +54,13 @@ namespace vecs {
 		};
 
 		//Internally synchronized
-		template<typename TDATA>
-		requires std::is_same_v<TDATA, data_tuple_t>
 		inline auto allocate_one() -> index_t {
 			auto idx = m_size.fetch_add(1);
-			if (!reserve(idx)) return index_t{};
-			return index_t{idx};
+			if (!reserve(idx)) {
+				m_size--;
+				return index_t{};
+			}
+			return index_t{ static_cast<decltype(index_t::value)>(idx)};
 		}
 
 		//Externally synchronized
