@@ -6,6 +6,7 @@ set(SOURCE test.cpp)
 set(HEADERS
   test.h
   ${INCLUDE}/VTLL.h
+  ${INCLUDE}/IntType.h
   ${INCLUDE}/VECSUtil.h
   ${INCLUDE}/VECSTable.h
   ${INCLUDE}/VECSContainer1.h
