@@ -30,6 +30,8 @@ namespace vecs {
 		VecsTable(size_t r = 1 << 16, std::pmr::memory_resource* mr = std::pmr::new_delete_resource()) noexcept
 			: m_segment{ mr }  { max_capacity(r); };
 
+		size_t size() { return m_size.load(); };
+
 		//Externally synchronized
 		template<size_t I>
 		inline auto comp_ref_idx(index_t n) noexcept -> vtll::Nth_type<DATA,I>& { return std::get<I>(*m_segment[n.value >> L])[n.value & BIT_MASK]; };
@@ -56,7 +58,7 @@ namespace vecs {
 		//Internally synchronized
 		inline auto allocate_one() -> index_t {
 			auto idx = m_size.fetch_add(1);
-			if (!reserve(idx)) {
+			if (!reserve(idx+1)) {
 				m_size--;
 				return index_t{};
 			}
@@ -80,7 +82,7 @@ namespace vecs {
 			if (m_seg_allocated.load() * N < r) {
 				const std::lock_guard<std::mutex> lock(m_mutex);
 				if (m_seg_allocated.load() * N < r) {
-					while (m_segment.size() * N < r) { m_segment.push_back({}); }
+					while (m_segment.size() * N < r) { m_segment.push_back(std::make_unique<array_tuple_t>()); }
 					m_seg_allocated = m_segment.size();
 				}
 			}
@@ -91,7 +93,7 @@ namespace vecs {
 		auto max_capacity(size_t r) noexcept -> void {
 			if (r == 0) return;
 			auto segs = (r-1) / N + 1;
-			if (segs < m_segment.capacity()) {
+			if (segs > m_segment.capacity()) {
 				m_segment.reserve(segs);
 			}
 			m_seg_max = m_segment.capacity();
