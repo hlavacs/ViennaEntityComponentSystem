@@ -10,94 +10,110 @@
 
 namespace vecs {
 
-	template<typename E>
-	class VecsComponentTable;
-
-	class VecsRegistryBaseClass;
-
-	template<typename INFO, typename E, size_t L = 8>
-	class VecsTable {
-
-		template<typename E>
-		friend class VecsComponentTable;
-
-		friend class VecsRegistryBaseClass;
-
-	public:
+	template<typename DATA, size_t L = 10>
+	struct VecsTable {
 		static const size_t N = 1 << L;
 		static const uint64_t BIT_MASK = N - 1;
-		using array_tuple_t		= vtll::to_tuple<vtll::transform_size_t<E,std::array,N>>;
-		using data_tuple_t		= vtll::to_tuple<E>;
-		using ref_tuple_t		= vtll::to_ref_tuple<E>;
-		using entry_tuple_t		= std::tuple< INFO, index_t, data_tuple_t >;
-		using entry_ref_tuple_t	= std::tuple< INFO&, index_t&, ref_tuple_t >;
 
-	protected:
+		using array_tuple_t		= vtll::to_tuple<vtll::transform_size_t<DATA,std::array,N>>;
+		using data_tuple_t		= vtll::to_tuple<DATA>;
+		using ref_tuple_t		= vtll::to_ref_tuple<DATA>;
 
-		struct segment_t {
-			std::array<INFO, N>		m_info;		//entry information (handle, mutex, ...)
-			std::array<index_t, N>	m_prev;		//previous free entry index 
-			std::array<index_t, N>	m_next;		//next free entry index or use as free index
-			array_tuple_t			m_data;		//the entry data organized as arrays
-		};
+		using seg_ptr = std::unique_ptr<array_tuple_t>;
 
-		using seg_ptr = std::unique_ptr<segment_t>;
-
-		std::pmr::memory_resource*	m_mr = nullptr;
 		std::pmr::vector<seg_ptr>	m_segment;
 		std::atomic<size_t>			m_size = 0;
-		index_t						m_first_free{};
-		VecsReadWriteMutex			m_mutex_insert;
+		std::atomic<size_t>			m_seg_allocated = 0;
+		size_t						m_seg_max = 0;
+		std::mutex					m_mutex;
 
-		inline auto addr_info(uint32_t n) -> INFO*	{ return &m_segment[n >> L]->m_info[n & BIT_MASK]; };
-		inline auto addr_prev(uint32_t n) -> index_t*	{ return &m_segment[n >> L]->m_info[n & BIT_MASK]; };
+		VecsTable(size_t r = 1 << 16, std::pmr::memory_resource* mr = std::pmr::new_delete_resource()) noexcept
+			: m_segment{ mr }  { max_capacity(r); };
 
-		template<typename C>
-		inline auto addr_data(uint32_t n) -> C* { return std::get<vtll::index_of<E,C>>(m_segment[n >> L]->m_data)[n & BIT_MASK]; };
+		//Externally synchronized
+		template<size_t I>
+		inline auto ref(index_t n) noexcept -> vtll::Nth_type<DATA,I>& { return std::ref(std::get<I>(m_segment[n.value >> L])[n.value & BIT_MASK]); };
 
-	public:
-		VecsTable(size_t r, std::pmr::memory_resource* mr = std::pmr::new_delete_resource())  noexcept
-			: m_mr{ mr }, m_segment{ mr }  { reserve(r); };
+		//Externally synchronized
+		template<size_t I>
+		inline auto comp(index_t n) noexcept -> vtll::Nth_type<DATA, I> { return std::get<I>(m_segment[n.value >> L])[n.value & BIT_MASK]; };
 
-		template<typename TINFO, typename TNEXT, typename TDATA>
-		auto insert(TINFO&& info, TNEXT&& index, TDATA&& data) noexcept -> index_t;
+		//Externally synchronized
+		inline auto ref_data(index_t n) noexcept -> ref_tuple_t {
+			auto f = [&]<size_t... Is>(std::index_sequence<Is...> is) {
+				return std::make_tuple(std::ref(std::get<is>(m_segment[n.value >> L])[n.value & BIT_MASK])... );
+			};
+			return f(std::make_index_sequence<vtll::size<DATA>>{});
+		};
 
-		template<typename TINFO, typename TNEXT, typename TDATA>
-		auto update(TINFO&& info, TNEXT&& index, TDATA&& data) noexcept -> index_t;
+		//Externally synchronized
+		inline auto data(index_t n) noexcept -> data_tuple_t {
+			auto f = [&]<size_t... Is>(std::index_sequence<Is...> is) {
+				return std::make_tuple( std::get<is>(m_segment[n.value >> L])[n.value & BIT_MASK]...);
+			};
+			return f(std::make_index_sequence<vtll::size<DATA>>{});
+		};
 
-		template<typename T>
-		auto update(index_t index, T&& info) noexcept -> void;
+		//Internally synchronized
+		template<typename TDATA>
+		requires std::is_same_v<TDATA, data_tuple_t>
+		inline auto allocate_one() -> index_t {
+			auto idx = m_size.fetch_add(1);
+			reserve(idx);
+			return index_t{idx};
+		}
 
-		auto info(index_t index) noexcept	 -> INFO&;
-		auto next(index_t index) noexcept	 -> index_t&;
-		auto data(index_t index) noexcept	 -> ref_tuple_t&;
+		//Internally synchronized
+		auto reserve(size_t r) noexcept -> bool {
+			if (r == 0 || r > m_seg_max * N) return false;
+			if (m_seg_allocated.load() * N < r) {
+				const std::lock_guard<std::mutex> lock(m_mutex);
+				if (m_seg_allocated.load() * N < r) {
+					while (m_segment.size() * N < r) { m_segment.push_back({}); }
+					m_seg_allocated = m_segment.size();
+				}
+			}
+			return true;
+		}
 
-		auto invalidate(index_t index)		 -> bool;
-		auto erase_one()					 -> std::tuple<INFO&, index_t>;
+		//Externally synchronized
+		auto max_capacity(size_t r) noexcept -> void {
+			if (r == 0) return;
+			auto segs = (r-1) / N + 1;
+			if (segs < m_segment.capacity()) {
+				m_segment.reserve(segs);
+			}
+			m_seg_max = m_segment.capacity();
+		}
 
-		auto size() const noexcept			 -> size_t { return m_size; };
-		auto reserve(size_t r) noexcept		 -> void;
+		//Externally synchronized
+		auto compress() noexcept -> void {
+			while (m_segment.size() > 1 && m_size + N <= m_segment.size() * N) {
+				m_segment.pop_back();
+			}
+			m_seg_allocated = m_segment.size();
+		}
 	};
 
 
-	template<typename INFO, typename E, size_t L> 
-	template<typename TINFO, typename TNEXT, typename TDATA>
-	inline auto VecsTable<INFO, E, L>::insert(TINFO&& info, TNEXT&& index, TDATA&& data) noexcept -> index_t {
 
-		static_assert(	std::is_same_v<TINFO, INFO> &&  std::is_same_v<TNEXT, index_t> 
+	/*
+	template<typename DATA, size_t L> 
+	template<typename TDATA>
+	inline auto VecsTable<DATA, L>::insert(TDATA&& data) noexcept -> index_t {
+
+		static_assert(	std::is_same_v<TINFO, INFO> &&  std::is_same_v<TIDX, index_t>
 						&& std::is_same_v<TDATA, typename VecsTable<INFO, E, L>::data_tuple_t>);
 
 		{
-			VecsSpinLockWrite mutex(m_mutex_insert);
+			const std::lock_guard<std::mutex> lock(m_mutex);
 
 			if (!m_first_free.is_null()) {		//there is an empty slot in the table
 				auto free = m_first_free;
-
-				/*m_first_free = ptr->m_next;
-				*ptr = value;
-				m_segment[free.value >> L]->m_size++;
-				m_size++;*/
-				return free.value;
+				m_first_free = ref_next(free);
+				ref(free) = data;
+				m_size++;
+				return free;
 			}
 
 			if (m_size < m_segment.size() * N) {	//append within last segment
@@ -115,18 +131,15 @@ namespace vecs {
 		//return push_back3(value);
 	}
 
-	template<typename INFO, typename E, size_t L> 
-	template<typename TINFO, typename TNEXT, typename TDATA>
-	inline auto VecsTable<INFO, E, L>::update(TINFO&& info, TNEXT&& index, TDATA&& data) noexcept -> index_t {
-		static_assert(	std::is_same_v<TINFO, INFO> && std::is_same_v<TNEXT, index_t> 
-						&& std::is_same_v<TDATA, typename VecsTable<INFO, E, L>::data_tuple_t>);
+	template<typename DATA, size_t L> 
+	inline auto VecsTable<DATA, L>::update(index_t index, DATA&& data) noexcept -> index_t {
 
 		return index_t{};
 	}
 
-	template<typename INFO, typename E, size_t L> 
-	template<typename T>
-	inline auto VecsTable<INFO, E, L>::update(index_t index, T&& info) noexcept -> void {
+	template<typename DATA, size_t L> 
+	template<typename C>
+	inline auto VecsTable<DATA, L>::update(index_t index, C&& info) noexcept -> void {
 		static_assert(	std::is_same_v<T, INFO> || std::is_same_v<T, index_t> 
 						|| std::is_same_v<T, typename VecsTable<INFO, E, L>::data_tuple_t> );
 
@@ -134,6 +147,11 @@ namespace vecs {
 
 	template<typename INFO, typename E, size_t L>
 	inline auto VecsTable<INFO, E, L>::info(index_t index) noexcept	-> INFO& {
+
+	}
+
+	template<typename INFO, typename E, size_t L>
+	inline auto VecsTable<INFO, E, L>::prev(index_t index) noexcept	-> index_t& {
 
 	}
 
@@ -162,7 +180,7 @@ namespace vecs {
 	inline auto VecsTable<INFO,E,L>::reserve(size_t r) noexcept		-> void {
 		while (m_segment.size() * N < r) m_segment.push_back({});
 	}
-
+	*/
 
 
 	/*
