@@ -346,7 +346,13 @@ namespace vecs {
 			entry_t(const entry_t& other) {};
 		};
 
+		using types = vtll::type_list<index_t, counter16_t, VecsReadWriteMutex>;
+		static const uint32_t m_next = 0;
+		static const uint32_t m_counter = 1;
+		static const uint32_t m_mutex = 2;
+
 		static inline std::vector<entry_t>	m_entity_table;
+		static inline VecsTable<types>		m_entity_table2;
 		static inline index_t				m_first_free{};
 
 		static inline std::array<std::unique_ptr<VecsRegistryBaseClass>, vtll::size<VecsEntityTypeList>::value> m_dispatch;
@@ -486,7 +492,9 @@ namespace vecs {
 	template<typename E>
 	inline auto VecsRegistry<E>::updateC(const VecsHandle& handle, size_t compidx, void* ptr, size_t size) noexcept -> bool {
 		if (!contains(handle)) return {};
-		return VecsComponentTable<E>().updateC(m_entity_table[handle.m_entity_index.value].m_next_free_or_comp_index, compidx, ptr, size);
+		//return VecsComponentTable<E>().updateC(m_entity_table[handle.m_entity_index.value].m_next_free_or_comp_index, compidx, ptr, size);
+
+		return VecsComponentTable<E>().updateC( m_entity_table2.comp_ref_idx<m_next>(handle.m_entity_index), compidx, ptr, size );
 	}
 
 	template<typename E>

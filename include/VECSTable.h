@@ -32,24 +32,23 @@ namespace vecs {
 
 		//Externally synchronized
 		template<size_t I>
-		inline auto ref(index_t n) noexcept -> vtll::Nth_type<DATA,I>& { return std::ref(std::get<I>(m_segment[n.value >> L])[n.value & BIT_MASK]); };
+		inline decltype(auto) comp_ref_idx(index_t n) noexcept { return std::ref(std::get<I>(*m_segment[n.value >> L])[n.value & BIT_MASK]); };
+
+		template<typename C>
+		inline decltype(auto) comp_ref_type(index_t n) noexcept { return std::ref(std::get<vtll::index_of<DATA,C>::value>(*m_segment[n.value >> L])[n.value & BIT_MASK]); };
 
 		//Externally synchronized
-		template<size_t I>
-		inline auto comp(index_t n) noexcept -> vtll::Nth_type<DATA, I> { return std::get<I>(m_segment[n.value >> L])[n.value & BIT_MASK]; };
-
-		//Externally synchronized
-		inline auto ref_data(index_t n) noexcept -> ref_tuple_t {
+		inline auto tuple_ref(index_t n) noexcept -> ref_tuple_t {
 			auto f = [&]<size_t... Is>(std::index_sequence<Is...> is) {
-				return std::make_tuple(std::ref(std::get<is>(m_segment[n.value >> L])[n.value & BIT_MASK])... );
+				return std::make_tuple(std::ref(std::get<is>(*m_segment[n.value >> L])[n.value & BIT_MASK])... );
 			};
 			return f(std::make_index_sequence<vtll::size<DATA>>{});
 		};
 
 		//Externally synchronized
-		inline auto data(index_t n) noexcept -> data_tuple_t {
+		inline auto tuple_value(index_t n) noexcept -> data_tuple_t {
 			auto f = [&]<size_t... Is>(std::index_sequence<Is...> is) {
-				return std::make_tuple( std::get<is>(m_segment[n.value >> L])[n.value & BIT_MASK]...);
+				return std::make_tuple( std::get<is>(*m_segment[n.value >> L])[n.value & BIT_MASK]...);
 			};
 			return f(std::make_index_sequence<vtll::size<DATA>>{});
 		};
@@ -68,7 +67,7 @@ namespace vecs {
 		requires std::is_same_v<TDATA, data_tuple_t>
 		inline auto update(index_t index, TDATA&& data ) -> bool {
 			if (index.value >= m_size) return false;
-			auto ref = ref_data(index);
+			auto ref = tuple_value(index);
 			vtll::static_for<size_t, 0, vtll::size<DATA>::value >([&](auto i) { std::get<i>(ref) = std::get<i>(data); } );
 			return true;
 		}
