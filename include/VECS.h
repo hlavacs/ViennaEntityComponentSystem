@@ -116,6 +116,11 @@ namespace vecs {
 		auto erase() noexcept		-> bool { return m_handle.erase(*this); };
 		auto name() const noexcept	-> std::string { return typeid(E).name(); };
 
+		template<size_t I>
+		auto component() noexcept -> std::optional<vtll::Nth_type<E,I>> {
+			return { std::get<I>(m_component_data) };
+		};
+
 		template<typename C>
 		auto component() noexcept -> std::optional<C> {
 			if constexpr (vtll::has_type<E,C>::value) {
@@ -277,8 +282,9 @@ namespace vecs {
 	inline auto VecsComponentTable<E>::update(const index_t index, ET&& ent) noexcept -> bool {
 		vtll::static_for<size_t, 0, vtll::size<E>::value >(
 			[&](auto i) {
-				using type = vtll::Nth_type<E, i>;
-				std::get<i>(m_components)[index.value] = ent.component<type>().value();
+				//using type = vtll::Nth_type<E, i>;
+				//std::get<i>(m_components)[index.value] = ent.component<type>().value();
+				m_data.update<c_info_size + i>(index, ent.component<i>().value());
 			}
 		);
 		return true;
