@@ -407,7 +407,7 @@ namespace vtll {
 	namespace detail {
 		template<size_t Begin, typename T, size_t... Is>
 		constexpr auto sub_tuple_impl(T&& tup, std::index_sequence<Is...>) {
-			return std::make_tuple( std::get<Begin + Is>(tup)... );
+			return std::make_tuple(std::get<Begin + Is>(tup)...);
 		}
 	}
 
@@ -416,9 +416,34 @@ namespace vtll {
 		return detail::sub_tuple_impl<Begin>(std::forward<T>(tup), std::make_integer_sequence<size_t, End - Begin>{ });
 	}
 
-	static_assert( is_same_tuple(sub_tuple<2, 4>(std::make_tuple(1, "a", 4.5, 'C', 5.0f)), std::make_tuple(4.5, 'C')), "The implementation of sub_tuple is bad");
+	static_assert(is_same_tuple(sub_tuple<2, 4>(std::make_tuple(1, "a", 4.5, 'C', 5.0f)), std::make_tuple(4.5, 'C')), "The implementation of sub_tuple is bad");
 	static_assert(!is_same_tuple(sub_tuple<2, 4>(std::make_tuple(1, "a", 4.5, 'C', 5.0f)), std::make_tuple("a", 4.5, 'C')), "The implementation of sub_tuple is bad");
 	static_assert(!is_same_tuple(sub_tuple<2, 4>(std::make_tuple(1, "a", 4.5, 'C', 5.0f)), std::make_tuple('C')), "The implementation of sub_tuple is bad");
+
+
+	//-------------------------------------------------------------------------
+	//sub_ref_tuple: extract a subtuple of references from a tuple
+
+	namespace detail {
+		template<size_t Begin, typename T, size_t... Is>
+		constexpr auto sub_ref_tuple_impl(T&& tup, std::index_sequence<Is...>) {
+			return std::make_tuple( std::ref(std::get<Begin + Is>(tup))... );
+		}
+	}
+
+	template <size_t Begin, size_t End, typename T>
+	constexpr auto sub_ref_tuple(T&& tup) {
+		return detail::sub_ref_tuple_impl<Begin>(std::forward<T>(tup), std::make_integer_sequence<size_t, End - Begin>{ });
+	}
+
+	/*assert( 
+		is_same_tuple(
+			sub_ref_tuple<2, 4>(
+				std::make_tuple(detail::a, detail::b, detail::c, detail::d, detail::e ))
+			
+			, std::make_tuple(std::ref(detail::c), std::ref(detail::d)))
+		, "The implementation of sub_ref_tuple is bad");
+		*/
 
 	//-------------------------------------------------------------------------
 	//has_type: check whether a type list contains a type

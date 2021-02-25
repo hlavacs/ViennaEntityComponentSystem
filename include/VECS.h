@@ -247,11 +247,14 @@ namespace vecs {
 	inline auto VecsComponentTable<E>::references(const index_t index) noexcept -> typename VecsComponentTable<E>::tuple_type_ref {
 		assert(index.value < m_handles.size());
 
-		auto f = [&]<typename... Cs>(std::tuple<std::pmr::vector<Cs>...>& tup) {
+		/*auto f = [&]<typename... Cs>(std::tuple<std::pmr::vector<Cs>...>& tup) {
 			return std::tie( std::get<vtll::index_of<E,Cs>::value>(tup)[index.value]... );
 		};
 
-		return f(m_components);
+		return f(m_components);*/
+
+		decltype(auto) tup = m_data.tuple_ref(index);
+		return vtll::sub_ref_tuple< c_info_size, std::tuple_size_v<decltype(tup)> >(tup);
 	}
 
 	template<typename E> 
