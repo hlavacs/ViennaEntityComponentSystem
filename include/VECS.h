@@ -329,7 +329,8 @@ namespace vecs {
 
 		auto update(const index_t index, C&& comp) noexcept -> bool {
 			if constexpr (vtll::has_type<E, C>::value) {
-				std::get< vtll::index_of<E, C>::type::value >(this->m_components)[index.value] = comp;
+				//std::get< vtll::index_of<E, C>::value >(this->m_components)[index.value] = comp;
+				this->m_data.comp_ref_idx<this->c_info_size + vtll::index_of<E, C>::value>() = comp;
 				return true;
 			}
 			return false;
@@ -337,8 +338,9 @@ namespace vecs {
 
 		auto updateC(index_t entidx, size_t compidx, void* ptr, size_t size) noexcept -> bool {
 			if constexpr (vtll::has_type<E, C>::value) {
-				auto tuple = this->references(entidx);
-				memcpy((void*)&std::get<vtll::index_of<E,C>::value>(tuple), ptr, size);
+				//auto tuple = this->references(entidx);
+				//memcpy((void*)&std::get<vtll::index_of<E,C>::value>(tuple), ptr, size);
+				memcpy((void*)& this->m_data.comp_ref_idx<this->c_info_size + vtll::index_of<E,C>::value>(entidx), ptr, size);
 				return true;
 			}
 			return false;
@@ -347,7 +349,8 @@ namespace vecs {
 		auto componentE(index_t entidx, size_t compidx, void* ptr, size_t size)  noexcept -> bool {
 			if constexpr (vtll::has_type<E,C>::value) {
 				auto tuple = this->references(entidx);
-				memcpy(ptr, (void*)&std::get<vtll::index_of<E,C>::value>(tuple), size);
+				//memcpy(ptr, (void*)&std::get<vtll::index_of<E,C>::value>(tuple), size);
+				memcpy(ptr, (void*)& this->m_data.comp_ref_idx<this->c_info_size + vtll::index_of<E, C>::value>(entidx), size);
 				return true;
 			}
 			return false;
