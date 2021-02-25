@@ -236,7 +236,8 @@ namespace vecs {
 
 	template<typename E>
 	inline auto VecsComponentTable<E>::values(const index_t index) noexcept -> typename VecsComponentTable<E>::tuple_type {
-		assert(index.value < m_handles.size());
+		//assert(index.value < m_handles.size());
+		assert(index.value < m_data.size());
 
 		/*auto f = [&]<typename... Cs>(std::tuple<std::pmr::vector<Cs>...>& tup) {
 			return std::make_tuple(std::get<vtll::index_of<E, Cs>::value>(tup)[index.value]...);
@@ -249,7 +250,8 @@ namespace vecs {
 
 	template<typename E> 
 	inline auto VecsComponentTable<E>::references(const index_t index) noexcept -> typename VecsComponentTable<E>::tuple_type_ref {
-		assert(index.value < m_handles.size());
+		//assert(index.value < m_handles.size());
+		assert(index.value < m_data.size());
 
 		/*auto f = [&]<typename... Cs>(std::tuple<std::pmr::vector<Cs>...>& tup) {
 			return std::tie( std::get<vtll::index_of<E,Cs>::value>(tup)[index.value]... );
@@ -263,7 +265,9 @@ namespace vecs {
 
 	template<typename E> 
 	inline auto VecsComponentTable<E>::handle(const index_t index) noexcept -> VecsHandle {
-		assert(index.value < m_handles.size());
+		//assert(index.value < m_handles.size());
+		assert(index.value < m_data.size());
+
 		//return { m_handles[index.value].m_handle };
 		return m_data.comp_ref_idx<c_handle>(index);
 	}
@@ -271,7 +275,9 @@ namespace vecs {
 	template<typename E>
 	template<typename C>
 	inline auto VecsComponentTable<E>::component(const index_t index) noexcept -> C& {
-		assert(index.value < m_handles.size());
+		//assert(index.value < m_handles.size());
+		assert(index.value < m_data.size());
+
 		//return std::get<vtll::index_of<E, C>::value>(m_components)[index.value];
 		return m_data.comp_ref_idx<c_info_size + vtll::index_of<E,C>::value>(index);
 	}
@@ -291,7 +297,9 @@ namespace vecs {
 
 	template<typename E>
 	inline auto VecsComponentTable<E>::erase(const index_t index) noexcept -> std::tuple<VecsHandle, index_t> {
-		assert(index.value < m_handles.size());
+		//assert(index.value < m_handles.size());
+		assert(index.value < m_data.size());
+
 		/*if (index.value < m_handles.size() - 1) {
 			std::swap(m_handles[index.value], m_handles[m_handles.size() - 1]);
 			m_handles.pop_back();
