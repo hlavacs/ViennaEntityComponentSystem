@@ -378,6 +378,24 @@ namespace vtll {
 		"The implementation of to_ptr_tuple is bad");
 
 	//-------------------------------------------------------------------------
+	//is_same_tuple: test whether two tuples are the same
+
+	namespace detail {
+		template<typename T, size_t... Is>
+		constexpr auto is_same_tuple_impl(const T& t1, const T& t2, std::index_sequence<Is...>) {
+			return ( (std::get<Is>(t1) == std::get<Is>(t2)) && ... );
+		}
+	}
+
+	template <typename T>
+	constexpr auto is_same_tuple(const T& t1, const T& t2 ) {
+		return detail::is_same_tuple_impl(t1, t2, std::make_index_sequence<std::tuple_size_v<T>>{ });
+	}
+
+	static_assert( is_same_tuple(std::make_tuple(1, "a", 4.5), std::make_tuple(1, "a", 4.5)), "The implementation of is_same_tuple is bad");
+	static_assert(!is_same_tuple(std::make_tuple(1, "a", 4.5), std::make_tuple(1, "b", 4.5)), "The implementation of is_same_tuple is bad");
+
+	//-------------------------------------------------------------------------
 	//sub_tuple: extract a subtuple from a tuple
 
 	namespace detail {
