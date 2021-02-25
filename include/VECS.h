@@ -35,14 +35,11 @@ namespace vecs {
 	//definition of the types used in VECS
 
 	class VecsHandle;
-
-	template <typename E>
-	class VecsEntity;
-
+	template <typename E> class VecsEntity;
+	template<typename E> class VecsComponentTable;
+	template<typename E, typename C> class VecsComponentTableDerived;
 	class VecsRegistryBaseClass;
-
-	template<typename E>
-	class VecsRegistry;
+	template<typename E> class VecsRegistry;
 
 	//-------------------------------------------------------------------------
 	//entity handle
@@ -53,8 +50,9 @@ namespace vecs {
 	*/
 
 	class VecsHandle {
-		template<typename E>
-		friend class VecsRegistry;
+		template<typename E> friend class VecsRegistry;
+		template<typename E> friend class VecsComponentTable;
+		template<typename E, typename C> friend class VecsComponentTableDerived;
 
 	protected:
 		index_t		m_entity_index{};			//the slot of the entity in the entity list
@@ -293,12 +291,15 @@ namespace vecs {
 	template<typename E>
 	inline auto VecsComponentTable<E>::erase(const index_t index) noexcept -> std::tuple<VecsHandle, index_t> {
 		assert(index.value < m_handles.size());
-		if (index.value < m_handles.size() - 1) {
+		/*if (index.value < m_handles.size() - 1) {
 			std::swap(m_handles[index.value], m_handles[m_handles.size() - 1]);
 			m_handles.pop_back();
 			return std::make_pair(m_handles[index.value].m_handle, index);
 		}
 		m_handles.pop_back();
+		return std::make_tuple(VecsHandle{}, index_t{});
+		*/
+		m_data.comp_ref_idx<c_handle>(index).m_type_index = {};
 		return std::make_tuple(VecsHandle{}, index_t{});
 	}
 
