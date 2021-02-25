@@ -149,9 +149,7 @@ namespace vecs {
 	template<typename E>
 	class VecsComponentTable : public VecsMonostate<VecsComponentTable<E>> {
 		friend class VecsRegistryBaseClass;
-
-		template<typename E>
-		friend class VecsRegistry;
+		template<typename E> friend class VecsRegistry;
 
 	public:
 		using tuple_type	 = vtll::to_tuple<E>;
@@ -215,14 +213,6 @@ namespace vecs {
 
 	template<typename E> [[nodiscard]] 
 	inline auto VecsComponentTable<E>::insert(VecsHandle& handle, tuple_type&& tuple) noexcept -> index_t {
-		/*m_handles.emplace_back(handle);
-		vtll::static_for<size_t, 0, vtll::size<E>::value >(
-			[&](auto i) {
-				std::get<i>(m_components).push_back(std::get<i>(tuple));
-			}
-		);
-		return index_t{ static_cast<typename index_t::type_name>(m_handles.size() - 1) };*/
-
 		auto idx = m_data.allocate_one();
 		if (idx.is_null()) return idx;
 		m_data.update<c_handle>(idx, handle);
@@ -236,49 +226,28 @@ namespace vecs {
 
 	template<typename E>
 	inline auto VecsComponentTable<E>::values(const index_t index) noexcept -> typename VecsComponentTable<E>::tuple_type {
-		//assert(index.value < m_handles.size());
 		assert(index.value < m_data.size());
-
-		/*auto f = [&]<typename... Cs>(std::tuple<std::pmr::vector<Cs>...>& tup) {
-			return std::make_tuple(std::get<vtll::index_of<E, Cs>::value>(tup)[index.value]...);
-		};
-		return f(m_components);*/
-
 		auto tup = m_data.tuple_value(index);
 		return vtll::sub_tuple< c_info_size, std::tuple_size_v<decltype(tup)> >(tup);
 	}
 
 	template<typename E> 
 	inline auto VecsComponentTable<E>::references(const index_t index) noexcept -> typename VecsComponentTable<E>::tuple_type_ref {
-		//assert(index.value < m_handles.size());
 		assert(index.value < m_data.size());
-
-		/*auto f = [&]<typename... Cs>(std::tuple<std::pmr::vector<Cs>...>& tup) {
-			return std::tie( std::get<vtll::index_of<E,Cs>::value>(tup)[index.value]... );
-		};
-
-		return f(m_components);*/
-
 		auto tup = m_data.tuple_ref(index);
 		return vtll::sub_ref_tuple<c_info_size, std::tuple_size_v<decltype(tup)> >(tup);
 	}
 
 	template<typename E> 
 	inline auto VecsComponentTable<E>::handle(const index_t index) noexcept -> VecsHandle {
-		//assert(index.value < m_handles.size());
 		assert(index.value < m_data.size());
-
-		//return { m_handles[index.value].m_handle };
 		return m_data.comp_ref_idx<c_handle>(index);
 	}
 
 	template<typename E>
 	template<typename C>
 	inline auto VecsComponentTable<E>::component(const index_t index) noexcept -> C& {
-		//assert(index.value < m_handles.size());
 		assert(index.value < m_data.size());
-
-		//return std::get<vtll::index_of<E, C>::value>(m_components)[index.value];
 		return m_data.comp_ref_idx<c_info_size + vtll::index_of<E,C>::value>(index);
 	}
 
@@ -287,8 +256,6 @@ namespace vecs {
 	inline auto VecsComponentTable<E>::update(const index_t index, ET&& ent) noexcept -> bool {
 		vtll::static_for<size_t, 0, vtll::size<E>::value >(
 			[&](auto i) {
-				//using type = vtll::Nth_type<E, i>;
-				//std::get<i>(m_components)[index.value] = ent.component<type>().value();
 				m_data.update<c_info_size + i>(index, ent.component<i>().value());
 			}
 		);
@@ -297,18 +264,7 @@ namespace vecs {
 
 	template<typename E>
 	inline auto VecsComponentTable<E>::erase(const index_t index) noexcept -> std::tuple<VecsHandle, index_t> {
-		//assert(index.value < m_handles.size());
 		assert(index.value < m_data.size());
-
-		/*if (index.value < m_handles.size() - 1) {
-			std::swap(m_handles[index.value], m_handles[m_handles.size() - 1]);
-			m_handles.pop_back();
-			return std::make_pair(m_handles[index.value].m_handle, index);
-		}
-		m_handles.pop_back();
-		return std::make_tuple(VecsHandle{}, index_t{});
-		*/
-
 		const std::lock_guard<std::mutex> lock(m_data.m_mutex);
 		m_data.comp_ref_idx<c_handle>(index) = {};	//invalidate handle
 		m_data.comp_ref_idx<c_prev>(index) = {};
@@ -346,8 +302,6 @@ namespace vecs {
 
 		auto updateC(index_t entidx, size_t compidx, void* ptr, size_t size) noexcept -> bool {
 			if constexpr (vtll::has_type<E, C>::value) {
-				//auto tuple = this->references(entidx);
-				//memcpy((void*)&std::get<vtll::index_of<E,C>::value>(tuple), ptr, size);
 				memcpy((void*)& this->m_data.comp_ref_idx<this->c_info_size + vtll::index_of<E,C>::value>(entidx), ptr, size);
 				return true;
 			}
@@ -357,7 +311,6 @@ namespace vecs {
 		auto componentE(index_t entidx, size_t compidx, void* ptr, size_t size)  noexcept -> bool {
 			if constexpr (vtll::has_type<E,C>::value) {
 				auto tuple = this->references(entidx);
-				//memcpy(ptr, (void*)&std::get<vtll::index_of<E,C>::value>(tuple), size);
 				memcpy(ptr, (void*)& this->m_data.comp_ref_idx<this->c_info_size + vtll::index_of<E, C>::value>(entidx), size);
 				return true;
 			}

@@ -11,7 +11,11 @@
 namespace vecs {
 
 	template<typename DATA, size_t L = 10>
-	struct VecsTable {
+	class VecsTable {
+		template<typename E> friend class VecsRegistry;
+		template<typename E> friend class VecsComponentTable;
+		template<typename E, typename C> friend class VecsComponentTableDerived;
+
 		static const size_t N = 1 << L;
 		static const uint64_t BIT_MASK = N - 1;
 
@@ -27,6 +31,7 @@ namespace vecs {
 		size_t						m_seg_max = 0;
 		std::mutex					m_mutex;
 
+	public:
 		VecsTable(size_t r = 1 << 16, std::pmr::memory_resource* mr = std::pmr::new_delete_resource()) noexcept
 			: m_segment{ mr }  { max_capacity(r); };
 
@@ -128,205 +133,6 @@ namespace vecs {
 		}
 	};
 
-
-
-	/*
-	template<typename DATA, size_t L> 
-	template<typename TDATA>
-	inline auto VecsTable<DATA, L>::insert(TDATA&& data) noexcept -> index_t {
-
-		static_assert(	std::is_same_v<TINFO, INFO> &&  std::is_same_v<TIDX, index_t>
-						&& std::is_same_v<TDATA, typename VecsTable<INFO, E, L>::data_tuple_t>);
-
-		{
-			const std::lock_guard<std::mutex> lock(m_mutex);
-
-			if (!m_first_free.is_null()) {		//there is an empty slot in the table
-				auto free = m_first_free;
-				m_first_free = ref_next(free);
-				ref(free) = data;
-				m_size++;
-				return free;
-			}
-
-			if (m_size < m_segment.size() * N) {	//append within last segment
-				//return push_back3(value);
-			}
-
-		}
-
-		if (m_size < m_segment.capacity() * N) { //append new segment, no reallocation
-			m_segment.push_back({});
-			//return push_back3(value);
-		}
-
-		m_segment.push_back({});	//reallocate vector
-		//return push_back3(value);
-	}
-
-	template<typename DATA, size_t L> 
-	inline auto VecsTable<DATA, L>::update(index_t index, DATA&& data) noexcept -> index_t {
-
-		return index_t{};
-	}
-
-	template<typename DATA, size_t L> 
-	template<typename C>
-	inline auto VecsTable<DATA, L>::update(index_t index, C&& info) noexcept -> void {
-		static_assert(	std::is_same_v<T, INFO> || std::is_same_v<T, index_t> 
-						|| std::is_same_v<T, typename VecsTable<INFO, E, L>::data_tuple_t> );
-
-	}
-
-	template<typename INFO, typename E, size_t L>
-	inline auto VecsTable<INFO, E, L>::info(index_t index) noexcept	-> INFO& {
-
-	}
-
-	template<typename INFO, typename E, size_t L>
-	inline auto VecsTable<INFO, E, L>::prev(index_t index) noexcept	-> index_t& {
-
-	}
-
-	template<typename INFO, typename E, size_t L>
-	inline auto VecsTable<INFO, E, L>::next(index_t index) noexcept	-> index_t& {
-
-	}
-
-	template<typename INFO, typename E, size_t L>
-	inline auto VecsTable<INFO, E, L>::data(index_t index) noexcept	-> typename VecsTable<INFO, E, L>::ref_tuple_t& {
-
-	}
-
-	template<typename INFO, typename E, size_t L>
-	inline auto VecsTable<INFO, E, L>::invalidate(index_t index)	-> bool {
-
-	}
-
-	template<typename INFO, typename E, size_t L>
-	inline auto VecsTable<INFO, E, L>::erase_one()					-> std::tuple<INFO&, index_t> {
-
-	}
-
-
-	template<typename INFO, typename E, size_t L>
-	inline auto VecsTable<INFO,E,L>::reserve(size_t r) noexcept		-> void {
-		while (m_segment.size() * N < r) m_segment.push_back({});
-	}
-	*/
-
-
-	/*
-
-	template<typename T, size_t L = 8, int SYNC = 2, bool SHRINK = false>
-	class VecsVector {
-	protected:
-		static const size_t N = 1 << L;
-		const uint64_t BIT_MASK = N - 1;
-
-		struct VecsTableSegment {
-			std::array<T, N> m_entry;
-		};
-
-		using seg_ptr = std::unique_ptr<VecsTableSegment>;
-
-		std::pmr::memory_resource*	m_mr = nullptr;
-		std::pmr::vector<seg_ptr>	m_segment;
-		std::atomic<size_t>			m_size = 0;
-		std::shared_timed_mutex 	m_mutex;		//guard reads and writes
-		std::mutex 					m_mutex_append;	//guard reads and writes
-
-		T* address(size_t) noexcept;
-		size_t push_back2(T&&) noexcept;
-		size_t push_back3(T&&) noexcept;
-
-	public:
-		VecsVector(std::pmr::memory_resource* mr = std::pmr::new_delete_resource())  noexcept
-			: m_mr{ mr }, m_segment{mr}  {};
-		std::optional<T>	at(size_t n) noexcept;
-		void				set(size_t n, T&& v) noexcept;
-		size_t				size() const noexcept { return m_size; };
-		size_t				push_back(T&&) noexcept;
-		std::optional<T>	pop_back() noexcept;
-		void				erase(size_t n) noexcept;
-		void				swap(size_t n1, size_t n2) noexcept;
-		void				reserve(size_t n) noexcept;
-	};
-
-	//---------------------------------------------------------------------------
-
-	template<typename T, size_t L = 8, int SYNC = 2, bool SHRINK = false>
-	class VecsTable {
-	protected:
-		static const size_t N = 1 << L;
-		const uint64_t BIT_MASK = N - 1;
-
-		struct VecsTableEntry {
-			T		m_data;		//the entry data 
-			index_t m_next{};	//use for list of free entries
-		};
-
-		struct VecsTableSegment {
-			std::array<VecsTableEntry, N> m_entry;
-			size_t						m_size = 0;
-		};
-
-		using seg_ptr = std::unique_ptr<VecsTableSegment>;
-
-		std::pmr::memory_resource*  m_mr = nullptr;
-		std::pmr::vector<seg_ptr>	m_segment;
-		std::atomic<size_t>			m_size = 0;
-		index_t						m_first_free{};
-		std::shared_timed_mutex 	m_mutex;		//guard reads and writes
-		std::mutex 					m_mutex_append;	//guard reads and writes
-
-		T* address(size_t) noexcept;
-		size_t add2(T&&) noexcept;
-		size_t push_back3(T&&) noexcept;
-
-	public:
-		VecsTable(std::pmr::memory_resource* mr = std::pmr::new_delete_resource())  noexcept
-			: m_mr{ mr }, m_segment{ mr }  {};
-		std::optional<T>	at(size_t n) noexcept;
-		void				set(size_t n, T&& v) noexcept;
-		size_t				size() const noexcept { return m_size; };
-		size_t				add(T&&) noexcept;
-		void				erase(size_t n) noexcept;
-		void				swap(size_t n1, size_t n2) noexcept;
-		void				reserve(size_t n) noexcept;
-	};
-
-	//---------------------------------------------------------------------------
-
-	template<typename T, typename ID, size_t L = 8, int SYNC = 2, bool SHRINK = false>
-	class VecsSlotMap {
-	protected:
-		static const size_t N = 1 << L;
-		const uint64_t BIT_MASK = N - 1;
-
-		struct VecsMapEntry {
-			index_t	m_entry_index;
-			ID		m_id;
-		};
-
-		VecsVector<T, L, 0, SHRINK>			m_entry;
-		VecsTable<VecsMapEntry, L, 0, SHRINK>	m_map;
-		std::shared_timed_mutex 			m_mutex;		//guard reads and writes
-		std::mutex 							m_mutex_append;	//guard appends
-
-	public:
-		VecsSlotMap(std::pmr::memory_resource* mr = std::pmr::new_delete_resource())  noexcept
-			: m_entry{ mr }, m_map{ mr }  {};
-		std::optional<T>	at(size_t n, ID& id) noexcept;
-		void				set(size_t n, ID& id, T&& v) noexcept;
-		size_t				size() const noexcept { return m_entry.size(); };
-		size_t				add(ID&& id, T&& v) noexcept;
-		void				erase(size_t n, ID& id) noexcept;
-		void				swap(size_t n1, size_t n2) noexcept;
-		void				reserve(size_t n) noexcept { m_entry.reserve(n); m_map.reserve(n); };
-	};
-
-	*/
 }
 
 
