@@ -161,9 +161,9 @@ namespace vecs {
 		static const uint32_t c_next = 2;
 		static const uint32_t c_info_size = 3;
 
-		using types = vtll::cat< info, E >;
-		using tuple_type2 = vtll::to_tuple<types>;
-		using tuple_type_ref2 = vtll::to_ref_tuple<types>;
+		using types2 = vtll::cat< info, E >;
+		using tuple_type2 = vtll::to_tuple<types2>;
+		using tuple_type_ref2 = vtll::to_ref_tuple<types2>;
 
 	protected:
 		struct entry_t {
@@ -173,7 +173,7 @@ namespace vecs {
 		static inline std::vector<entry_t>	m_handles;
 		static inline tuple_type_vec		m_components;
 
-		static inline VecsTable<types>		m_data;
+		static inline VecsTable<types2>		m_data;
 
 		static inline std::array<std::unique_ptr<VecsComponentTable<E>>, vtll::size<VecsComponentTypeList>::value> m_dispatch; //one for each component type
 
@@ -195,7 +195,10 @@ namespace vecs {
 		auto values(const index_t index) noexcept						-> tuple_type;
 		auto references(const index_t index) noexcept					-> tuple_type_ref;
 		auto handle(const index_t index) noexcept						-> VecsHandle;
-		auto size() noexcept											-> size_t { return m_handles.size(); };
+		auto size() noexcept											-> size_t { 
+			//return m_handles.size();
+			return m_data.size();
+		};
 		auto erase(const index_t idx) noexcept							-> std::tuple<VecsHandle, index_t>;
 
 		template<typename C>
@@ -208,15 +211,23 @@ namespace vecs {
 
 	template<typename E> [[nodiscard]] 
 	inline auto VecsComponentTable<E>::insert(VecsHandle& handle, tuple_type&& tuple) noexcept -> index_t {
-		m_handles.emplace_back(handle);
-
+		/*m_handles.emplace_back(handle);
 		vtll::static_for<size_t, 0, vtll::size<E>::value >(
 			[&](auto i) {
 				std::get<i>(m_components).push_back(std::get<i>(tuple));
 			}
 		);
+		return index_t{ static_cast<typename index_t::type_name>(m_handles.size() - 1) };*/
 
-		return index_t{ static_cast<typename index_t::type_name>(m_handles.size() - 1) };
+		auto idx = m_data.allocate_one();
+		if (idx.is_null()) return idx;
+		m_data.update<0>(idx, handle);
+		/*vtll::static_for<size_t, 0, vtll::size<E>::value >(
+			[&](auto i) {
+				std::get<c_info_size + i>(m_components).push_back(std::get<i>(tuple));
+			}
+		);*/
+		return idx;
 	};
 
 	template<typename E>

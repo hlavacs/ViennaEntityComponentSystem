@@ -9,6 +9,15 @@
 using namespace vecs;
 
 int main() {
+    using info = vtll::type_list<VecsHandle, index_t, index_t>;
+    static const uint32_t c_handle = 0;
+    static const uint32_t c_prev = 1;
+    static const uint32_t c_next = 2;
+    static const uint32_t c_info_size = 3;
+
+    using types2 = vtll::cat< info, VeEntityTypeNode >;
+    std::cout << typeid(types2).hash_code() << " " << typeid(types2).name() << std::endl;
+
     
     std::cout << sizeof(VecsHandle) << " " << sizeof(index_t) << std::endl;
     std::cout << vtll::size<VecsEntityTypeList>::value << std::endl;

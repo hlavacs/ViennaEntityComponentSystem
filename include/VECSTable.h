@@ -66,11 +66,30 @@ namespace vecs {
 		}
 
 		//Externally synchronized
+		template<size_t I>
+		inline auto update(index_t index, const vtll::Nth_type<DATA,I>& data) -> bool {
+			if (index.value >= m_size) return false;
+			auto ref = comp_ref_idx<I>(index);
+			ref = data;
+			return true;
+		}
+
+		//Externally synchronized
+		template<typename C>
+		requires vtll::has_type<DATA,std::decay_t<C>>::value
+		inline auto update(index_t index, C&& data) -> bool {
+			if (index.value >= m_size) return false;
+			auto ref = comp_ref_type<std::decay_t<C>>(index);
+			ref = data;
+			return true;
+		}
+
+		//Externally synchronized
 		template<typename TDATA>
 		requires std::is_same_v<TDATA, data_tuple_t>
 		inline auto update(index_t index, TDATA&& data ) -> bool {
 			if (index.value >= m_size) return false;
-			auto ref = tuple_value(index);
+			auto ref = tuple_ref(index);
 			vtll::static_for<size_t, 0, vtll::size<DATA>::value >([&](auto i) { std::get<i>(ref) = std::get<i>(data); } );
 			return true;
 		}
