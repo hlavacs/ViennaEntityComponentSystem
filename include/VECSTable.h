@@ -33,11 +33,15 @@ namespace vecs {
 		size_t size() { return m_size.load(); };
 
 		//Externally synchronized
-		template<size_t I>
-		inline auto comp_ref_idx(index_t n) noexcept -> vtll::Nth_type<DATA,I>& { return std::get<I>(*m_segment[n.value >> L])[n.value & BIT_MASK]; };
+		template<size_t I, typename C = vtll::Nth_type<DATA,I>>
+		inline auto comp_ref_idx(index_t n) noexcept -> C& { 
+			return std::get<I>(*m_segment[n.value >> L])[n.value & BIT_MASK]; 
+		};
 
 		template<typename C>
-		inline auto comp_ref_type(index_t n) noexcept -> C& { return std::get<vtll::index_of<DATA,C>::value>(*m_segment[n.value >> L])[n.value & BIT_MASK]; };
+		inline auto comp_ref_type(index_t n) noexcept -> C& { 
+			return std::get<vtll::index_of<DATA,C>::value>(*m_segment[n.value >> L])[n.value & BIT_MASK]; 
+		};
 
 		//Externally synchronized
 		inline auto tuple_ref(index_t n) noexcept -> ref_tuple_t {
@@ -78,8 +82,7 @@ namespace vecs {
 		requires vtll::has_type<DATA,std::decay_t<C>>::value
 		inline auto update(index_t index, C&& data) -> bool {
 			if (index.value >= m_size) return false;
-			auto ref = comp_ref_type<std::decay_t<C>>(index);
-			ref = data;
+			comp_ref_type<std::decay_t<C>>(index) = data;
 			return true;
 		}
 
@@ -88,7 +91,7 @@ namespace vecs {
 		requires std::is_same_v<TDATA, data_tuple_t>
 		inline auto update(index_t index, TDATA&& data ) -> bool {
 			if (index.value >= m_size) return false;
-			auto ref = tuple_ref(index);
+			decltype(auto) ref = tuple_ref(index);
 			vtll::static_for<size_t, 0, vtll::size<DATA>::value >([&](auto i) { std::get<i>(ref) = std::get<i>(data); } );
 			return true;
 		}
