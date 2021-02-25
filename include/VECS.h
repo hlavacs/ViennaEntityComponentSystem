@@ -176,6 +176,7 @@ namespace vecs {
 		static inline std::vector<entry_t>	m_handles;
 		static inline tuple_type_vec		m_components;
 
+		static inline index_t				m_first_free{};
 		static inline VecsTable<types2>		m_data;
 
 		static inline std::array<std::unique_ptr<VecsComponentTable<E>>, vtll::size<VecsComponentTypeList>::value> m_dispatch; //one for each component type
@@ -299,7 +300,16 @@ namespace vecs {
 		m_handles.pop_back();
 		return std::make_tuple(VecsHandle{}, index_t{});
 		*/
-		m_data.comp_ref_idx<c_handle>(index).m_type_index = {};
+
+		const std::lock_guard<std::mutex> lock(m_data.m_mutex);
+		m_data.comp_ref_idx<c_handle>(index) = {};	//invalidate handle
+		m_data.comp_ref_idx<c_prev>(index) = {};
+		m_data.comp_ref_idx<c_next>(index) = m_first_free;
+		if (!m_first_free.is_null()) {
+			m_data.comp_ref_idx<c_prev>(m_first_free) = index;
+		}
+		m_first_free = index;
+
 		return std::make_tuple(VecsHandle{}, index_t{});
 	}
 
