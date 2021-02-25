@@ -62,15 +62,15 @@ namespace vecs {
 	//-------------------------------------------------------------------------
 	//engine entity types
 
-	using VeEntityNode = VeEntityType<VeComponentPosition, VeComponentOrientation, VeComponentTransform>;
-	using VeEntityDraw = VeEntityType<VeComponentMaterial, VeComponentGeometry>;
-	using VeEntityAnimation = VeEntityType<VeComponentAnimation>;
+	using VeEntityTypeNode = VeEntityType<VeComponentPosition, VeComponentOrientation, VeComponentTransform>;
+	using VeEntityTypeDraw = VeEntityType<VeComponentMaterial, VeComponentGeometry>;
+	using VeEntityTypeAnimation = VeEntityType<VeComponentAnimation>;
 	//...
 
 	using VeEntityTypeListSystem = vtll::type_list<
-		  VeEntityNode
-		, VeEntityDraw
-		, VeEntityAnimation
+		  VeEntityTypeNode
+		, VeEntityTypeDraw
+		, VeEntityTypeAnimation
 		// ,... 
 	>;
 
