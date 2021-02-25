@@ -377,20 +377,20 @@ namespace vecs {
 		//insert data
 
 		template<typename... Ts> [[nodiscard]] 
-		auto insert(Ts&&... args) noexcept					-> VecsHandle {
-			static_assert(vtll::is_same<VeEntityType<Ts...>, Ts...>::value);
-			return VecsRegistry<VeEntityType<Ts...>>().insert(std::forward<Ts>(args)...);
+		auto insert(Ts&&... args) noexcept	-> VecsHandle {
+			static_assert(vtll::is_same<VeEntityType<std::decay_t<Ts>...>, std::decay_t<Ts>...>::value);
+			return VecsRegistry<VeEntityType<std::decay_t<Ts>...>>().insert(std::forward<Ts>(args)...);
 		}
 
 		//-------------------------------------------------------------------------
 		//get data
 
 		template<typename E>
-		auto entity(const VecsHandle& handle) noexcept		-> std::optional<VecsEntity<E>>;
+		auto entity(const VecsHandle& handle) noexcept -> std::optional<VecsEntity<E>>;
 
 		template<typename C>
 		requires vtll::has_type<VecsComponentTypeList, C>::value
-		auto component(const VecsHandle& handle) noexcept	-> std::optional<C> {
+		auto component(const VecsHandle& handle) noexcept -> std::optional<C> {
 			C res{};
 			if (m_dispatch[handle.index()]->componentE(handle, vtll::index_of<VecsComponentTypeList, C>::value, (void*)&res, sizeof(C))) {
 				return { res };
