@@ -69,8 +69,7 @@ namespace vecs {
 		template<size_t I>
 		inline auto update(index_t index, const vtll::Nth_type<DATA,I>& data) -> bool {
 			if (index.value >= m_size) return false;
-			auto ref = comp_ref_idx<I>(index);
-			ref = data;
+			comp_ref_idx<I>(index) = data;
 			return true;
 		}
 
