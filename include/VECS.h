@@ -532,14 +532,14 @@ namespace vecs {
 	};
 
 	template<typename E>
-	inline auto VecsRegistry<E>::contains(const VecsHandle& handle) noexcept			-> bool {
+	inline auto VecsRegistry<E>::contains(const VecsHandle& handle) noexcept -> bool {
 		if (handle.m_entity_index.is_null() || handle.m_entity_index.value >= m_entity_table.size()) return false;
 		if (handle.m_generation_counter != m_entity_table.comp_ref_idx<c_counter>(handle.m_entity_index)) return false;
 		return true;
 	}
 
 	template<typename E>
-	inline auto VecsRegistry<E>::entity(const VecsHandle& handle) noexcept				-> std::optional<VecsEntity<E>> {
+	inline auto VecsRegistry<E>::entity(const VecsHandle& handle) noexcept -> std::optional<VecsEntity<E>> {
 		if (!contains(handle)) return {};
 		VecsEntity<E> res(handle, VecsComponentTable<E>().values(m_entity_table.comp_ref_idx<c_next>(handle.m_entity_index)));
 		return { res };
@@ -547,16 +547,16 @@ namespace vecs {
 
 	template<typename E>
 	template<typename C>
-	inline auto VecsRegistry<E>::component(const VecsHandle& handle) noexcept			-> std::optional<C> {
+	inline auto VecsRegistry<E>::component(const VecsHandle& handle) noexcept -> std::optional<C> {
 		if constexpr (!vtll::has_type<E,C>::value) { return {}; }
 		if (!contains(handle)) return {};
-		auto compidx = m_entity_table.comp_ref_idx<c_next>(handle.m_entity_index);
+		auto& compidx = m_entity_table.comp_ref_idx<c_next>(handle.m_entity_index);
 		return { VecsComponentTable<E>().component<C>(compidx) };
 	}
 
 	template<typename E>
 	template<typename ET>
-	inline auto VecsRegistry<E>::update(const VecsHandle& handle, ET&& ent) noexcept	-> bool {
+	inline auto VecsRegistry<E>::update(const VecsHandle& handle, ET&& ent) noexcept -> bool {
 		if (!contains(handle)) return false;
 		VecsComponentTable<E>().update(handle.m_entity_index, std::forward<ET>(ent));
 		return true;
@@ -564,7 +564,7 @@ namespace vecs {
 
 	template<typename E>
 	template<typename C> requires (vtll::has_type<VecsComponentTypeList, C>::value)
-	inline auto VecsRegistry<E>::update(const VecsHandle& handle, C&& comp) noexcept	-> bool {
+	inline auto VecsRegistry<E>::update(const VecsHandle& handle, C&& comp) noexcept -> bool {
 		if constexpr (!vtll::has_type<E, C>::value) { return false; }
 		if (!contains(handle)) return false;
 		VecsComponentTable<E>().update<C>(handle.m_entity_index, std::forward<C>(comp));
@@ -572,7 +572,7 @@ namespace vecs {
 	}
 
 	template<typename E>
-	inline auto VecsRegistry<E>::erase(const VecsHandle& handle) noexcept				-> bool {
+	inline auto VecsRegistry<E>::erase(const VecsHandle& handle) noexcept -> bool {
 		if (!contains(handle)) return false;
 		
 		auto [corr_hndl, corr_index] = VecsComponentTable<E>().erase( m_entity_table.comp_ref_idx < c_next>(handle.m_entity_index) );
