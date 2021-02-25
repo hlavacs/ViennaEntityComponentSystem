@@ -268,7 +268,8 @@ namespace vecs {
 	template<typename C>
 	inline auto VecsComponentTable<E>::component(const index_t index) noexcept -> C& {
 		assert(index.value < m_handles.size());
-		return std::get<vtll::index_of<E, C>::value>(m_components)[index.value];
+		//return std::get<vtll::index_of<E, C>::value>(m_components)[index.value];
+		return m_data.comp_ref_idx<c_info_size + vtll::index_of<E,C>::value>(index);
 	}
 
 	template<typename E>
