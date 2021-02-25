@@ -253,14 +253,15 @@ namespace vecs {
 
 		return f(m_components);*/
 
-		decltype(auto) tup = m_data.tuple_ref(index);
-		return vtll::sub_ref_tuple< c_info_size, std::tuple_size_v<decltype(tup)> >(tup);
+		auto tup = m_data.tuple_ref(index);
+		return vtll::sub_ref_tuple<c_info_size, std::tuple_size_v<decltype(tup)> >(tup);
 	}
 
 	template<typename E> 
-	inline auto VecsComponentTable<E>::handle(const index_t index) noexcept -> VecsHandle{
+	inline auto VecsComponentTable<E>::handle(const index_t index) noexcept -> VecsHandle {
 		assert(index.value < m_handles.size());
-		return { m_handles[index.value].m_handle };
+		//return { m_handles[index.value].m_handle };
+		return m_data.comp_ref_idx<c_handle>(index);
 	}
 
 	template<typename E>
