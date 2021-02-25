@@ -22,13 +22,16 @@ int main() {
 	VeComponentPosition pos{ glm::vec3{9.0f, 2.0f, 3.0f} };
 	VeComponentOrientation orient{ glm::quat{glm::vec3{90.0f, 45.0f, 0.0f}} };
 	VeComponentTransform trans{ glm::mat4{ 1.0f } };
+	VeComponentMaterial mat{ 99 };
+	VeComponentGeometry geo{ 11 };
 
 	//TESTRESULT(++number, "Single function", co_await[&]() { func(&counter); }, counter.load() == 1, counter = 0);
 	//TESTRESULT(++number, "10 functions", co_await[&]() { func(&counter, 10); }, counter.load() == 10, counter = 0);
 
-	TESTRESULT(++number, "insert", auto h1 = VecsRegistry().insert(pos, orient, trans), VecsRegistry().size() == 1, );
-
-
+	{
+		TESTRESULT(++number, "insert", auto h1 = VecsRegistry().insert(pos, orient, trans)	, VecsRegistry().size() == 1, );
+		TESTRESULT(++number, "insert", auto h2 = VecsRegistry().insert(mat, geo)			, VecsRegistry().size() == 2, );
+	}
 
 
     return 0;

@@ -29,15 +29,19 @@ namespace vecs {
 	};
 
 	struct VeComponentGeometry {
+		int i;
 	};
 
 	struct VeComponentAnimation {
+		int i;
 	};
 
 	struct VeComponentCollisionShape {
+		int i;
 	};
 
 	struct VeComponentRigidBody {
+		int i;
 	};
 
 	using VeComponentTypeListSystem = vtll::type_list<
