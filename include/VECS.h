@@ -156,10 +156,10 @@ namespace vecs {
 		using tuple_type_vec = vtll::to_tuple<vtll::transform<E,std::pmr::vector>>;
 
 		using info = vtll::type_list<VecsHandle, index_t, index_t>;
-		static const uint32_t c_handle = 0;
-		static const uint32_t c_prev = 1;
-		static const uint32_t c_next = 2;
-		static const uint32_t c_info_size = 3;
+		static const size_t c_handle = 0;
+		static const size_t c_prev = 1;
+		static const size_t c_next = 2;
+		static const size_t c_info_size = 3;
 
 		using types2 = vtll::cat< info, E >;
 		using tuple_type2 = vtll::to_tuple<types2>;
@@ -221,12 +221,12 @@ namespace vecs {
 
 		auto idx = m_data.allocate_one();
 		if (idx.is_null()) return idx;
-		m_data.update<0>(idx, handle);
-		/*vtll::static_for<size_t, 0, vtll::size<E>::value >(
+		m_data.update<c_handle>(idx, handle);
+		vtll::static_for<size_t, 0, vtll::size<E>::value >(
 			[&](auto i) {
-				std::get<c_info_size + i>(m_components).push_back(std::get<i>(tuple));
+				m_data.update<c_info_size + i>(idx, std::get<i>(tuple));
 			}
-		);*/
+		);
 		return idx;
 	};
 
@@ -234,11 +234,13 @@ namespace vecs {
 	inline auto VecsComponentTable<E>::values(const index_t index) noexcept -> typename VecsComponentTable<E>::tuple_type {
 		assert(index.value < m_handles.size());
 
-		auto f = [&]<typename... Cs>(std::tuple<std::pmr::vector<Cs>...>& tup) {
+		/*auto f = [&]<typename... Cs>(std::tuple<std::pmr::vector<Cs>...>& tup) {
 			return std::make_tuple(std::get<vtll::index_of<E, Cs>::value>(tup)[index.value]...);
 		};
+		return f(m_components);*/
 
-		return f(m_components);
+		auto tup = m_data.tuple_value(index);
+		return vtll::sub_tuple< c_info_size, std::tuple_size_v<decltype(tup)> >(tup);
 	}
 
 	template<typename E> 

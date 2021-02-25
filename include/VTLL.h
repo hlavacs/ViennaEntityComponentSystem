@@ -378,6 +378,25 @@ namespace vtll {
 		"The implementation of to_ptr_tuple is bad");
 
 	//-------------------------------------------------------------------------
+	//sub_tuple: extract a subtuple from a tuple
+
+	namespace detail {
+		template<size_t Begin, typename T, size_t... Is>
+		constexpr auto sub_tuple_impl(T&& tup, std::index_sequence<Is...>) {
+			return std::make_tuple( std::get<Begin + Is>(tup)... );
+		}
+	}
+
+	template <size_t Begin, size_t End, typename T>
+	constexpr auto sub_tuple(T&& tup) {
+		return detail::sub_tuple_impl<Begin>(std::forward<T>(tup), std::make_integer_sequence<size_t, End - Begin>{ });
+	}
+
+	//static_assert(
+	//	std::is_same_v<  >,
+	//	"The implementation of to_ptr_tuple is bad");
+
+	//-------------------------------------------------------------------------
 	//has_type: check whether a type list contains a type
 
 	namespace detail {

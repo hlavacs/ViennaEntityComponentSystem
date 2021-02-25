@@ -41,18 +41,18 @@ namespace vecs {
 
 		//Externally synchronized
 		inline auto tuple_ref(index_t n) noexcept -> ref_tuple_t {
-			auto f = [&]<size_t... Is>(std::index_sequence<Is...> is) {
-				return std::make_tuple(std::ref(std::get<is>(*m_segment[n.value >> L])[n.value & BIT_MASK])... );
+			auto f = [&]<size_t... Is>(std::index_sequence<Is...>) {
+				return std::make_tuple(std::ref(std::get<Is>(*m_segment[n.value >> L])[n.value & BIT_MASK])... );
 			};
-			return f(std::make_index_sequence<vtll::size<DATA>>{});
+			return f(std::make_index_sequence<vtll::size<DATA>::value>{});
 		};
 
 		//Externally synchronized
 		inline auto tuple_value(index_t n) noexcept -> data_tuple_t {
-			auto f = [&]<size_t... Is>(std::index_sequence<Is...> is) {
-				return std::make_tuple( std::get<is>(*m_segment[n.value >> L])[n.value & BIT_MASK]...);
+			auto f = [&]<size_t... Is>(std::index_sequence<Is...>) {
+				return std::make_tuple( std::get<Is>(*m_segment[n.value >> L])[n.value & BIT_MASK]... );
 			};
-			return f(std::make_index_sequence<vtll::size<DATA>>{});
+			return f(std::make_index_sequence<vtll::size<DATA>::value>{});
 		};
 
 		//Internally synchronized
