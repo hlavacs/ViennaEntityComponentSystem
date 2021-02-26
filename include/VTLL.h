@@ -36,6 +36,11 @@ namespace vtll {
 		using size = std::integral_constant<std::size_t, 0>;
 	};
 
+	template <size_t... Is>
+	struct value_list {
+		using size = std::integral_constant<std::size_t, sizeof...(Is)>;
+	};
+
 	namespace detail {
 		template <typename... Ts>
 		struct type_list2 {
