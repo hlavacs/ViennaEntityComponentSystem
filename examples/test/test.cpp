@@ -25,12 +25,48 @@ int main() {
 	VeComponentMaterial mat{ 99 };
 	VeComponentGeometry geo{ 11 };
 
-	//TESTRESULT(++number, "Single function", co_await[&]() { func(&counter); }, counter.load() == 1, counter = 0);
-	//TESTRESULT(++number, "10 functions", co_await[&]() { func(&counter, 10); }, counter.load() == 10, counter = 0);
+	{
+		TESTRESULT(++number, "insert",		 auto h1 = VecsRegistry().insert(pos, orient, trans),		  h1.has_value() && VecsRegistry().size() == 1, );
+		TESTRESULT(++number, "insert<type>", auto h2 = VecsRegistry<VeEntityTypeDraw>().insert(mat, geo), h2.has_value() && VecsRegistry().size() == 2, );
+		
+		TESTRESULT(++number, "component entity", auto ent1  = h1.entity<VeEntityTypeNode>().value(),	   
+			(ent1.component<VeComponentPosition>().value().m_position == glm::vec3{ 9.0f, 2.0f, 3.0f }), );
+
+		TESTRESULT(++number, "component entity", auto ent2 = h2.entity<VeEntityTypeDraw>().value(),
+			(ent2.component<VeComponentMaterial>().value().i == 99), );
+
+		TESTRESULT(++number, "component entity", auto ent3 = h1.entity<VeEntityTypeDraw>(), ent3.has_value(), );
+
+		TESTRESULT(++number, "component entity", , (!ent1.component<VeComponentMaterial>().has_value()), );
+
+		TESTRESULT(++number, "component handle", auto comp1 = h1.component<VeComponentPosition>().value(), 
+			(comp1.m_position == glm::vec3{ 9.0f, 2.0f, 3.0f }), );
+
+		TESTRESULT(++number, "component handle", auto comp2 = h1.component<VeComponentMaterial>(), (!comp2.has_value()), );
+
+		TESTRESULT(++number, "local_update", ent1.local_update(VeComponentPosition{ glm::vec3{-99.0f, -22.0f, -33.0f} }),
+			(ent1.component<VeComponentPosition>().value().m_position == glm::vec3{ -99.0f, -22.0f, -33.0f }), );
+
+		TESTRESULT(++number, "update entity", ent1.update(), (h1.component<VeComponentPosition>().value().m_position == glm::vec3{ -99.0f, -22.0f, -33.0f }), );
+
+		TESTRESULT(++number, "local_update",  ent1.local_update<VeComponentPosition>(VeComponentPosition{ glm::vec3{-9.0f, -2.0f, -3.0f} }),
+			(ent1.component<VeComponentPosition>().value().m_position == glm::vec3{ -9.0f, -2.0f, -3.0f }), );
+
+		TESTRESULT(++number, "update entity", ent1.update(), (h1.component<VeComponentPosition>().value().m_position == glm::vec3{ -9.0f, -2.0f, -3.0f }), );
+
+		TESTRESULT(++number, "update handle", h1.update(VeComponentPosition{ glm::vec3{99.0f, 22.0f, 33.0f} }),
+			(h1.component<VeComponentPosition>().value().m_position == glm::vec3{ 99.0f, 22.0f, 33.0f }), );
+
+		TESTRESULT(++number, "update handle", h1.update<VeComponentPosition>(VeComponentPosition{ glm::vec3{-99.0f, -22.0f, -33.0f} }),
+			(h1.component<VeComponentPosition>().value().m_position == glm::vec3{ -99.0f, -22.0f, -33.0f }), );
+
+		TESTRESULT(++number, "erase handle", h1.erase(), (!h1.has_value() && VecsRegistry().size() == 1), );
+		TESTRESULT(++number, "erase handle", h2.erase(), (!h2.has_value() && VecsRegistry().size() == 0), );
+	}
 
 	{
-		TESTRESULT(++number, "insert", auto h1 = VecsRegistry().insert(pos, orient, trans)	, VecsRegistry().size() == 1, );
-		TESTRESULT(++number, "insert", auto h2 = VecsRegistry().insert(mat, geo)			, VecsRegistry().size() == 2, );
+
+
 	}
 
 

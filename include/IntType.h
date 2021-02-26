@@ -47,8 +47,8 @@ struct int_type {
 		constexpr bool operator()(const T& lhs, const T& rhs) const { return lhs == rhs; };
 	};
 
-	bool is_null() const {
-		return value == null;
+	bool has_value() const {
+		return value != null;
 	}
 };
 

@@ -66,7 +66,7 @@ namespace vecs {
 
 		auto index() const noexcept -> uint32_t { return static_cast<uint32_t>(m_type_index.value); };
 
-		auto is_valid() noexcept -> bool;
+		auto has_value() noexcept -> bool;
 
 		template<typename E>
 		auto entity() noexcept -> std::optional<VecsEntity<E>>;
@@ -109,7 +109,7 @@ namespace vecs {
 	public:
 		VecsEntity(const VecsHandle& h, const tuple_type& tup) noexcept : m_handle{ h }, m_component_data{ tup } {};
 		auto handle() const noexcept -> VecsHandle { return m_handle; }
-		auto is_valid() noexcept	-> bool { return m_handle.is_valid(); }
+		auto has_value() noexcept	-> bool { return m_handle.has_value(); }
 		auto update() noexcept		-> bool { return m_handle.update(*this); };
 		auto erase() noexcept		-> bool { return m_handle.erase(*this); };
 		auto name() const noexcept	-> std::string { return typeid(E).name(); };
@@ -206,7 +206,7 @@ namespace vecs {
 	template<typename... Ts> [[nodiscard]] 
 	inline auto VecsComponentTable<E>::insert(VecsHandle& handle, Ts&&... args) noexcept -> index_t {
 		auto idx = m_data.allocate_one();
-		if (idx.is_null()) return idx;
+		if (!idx.has_value()) return idx;
 		m_data.update<c_handle>(idx, handle);
 		(m_data.update<c_info_size + vtll::index_of<E,std::decay_t<Ts>>::value>(idx, std::forward<Ts>(args)), ...);
 		return idx;
@@ -257,7 +257,7 @@ namespace vecs {
 		m_data.comp_ref_idx<c_handle>(index) = {};	//invalidate handle
 		m_data.comp_ref_idx<c_prev>(index) = {};
 		m_data.comp_ref_idx<c_next>(index) = m_first_free;
-		if (!m_first_free.is_null()) {
+		if (m_first_free.has_value()) {
 			m_data.comp_ref_idx<c_prev>(m_first_free) = index;
 		}
 		m_first_free = index;
@@ -505,13 +505,13 @@ namespace vecs {
 	requires vtll::is_same<E, std::decay_t<Cs>...>::value [[nodiscard]]
 	inline auto VecsRegistry<E>::insert(Cs&&... args) noexcept	-> VecsHandle {
 		index_t idx{};
-		if (!m_first_free.is_null()) {
+		if (m_first_free.has_value()) {
 			idx = m_first_free;
 			m_first_free = m_entity_table.comp_ref_idx<c_next>(m_first_free);
 		}
 		else {
 			idx = m_entity_table.allocate_one();	
-			if (idx.is_null()) return {};
+			if (!idx.has_value()) return {};
 			m_entity_table.comp_ref_idx<c_counter>(idx) = counter16_t{0};		//start with counter 0
 		}
 
@@ -523,7 +523,7 @@ namespace vecs {
 
 	template<typename E>
 	inline auto VecsRegistry<E>::contains(const VecsHandle& handle) noexcept -> bool {
-		if (handle.m_entity_index.is_null() || handle.m_entity_index.value >= m_entity_table.size()) return false;
+		if (!handle.m_entity_index.has_value() || handle.m_entity_index.value >= m_entity_table.size()) return false;
 		if (handle.m_generation_counter != m_entity_table.comp_ref_idx<c_counter>(handle.m_entity_index)) return false;
 		return true;
 	}
@@ -567,13 +567,13 @@ namespace vecs {
 		
 		auto [corr_hndl, corr_index] = VecsComponentTable<E>().erase( m_entity_table.comp_ref_idx < c_next>(handle.m_entity_index) );
 		
-		if (!corr_index.is_null()) { 
+		if (corr_index.has_value()) {
 			m_entity_table.comp_ref_idx<c_next>(corr_hndl.m_entity_index) = corr_index; 
 		}
 
 		m_entity_table.comp_ref_idx<c_counter>(handle.m_entity_index).value++;		//>invalidate the entity handle
 		
-		if (m_entity_table.comp_ref_idx<c_counter>(handle.m_entity_index).is_null()) { 
+		if (!m_entity_table.comp_ref_idx<c_counter>(handle.m_entity_index).has_value()) {
 			m_entity_table.comp_ref_idx<c_counter>(handle.m_entity_index).value = 0;	//wrap to zero
 		}
 		
@@ -629,9 +629,9 @@ namespace vecs {
 		};
 
 		virtual
-		auto is_valid() noexcept								-> bool {
+		auto has_value() noexcept								-> bool {
 			if (m_is_end || is_vector_end()) return false;
-			return m_dispatch[m_current_iterator.value]->is_valid();
+			return m_dispatch[m_current_iterator.value]->has_value();
 		}
 
 		auto operator=(const VecsIterator& v) noexcept			-> VecsIterator<Cs...>& {
@@ -716,8 +716,8 @@ namespace vecs {
 			if (is_end) this->m_current_index.value = static_cast<decltype(this->m_current_index.value)>(VecsComponentTable<E>().size());
 		};
 
-		auto is_valid() noexcept		-> bool {
-			return VecsComponentTable<E>().handle(this->m_current_index).is_valid();
+		auto has_value() noexcept		-> bool {
+			return VecsComponentTable<E>().handle(this->m_current_index).has_value();
 		}
 
 		auto operator*() noexcept		-> typename VecsIterator<Cs...>::value_type {
@@ -756,7 +756,7 @@ namespace vecs {
 	template<typename... Cs>
 	inline auto for_each(VecsIterator<Cs...>& b, VecsIterator<Cs...>& e, std::function<Functor<Cs...>> f) -> void {
 		for (; b != e; b++) {
-			if(b.is_valid()) f(b);
+			if(b.has_value()) f(b);
 		}
 	}
 
@@ -810,8 +810,8 @@ namespace vecs {
 	//-------------------------------------------------------------------------
 	//VecsHandle
 
-	inline auto VecsHandle::is_valid() noexcept					-> bool {
-		if (m_entity_index.is_null() || m_generation_counter.is_null() || m_type_index.is_null()) return false;
+	inline auto VecsHandle::has_value() noexcept					-> bool {
+		if (!m_entity_index.has_value() || !m_generation_counter.has_value() || !m_type_index.has_value()) return false;
 		return VecsRegistryBaseClass().contains(*this);
 	}
 
