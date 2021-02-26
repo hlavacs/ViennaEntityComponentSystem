@@ -54,6 +54,11 @@ namespace vtll {
 	}
 
 	//-------------------------------------------------------------------------
+	//type list algorithms
+
+
+
+	//-------------------------------------------------------------------------
 	//size: size of a type list
 
 	namespace detail {
@@ -312,147 +317,6 @@ namespace vtll {
 	};
 
 	static_assert( is_same<type_list<double, int>, double, int>::value, "The implementation of is_same is bad");
-
-	//-------------------------------------------------------------------------
-	//to_tuple: turn a list into a tuple
-
-	namespace detail {
-		template<typename Seq>
-		struct to_tuple_impl;
-
-		template<template <typename...> class Seq>
-		struct to_tuple_impl<Seq<>> {
-			using type = std::tuple<>;
-		};
-
-		template<template <typename...> class Seq, typename... Ts>
-		struct to_tuple_impl<Seq<Ts...>> {
-			using type = std::tuple<Ts...>;
-		};
-	}
-	template <typename Seq>
-	using to_tuple = typename detail::to_tuple_impl<Seq>::type;
-
-	static_assert(
-		std::is_same_v< to_tuple<type_list<double, int>>, std::tuple<double, int> >,
-		"The implementation of to_tuple is bad");
-
-	//-------------------------------------------------------------------------
-	//to_ref_tuple: turn a list into a tuple of reference types. when creating such tuples, use std::ref as a wrapper for the elements!
-
-	namespace detail {
-		template<typename Seq>
-		struct to_ref_tuple_impl;
-
-		template<template <typename...> class Seq>
-		struct to_ref_tuple_impl<Seq<>> {
-			using type = std::tuple<>;
-		};
-
-		template<template <typename...> class Seq, typename... Ts>
-		struct to_ref_tuple_impl<Seq<Ts...>> {
-			using type = std::tuple<Ts&...>;
-		};
-	}
-	template <typename Seq>
-	using to_ref_tuple = typename detail::to_ref_tuple_impl<Seq>::type;
-
-	static_assert(
-		std::is_same_v< to_ref_tuple<type_list<double, int>>, std::tuple<double&, int&> >,
-		"The implementation of to_ref_tuple is bad");
-
-
-	//-------------------------------------------------------------------------
-	//to_ptr_tuple: turn a list into a tuple of pointer types
-
-	namespace detail {
-		template<typename Seq>
-		struct to_ptr_tuple_impl;
-
-		template<template <typename...> class Seq>
-		struct to_ptr_tuple_impl<Seq<>> {
-			using type = std::tuple<>;
-		};
-
-		template<template <typename...> class Seq, typename... Ts>
-		struct to_ptr_tuple_impl<Seq<Ts...>> {
-			using type = std::tuple<Ts*...>;
-		};
-	}
-	template <typename Seq>
-	using to_ptr_tuple = typename detail::to_ptr_tuple_impl<Seq>::type;
-
-	static_assert(
-		std::is_same_v< to_ptr_tuple<type_list<double, int>>, std::tuple<double*, int*> >,
-		"The implementation of to_ptr_tuple is bad");
-
-	//-------------------------------------------------------------------------
-	//is_same_tuple: test whether two tuples are the same
-
-	namespace detail {
-		template<typename T, size_t... Is>
-		constexpr auto is_same_tuple_impl(const T& t1, const T& t2, std::index_sequence<Is...>) {
-			return ( (std::get<Is>(t1) == std::get<Is>(t2)) && ... );
-		}
-	}
-
-	template <typename T>
-	constexpr auto is_same_tuple(const T& t1, const T& t2 ) {
-		return detail::is_same_tuple_impl(t1, t2, std::make_index_sequence<std::tuple_size_v<T>>{ });
-	}
-
-	template <typename T1, typename T2>
-	constexpr auto is_same_tuple(const T1& t1, const T2& t2) {
-		return false;
-	}
-
-	static_assert( is_same_tuple(std::make_tuple(1, "a", 4.5), std::make_tuple(1, "a", 4.5)), "The implementation of is_same_tuple is bad");
-	static_assert(!is_same_tuple(std::make_tuple(1, "a", 4.5), std::make_tuple(1, "b", 4.5)), "The implementation of is_same_tuple is bad");
-	static_assert(!is_same_tuple(std::make_tuple(1, "a", 4.5), std::make_tuple("a", 4.5)), "The implementation of is_same_tuple is bad");
-
-	//-------------------------------------------------------------------------
-	//sub_tuple: extract a subtuple from a tuple
-
-	namespace detail {
-		template<size_t Begin, typename T, size_t... Is>
-		constexpr auto sub_tuple_impl(T&& tup, std::index_sequence<Is...>) {
-			return std::make_tuple(std::get<Begin + Is>(tup)...);
-		}
-	}
-
-	template <size_t Begin, size_t End, typename T>
-	constexpr auto sub_tuple(T&& tup) {
-		return detail::sub_tuple_impl<Begin>(std::forward<T>(tup), std::make_integer_sequence<size_t, End - Begin>{ });
-	}
-
-	static_assert(is_same_tuple(sub_tuple<2, 4>(std::make_tuple(1, "a", 4.5, 'C', 5.0f)), std::make_tuple(4.5, 'C')), "The implementation of sub_tuple is bad");
-	static_assert(!is_same_tuple(sub_tuple<2, 4>(std::make_tuple(1, "a", 4.5, 'C', 5.0f)), std::make_tuple("a", 4.5, 'C')), "The implementation of sub_tuple is bad");
-	static_assert(!is_same_tuple(sub_tuple<2, 4>(std::make_tuple(1, "a", 4.5, 'C', 5.0f)), std::make_tuple('C')), "The implementation of sub_tuple is bad");
-
-
-	//-------------------------------------------------------------------------
-	//sub_ref_tuple: extract a subtuple of references from a tuple
-
-	namespace detail {
-		template<size_t Begin, typename T, size_t... Is>
-		constexpr auto sub_ref_tuple_impl(T&& tup, std::index_sequence<Is...>) {
-			return std::make_tuple( std::ref(std::get<Begin + Is>(tup))... );
-		}
-	}
-
-	template <size_t Begin, size_t End, typename T>
-	constexpr auto sub_ref_tuple(T&& tup) {
-		return detail::sub_ref_tuple_impl<Begin>(std::forward<T>(tup), std::make_integer_sequence<size_t, End - Begin>{ });
-	}
-
-	/*assert( 
-		is_same_tuple(
-			sub_ref_tuple<2, 4>(
-				std::make_tuple(detail::a, detail::b, detail::c, detail::d, detail::e ))
-			
-			, std::make_tuple(std::ref(detail::c), std::ref(detail::d)))
-		, "The implementation of sub_ref_tuple is bad");
-		*/
 
 	//-------------------------------------------------------------------------
 	//has_type: check whether a type list contains a type
@@ -726,15 +590,6 @@ namespace vtll {
 		"The implementation of sum is bad");
 
 	//-------------------------------------------------------------------------
-	//sum_size_t: compute the sum of a list of size_t s
-
-	template <size_t... Is>
-	using sum_size_t = std::integral_constant<size_t, (Is + ... + 0)>;
-
-	static_assert( std::is_same_v< sum_size_t< 1, 2, 3> , std::integral_constant<size_t, 6> >,
-		"The implementation of sum_size_t is bad");
-
-	//-------------------------------------------------------------------------
 	//function: compute function on list of std::integral_constant<size_t, I>
 
 	namespace detail {
@@ -764,27 +619,6 @@ namespace vtll {
 		"The implementation of function is bad");
 
 	//-------------------------------------------------------------------------
-	//function_size_t: compute the sum of a list of size_t s
-
-	namespace detail {
-		template<size_t I>
-		struct test_func2 {
-			using type = std::integral_constant<size_t, 2 * I>;
-		};
-	}
-
-	template <template<size_t> typename Fun, size_t... Is>
-	using function_size_t = vtll::type_list< typename Fun<Is>::type... >;
-
-	static_assert(
-		std::is_same_v< 
-			function_size_t< detail::test_func2, 1, 2, 3 >
-			, type_list< std::integral_constant<size_t, 2 >, std::integral_constant<size_t, 4 >, std::integral_constant<size_t, 6 > >
-		>,
-		"The implementation of function_size_t is bad");
-
-
-	//-------------------------------------------------------------------------
 	//static for: with this compile time for loop you can loop over any tuple, type list, or variadic argument list
 
 	namespace detail {
@@ -808,6 +642,299 @@ namespace vtll {
 			);
 		}
 	}
+
+
+
+	//-------------------------------------------------------------------------
+	//tuple algorithms
+
+	//-------------------------------------------------------------------------
+	//to_tuple: turn a list into a tuple
+
+	namespace detail {
+		template<typename Seq>
+		struct to_tuple_impl;
+
+		template<template <typename...> class Seq>
+		struct to_tuple_impl<Seq<>> {
+			using type = std::tuple<>;
+		};
+
+		template<template <typename...> class Seq, typename... Ts>
+		struct to_tuple_impl<Seq<Ts...>> {
+			using type = std::tuple<Ts...>;
+		};
+	}
+	template <typename Seq>
+	using to_tuple = typename detail::to_tuple_impl<Seq>::type;
+
+	static_assert(
+		std::is_same_v< to_tuple<type_list<double, int>>, std::tuple<double, int> >,
+		"The implementation of to_tuple is bad");
+
+	//-------------------------------------------------------------------------
+	//to_ref_tuple: turn a list into a tuple of reference types. when creating such tuples, use std::ref as a wrapper for the elements!
+
+	namespace detail {
+		template<typename Seq>
+		struct to_ref_tuple_impl;
+
+		template<template <typename...> class Seq>
+		struct to_ref_tuple_impl<Seq<>> {
+			using type = std::tuple<>;
+		};
+
+		template<template <typename...> class Seq, typename... Ts>
+		struct to_ref_tuple_impl<Seq<Ts...>> {
+			using type = std::tuple<Ts&...>;
+		};
+	}
+	template <typename Seq>
+	using to_ref_tuple = typename detail::to_ref_tuple_impl<Seq>::type;
+
+	static_assert(
+		std::is_same_v< to_ref_tuple<type_list<double, int>>, std::tuple<double&, int&> >,
+		"The implementation of to_ref_tuple is bad");
+
+
+	//-------------------------------------------------------------------------
+	//to_ptr_tuple: turn a list into a tuple of pointer types
+
+	namespace detail {
+		template<typename Seq>
+		struct to_ptr_tuple_impl;
+
+		template<template <typename...> class Seq>
+		struct to_ptr_tuple_impl<Seq<>> {
+			using type = std::tuple<>;
+		};
+
+		template<template <typename...> class Seq, typename... Ts>
+		struct to_ptr_tuple_impl<Seq<Ts...>> {
+			using type = std::tuple<Ts*...>;
+		};
+	}
+	template <typename Seq>
+	using to_ptr_tuple = typename detail::to_ptr_tuple_impl<Seq>::type;
+
+	static_assert(
+		std::is_same_v< to_ptr_tuple<type_list<double, int>>, std::tuple<double*, int*> >,
+		"The implementation of to_ptr_tuple is bad");
+
+	//-------------------------------------------------------------------------
+	//is_same_tuple: test whether two tuples are the same
+
+	namespace detail {
+		template<typename T, size_t... Is>
+		constexpr auto is_same_tuple_impl(const T& t1, const T& t2, std::index_sequence<Is...>) {
+			return ((std::get<Is>(t1) == std::get<Is>(t2)) && ...);
+		}
+	}
+
+	template <typename T>
+	constexpr auto is_same_tuple(const T& t1, const T& t2) {
+		return detail::is_same_tuple_impl(t1, t2, std::make_index_sequence<std::tuple_size_v<T>>{ });
+	}
+
+	template <typename T1, typename T2>
+	constexpr auto is_same_tuple(const T1& t1, const T2& t2) {
+		return false;
+	}
+
+	static_assert(is_same_tuple(std::make_tuple(1, "a", 4.5), std::make_tuple(1, "a", 4.5)), "The implementation of is_same_tuple is bad");
+	static_assert(!is_same_tuple(std::make_tuple(1, "a", 4.5), std::make_tuple(1, "b", 4.5)), "The implementation of is_same_tuple is bad");
+	static_assert(!is_same_tuple(std::make_tuple(1, "a", 4.5), std::make_tuple("a", 4.5)), "The implementation of is_same_tuple is bad");
+
+	//-------------------------------------------------------------------------
+	//sub_tuple: extract a subtuple from a tuple
+
+	namespace detail {
+		template<size_t Begin, typename T, size_t... Is>
+		constexpr auto sub_tuple_impl(T&& tup, std::index_sequence<Is...>) {
+			return std::make_tuple(std::get<Begin + Is>(tup)...);
+		}
+	}
+
+	template <size_t Begin, size_t End, typename T>
+	constexpr auto sub_tuple(T&& tup) {
+		return detail::sub_tuple_impl<Begin>(std::forward<T>(tup), std::make_integer_sequence<size_t, End - Begin>{ });
+	}
+
+	static_assert(is_same_tuple(sub_tuple<2, 4>(std::make_tuple(1, "a", 4.5, 'C', 5.0f)), std::make_tuple(4.5, 'C')), "The implementation of sub_tuple is bad");
+	static_assert(!is_same_tuple(sub_tuple<2, 4>(std::make_tuple(1, "a", 4.5, 'C', 5.0f)), std::make_tuple("a", 4.5, 'C')), "The implementation of sub_tuple is bad");
+	static_assert(!is_same_tuple(sub_tuple<2, 4>(std::make_tuple(1, "a", 4.5, 'C', 5.0f)), std::make_tuple('C')), "The implementation of sub_tuple is bad");
+
+
+	//-------------------------------------------------------------------------
+	//sub_ref_tuple: extract a subtuple of references from a tuple
+
+	namespace detail {
+		template<size_t Begin, typename T, size_t... Is>
+		constexpr auto sub_ref_tuple_impl(T&& tup, std::index_sequence<Is...>) {
+			return std::make_tuple(std::ref(std::get<Begin + Is>(tup))...);
+		}
+	}
+
+	template <size_t Begin, size_t End, typename T>
+	constexpr auto sub_ref_tuple(T&& tup) {
+		return detail::sub_ref_tuple_impl<Begin>(std::forward<T>(tup), std::make_integer_sequence<size_t, End - Begin>{ });
+	}
+
+	/*assert(
+		is_same_tuple(
+			sub_ref_tuple<2, 4>(
+				std::make_tuple(detail::a, detail::b, detail::c, detail::d, detail::e ))
+
+			, std::make_tuple(std::ref(detail::c), std::ref(detail::d)))
+		, "The implementation of sub_ref_tuple is bad");
+		*/
+
+
+
+
+	//-------------------------------------------------------------------------
+	//value list algorithms
+
+
+	//-------------------------------------------------------------------------
+	//size_value: get the size of a value list
+
+	namespace detail {
+		template <typename Seq>
+		struct size_value_impl;
+
+		template < template<size_t...> typename Seq, size_t... Is>
+		struct size_value_impl<Seq<Is...>> {
+			using type = std::integral_constant<size_t, sizeof...(Is)>;
+		};
+	}
+
+	template <typename Seq>
+	using size_value = typename detail::size_value_impl<Seq>::type;
+
+	static_assert(std::is_same_v< size_value< value_list<1, 2, 5>>, std::integral_constant<size_t, 3> >,
+		"The implementation of size_value is bad");
+
+	//-------------------------------------------------------------------------
+	//Nth_value: get the Nth value from a value list
+
+	namespace detail {
+		template <typename Seq, size_t N>
+		struct Nth_value_impl;
+
+		template < template<size_t...> typename Seq, size_t... Is, size_t N>
+		struct Nth_value_impl<Seq<Is...>,N> {
+			using type = Nth_type< type_list<std::integral_constant<size_t, Is>...>, N>;
+		};
+	}
+
+	template <typename Seq, size_t N>
+	using Nth_value = typename detail::Nth_value_impl<Seq, N>::type;
+
+	static_assert( std::is_same_v< Nth_value< value_list<1, 2, 3>, 1 >, std::integral_constant<size_t, 2> >,
+		"The implementation of Nth_value is bad");
+
+	//-------------------------------------------------------------------------
+	//front_value: get the first value from a value list
+
+	template <typename Seq>
+	using front_value = typename Nth_value<Seq, 0>::type;
+
+	static_assert(std::is_same_v< front_value< value_list<1, 2, 3> >, std::integral_constant<size_t, 1> >,
+		"The implementation of front_value is bad");
+
+	//-------------------------------------------------------------------------
+	//back_value: get the last value from a value list
+
+	template <typename Seq>
+	using back_value = typename Nth_value<Seq, std::integral_constant<size_t, size_value<Seq>::value - 1>::value >::type;
+
+	static_assert(std::is_same_v< back_value< value_list<1, 2, 6> >, std::integral_constant<size_t, 6> >,
+		"The implementation of back_value is bad");
+
+	//-------------------------------------------------------------------------
+	//sum_size_t: compute the sum of a list of size_t s
+
+	template <size_t... Is>
+	using sum_size_t = std::integral_constant<size_t, (Is + ... + 0)>;
+
+	static_assert(std::is_same_v< sum_size_t< 1, 2, 3>, std::integral_constant<size_t, 6> >,
+		"The implementation of sum_size_t is bad");
+
+
+	//-------------------------------------------------------------------------
+	//function_size_t: compute function on a list of size_t s
+
+	namespace detail {
+		template<size_t I>
+		struct test_func2 {
+			using type = std::integral_constant<size_t, 2 * I>;
+		};
+	}
+
+	template <template<size_t> typename Fun, size_t... Is>
+	using function_size_t = vtll::type_list< typename Fun<Is>::type... >;
+
+	static_assert(
+		std::is_same_v<
+		function_size_t< detail::test_func2, 1, 2, 3 >
+		, type_list< std::integral_constant<size_t, 2 >, std::integral_constant<size_t, 4 >, std::integral_constant<size_t, 6 > >
+		>,
+		"The implementation of function_size_t is bad");
+
+
+	//-------------------------------------------------------------------------
+	//type_to_value_list: turn a list of std::integral_constant<> into a value list
+
+	namespace detail {
+		template<typename Seq>
+		struct type_to_value_list_impl;
+
+		template<template<typename...> typename Seq, typename... Ts>
+		struct type_to_value_list_impl<Seq<Ts...>> {
+			using type = value_list<Ts::value...>;
+		};
+	}
+
+	template<typename Seq>
+	using type_to_value_list = typename detail::type_to_value_list_impl<Seq>::type;
+
+	static_assert(
+		std::is_same_v<
+			type_to_value_list<
+				type_list< std::integral_constant<size_t, 2>, std::integral_constant<size_t, 4>, std::integral_constant<size_t, 6> > >
+			, value_list<2, 4, 6>
+		>,
+		"The implementation of to_value_list is bad");
+
+
+	//-------------------------------------------------------------------------
+	//value_to_type_list: turn a value list into a list of std::integral_constant<>
+
+	namespace detail {
+		template<typename Seq>
+		struct value_to_type_list_impl;
+
+		template<template<size_t...> typename Seq, size_t... Is>
+		struct value_to_type_list_impl<Seq<Is...>> {
+			using type = type_list<std::integral_constant<size_t,Is>...>;
+		};
+	}
+
+	template<typename Seq>
+	using value_to_type_list = typename detail::value_to_type_list_impl<Seq>::type;
+
+	static_assert(
+		std::is_same_v<
+			value_to_type_list< value_list<2,4,6> >
+			, type_list< std::integral_constant<size_t, 2>, std::integral_constant<size_t, 4>, std::integral_constant<size_t, 6> >
+		>,
+		"The implementation of value_to_type_list is bad");
+
+
+
+
+
 }
 
 
