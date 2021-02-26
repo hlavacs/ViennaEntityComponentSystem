@@ -20,6 +20,10 @@ int main() {
 	int number = 0;
 	std::atomic<int> counter = 0;
 
+	VecsRegistry{ 1 << 10 };
+	VecsRegistry<VeEntityTypeNode>{1 << 8};
+	VecsRegistry<VeEntityTypeDraw>{1 << 8};
+
 	VeComponentName name;
 	VeComponentPosition pos{ glm::vec3{9.0f, 2.0f, 3.0f} };
 	VeComponentOrientation orient{ glm::quat{glm::vec3{90.0f, 45.0f, 0.0f}} };
@@ -29,11 +33,11 @@ int main() {
 
 	{
 		TESTRESULT(++number, "insert", 
-			auto h1 = VecsRegistry().insert(VeComponentName{ "Node" }, pos, orient, trans), 
+			auto h1 = VecsRegistry{}.insert(VeComponentName{ "Node" }, pos, orient, trans),
 				h1.has_value() && VecsRegistry().size() == 1, );
 
 		TESTRESULT(++number, "insert<type>", 
-			auto h2 = VecsRegistry<VeEntityTypeDraw>().insert(VeComponentName{ "Draw" }, mat, geo), 
+			auto h2 = VecsRegistry<VeEntityTypeDraw>{}.insert(VeComponentName{ "Draw" }, mat, geo),
 				h2.has_value() && VecsRegistry().size() == 2, );
 		
 		TESTRESULT(++number, "component entity", auto ent1  = h1.entity<VeEntityTypeNode>().value(),	   
@@ -83,8 +87,8 @@ int main() {
 
 	{
 		for (int i = 0; i < 1000; i++) {
-			auto h1 = VecsRegistry().insert(VeComponentName{ "Node" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentTransform{});
-			auto h2 = VecsRegistry().insert(VeComponentName{ "Draw" }, VeComponentMaterial{ 1 }, VeComponentGeometry{ 1 });
+			auto h1 = VecsRegistry{}.insert(VeComponentName{ "Node" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentTransform{});
+			auto h2 = VecsRegistry{}.insert(VeComponentName{ "Draw" }, VeComponentMaterial{ 1 }, VeComponentGeometry{ 1 });
 		}
 		TESTRESULT(++number, "system create", , (VecsRegistry().size() == 2000), );
 

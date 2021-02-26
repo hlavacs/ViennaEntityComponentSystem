@@ -28,12 +28,17 @@ namespace vecs {
 
 	using VeEntityUser1 = VeEntityType<VeComponentPosition, VeComponentUser1>; //can be any mix of component types
 
-	//using VeEntityTypeListUser = vtll::type_list<
-	//	VeEntityeUser1
-	//  , ...  
-	//>;
+	using VeEntityTypeListUser = vtll::type_list<
+		//VeEntityeUser1
+		//, ...  
+	>;
 
-	using VeEntityTypeListUser = vtll::type_list<>; //default is no user entity types 
+	using VeTableSizeUser = vtll::type_list<
+		//  vtll::type_list< std::integral_constant<size_t, 10>, std::integral_constant<size_t, 16>>
+		//, vtll::type_list< std::integral_constant<size_t, 10>, std::integral_constant<size_t, 16>>
+		//, vtll::type_list< std::integral_constant<size_t, 10>, std::integral_constant<size_t, 16>>
+	>;
+
 
 }
 

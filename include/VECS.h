@@ -31,6 +31,10 @@ namespace vecs {
 
 	using VecsEntityTypeList = vtll::cat< VeEntityTypeListSystem, VeEntityTypeListUser >;
 
+	using VeTableSize = vtll::cat< VeTableSizeSystem, VeTableSizeUser >;
+
+
+
 	//-------------------------------------------------------------------------
 	//definition of the types used in VECS
 
@@ -162,9 +166,12 @@ namespace vecs {
 
 		using types = vtll::cat< info, E >;
 
+		static const size_t c_segment_size = vtll::front< vtll::Nth_type< VeTableSize, vtll::index_of<VecsEntityTypeList, E>::value> >::value;
+		static const size_t c_max_size     = vtll::back<  vtll::Nth_type< VeTableSize, vtll::index_of<VecsEntityTypeList, E>::value> >::value;
+
 	protected:
-		static inline index_t				m_first_free{};
-		static inline VecsTable<types>		m_data;
+		static inline index_t							m_first_free{};
+		static inline VecsTable<types, c_segment_size>	m_data;
 
 		static inline std::array<std::unique_ptr<VecsComponentTable<E>>, vtll::size<VecsComponentTypeList>::value> m_dispatch; //one for each component type
 
@@ -177,22 +184,22 @@ namespace vecs {
 		}
 
 	public:
-		VecsComponentTable(size_t r = 1 << 20) noexcept;
+		VecsComponentTable(size_t r = 1 << c_max_size) noexcept;
 
 		template<typename... Ts> [[nodiscard]]
 		auto insert(VecsHandle& handle, Ts&&... args) noexcept	-> index_t;
-		auto values(const index_t index) noexcept						-> value_type;
-		auto handle(const index_t index) noexcept						-> VecsHandle;
-		auto size() noexcept											-> size_t { 
+		auto values(const index_t index) noexcept				-> value_type;
+		auto handle(const index_t index) noexcept				-> VecsHandle;
+		auto size() noexcept									-> size_t { 
 			return m_data.size();
 		};
-		auto erase(const index_t idx) noexcept							-> std::tuple<VecsHandle, index_t>;
+		auto erase(const index_t idx) noexcept					-> std::tuple<VecsHandle, index_t>;
 
 		template<typename C>
-		auto component(const index_t index) noexcept					-> C&;
+		auto component(const index_t index) noexcept			-> C&;
 
 		template<typename ET>
-		auto update(const index_t index, ET&& ent) noexcept				-> bool;
+		auto update(const index_t index, ET&& ent) noexcept		-> bool;
 	};
 
 
@@ -264,7 +271,7 @@ namespace vecs {
 	template<typename E, typename C>
 	class VecsComponentTableDerived : public VecsComponentTable<E> {
 	public:
-		VecsComponentTableDerived( size_t res = 1 << 10 )  noexcept : VecsComponentTable<E>(res) {};
+		VecsComponentTableDerived( size_t r = 1 << VecsComponentTable<E>::c_max_size) noexcept : VecsComponentTable<E>(r) {};
 
 		auto update(const index_t index, C&& comp) noexcept -> bool {
 			if constexpr (vtll::has_type<E, std::decay_t<C>>::value) {
@@ -306,6 +313,11 @@ namespace vecs {
 	};
 
 
+	template<>
+	class VecsComponentTable<void> {
+	public:
+		VecsComponentTable(size_t r = 1 << 16) noexcept {};
+	};
 
 	//-------------------------------------------------------------------------
 	//entity table base class
@@ -445,8 +457,11 @@ namespace vecs {
 		auto updateC(const VecsHandle& handle, size_t compidx, void* ptr, size_t size) noexcept		-> bool ;
 		auto componentE(const VecsHandle& handle, size_t compidx, void* ptr, size_t size) noexcept	-> bool;
 
+		static const size_t c_max_size = vtll::back<  vtll::Nth_type< VeTableSize, vtll::index_of<VecsEntityTypeList, E>::value> >::value;
+
 	public:
-		VecsRegistry(size_t r = 1 << 20) noexcept : VecsRegistryBaseClass(r) {};
+		VecsRegistry(size_t r = 1 << c_max_size) noexcept : VecsRegistryBaseClass() { VecsComponentTable<E>{r}; };
+		VecsRegistry(std::nullopt_t u) noexcept : VecsRegistryBaseClass() {};
 
 		//-------------------------------------------------------------------------
 		//insert data
@@ -594,7 +609,8 @@ namespace vecs {
 	template<>
 	class VecsRegistry<void> : public VecsRegistryBaseClass {
 	public:
-		VecsRegistry(size_t r = 1 << 20) noexcept : VecsRegistryBaseClass(r) {};
+		VecsRegistry(size_t r = 1 << 16) noexcept : VecsRegistryBaseClass(r) {};
+		VecsRegistry(std::nullopt_t u) noexcept : VecsRegistryBaseClass() {};
 	};
 
 
@@ -780,7 +796,7 @@ namespace vecs {
 		vtll::static_for<size_t, 0, vtll::size<VecsEntityTypeList>::value >(
 			[&](auto i) {
 				using type = vtll::Nth_type<VecsEntityTypeList, i>;
-				m_dispatch[i] = std::make_unique<VecsRegistry<type>>();
+				m_dispatch[i] = std::make_unique<VecsRegistry<type>>(std::nullopt);
 			}
 		);
 	}

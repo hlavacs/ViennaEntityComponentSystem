@@ -83,6 +83,13 @@ namespace vecs {
 		// ,... 
 	>;
 
+	using VeTableSizeSystem = vtll::type_list<
+		  vtll::type_list< std::integral_constant<size_t, 10>, std::integral_constant<size_t, 16>>
+		, vtll::type_list< std::integral_constant<size_t, 10>, std::integral_constant<size_t, 16>>
+		, vtll::type_list< std::integral_constant<size_t, 10>, std::integral_constant<size_t, 16>>
+		//, ...
+	>;
+
 }
 
 #endif
