@@ -2,6 +2,7 @@
 #include <iostream>
 #include <iomanip>
 #include <utility>
+#include <string>
 #include "glm.hpp"
 #include "gtc/quaternion.hpp"
 #include "VECS.h"
@@ -19,6 +20,7 @@ int main() {
 	int number = 0;
 	std::atomic<int> counter = 0;
 
+	VeComponentName name;
 	VeComponentPosition pos{ glm::vec3{9.0f, 2.0f, 3.0f} };
 	VeComponentOrientation orient{ glm::quat{glm::vec3{90.0f, 45.0f, 0.0f}} };
 	VeComponentTransform trans{ glm::mat4{ 1.0f } };
@@ -26,8 +28,13 @@ int main() {
 	VeComponentGeometry geo{ 11 };
 
 	{
-		TESTRESULT(++number, "insert",		 auto h1 = VecsRegistry().insert(pos, orient, trans),		  h1.has_value() && VecsRegistry().size() == 1, );
-		TESTRESULT(++number, "insert<type>", auto h2 = VecsRegistry<VeEntityTypeDraw>().insert(mat, geo), h2.has_value() && VecsRegistry().size() == 2, );
+		TESTRESULT(++number, "insert", 
+			auto h1 = VecsRegistry().insert(VeComponentName{ "Node" }, pos, orient, trans), 
+				h1.has_value() && VecsRegistry().size() == 1, );
+
+		TESTRESULT(++number, "insert<type>", 
+			auto h2 = VecsRegistry<VeEntityTypeDraw>().insert(VeComponentName{ "Draw" }, mat, geo), 
+				h2.has_value() && VecsRegistry().size() == 2, );
 		
 		TESTRESULT(++number, "component entity", auto ent1  = h1.entity<VeEntityTypeNode>().value(),	   
 			(ent1.component<VeComponentPosition>().value().m_position == glm::vec3{ 9.0f, 2.0f, 3.0f }), );
@@ -62,10 +69,33 @@ int main() {
 
 		TESTRESULT(++number, "erase handle", h1.erase(), (!h1.has_value() && VecsRegistry().size() == 1), );
 		TESTRESULT(++number, "erase handle", h2.erase(), (!h2.has_value() && VecsRegistry().size() == 0), );
+
+		int i = 0;
+		bool test = true;
+		for_each<VeComponentName>([&](auto& iter) {
+			++i;
+			auto [handle, name] = *iter;
+			if (name.m_name != "Node" && name.m_name != "Draw") { test = false; }
+			//std::cout << "Entity " << name << "\n";
+			});
+		TESTRESULT(++number, "system create", , (test && i == 0), );
 	}
 
 	{
+		for (int i = 0; i < 1000; i++) {
+			auto h1 = VecsRegistry().insert(VeComponentName{ "Node" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentTransform{});
+			auto h2 = VecsRegistry().insert(VeComponentName{ "Draw" }, VeComponentMaterial{ 1 }, VeComponentGeometry{ 1 });
+		}
 
+		int i = 0;
+		bool test = true;
+		for_each<VeComponentName>([&](auto& iter) {
+			++i;
+			auto [handle, name] = *iter;
+			if (name.m_name != "Node" && name.m_name != "Draw") {	test = false; }
+			//std::cout << "Entity " << name << "\n";
+		});
+		TESTRESULT(++number, "system create", , (test && i == 2000), );
 
 	}
 

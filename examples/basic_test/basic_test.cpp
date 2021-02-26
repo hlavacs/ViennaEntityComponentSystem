@@ -22,7 +22,7 @@ int main() {
     std::cout << sizeof(VecsHandle) << " " << sizeof(index_t) << std::endl;
     std::cout << vtll::size<VecsEntityTypeList>::value << std::endl;
 
-    auto h1 = VecsRegistry().insert(VeComponentPosition{ glm::vec3{9.0f, 2.0f, 3.0f} }, VeComponentOrientation{}, VeComponentTransform{});
+    auto h1 = VecsRegistry().insert(VeComponentName{ "Node" }, VeComponentPosition{ glm::vec3{9.0f, 2.0f, 3.0f} }, VeComponentOrientation{}, VeComponentTransform{});
     std::cout << typeid(VeEntityTypeNode).hash_code() << " " << typeid(VeEntityTypeNode).name() << std::endl;
 
     auto data1b = h1.entity<VeEntityTypeNode>().value();
@@ -38,7 +38,7 @@ int main() {
     data1b.update();
     auto comp1_5 = h1.component<VeComponentPosition>();
 
-    auto h2 = VecsRegistry().insert(VeComponentMaterial{ 99 }, VeComponentGeometry{});
+    auto h2 = VecsRegistry().insert(VeComponentName{ "Draw" }, VeComponentMaterial{ 99 }, VeComponentGeometry{});
     std::cout << typeid(VeEntityTypeDraw).hash_code() << " " << typeid(VeEntityTypeDraw).name() << std::endl;
 
     auto data2b = h2.entity<VeEntityTypeDraw>().value();

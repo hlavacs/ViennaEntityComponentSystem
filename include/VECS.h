@@ -109,10 +109,10 @@ namespace vecs {
 	public:
 		VecsEntity(const VecsHandle& h, const tuple_type& tup) noexcept : m_handle{ h }, m_component_data{ tup } {};
 		auto handle() const noexcept -> VecsHandle { return m_handle; }
-		auto has_value() noexcept	-> bool { return m_handle.has_value(); }
-		auto update() noexcept		-> bool { return m_handle.update(*this); };
-		auto erase() noexcept		-> bool { return m_handle.erase(*this); };
-		auto name() const noexcept	-> std::string { return typeid(E).name(); };
+		auto has_value() noexcept	 -> bool { return m_handle.has_value(); }
+		auto update() noexcept		 -> bool { return m_handle.update(*this); };
+		auto erase() noexcept		 -> bool { return m_handle.erase(*this); };
+		auto name() const noexcept	 -> std::string { return typeid(E).name(); };
 
 		template<size_t I>
 		auto component() noexcept -> std::optional<vtll::Nth_type<E,I>> {
@@ -154,7 +154,6 @@ namespace vecs {
 	public:
 		using tuple_type	 = vtll::to_tuple<E>;
 		using tuple_type_ref = vtll::to_ref_tuple<E>;
-		using tuple_type_vec = vtll::to_tuple<vtll::transform<E,std::pmr::vector>>;
 
 		using info = vtll::type_list<VecsHandle, index_t, index_t>;
 		static const size_t c_handle = 0;
@@ -297,7 +296,6 @@ namespace vecs {
 
 		auto componentE(index_t entidx, size_t compidx, void* ptr, size_t size)  noexcept -> bool {
 			if constexpr (vtll::has_type<E,C>::value) {
-				auto tuple = this->references(entidx);
 				memcpy(ptr, (void*)& this->m_data.comp_ref_idx<this->c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(entidx), size);
 				return true;
 			}

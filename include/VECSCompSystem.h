@@ -12,6 +12,10 @@ namespace vecs {
 	//-------------------------------------------------------------------------
 	//component types
 
+	struct VeComponentName {
+		std::string m_name;
+	};
+
 	struct VeComponentPosition {
 		glm::vec3 m_position;
 	};
@@ -45,7 +49,8 @@ namespace vecs {
 	};
 
 	using VeComponentTypeListSystem = vtll::type_list<
-		VeComponentPosition
+		VeComponentName
+		, VeComponentPosition
 		, VeComponentOrientation
 		, VeComponentTransform
 		, VeComponentMaterial
@@ -66,9 +71,9 @@ namespace vecs {
 	//-------------------------------------------------------------------------
 	//engine entity types
 
-	using VeEntityTypeNode = VeEntityType<VeComponentPosition, VeComponentOrientation, VeComponentTransform>;
-	using VeEntityTypeDraw = VeEntityType<VeComponentMaterial, VeComponentGeometry>;
-	using VeEntityTypeAnimation = VeEntityType<VeComponentAnimation>;
+	using VeEntityTypeNode = VeEntityType<VeComponentName, VeComponentPosition, VeComponentOrientation, VeComponentTransform>;
+	using VeEntityTypeDraw = VeEntityType<VeComponentName, VeComponentMaterial, VeComponentGeometry>;
+	using VeEntityTypeAnimation = VeEntityType<VeComponentName, VeComponentAnimation>;
 	//...
 
 	using VeEntityTypeListSystem = vtll::type_list<
