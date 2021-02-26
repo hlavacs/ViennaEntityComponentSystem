@@ -86,6 +86,7 @@ int main() {
 			auto h1 = VecsRegistry().insert(VeComponentName{ "Node" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentTransform{});
 			auto h2 = VecsRegistry().insert(VeComponentName{ "Draw" }, VeComponentMaterial{ 1 }, VeComponentGeometry{ 1 });
 		}
+		TESTRESULT(++number, "system create", , (VecsRegistry().size() == 2000), );
 
 		int i = 0;
 		bool test = true;
@@ -95,7 +96,9 @@ int main() {
 			if (name.m_name != "Node" && name.m_name != "Draw") {	test = false; }
 			//std::cout << "Entity " << name << "\n";
 		});
-		TESTRESULT(++number, "system create", , (test && i == 2000), );
+		TESTRESULT(++number, "system run", , (test && i == 2000), );
+
+		TESTRESULT(++number, "clear", VecsRegistry().clear(), (VecsRegistry().size() == 0), );
 
 	}
 

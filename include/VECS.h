@@ -152,8 +152,7 @@ namespace vecs {
 		template<typename E> friend class VecsRegistry;
 
 	public:
-		using tuple_type	 = vtll::to_tuple<E>;
-		using tuple_type_ref = vtll::to_ref_tuple<E>;
+		using value_type = vtll::to_tuple<E>;
 
 		using info = vtll::type_list<VecsHandle, index_t, index_t>;
 		static const size_t c_handle = 0;
@@ -161,13 +160,11 @@ namespace vecs {
 		static const size_t c_next = 2;
 		static const size_t c_info_size = 3;
 
-		using types2 = vtll::cat< info, E >;
-		using tuple_type2 = vtll::to_tuple<types2>;
-		using tuple_type_ref2 = vtll::to_ref_tuple<types2>;
+		using types = vtll::cat< info, E >;
 
 	protected:
 		static inline index_t				m_first_free{};
-		static inline VecsTable<types2>		m_data;
+		static inline VecsTable<types>		m_data;
 
 		static inline std::array<std::unique_ptr<VecsComponentTable<E>>, vtll::size<VecsComponentTypeList>::value> m_dispatch; //one for each component type
 
@@ -184,11 +181,9 @@ namespace vecs {
 
 		template<typename... Ts> [[nodiscard]]
 		auto insert(VecsHandle& handle, Ts&&... args) noexcept	-> index_t;
-		auto values(const index_t index) noexcept						-> tuple_type;
-		auto references(const index_t index) noexcept					-> tuple_type_ref;
+		auto values(const index_t index) noexcept						-> value_type;
 		auto handle(const index_t index) noexcept						-> VecsHandle;
 		auto size() noexcept											-> size_t { 
-			//return m_handles.size();
 			return m_data.size();
 		};
 		auto erase(const index_t idx) noexcept							-> std::tuple<VecsHandle, index_t>;
@@ -212,17 +207,10 @@ namespace vecs {
 	};
 
 	template<typename E>
-	inline auto VecsComponentTable<E>::values(const index_t index) noexcept -> typename VecsComponentTable<E>::tuple_type {
+	inline auto VecsComponentTable<E>::values(const index_t index) noexcept -> typename VecsComponentTable<E>::value_type {
 		assert(index.value < m_data.size());
 		auto tup = m_data.tuple_value(index);
 		return vtll::sub_tuple< c_info_size, std::tuple_size_v<decltype(tup)> >(tup);
-	}
-
-	template<typename E> 
-	inline auto VecsComponentTable<E>::references(const index_t index) noexcept -> typename VecsComponentTable<E>::tuple_type_ref {
-		assert(index.value < m_data.size());
-		auto tup = m_data.tuple_ref(index);
-		return vtll::sub_ref_tuple<c_info_size, std::tuple_size_v<decltype(tup)> >(tup);
 	}
 
 	template<typename E> 
@@ -396,6 +384,19 @@ namespace vecs {
 		}
 
 		//-------------------------------------------------------------------------
+		//erase
+
+		auto clear() noexcept -> size_t { return 0; };
+
+		template<typename E = void>
+		auto clear() noexcept -> size_t;
+
+		virtual
+		auto erase(const VecsHandle& handle) noexcept		-> bool {
+			return m_dispatch[handle.index()]->erase(handle);
+		}
+
+		//-------------------------------------------------------------------------
 		//utility
 
 		template<typename E = void>
@@ -413,11 +414,6 @@ namespace vecs {
 		virtual 
 		auto contains(const VecsHandle& handle) noexcept	-> bool {
 			return m_dispatch[handle.index()]->contains(handle);
-		}
-
-		virtual 
-		auto erase(const VecsHandle& handle) noexcept		-> bool {
-			return m_dispatch[handle.index()]->erase(handle);
 		}
 	};
 
@@ -476,6 +472,11 @@ namespace vecs {
 		template<typename C> 
 		requires (vtll::has_type<VecsComponentTypeList, std::decay_t<C>>::value)
 		auto update(const VecsHandle& handle, C&& comp) noexcept -> bool;
+
+		//-------------------------------------------------------------------------
+		//erase
+
+		auto clear() noexcept -> size_t { return 0; };
 
 		//-------------------------------------------------------------------------
 		//utility
@@ -788,6 +789,12 @@ namespace vecs {
 	inline auto VecsRegistryBaseClass::entity(const VecsHandle& handle) noexcept			-> std::optional<VecsEntity<E>> {
 		return VecsRegistry<E>().entity(handle);
 	}
+
+	template<typename E>
+	inline auto VecsRegistryBaseClass::clear() noexcept -> size_t {
+		return VecsRegistry<E>().clear();
+	}
+
 
 	template<typename ET>
 	inline auto VecsRegistryBaseClass::update(const VecsHandle& handle, ET&& ent) noexcept	-> bool {
