@@ -25,7 +25,6 @@ namespace vecs {
 	using VecsComponentTypeList = vtll::cat< VeComponentTypeListSystem, VeComponentTypeListUser >;
 	using VecsComponentPtr = vtll::to_variant<vtll::to_ptr<VecsComponentTypeList>>;
 
-
 	//-------------------------------------------------------------------------
 	//entity type list
 
@@ -33,7 +32,12 @@ namespace vecs {
 
 	using VeTableSize = vtll::cat< VeTableSizeSystem, VeTableSizeUser >;
 
+	template<typename T>
+	struct left_shift_1 {
+		using type = std::integral_constant<size_t, 1 << T::value>;
+	};
 
+	using VeTableMaxSize = vtll::sum< vtll::function< vtll::transform< VeTableSize, vtll::back >, left_shift_1 > >;
 
 	//-------------------------------------------------------------------------
 	//definition of the types used in VECS
@@ -316,7 +320,7 @@ namespace vecs {
 	template<>
 	class VecsComponentTable<void> {
 	public:
-		VecsComponentTable(size_t r = 1 << 16) noexcept {};
+		VecsComponentTable(size_t r = VeTableMaxSize::value) noexcept {};
 	};
 
 	//-------------------------------------------------------------------------
@@ -356,7 +360,7 @@ namespace vecs {
 		virtual auto componentE(const VecsHandle& handle, size_t compidx, void*ptr, size_t size) noexcept -> bool { return false; };
 
 	public:
-		VecsRegistryBaseClass( size_t r = 1 << 20 ) noexcept;
+		VecsRegistryBaseClass( size_t r = VeTableMaxSize::value ) noexcept;
 
 		//-------------------------------------------------------------------------
 		//insert data
@@ -609,7 +613,7 @@ namespace vecs {
 	template<>
 	class VecsRegistry<void> : public VecsRegistryBaseClass {
 	public:
-		VecsRegistry(size_t r = 1 << 16) noexcept : VecsRegistryBaseClass(r) {};
+		VecsRegistry(size_t r = VeTableMaxSize::value) noexcept : VecsRegistryBaseClass(r) {};
 		VecsRegistry(std::nullopt_t u) noexcept : VecsRegistryBaseClass() {};
 	};
 
@@ -861,8 +865,6 @@ namespace vecs {
 	inline auto VecsHandle::erase() noexcept					-> bool {
 		return VecsRegistryBaseClass().erase(*this);
 	}
-
-
 
 	//-------------------------------------------------------------------------
 	//system

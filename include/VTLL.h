@@ -730,6 +730,56 @@ namespace vtll {
 		"The implementation of sum_size_t is bad");
 
 	//-------------------------------------------------------------------------
+	//function: compute function on list of std::integral_constant<size_t, I>
+
+	namespace detail {
+		template<typename Seq, template<typename> typename Fun>
+		struct function_impl;
+
+		template<template <typename...> typename Seq, typename... Ts, template<typename> typename Fun>
+		struct function_impl<Seq<Ts...>, Fun> {
+			using type = Seq< typename Fun<Ts>::type... >;
+		};
+
+		template<typename T>
+		struct test_func {
+			using type = std::integral_constant<size_t, 2*T::value>;
+		};
+	}
+	template <typename Seq, template<typename> typename Fun>
+	using function = typename detail::function_impl<Seq,Fun>::type;
+
+	static_assert(
+		std::is_same_v<
+			function< 
+				type_list<std::integral_constant<size_t, 1>, std::integral_constant<size_t, 2>, std::integral_constant<size_t, 3> >
+				, detail::test_func >
+			, type_list<std::integral_constant<size_t, 2>, std::integral_constant<size_t, 4>, std::integral_constant<size_t, 6> > >,
+
+		"The implementation of function is bad");
+
+	//-------------------------------------------------------------------------
+	//function_size_t: compute the sum of a list of size_t s
+
+	namespace detail {
+		template<size_t I>
+		struct test_func2 {
+			using type = std::integral_constant<size_t, 2 * I>;
+		};
+	}
+
+	template <template<size_t> typename Fun, size_t... Is>
+	using function_size_t = vtll::type_list< typename Fun<Is>::type... >;
+
+	static_assert(
+		std::is_same_v< 
+			function_size_t< detail::test_func2, 1, 2, 3 >
+			, type_list< std::integral_constant<size_t, 2 >, std::integral_constant<size_t, 4 >, std::integral_constant<size_t, 6 > >
+		>,
+		"The implementation of function_size_t is bad");
+
+
+	//-------------------------------------------------------------------------
 	//static for: with this compile time for loop you can loop over any tuple, type list, or variadic argument list
 
 	namespace detail {
