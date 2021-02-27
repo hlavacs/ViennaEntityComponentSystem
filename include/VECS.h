@@ -30,7 +30,7 @@ namespace vecs {
 
 	using VecsEntityTypeList = vtll::cat< VeEntityTypeListSystem, VeEntityTypeListUser >;
 
-	using VeTableSize = vtll::transform< vtll::cat< VeTableSizeSystem, VeTableSizeUser >, vtll::value_to_type_list>;
+	using VeTableSize = vtll::transform< vtll::cat< VeTableSizeSystem, VeTableSizeUser >, vtll::value_to_type>;
 
 	template<typename T>
 	struct left_shift_1 {

@@ -797,6 +797,54 @@ namespace vtll {
 
 
 	//-------------------------------------------------------------------------
+	//type_to_value: turn a list of std::integral_constant<> into a value list
+
+	namespace detail {
+		template<typename Seq>
+		struct type_to_value_impl;
+
+		template<template<typename...> typename Seq, typename... Ts>
+		struct type_to_value_impl<Seq<Ts...>> {
+			using type = value_list<Ts::value...>;
+		};
+	}
+
+	template<typename Seq>
+	using type_to_value = typename detail::type_to_value_impl<Seq>::type;
+
+	static_assert(
+		std::is_same_v<
+			type_to_value<
+				type_list< std::integral_constant<size_t, 2>, std::integral_constant<size_t, 4>, std::integral_constant<size_t, 6> > >
+			, value_list<2, 4, 6>
+		>,
+		"The implementation of type_to_value is bad");
+
+	//-------------------------------------------------------------------------
+	//value_to_type: turn a value list into a list of std::integral_constant<>
+
+	namespace detail {
+		template<typename Seq>
+		struct value_to_type_impl;
+
+		template<template<size_t...> typename Seq, size_t... Is>
+		struct value_to_type_impl<Seq<Is...>> {
+			using type = type_list<std::integral_constant<size_t, Is>...>;
+		};
+	}
+
+	template<typename Seq>
+	using value_to_type = typename detail::value_to_type_impl<Seq>::type;
+
+	static_assert(
+		std::is_same_v<
+		value_to_type< value_list<2, 4, 6> >
+		, type_list< std::integral_constant<size_t, 2>, std::integral_constant<size_t, 4>, std::integral_constant<size_t, 6> >
+		>,
+		"The implementation of value_to_type is bad");
+
+
+	//-------------------------------------------------------------------------
 	//size_value: get the size of a value list
 
 	namespace detail {
@@ -853,17 +901,17 @@ namespace vtll {
 		"The implementation of back_value is bad");
 
 	//-------------------------------------------------------------------------
-	//sum_size_t: compute the sum of a list of size_t s
+	//sum_value: compute the sum of a list of size_t s
 
 	template <size_t... Is>
-	using sum_size_t = std::integral_constant<size_t, (Is + ... + 0)>;
+	using sum_value = std::integral_constant<size_t, (Is + ... + 0)>;
 
-	static_assert(std::is_same_v< sum_size_t< 1, 2, 3>, std::integral_constant<size_t, 6> >,
-		"The implementation of sum_size_t is bad");
+	static_assert(std::is_same_v< sum_value< 1, 2, 3>, std::integral_constant<size_t, 6> >,
+		"The implementation of sum_value is bad");
 
 
 	//-------------------------------------------------------------------------
-	//function_size_t: compute function on a list of size_t s
+	//function_value: compute function on a list of size_t s
 
 	namespace detail {
 		template<size_t I>
@@ -873,64 +921,14 @@ namespace vtll {
 	}
 
 	template <template<size_t> typename Fun, size_t... Is>
-	using function_size_t = vtll::type_list< typename Fun<Is>::type... >;
+	using function_value = vtll::type_list< typename Fun<Is>::type... >;
 
 	static_assert(
 		std::is_same_v<
-		function_size_t< detail::test_func2, 1, 2, 3 >
+		function_value< detail::test_func2, 1, 2, 3 >
 		, type_list< std::integral_constant<size_t, 2 >, std::integral_constant<size_t, 4 >, std::integral_constant<size_t, 6 > >
 		>,
-		"The implementation of function_size_t is bad");
-
-
-	//-------------------------------------------------------------------------
-	//type_to_value_list: turn a list of std::integral_constant<> into a value list
-
-	namespace detail {
-		template<typename Seq>
-		struct type_to_value_list_impl;
-
-		template<template<typename...> typename Seq, typename... Ts>
-		struct type_to_value_list_impl<Seq<Ts...>> {
-			using type = value_list<Ts::value...>;
-		};
-	}
-
-	template<typename Seq>
-	using type_to_value_list = typename detail::type_to_value_list_impl<Seq>::type;
-
-	static_assert(
-		std::is_same_v<
-			type_to_value_list<
-				type_list< std::integral_constant<size_t, 2>, std::integral_constant<size_t, 4>, std::integral_constant<size_t, 6> > >
-			, value_list<2, 4, 6>
-		>,
-		"The implementation of to_value_list is bad");
-
-
-	//-------------------------------------------------------------------------
-	//value_to_type_list: turn a value list into a list of std::integral_constant<>
-
-	namespace detail {
-		template<typename Seq>
-		struct value_to_type_list_impl;
-
-		template<template<size_t...> typename Seq, size_t... Is>
-		struct value_to_type_list_impl<Seq<Is...>> {
-			using type = type_list<std::integral_constant<size_t,Is>...>;
-		};
-	}
-
-	template<typename Seq>
-	using value_to_type_list = typename detail::value_to_type_list_impl<Seq>::type;
-
-	static_assert(
-		std::is_same_v<
-			value_to_type_list< value_list<2,4,6> >
-			, type_list< std::integral_constant<size_t, 2>, std::integral_constant<size_t, 4>, std::integral_constant<size_t, 6> >
-		>,
-		"The implementation of value_to_type_list is bad");
-
+		"The implementation of function_value is bad");
 
 
 
