@@ -4,6 +4,7 @@
 #include <tuple>
 #include <variant>
 #include <iostream>
+#include <limits>
 
 /***********************************************************************************
 * 
@@ -129,6 +130,9 @@ namespace vtll {
 	namespace detail {
 		template<typename, typename>
 		struct index_of_impl;
+
+		template <typename T, template <typename...> typename Seq>
+		struct index_of_impl<Seq<>, T> : std::integral_constant<std::size_t, std::numeric_limits<size_t>::max()> {};
 
 		template <typename T, template <typename...> typename Seq, typename... Ts>
 		struct index_of_impl<Seq<T, Ts...>,T> : std::integral_constant<std::size_t, 0> {};
@@ -617,6 +621,52 @@ namespace vtll {
 			, type_list<std::integral_constant<size_t, 2>, std::integral_constant<size_t, 4>, std::integral_constant<size_t, 6> > >,
 
 		"The implementation of function is bad");
+
+	//-------------------------------------------------------------------------
+	//map: find a type key in a map, i.e. a list of type key - type value pairs, and retrieve its type value, or a default type if not found
+
+	namespace detail {
+		template<typename Map, typename Key, typename Default>
+		struct map_impl {
+			using Keys = transform<Map, front>;
+			using type = typename	std::conditional< 
+										has_type<Keys, Key>::value								//keys contain the key?
+										, back< Nth_type<Map, index_of<Keys, Key>::value> >		//yes - get the value
+										, Default												//no - get default value
+									>::type;
+		};
+
+		using test_map = type_list<
+			  type_list<int, char>
+			, type_list<float, double>
+			, type_list<double, float>
+		>;
+	}
+	template <typename Map, typename Key, typename Default>
+	using map = typename detail::map_impl<Map, Key, Default>::type;
+
+	static_assert(std::is_same_v< map<detail::test_map, int, float >, char >, "The implementation of map is bad");
+	static_assert(std::is_same_v< map<detail::test_map, char, float >, float >, "The implementation of map is bad");
+
+
+	//-------------------------------------------------------------------------
+	//apply_map: apply a list of keys to a map, get the list of their values, of defaults if the keys are not found
+	namespace detail {
+		template<typename Map, typename Keys, typename Default>
+		struct apply_map_impl;
+
+		template<typename Map, template<typename...> typename Keys, typename... Ks, typename Default>
+		struct apply_map_impl<Map, Keys<Ks...>, Default> {
+			using type = vtll::type_list< vtll::map<Map, Ks, Default>... >;
+		};
+	}
+
+	template<typename Map, typename Keys, typename Default>
+	using apply_map = typename detail::apply_map_impl<Map, Keys, Default>::type;
+
+	static_assert(
+		std::is_same_v< apply_map<detail::test_map, type_list<int, float, char>, char >, type_list<char, double, char> >, 
+		"The implementation of apply_map is bad");
 
 	//-------------------------------------------------------------------------
 	//static for: with this compile time for loop you can loop over any tuple, type list, or variadic argument list

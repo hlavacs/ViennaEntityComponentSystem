@@ -83,10 +83,12 @@ namespace vecs {
 		// ,... 
 	>;
 
-	using VeTableSizeSystem = vtll::type_list<
-		  vtll::value_list< 10, 16 >
-		, vtll::value_list< 10, 16 >
-		, vtll::value_list< 10, 16 >
+	using VeTableSizeDefault = vtll::value_list< 10, 16 >;
+
+	using VeTableSizeMapSystem = vtll::type_list<
+		  vtll::type_list< VeEntityTypeNode,		VeTableSizeDefault >
+		, vtll::type_list< VeEntityTypeDraw,		VeTableSizeDefault >
+		, vtll::type_list< VeEntityTypeAnimation,	VeTableSizeDefault >
 		//, ...
 	>;
 

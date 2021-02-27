@@ -30,14 +30,16 @@ namespace vecs {
 
 	using VecsEntityTypeList = vtll::cat< VeEntityTypeListSystem, VeEntityTypeListUser >;
 
-	using VeTableSize = vtll::transform< vtll::cat< VeTableSizeSystem, VeTableSizeUser >, vtll::value_to_type>;
+	using VeTableSizeMap = vtll::cat< VeTableSizeMapSystem, VeTableSizeMapUser >;
 
 	template<typename T>
 	struct left_shift_1 {
 		using type = std::integral_constant<size_t, 1 << T::value>;
 	};
 
-	using VeTableMaxSize = vtll::sum< vtll::function< vtll::transform< VeTableSize, vtll::back >, left_shift_1 > >;
+	using VeTableMaxSizes2 = vtll::transform < vtll::apply_map<VeTableSizeMap, VecsEntityTypeList, VeTableSizeDefault>, vtll::value_to_type>;
+
+	using VeTableMaxSize = vtll::sum< vtll::function< vtll::transform< VeTableMaxSizes2, vtll::back >, left_shift_1 > >;
 
 	//-------------------------------------------------------------------------
 	//definition of the types used in VECS
@@ -169,9 +171,9 @@ namespace vecs {
 		static const size_t c_info_size = 3;
 
 		using types = vtll::cat< info, E >;
-
-		static const size_t c_segment_size = vtll::front< vtll::Nth_type< VeTableSize, vtll::index_of<VecsEntityTypeList, E>::value> >::value;
-		static const size_t c_max_size     = vtll::back<  vtll::Nth_type< VeTableSize, vtll::index_of<VecsEntityTypeList, E>::value> >::value;
+	
+		static const size_t c_segment_size	= vtll::front_value< vtll::map< VeTableSizeMap, E, VeTableSizeDefault > >::value;
+		static const size_t c_max_size		= vtll::back_value<  vtll::map< VeTableSizeMap, E, VeTableSizeDefault > >::value;
 
 	protected:
 		static inline index_t							m_first_free{};
@@ -461,7 +463,7 @@ namespace vecs {
 		auto updateC(const VecsHandle& handle, size_t compidx, void* ptr, size_t size) noexcept		-> bool ;
 		auto componentE(const VecsHandle& handle, size_t compidx, void* ptr, size_t size) noexcept	-> bool;
 
-		static const size_t c_max_size = vtll::back<  vtll::Nth_type< VeTableSize, vtll::index_of<VecsEntityTypeList, E>::value> >::value;
+		static const size_t c_max_size = vtll::back_value<vtll::map< VeTableSizeMap, E, VeTableSizeDefault > >::value;
 
 	public:
 		VecsRegistry(size_t r = 1 << c_max_size) noexcept : VecsRegistryBaseClass() { VecsComponentTable<E>{r}; };
