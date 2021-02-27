@@ -34,7 +34,7 @@ namespace vecs {
 	>;
 
 	using VeTableSizeMapUser = vtll::type_list<
-		  vtll::type_list< VeEntityUser1, VeTableSizeDefault >
+		  vtll::type_list< VeEntityUser1,	vtll::value_list< 10, 16 > >
 		//, ...
 	>;
 
