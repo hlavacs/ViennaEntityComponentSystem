@@ -13,38 +13,24 @@ using namespace std::chrono_literals;
 
 namespace vecs {
 
-	class VecsSpinLockRead;
-	class VecsSpinLockWrite;
-
-	class VecsReadWriteMutex {
-		friend class VecsSpinLockRead;
-		friend class VecsSpinLockWrite;
-
-	protected:
-		std::atomic<uint32_t> m_read = 0;
-		std::atomic<uint32_t> m_write = 0;
-	public:
-		VecsReadWriteMutex() = default;
-	};
-
-
 	class VecsSpinLockWrite {
 	protected:
 		static const uint32_t m_max_cnt = 1 << 10;
-		VecsReadWriteMutex& m_spin_mutex;
+		std::atomic<uint32_t>& m_read;
+		std::atomic<uint32_t>& m_write;
 
 	public:
-		VecsSpinLockWrite(VecsReadWriteMutex& spin_mutex) : m_spin_mutex(spin_mutex) {
+		VecsSpinLockWrite(std::atomic<uint32_t>& read, std::atomic<uint32_t>& write) : m_read(read), m_write(write) {
 			uint32_t cnt = 0;
 			uint32_t w;
 
 			do {
-				w = m_spin_mutex.m_write.fetch_add(1);			//prohibit other readers and writers
-				if (w == 0) {									//I have the ticket?
+				w = m_write.fetch_add(1);			//prohibit other readers and writers
+				if (w == 0) {						//I have the ticket?
 					break;
 				}
 
-				m_spin_mutex.m_write--;						//undo and try again
+				m_write--;									//undo and try again
 				if (++cnt > m_max_cnt) {					//spin or sleep?
 					cnt = 0;
 					std::this_thread::sleep_for(100ns);		//might sleep a little to take stress from CPU
@@ -53,7 +39,7 @@ namespace vecs {
 
 			//a new reader might have slipped into here, or old readers exist
 			cnt = 0;
-			while (m_spin_mutex.m_read.load() > 0) {		//wait for existing readers to finish
+			while (m_read.load() > 0) {		//wait for existing readers to finish
 				if (++cnt > m_max_cnt) {
 					cnt = 0;
 					std::this_thread::sleep_for(100ns);
@@ -62,7 +48,7 @@ namespace vecs {
 		}
 
 		~VecsSpinLockWrite() {
-			m_spin_mutex.m_write--;
+			m_write--;
 		}
 	};
 
@@ -70,31 +56,32 @@ namespace vecs {
 	class VecsSpinLockRead {
 	protected:
 		static const uint32_t m_max_cnt = 1 << 10;
-		VecsReadWriteMutex& m_spin_mutex;
+		std::atomic<uint32_t>& m_read;
+		std::atomic<uint32_t>& m_write;
 
 	public:
-		VecsSpinLockRead(VecsReadWriteMutex& spin_mutex) : m_spin_mutex(spin_mutex) {
+		VecsSpinLockRead(std::atomic<uint32_t>& read, std::atomic<uint32_t>& write) : m_read(read), m_write(write) {
 			uint32_t cnt = 0;
 
 			do {
-				while (m_spin_mutex.m_write.load() > 0) {	//wait for writers to finish
+				while (m_write.load() > 0) {	//wait for writers to finish
 					if (++cnt > m_max_cnt) {
 						cnt = 0;
 						std::this_thread::sleep_for(100ns);//might sleep a little to take stress from CPU
 					}
 				}
 				//writer might have joined until here
-				m_spin_mutex.m_read++;	//announce yourself as reader
+				m_read++;	//announce yourself as reader
 
-				if (m_spin_mutex.m_write.load() == 0) { //still no writer?
+				if (m_write.load() == 0) { //still no writer?
 					break;
 				}
-				m_spin_mutex.m_read--; //undo reading and try again
+				m_read--; //undo reading and try again
 			} while (true);
 		}
 
 		~VecsSpinLockRead() {
-			m_spin_mutex.m_read--;
+			m_read--;
 		}
 	};
 

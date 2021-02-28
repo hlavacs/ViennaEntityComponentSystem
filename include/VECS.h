@@ -120,8 +120,8 @@ namespace vecs {
 		VecsEntity(const VecsHandle& h, const tuple_type& tup) noexcept : m_handle{ h }, m_component_data{ tup } {};
 		auto handle() const noexcept -> VecsHandle { return m_handle; }
 		auto has_value() noexcept	 -> bool { return m_handle.has_value(); }
-		auto update() noexcept		 -> bool { return m_handle.update(*this); };
-		auto erase() noexcept		 -> bool { return m_handle.erase(*this); };
+		auto update() noexcept		 -> bool;
+		auto erase() noexcept		 -> bool;
 		auto name() const noexcept	 -> std::string { return typeid(E).name(); };
 
 		template<size_t I>
@@ -212,7 +212,7 @@ namespace vecs {
 	template<typename E> 
 	template<typename... Ts> [[nodiscard]] 
 	inline auto VecsComponentTable<E>::insert(VecsHandle& handle, Ts&&... args) noexcept -> index_t {
-		auto idx = m_data.allocate_one();
+		auto idx = m_data.push_back();
 		if (!idx.has_value()) return idx;
 		m_data.update<c_handle>(idx, handle);
 		(m_data.update<c_info_size + vtll::index_of<E,std::decay_t<Ts>>::value>(idx, std::forward<Ts>(args)), ...);
@@ -339,19 +339,12 @@ namespace vecs {
 	class VecsRegistryBaseClass : public VecsMonostate<VecsRegistryBaseClass> {
 	protected:
 
-		struct entry_t {
-			index_t				m_next_free_or_comp_index{};	//next free slot or index of component table
-			counter16_t			m_generation_counter{ 0 };		//generation counter starts with 0
-			VecsReadWriteMutex	m_mutex;						//per entity synchronization
-
-			entry_t() {};
-			entry_t(const entry_t& other) {};
-		};
-
-		using types = vtll::type_list<index_t, counter16_t, VecsReadWriteMutex>;
+		using types = vtll::type_list<index_t, counter16_t, index16_t, std::atomic<uint32_t>, std::atomic<uint32_t>>;
 		static const uint32_t c_next = 0;
 		static const uint32_t c_counter = 1;
-		static const uint32_t c_mutex = 2;
+		static const uint32_t c_type = 2;
+		static const uint32_t c_mutex_read = 3;
+		static const uint32_t c_mutex_write = 4;
 
 		static inline VecsTable<types>	m_entity_table;
 		static inline index_t			m_first_free{};
@@ -530,10 +523,12 @@ namespace vecs {
 			m_first_free = m_entity_table.comp_ref_idx<c_next>(m_first_free);
 		}
 		else {
-			idx = m_entity_table.allocate_one();	
+			idx = m_entity_table.push_back();	
 			if (!idx.has_value()) return {};
 			m_entity_table.comp_ref_idx<c_counter>(idx) = counter16_t{0};		//start with counter 0
 		}
+
+		m_entity_table.comp_ref_idx<c_type>(idx) = index16_t{ vtll::index_of<VecsEntityTypeList, E>::value };
 
 		VecsHandle handle{ idx, m_entity_table.comp_ref_idx<c_counter>(idx), index16_t{ vtll::index_of<VecsEntityTypeList, E>::value } };	
 		index_t compidx = VecsComponentTable<E>().insert(handle, args...);	//add data as tuple
@@ -543,8 +538,10 @@ namespace vecs {
 
 	template<typename E>
 	inline auto VecsRegistry<E>::contains(const VecsHandle& handle) noexcept -> bool {
+		if (handle.m_type_index != index16_t{ vtll::index_of<VecsEntityTypeList, E>::value }) return false;
 		if (!handle.m_entity_index.has_value() || handle.m_entity_index.value >= m_entity_table.size()) return false;
 		if (handle.m_generation_counter != m_entity_table.comp_ref_idx<c_counter>(handle.m_entity_index)) return false;
+		if (handle.m_type_index != m_entity_table.comp_ref_idx<c_type>(handle.m_entity_index)) return false;
 		return true;
 	}
 
@@ -867,6 +864,20 @@ namespace vecs {
 	inline auto VecsHandle::erase() noexcept					-> bool {
 		return VecsRegistryBaseClass().erase(*this);
 	}
+
+	//-------------------------------------------------------------------------
+	//VecsEntity
+
+	template <typename E>
+	auto VecsEntity<E>::update() noexcept -> bool {
+		return VecsRegistry<E>().update(m_handle, *this); 
+	};
+
+	template <typename E>
+	auto VecsEntity<E>::erase() noexcept -> bool {
+		return VecsRegistry<E>().erase(m_handle);
+	};
+
 
 	//-------------------------------------------------------------------------
 	//system

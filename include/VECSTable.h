@@ -65,7 +65,7 @@ namespace vecs {
 		};
 
 		//Internally synchronized
-		inline auto allocate_one() -> index_t {
+		inline auto push_back() -> index_t {
 			auto idx = m_size.fetch_add(1);
 			if (!reserve(idx+1)) {
 				m_size--;
