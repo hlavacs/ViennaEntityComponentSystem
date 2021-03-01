@@ -203,6 +203,7 @@ namespace vecs {
 		auto handle(const index_t index) noexcept				-> VecsHandle;
 		auto size() noexcept									-> size_t { return m_data.size(); };
 		auto erase(const index_t idx) noexcept					-> std::tuple<VecsHandle, index_t>;
+		auto clear(const index_t idx) noexcept					-> size_t ;
 
 		template<typename C>
 		requires vtll::has_type<E, C>::value
@@ -271,6 +272,11 @@ namespace vecs {
 		m_first_free = index;
 
 		return std::make_tuple(VecsHandle{}, index_t{});
+	}
+
+	template<typename E>
+	inline auto VecsComponentTable<E>::clear(const index_t idx) noexcept -> size_t {
+		return 0;
 	}
 
 
