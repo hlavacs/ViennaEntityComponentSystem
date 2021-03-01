@@ -119,7 +119,7 @@ namespace vecs {
 	public:
 		VecsEntity(const VecsHandle& h, const tuple_type& tup) noexcept : m_handle{ h }, m_component_data{ tup } {};
 		auto handle() const noexcept -> VecsHandle { return m_handle; }
-		auto has_value() noexcept	 -> bool { return m_handle.has_value(); }
+		auto has_value() noexcept	 -> bool;
 		auto update() noexcept		 -> bool;
 		auto erase() noexcept		 -> bool;
 		auto name() const noexcept	 -> std::string { return typeid(E).name(); };
@@ -538,6 +538,7 @@ namespace vecs {
 
 	template<typename E>
 	inline auto VecsRegistry<E>::contains(const VecsHandle& handle) noexcept -> bool {
+		if (!handle.m_entity_index.has_value() || !handle.m_generation_counter.has_value() || !handle.m_type_index.has_value()) return false;
 		if (handle.m_type_index != index16_t{ vtll::index_of<VecsEntityTypeList, E>::value }) return false;
 		if (!handle.m_entity_index.has_value() || handle.m_entity_index.value >= m_entity_table.size()) return false;
 		if (handle.m_generation_counter != m_entity_table.comp_ref_idx<c_counter>(handle.m_entity_index)) return false;
@@ -834,8 +835,7 @@ namespace vecs {
 	//-------------------------------------------------------------------------
 	//VecsHandle
 
-	inline auto VecsHandle::has_value() noexcept					-> bool {
-		if (!m_entity_index.has_value() || !m_generation_counter.has_value() || !m_type_index.has_value()) return false;
+	inline auto VecsHandle::has_value() noexcept				-> bool {
 		return VecsRegistryBaseClass().contains(*this);
 	}
 
@@ -867,6 +867,11 @@ namespace vecs {
 
 	//-------------------------------------------------------------------------
 	//VecsEntity
+
+	template <typename E>
+	auto VecsEntity<E>::has_value() noexcept -> bool { 
+		return VecsRegistry<E>.contains(m_handle); 
+	}
 
 	template <typename E>
 	auto VecsEntity<E>::update() noexcept -> bool {

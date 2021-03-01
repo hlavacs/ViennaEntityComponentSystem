@@ -71,9 +71,6 @@ int main() {
 		TESTRESULT(++number, "update handle", h1.update<VeComponentPosition>(VeComponentPosition{ glm::vec3{-99.0f, -22.0f, -33.0f} }),
 			(h1.component<VeComponentPosition>().value().m_position == glm::vec3{ -99.0f, -22.0f, -33.0f }), );
 
-		TESTRESULT(++number, "erase handle", h1.erase(), (!h1.has_value() && VecsRegistry().size() == 1), );
-		TESTRESULT(++number, "erase handle", h2.erase(), (!h2.has_value() && VecsRegistry().size() == 0), );
-
 		int i = 0;
 		bool test = true;
 		for_each<VeComponentName>([&](auto& iter) {
@@ -83,7 +80,11 @@ int main() {
 			//std::cout << "Entity " << name << "\n";
 			});
 		TESTRESULT(++number, "system create", , (test && i == 0), );
+
+		TESTRESULT(++number, "erase handle", h1.erase(), (!h1.has_value() && VecsRegistry().size() == 1), );
+		TESTRESULT(++number, "erase handle", h2.erase(), (!h2.has_value() && VecsRegistry().size() == 0), );
 	}
+
 
 	{
 		for (int i = 0; i < 1000; i++) {

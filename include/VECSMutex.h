@@ -16,7 +16,7 @@ namespace vecs {
 	class VecsSpinLockWrite {
 	protected:
 		static const uint32_t m_max_cnt = 1 << 10;
-		std::atomic<uint32_t>& m_read;
+		std::atomic<uint32_t>& m_read;		//do not put into the same chache line!
 		std::atomic<uint32_t>& m_write;
 
 	public:
@@ -62,18 +62,23 @@ namespace vecs {
 	public:
 		VecsSpinLockRead(std::atomic<uint32_t>& read, std::atomic<uint32_t>& write) : m_read(read), m_write(write) {
 			uint32_t cnt = 0;
+			uint32_t w;
 
 			do {
-				while (m_write.load() > 0) {	//wait for writers to finish
+				w = m_write.load();
+				while ( w > 0) {	//wait for writers to finish
 					if (++cnt > m_max_cnt) {
 						cnt = 0;
 						std::this_thread::sleep_for(100ns);//might sleep a little to take stress from CPU
 					}
+					w = m_write.load();
 				}
+
 				//writer might have joined until here
 				m_read++;	//announce yourself as reader
 
-				if (m_write.load() == 0) { //still no writer?
+				w = m_write.load();
+				if (w == 0) { //still no writer?
 					break;
 				}
 				m_read--; //undo reading and try again
