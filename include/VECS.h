@@ -183,10 +183,12 @@ namespace vecs {
 		static inline std::array<std::unique_ptr<VecsComponentTable<E>>, vtll::size<VecsComponentTypeList>::value> m_dispatch; //one for each component type
 
 		virtual auto updateC(index_t entidx, size_t compidx, void* ptr, size_t size) noexcept -> bool {
+			assert(compidx < vtll::size<types>::value);
 			return m_dispatch[compidx]->updateC(entidx, compidx, ptr, size);
 		}
 
 		virtual auto componentE(index_t entidx, size_t compidx, void* ptr, size_t size)  noexcept -> bool {
+			assert(compidx < vtll::size<types>::value);
 			return m_dispatch[compidx]->componentE(entidx, compidx, ptr, size);
 		}
 
@@ -481,16 +483,18 @@ namespace vecs {
 		auto entity(const VecsHandle& h) noexcept			-> std::optional<VecsEntity<E>>;
 
 		template<typename C>
+		requires (vtll::has_type<E, std::decay_t<C>>::value)
 		auto component(const VecsHandle& handle) noexcept	->std::optional<C> ;
 
 		//-------------------------------------------------------------------------
 		//update data
 
 		template<typename ET>
+		requires (std::is_same_v<std::decay_t<E>, vtll::front<std::decay_t<ET>>>)
 		auto update(const VecsHandle& handle, ET&& ent) noexcept -> bool;
 
 		template<typename C> 
-		requires (vtll::has_type<VecsComponentTypeList, std::decay_t<C>>::value)
+		requires (vtll::has_type<E, std::decay_t<C>>::value)
 		auto update(const VecsHandle& handle, C&& comp) noexcept -> bool;
 
 		//-------------------------------------------------------------------------
@@ -539,6 +543,7 @@ namespace vecs {
 		VecsHandle handle{ idx, m_entity_table.comp_ref_idx<c_counter>(idx), index16_t{ vtll::index_of<VecsEntityTypeList, E>::value } };	
 		index_t compidx = VecsComponentTable<E>().insert(handle, args...);	//add data as tuple
 		m_entity_table.comp_ref_idx<c_next>(idx) = compidx;						//index in component vector 
+		m_size++;
 		return handle;
 	};
 
@@ -561,6 +566,7 @@ namespace vecs {
 
 	template<typename E>
 	template<typename C>
+	requires (vtll::has_type<E, std::decay_t<C>>::value)
 	inline auto VecsRegistry<E>::component(const VecsHandle& handle) noexcept -> std::optional<C> {
 		if constexpr (!vtll::has_type<E, std::decay_t<C>>::value) { return {}; }
 		if (!contains(handle)) return {};
@@ -570,6 +576,7 @@ namespace vecs {
 
 	template<typename E>
 	template<typename ET>
+	requires (std::is_same_v<std::decay_t<E>, vtll::front<std::decay_t<ET>>>)
 	inline auto VecsRegistry<E>::update(const VecsHandle& handle, ET&& ent) noexcept -> bool {
 		if (!contains(handle)) return false;
 		VecsComponentTable<E>().update(handle.m_entity_index, std::forward<ET>(ent));
@@ -577,7 +584,8 @@ namespace vecs {
 	}
 
 	template<typename E>
-	template<typename C> requires (vtll::has_type<VecsComponentTypeList, std::decay_t<C>>::value)
+	template<typename C> 
+	requires (vtll::has_type<E, std::decay_t<C>>::value)
 	inline auto VecsRegistry<E>::update(const VecsHandle& handle, C&& comp) noexcept -> bool {
 		if constexpr (!vtll::has_type<E, std::decay_t<C>>::value) { return false; }
 		if (!contains(handle)) return false;

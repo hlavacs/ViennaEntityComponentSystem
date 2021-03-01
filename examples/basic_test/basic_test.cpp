@@ -41,7 +41,7 @@ int main() {
     auto h2 = VecsRegistry{}.insert(VeComponentName{ "Draw" }, VeComponentMaterial{ 99 }, VeComponentGeometry{});
     std::cout << typeid(VeEntityTypeDraw).hash_code() << " " << typeid(VeEntityTypeDraw).name() << std::endl;
 
-    auto data2b = h2.entity<VeEntityTypeDraw>().value();
+    auto data2b = h2.entity<VeEntityTypeDraw>().value(); 
     auto comp2_1 = data2b.component<VeComponentMaterial>();
     auto comp2_2 = h2.component<VeComponentMaterial>();
 
