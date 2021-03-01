@@ -587,11 +587,72 @@ namespace vtll {
 	using sum = typename detail::sum_impl<Seq>::type;
 
 	static_assert(
-		std::is_same_v< 
-			sum< type_list<std::integral_constant<size_t, 1>, std::integral_constant<size_t, 2>, std::integral_constant<size_t, 3> > > 
-			, std::integral_constant<size_t, 6> >,
+		std::is_same_v<
+		sum< type_list<std::integral_constant<size_t, 1>, std::integral_constant<size_t, 2>, std::integral_constant<size_t, 3> > >
+		, std::integral_constant<size_t, 6> >,
 
 		"The implementation of sum is bad");
+
+	//-------------------------------------------------------------------------
+	//max: compute the max of a list of std::integral_constant<size_t, I>
+
+	namespace detail {
+		template<typename Seq, typename M>
+		struct max_impl;
+
+		template<template <typename...> typename Seq, typename M>
+		struct max_impl<Seq<>, M> {
+			using type = M;
+		};
+
+		template<template <typename...> typename Seq, typename... Ts, typename T, typename M>
+		struct max_impl<Seq<T,Ts...>, M> {
+			using type = typename std::conditional<
+							(bool) (T::value > M::value),
+							typename max_impl<Seq<Ts...>, T>::type,
+							typename max_impl<Seq<Ts...>, M>::type
+						 >::type ;
+		};
+	}
+	template <typename Seq>
+	using max = typename detail::max_impl<Seq, std::integral_constant<size_t, 0>>::type;
+
+	static_assert(
+		std::is_same_v< 
+			max< type_list<std::integral_constant<size_t, 5>, std::integral_constant<size_t, 4>, std::integral_constant<size_t, 3> > > 
+			, std::integral_constant<size_t, 5> >,
+		"The implementation of max is bad");
+
+	//-------------------------------------------------------------------------
+	//min: compute the min of a list of std::integral_constant<size_t, I>
+
+	namespace detail {
+		template<typename Seq, typename M>
+		struct min_impl;
+
+		template<template <typename...> typename Seq, typename M>
+		struct min_impl<Seq<>, M> {
+			using type = M;
+		};
+
+		template<template <typename...> typename Seq, typename T, typename... Ts, typename M>
+		struct min_impl<Seq<T, Ts...>, M> {
+			static const bool B = T::value < M::value;
+			using type = typename std::conditional<
+										(bool) (T::value < M::value),
+										typename min_impl<Seq<Ts...>, T>::type,
+										typename min_impl<Seq<Ts...>, M>::type
+								  >::type;
+		};
+	}
+	template <typename Seq>
+	using min = typename detail::min_impl<Seq, std::integral_constant<size_t, std::numeric_limits<size_t>::max()>>::type;
+
+	static_assert(
+		std::is_same_v<
+				min< type_list<std::integral_constant<size_t, 6>, std::integral_constant<size_t, 4>, std::integral_constant<size_t, 9> > >
+				, std::integral_constant<size_t, 4> >,
+		"The implementation of min is bad");
 
 	//-------------------------------------------------------------------------
 	//function: compute function on list of std::integral_constant<size_t, I>
