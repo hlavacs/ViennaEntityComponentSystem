@@ -37,9 +37,13 @@ namespace vecs {
 		using type = std::integral_constant<size_t, 1 << T::value>;
 	};
 
-	using VecsTableMaxSizes = vtll::transform < vtll::apply_map<VecsTableSizeMap, VecsEntityTypeList, VeTableSizeDefault>, vtll::value_to_type>;
+	using VecsTableConstants = vtll::transform < vtll::apply_map<VecsTableSizeMap, VecsEntityTypeList, VeTableSizeDefault>, vtll::value_to_type>;
 
-	using VecsTableMaxSize = vtll::sum< vtll::function< vtll::transform< VecsTableMaxSizes, vtll::back >, left_shift_1 > >;
+	using VecsTableMaxSeg = vtll::max< vtll::transform< VecsTableConstants, vtll::front > >;
+
+	using VecsTableMaxSizeSum = vtll::sum< vtll::function< vtll::transform< VecsTableConstants, vtll::back >, left_shift_1 > >;
+
+	using VecsTableMaxSize = std::integral_constant<size_t, VecsTableMaxSeg::value * (VecsTableMaxSizeSum::value / VecsTableMaxSeg::value + 1)>;
 
 	//-------------------------------------------------------------------------
 	//definition of the types used in VECS
@@ -60,6 +64,7 @@ namespace vecs {
 	*/
 
 	class VecsHandle {
+		friend VecsRegistryBaseClass;
 		template<typename E> friend class VecsRegistry;
 		template<typename E> friend class VecsComponentTable;
 		template<typename E, typename C> friend class VecsComponentTableDerived;
@@ -82,6 +87,7 @@ namespace vecs {
 		auto entity() noexcept -> std::optional<VecsEntity<E>>;
 
 		template<typename C>
+		requires vtll::has_type<VecsComponentTypeList, std::decay_t<C>>::value
 		auto component() noexcept -> std::optional<C>;
 
 		template<typename ET>
@@ -130,20 +136,15 @@ namespace vecs {
 		};
 
 		template<typename C>
-		auto component() noexcept -> std::optional<C> {
-			if constexpr (vtll::has_type<E, std::decay_t<C>>::value) {
-				return { std::get<vtll::index_of<E,std::decay_t<C>>::value>(m_component_data) };
-			}
-			return {};
+		requires vtll::has_type<E, std::decay_t<C>>::value
+		auto component() noexcept -> C {
+			return std::get<vtll::index_of<E,std::decay_t<C>>::value>(m_component_data);
 		};
 
 		template<typename C>
-		requires vtll::has_type<VecsComponentTypeList, std::decay_t<C>>::value
+		requires vtll::has_type<E, std::decay_t<C>>::value
 		auto local_update( C&& comp ) noexcept -> void {
-			if constexpr (vtll::has_type<E,std::decay_t<C>>::value) {
-				std::get<vtll::index_of<E, std::decay_t<C>>::value>(m_component_data) = comp;
-			}
-			return;
+			std::get<vtll::index_of<E, std::decay_t<C>>::value>(m_component_data) = comp;
 		};
 	};
 
@@ -346,8 +347,9 @@ namespace vecs {
 		static const uint32_t c_mutex_read = 3;
 		static const uint32_t c_mutex_write = 4;
 
-		static inline VecsTable<types>	m_entity_table;
-		static inline index_t			m_first_free{};
+		static inline VecsTable<types, VecsTableMaxSeg::value>	m_entity_table;
+		static inline index_t									m_first_free{};
+		static inline std::atomic<uint32_t>						m_size{0};
 
 		static inline std::array<std::unique_ptr<VecsRegistryBaseClass>, vtll::size<VecsEntityTypeList>::value> m_dispatch;
 
@@ -375,6 +377,7 @@ namespace vecs {
 		template<typename C>
 		requires vtll::has_type<VecsComponentTypeList, std::decay_t<C>>::value
 		auto component(const VecsHandle& handle) noexcept -> std::optional<C> {
+			if (!handle.m_type_index.has_value() || handle.m_type_index.value >= vtll::size<VecsEntityTypeList>::value) return {};
 			C res{};
 			if (m_dispatch[handle.index()]->componentE(handle, vtll::index_of<VecsComponentTypeList, std::decay_t<C>>::value, (void*)&res, sizeof(C))) {
 				return { res };
@@ -391,6 +394,7 @@ namespace vecs {
 		template<typename C>
 		requires vtll::has_type<VecsComponentTypeList, std::decay_t<C>>::value
 		auto update(const VecsHandle& handle, C&& comp) noexcept -> bool {
+			if (!handle.m_type_index.has_value() || handle.m_type_index.value >= vtll::size<VecsEntityTypeList>::value) return false;
 			return m_dispatch[handle.index()]->updateC(handle, vtll::index_of<VecsComponentTypeList, std::decay_t<C>>::value, (void*)&comp, sizeof(C));
 		}
 
@@ -404,6 +408,7 @@ namespace vecs {
 
 		virtual
 		auto erase(const VecsHandle& handle) noexcept		-> bool {
+			if (!handle.m_type_index.has_value() || handle.m_type_index.value >= vtll::size<VecsEntityTypeList>::value) return false;
 			return m_dispatch[handle.index()]->erase(handle);
 		}
 
@@ -414,7 +419,7 @@ namespace vecs {
 		auto size() noexcept		-> size_t { return VecsComponentTable<E>().size(); };
 
 		template<>
-		auto size<>() noexcept		-> size_t;
+		auto size<>() noexcept		-> size_t { return m_size; };
 
 		template<typename... Cs>
 		auto begin() noexcept		-> VecsIterator<Cs...>;
@@ -424,12 +429,13 @@ namespace vecs {
 
 		virtual 
 		auto contains(const VecsHandle& handle) noexcept	-> bool {
+			if (!handle.m_type_index.has_value() || handle.m_type_index.value >= vtll::size<VecsEntityTypeList>::value) return false;
 			return m_dispatch[handle.index()]->contains(handle);
 		}
 	};
 
 
-	template<>
+	/*template<>
 	auto VecsRegistryBaseClass::size<void>() noexcept		-> size_t {
 		size_t sum = 0;
 		vtll::static_for<size_t, 0, vtll::size<VecsEntityTypeList>::value >(
@@ -439,7 +445,7 @@ namespace vecs {
 			}
 		);
 		return sum;
-	}
+	}*/
 
 
 
@@ -539,8 +545,8 @@ namespace vecs {
 	template<typename E>
 	inline auto VecsRegistry<E>::contains(const VecsHandle& handle) noexcept -> bool {
 		if (!handle.m_entity_index.has_value() || !handle.m_generation_counter.has_value() || !handle.m_type_index.has_value()) return false;
-		if (handle.m_type_index != index16_t{ vtll::index_of<VecsEntityTypeList, E>::value }) return false;
-		if (!handle.m_entity_index.has_value() || handle.m_entity_index.value >= m_entity_table.size()) return false;
+		if (handle.m_type_index.value != vtll::index_of<VecsEntityTypeList, E>::value ) return false;
+		if (handle.m_entity_index.value >= m_entity_table.size()) return false;
 		if (handle.m_generation_counter != m_entity_table.comp_ref_idx<c_counter>(handle.m_entity_index)) return false;
 		if (handle.m_type_index != m_entity_table.comp_ref_idx<c_type>(handle.m_entity_index)) return false;
 		return true;
@@ -558,8 +564,8 @@ namespace vecs {
 	inline auto VecsRegistry<E>::component(const VecsHandle& handle) noexcept -> std::optional<C> {
 		if constexpr (!vtll::has_type<E, std::decay_t<C>>::value) { return {}; }
 		if (!contains(handle)) return {};
-		auto& compidx = m_entity_table.comp_ref_idx<c_next>(handle.m_entity_index);
-		return { VecsComponentTable<E>().component<C>(compidx) };
+		auto& comp_table_idx = m_entity_table.comp_ref_idx<c_next>(handle.m_entity_index);
+		return { VecsComponentTable<E>().component<C>(comp_table_idx) };
 	}
 
 	template<typename E>
@@ -845,6 +851,7 @@ namespace vecs {
 	}
 
 	template<typename C>
+	requires vtll::has_type<VecsComponentTypeList, std::decay_t<C>>::value
 	inline auto VecsHandle::component() noexcept				-> std::optional<C> {
 		return VecsRegistryBaseClass().component<C>(*this);
 	}
@@ -870,7 +877,7 @@ namespace vecs {
 
 	template <typename E>
 	auto VecsEntity<E>::has_value() noexcept -> bool { 
-		return VecsRegistry<E>.contains(m_handle); 
+		return VecsRegistry<E>().contains(m_handle); 
 	}
 
 	template <typename E>
