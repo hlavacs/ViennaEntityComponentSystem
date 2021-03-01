@@ -195,8 +195,10 @@ namespace vecs {
 	public:
 		VecsComponentTable(size_t r = 1 << c_max_size) noexcept;
 
-		template<typename... Ts> [[nodiscard]]
-		auto insert(VecsHandle& handle, Ts&&... args) noexcept	-> index_t;
+		template<typename... Cs>
+		requires vtll::is_same<E, std::decay_t<Cs>...>::value [[nodiscard]]
+		auto insert(VecsHandle& handle, Cs&&... args) noexcept	-> index_t;
+
 		auto values(const index_t index) noexcept				-> value_type;
 		auto handle(const index_t index) noexcept				-> VecsHandle;
 		auto size() noexcept									-> size_t { 
@@ -205,20 +207,23 @@ namespace vecs {
 		auto erase(const index_t idx) noexcept					-> std::tuple<VecsHandle, index_t>;
 
 		template<typename C>
+		requires vtll::has_type<E, C>::value
 		auto component(const index_t index) noexcept			-> C&;
 
 		template<typename ET>
+		requires (std::is_same_v<E, vtll::front<std::decay_t<ET>>>)
 		auto update(const index_t index, ET&& ent) noexcept		-> bool;
 	};
 
 
 	template<typename E> 
-	template<typename... Ts> [[nodiscard]] 
-	inline auto VecsComponentTable<E>::insert(VecsHandle& handle, Ts&&... args) noexcept -> index_t {
+	template<typename... Cs>
+	requires vtll::is_same<E, std::decay_t<Cs>...>::value [[nodiscard]]
+	inline auto VecsComponentTable<E>::insert(VecsHandle& handle, Cs&&... args) noexcept -> index_t {
 		auto idx = m_data.push_back();
 		if (!idx.has_value()) return idx;
 		m_data.update<c_handle>(idx, handle);
-		(m_data.update<c_info_size + vtll::index_of<E,std::decay_t<Ts>>::value>(idx, std::forward<Ts>(args)), ...);
+		(m_data.update<c_info_size + vtll::index_of<E,std::decay_t<Cs>>::value>(idx, std::forward<Cs>(args)), ...);
 		return idx;
 	};
 
@@ -237,6 +242,7 @@ namespace vecs {
 
 	template<typename E>
 	template<typename C>
+	requires vtll::has_type<E, C>::value
 	inline auto VecsComponentTable<E>::component(const index_t index) noexcept -> C& {
 		assert(index.value < m_data.size());
 		return m_data.comp_ref_idx<c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(index);
@@ -244,6 +250,7 @@ namespace vecs {
 
 	template<typename E>
 	template<typename ET>
+	requires (std::is_same_v<E, vtll::front<std::decay_t<ET>>>)
 	inline auto VecsComponentTable<E>::update(const index_t index, ET&& ent) noexcept -> bool {
 		vtll::static_for<size_t, 0, vtll::size<E>::value >(
 			[&](auto i) {
@@ -490,7 +497,7 @@ namespace vecs {
 		//update data
 
 		template<typename ET>
-		requires (std::is_same_v<std::decay_t<E>, vtll::front<std::decay_t<ET>>>)
+		requires (std::is_same_v<E, vtll::front<std::decay_t<ET>>>)
 		auto update(const VecsHandle& handle, ET&& ent) noexcept -> bool;
 
 		template<typename C> 
@@ -576,7 +583,7 @@ namespace vecs {
 
 	template<typename E>
 	template<typename ET>
-	requires (std::is_same_v<std::decay_t<E>, vtll::front<std::decay_t<ET>>>)
+	requires (std::is_same_v<E, vtll::front<std::decay_t<ET>>>)
 	inline auto VecsRegistry<E>::update(const VecsHandle& handle, ET&& ent) noexcept -> bool {
 		if (!contains(handle)) return false;
 		VecsComponentTable<E>().update(handle.m_entity_index, std::forward<ET>(ent));
