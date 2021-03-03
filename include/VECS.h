@@ -165,20 +165,19 @@ namespace vecs {
 	public:
 		using value_type = vtll::to_tuple<E>;
 
-		using info = vtll::type_list<VecsHandle, index_t, index_t>;
+		using info = vtll::type_list<VecsHandle>;
 		static const size_t c_handle = 0;
-		static const size_t c_prev = 1;
-		static const size_t c_next = 2;
-		static const size_t c_info_size = 3;
+		static const size_t c_info_size = 1;
 
 		using types = vtll::cat< info, E >;
-	
+		using types_deleted = vtll::type_list< index_t >;
+
 		static const size_t c_segment_size	= vtll::front_value< vtll::map< VecsTableSizeMap, E, VeTableSizeDefault > >::value;
 		static const size_t c_max_size		= vtll::back_value<  vtll::map< VecsTableSizeMap, E, VeTableSizeDefault > >::value;
 
 	protected:
-		static inline index_t							m_first_free{};
-		static inline VecsTable<types, c_segment_size>	m_data;
+		static inline VecsTable<types, c_segment_size>			m_data;
+		static inline VecsTable<types_deleted, c_segment_size>	m_deleted;
 
 		static inline std::array<std::unique_ptr<VecsComponentTable<E>>, vtll::size<VecsComponentTypeList>::value> m_dispatch; //one for each component type
 
@@ -202,7 +201,8 @@ namespace vecs {
 		auto values(const index_t index) noexcept				-> value_type;
 		auto handle(const index_t index) noexcept				-> VecsHandle;
 		auto size() noexcept									-> size_t { return m_data.size(); };
-		auto erase(const index_t idx) noexcept					-> std::tuple<VecsHandle, index_t>;
+		auto erase(const index_t idx) noexcept					-> bool;
+		auto erase() noexcept									-> void;
 		auto clear(const index_t idx) noexcept					-> size_t ;
 
 		template<typename C>
@@ -260,18 +260,16 @@ namespace vecs {
 	}
 
 	template<typename E>
-	inline auto VecsComponentTable<E>::erase(const index_t index) noexcept -> std::tuple<VecsHandle, index_t> {
+	inline auto VecsComponentTable<E>::erase(const index_t index) noexcept -> bool {
 		assert(index.value < m_data.size());
 		const std::lock_guard<std::mutex> lock(m_data.m_mutex);
-		m_data.comp_ref_idx<c_handle>(index) = {};	//invalidate handle
-		m_data.comp_ref_idx<c_prev>(index) = {};
-		m_data.comp_ref_idx<c_next>(index) = m_first_free;
-		if (m_first_free.has_value()) {
-			m_data.comp_ref_idx<c_prev>(m_first_free) = index;
-		}
-		m_first_free = index;
+		m_data.comp_ref_idx<c_handle>(index) = {};	//invalidate handle	
+		return true;
+	}
 
-		return std::make_tuple(VecsHandle{}, index_t{});
+	template<typename E>
+	inline auto VecsComponentTable<E>::erase() noexcept -> void {
+
 	}
 
 	template<typename E>
@@ -353,13 +351,13 @@ namespace vecs {
 	class VecsRegistryBaseClass : public VecsMonostate<VecsRegistryBaseClass> {
 	protected:
 
-		struct entity_t{
+		struct map_t{
 			index_t		m_index{};
 			counter16_t m_generation_counter{};
 			index16_t	m_type_index{};
 		};
 
-		using types = vtll::type_list<entity_t, std::atomic<uint32_t>, std::atomic<uint32_t>>;
+		using types = vtll::type_list<map_t, std::atomic<uint32_t>, std::atomic<uint32_t>>;
 		static const uint32_t c_map_data = 0;
 		static const uint32_t c_mutex_read = 1;
 		static const uint32_t c_mutex_write = 2;
@@ -433,10 +431,10 @@ namespace vecs {
 		//utility
 
 		template<typename E = void>
-		auto size() noexcept		-> size_t { return VecsComponentTable<E>().size(); };
+		auto size() noexcept		-> size_t { return VecsRegistry<E>::sizeE.load(); };
 
 		template<>
-		auto size<>() noexcept		-> size_t { return m_size; };
+		auto size<>() noexcept		-> size_t { return m_size.load(); };
 
 		template<typename... Cs>
 		auto begin() noexcept		-> VecsIterator<Cs...>;
@@ -476,6 +474,8 @@ namespace vecs {
 	template<typename E = void>
 	class VecsRegistry : public VecsRegistryBaseClass {
 	protected:
+		static inline std::atomic<uint32_t> m_sizeE{0};
+
 		auto updateC(const VecsHandle& handle, size_t compidx, void* ptr, size_t size) noexcept		-> bool ;
 		auto componentE(const VecsHandle& handle, size_t compidx, void* ptr, size_t size) noexcept	-> bool;
 
@@ -516,13 +516,11 @@ namespace vecs {
 		//erase
 
 		auto clear() noexcept -> size_t;
-
 		auto erase(const VecsHandle& handle) noexcept -> bool;
 
 		//-------------------------------------------------------------------------
 		//utility
 
-		auto size() noexcept								-> size_t { return VecsComponentTable<E>().size(); };
 		auto contains(const VecsHandle& handle) noexcept	-> bool;
 	};
 
@@ -560,6 +558,7 @@ namespace vecs {
 		index_t compidx = VecsComponentTable<E>().insert(handle, args...);	//add data as tuple
 		m_entity_table.comp_ref_idx<c_map_data>(idx).m_index = compidx;						//index in component vector 
 		m_size++;
+		m_sizeE++;
 		return handle;
 	};
 
@@ -617,7 +616,11 @@ namespace vecs {
 	template<typename E>
 	inline auto VecsRegistry<E>::erase(const VecsHandle& handle) noexcept -> bool {
 		if (!contains(handle)) return false;
-		
+		m_size--;
+		m_sizeE--;
+		m_entity_table.comp_ref_idx<c_map_data>(handle.m_entity_index).m_generation_counter.value++;		//>invalidate the entity handle
+		return VecsComponentTable<E>().erase(m_entity_table.comp_ref_idx <c_map_data>(handle.m_entity_index).m_index);
+
 		/*
 		auto [corr_hndl, corr_index] = VecsComponentTable<E>().erase( m_entity_table.comp_ref_idx < c_next>(handle.m_entity_index) );
 		
@@ -634,8 +637,8 @@ namespace vecs {
 		m_entity_table.comp_ref_idx<c_next>(handle.m_entity_index) = m_first_free;		//>put old entry into free list
 		
 		m_first_free = handle.m_entity_index;
-		*/
-		return true;
+		
+		return true;*/
 	}
 
 
