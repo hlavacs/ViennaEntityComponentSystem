@@ -264,6 +264,7 @@ namespace vecs {
 		assert(index.value < m_data.size());
 		const std::lock_guard<std::mutex> lock(m_data.m_mutex);
 		m_data.comp_ref_idx<c_handle>(index) = {};	//invalidate handle	
+		m_deleted.push_back(std::make_tuple(index));
 		return true;
 	}
 
@@ -625,11 +626,7 @@ namespace vecs {
 
 		VecsComponentTable<E>().erase(m_entity_table.comp_ref_idx <c_map_data>(handle.m_entity_index).m_index);
 
-		m_entity_table.comp_ref_idx<c_map_data>(handle.m_entity_index).m_generation_counter.value++;		//>invalidate the entity handle
-		if (!m_entity_table.comp_ref_idx<c_map_data>(handle.m_entity_index).m_generation_counter.has_value()) {
-			m_entity_table.comp_ref_idx<c_map_data>(handle.m_entity_index).m_generation_counter.value = 0;	//wrap to zero
-		}
-
+		m_entity_table.comp_ref_idx<c_map_data>(handle.m_entity_index).m_generation_counter++;		//>invalidate the entity handle
 		m_entity_table.comp_ref_idx<c_map_data>(handle.m_entity_index).m_index = m_first_free;		//>put old entry into free list
 		m_first_free = handle.m_entity_index;
 
@@ -728,7 +725,7 @@ namespace vecs {
 
 		virtual 
 		auto operator++(int) noexcept							-> VecsIterator<Cs...>& { 
-			return operator++(); return *this; 
+			return operator++(); 
 		};
 
 		auto operator+=(size_t N) noexcept -> void {
