@@ -182,12 +182,10 @@ namespace vecs {
 		static inline std::array<std::unique_ptr<VecsComponentTable<E>>, vtll::size<VecsComponentTypeList>::value> m_dispatch; //one for each component type
 
 		virtual auto updateC(index_t entidx, size_t compidx, void* ptr, size_t size) noexcept -> bool {
-			assert(compidx < vtll::size<types>::value);
 			return m_dispatch[compidx]->updateC(entidx, compidx, ptr, size);
 		}
 
 		virtual auto componentE(index_t entidx, size_t compidx, void* ptr, size_t size)  noexcept -> bool {
-			assert(compidx < vtll::size<types>::value);
 			return m_dispatch[compidx]->componentE(entidx, compidx, ptr, size);
 		}
 
@@ -353,15 +351,14 @@ namespace vecs {
 	protected:
 
 		struct map_t{
-			index_t		m_index{};
-			counter16_t m_generation_counter{};
-			index16_t	m_type_index{};
+			index_t				m_index{};
+			counter16_t			m_generation_counter{};
+			index16_t			m_type_index{};
+			std::atomic_flag	m_flag;
 		};
 
-		using types = vtll::type_list<map_t, std::atomic<uint32_t>, std::atomic<uint32_t>>;
-		static const uint32_t c_map_data = 0;
-		static const uint32_t c_mutex_read = 1;
-		static const uint32_t c_mutex_write = 2;
+		using types = vtll::type_list<map_t>;
+		static const uint32_t c_map_data{ 0 };
 
 		static inline VecsTable<types, VecsTableMaxSeg::value>	m_entity_table;
 		static inline index_t									m_first_free{};
