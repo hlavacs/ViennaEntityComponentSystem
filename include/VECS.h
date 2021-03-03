@@ -622,8 +622,18 @@ namespace vecs {
 		if (!contains(handle)) return false;
 		m_size--;
 		m_sizeE--;
+
+		VecsComponentTable<E>().erase(m_entity_table.comp_ref_idx <c_map_data>(handle.m_entity_index).m_index);
+
 		m_entity_table.comp_ref_idx<c_map_data>(handle.m_entity_index).m_generation_counter.value++;		//>invalidate the entity handle
-		return VecsComponentTable<E>().erase(m_entity_table.comp_ref_idx <c_map_data>(handle.m_entity_index).m_index);
+		if (!m_entity_table.comp_ref_idx<c_map_data>(handle.m_entity_index).m_generation_counter.has_value()) {
+			m_entity_table.comp_ref_idx<c_map_data>(handle.m_entity_index).m_generation_counter.value = 0;	//wrap to zero
+		}
+
+		m_entity_table.comp_ref_idx<c_map_data>(handle.m_entity_index).m_index = m_first_free;		//>put old entry into free list
+		m_first_free = handle.m_entity_index;
+
+		return true; 
 
 		/*
 		auto [corr_hndl, corr_index] = VecsComponentTable<E>().erase( m_entity_table.comp_ref_idx < c_next>(handle.m_entity_index) );
