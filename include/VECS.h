@@ -202,7 +202,7 @@ namespace vecs {
 		auto handle(const index_t index) noexcept				-> VecsHandle;
 		auto size() noexcept									-> size_t { return m_data.size(); };
 		auto erase(const index_t idx) noexcept					-> bool;
-		auto erase() noexcept									-> void;
+		auto compress() noexcept								-> void;
 		auto clear(const index_t idx) noexcept					-> size_t ;
 
 		template<typename C>
@@ -268,7 +268,7 @@ namespace vecs {
 	}
 
 	template<typename E>
-	inline auto VecsComponentTable<E>::erase() noexcept -> void {
+	inline auto VecsComponentTable<E>::compress() noexcept -> void {
 
 	}
 
@@ -473,6 +473,9 @@ namespace vecs {
 
 	template<typename E = void>
 	class VecsRegistry : public VecsRegistryBaseClass {
+
+		friend class VecsRegistryBaseClass;
+
 	protected:
 		static inline std::atomic<uint32_t> m_sizeE{0};
 
@@ -480,6 +483,8 @@ namespace vecs {
 		auto componentE(const VecsHandle& handle, size_t compidx, void* ptr, size_t size) noexcept	-> bool;
 
 		static const size_t c_max_size = vtll::back_value<vtll::map< VecsTableSizeMap, E, VeTableSizeDefault > >::value;
+
+		auto clearE() noexcept -> size_t;
 
 	public:
 		VecsRegistry(size_t r = 1 << c_max_size) noexcept : VecsRegistryBaseClass() { VecsComponentTable<E>{r}; };
@@ -515,7 +520,6 @@ namespace vecs {
 		//-------------------------------------------------------------------------
 		//erase
 
-		auto clear() noexcept -> size_t;
 		auto erase(const VecsHandle& handle) noexcept -> bool;
 
 		//-------------------------------------------------------------------------
@@ -609,7 +613,7 @@ namespace vecs {
 	}
 
 	template<typename E>
-	inline auto VecsRegistry<E>::clear() noexcept -> size_t {
+	inline auto VecsRegistry<E>::clearE() noexcept -> size_t {
 		return 0;
 	}
 
@@ -853,7 +857,7 @@ namespace vecs {
 		size_t num = 0;
 		vtll::static_for<size_t, 0, vtll::size<VecsEntityTypeList>::value >(
 			[&](auto i) {
-				num += VecsRegistry<vtll::Nth_type<VecsEntityTypeList,i>>().clear();
+				num += VecsRegistry<vtll::Nth_type<VecsEntityTypeList,i>>().clearE();
 			}
 		);
 		m_size.store(m_size.load() - static_cast<uint32_t>(num));
@@ -862,7 +866,7 @@ namespace vecs {
 
 	template<typename E>
 	inline auto VecsRegistryBaseClass::clear() noexcept -> size_t {
-		size_t num = VecsRegistry<E>().clear();
+		size_t num = VecsRegistry<E>().clearE();
 		m_size.store(m_size.load() - static_cast<uint32_t>(num));
 	}
 
