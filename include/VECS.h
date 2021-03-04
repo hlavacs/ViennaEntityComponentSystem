@@ -426,7 +426,7 @@ namespace vecs {
 		//utility
 
 		template<typename E = void>
-		auto size() noexcept		-> size_t { return VecsRegistry<E>::sizeE.load(); };
+		auto size() noexcept		-> size_t { return VecsRegistry<E>::m_sizeE.load(); };
 
 		template<>
 		auto size<>() noexcept		-> size_t { return m_size.load(); };
@@ -649,6 +649,7 @@ namespace vecs {
 	class VecsIterator {
 	protected:
 		using entity_types = vtll::filter_have_all_types< VecsEntityTypeList, vtll::type_list<Cs...> >;
+		using last_type = vtll::back<entity_types>;
 
 		std::array<std::unique_ptr<VecsIterator<Cs...>>, vtll::size<entity_types>::value> m_dispatch;
 		index_t m_current_iterator{ 0 };
@@ -658,7 +659,7 @@ namespace vecs {
 	public:
 		using value_type = std::tuple<VecsHandle, Cs&...>;
 
-		VecsIterator() noexcept {};
+		VecsIterator() noexcept {};				//needed for derived iterator to call
 		VecsIterator( bool is_end ) noexcept ;
 		VecsIterator(const VecsIterator& v) noexcept : VecsIterator(v.m_is_end) {
 			if (m_is_end) return;
@@ -722,8 +723,7 @@ namespace vecs {
 		}
 
 		auto operator==(const VecsIterator<Cs...>& v) noexcept		-> bool {
-			return	v.m_current_iterator == m_current_iterator &&
-					v.m_dispatch[m_current_iterator.value]->m_current_index == m_dispatch[m_current_iterator.value]->m_current_index;
+			return	v.m_current_iterator == m_current_iterator && v.m_current_index == m_current_index;
 		}
 
 		virtual 
@@ -751,9 +751,11 @@ namespace vecs {
 		size_t m_size{0};
 
 	public:
-		VecsIteratorDerived(bool is_end = false) noexcept { //empty constructor does not create new children
+		VecsIteratorDerived(bool is_end = false) noexcept { //empty parent default constructor does not create new children
 			m_size = VecsComponentTable<E>().size();
-			if (is_end) this->m_current_index.value = static_cast<decltype(this->m_current_index.value)>(m_size);
+			if (is_end) {
+				this->m_current_index.value = static_cast<decltype(this->m_current_index.value)>(m_size);
+			}
 		};
 
 		auto has_value() noexcept		-> bool {
@@ -784,6 +786,8 @@ namespace vecs {
 	inline VecsIterator<Cs...>::VecsIterator(bool is_end) noexcept : m_is_end{ is_end } {
 		if (is_end) {
 			m_current_iterator.value = static_cast<decltype(m_current_iterator.value)>(m_dispatch.size() - 1);
+			m_current_index.value = static_cast<decltype(m_current_iterator.value)>(VecsRegistry<last_type>().size<last_type>());
+			return;
 		}
 
 		vtll::static_for<size_t, 0, vtll::size<entity_types>::value >(
