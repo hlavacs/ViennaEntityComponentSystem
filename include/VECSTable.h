@@ -88,6 +88,11 @@ namespace vecs {
 			return index_t{ static_cast<decltype(index_t::value)>(idx) };
 		}
 
+		//Internally synchronized
+		inline auto pop_back() -> void {
+			m_size--;
+		}
+
 		//Externally synchronized
 		template<size_t I>
 		inline auto update(index_t index, const vtll::Nth_type<DATA,I>& data) -> bool {
@@ -106,9 +111,9 @@ namespace vecs {
 		}
 
 		//Externally synchronized
-		template<typename TDATA>
-		requires std::is_same_v<TDATA, data_tuple_t>
-		inline auto update(index_t index, TDATA&& data ) -> bool {
+		template<typename T>
+		requires std::is_same_v<vtll::to_tuple<DATA>, std::decay_t<T>>
+		inline auto update(index_t index, T&& data ) -> bool {
 			if (index.value >= m_size) return false;
 			decltype(auto) ref = tuple_ref(index);
 			vtll::static_for<size_t, 0, vtll::size<DATA>::value >([&](auto i) { std::get<i>(ref) = std::get<i>(data); } );

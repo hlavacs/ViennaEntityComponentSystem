@@ -189,6 +189,8 @@ namespace vecs {
 			return m_dispatch[compidx]->componentE(entidx, compidx, ptr, size);
 		}
 
+		auto remove_deleted_tail() noexcept -> void;
+
 	public:
 		VecsComponentTable(size_t r = 1 << c_max_size) noexcept;
 
@@ -811,8 +813,24 @@ namespace vecs {
 	//VecsComponentTable
 
 	template<typename E>
-	inline auto VecsComponentTable<E>::compress() noexcept -> void {
+	inline auto VecsComponentTable<E>::remove_deleted_tail() noexcept -> void {
+		while (m_data.size() > 0) {
+			auto & handle = m_data.comp_ref_idx<c_handle>(index_t{ m_data.size() - 1 });
+			if (handle.has_value()) return;
+			m_data.pop_back();
+		}
+	}
 
+	template<typename E>
+	inline auto VecsComponentTable<E>::compress() noexcept -> void {
+		for (size_t i = 0; i < m_data.size(); ++i) {
+			remove_deleted_tail();
+			auto& index = m_deleted.comp_ref_idx<0>(index_t{i});
+			if (index.value < m_data.size()) {
+				auto tup = m_data.tuple_value(index_t{ m_data.size() - 1 });
+				m_data.update(index, tup);
+			}
+		}
 	}
 
 	template<typename E>
