@@ -20,9 +20,9 @@ int main() {
 	int number = 0;
 	std::atomic<int> counter = 0;
 
-	VecsRegistry{ 1 << 10 };
-	VecsRegistry<VeEntityTypeNode>{1 << 8};
-	VecsRegistry<VeEntityTypeDraw>{1 << 8};
+	VecsRegistry{};
+	VecsRegistry<VeEntityTypeNode>{};
+	VecsRegistry<VeEntityTypeDraw>{};
 
 	VeComponentName name;
 	VeComponentPosition pos{ glm::vec3{9.0f, 2.0f, 3.0f} };

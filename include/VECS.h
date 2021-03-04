@@ -19,35 +19,72 @@ using namespace std::chrono_literals;
 
 namespace vecs {
 
-	//-------------------------------------------------------------------------
-	//component type list and pointer
-
+	/** 
+	* \brief Component type list: a list with all component types that an entity can have.
+	* 
+	* It is the sum of the components of the engine part, and the components as defined by the engine user
+	*/
 	using VecsComponentTypeList = vtll::cat< VeComponentTypeListSystem, VeComponentTypeListUser >;
-	using VecsComponentPtr = vtll::to_variant<vtll::to_ptr<VecsComponentTypeList>>;
 
-	//-------------------------------------------------------------------------
-	//entity type list
-
+	/**
+	* \brief Entity type list: a list with all possible entity types the ECS can deal with.
+	* 
+	* An entity type is a collection of component types. 
+	* The list is the sum of the entitiy types of the engine part, and the entity types as defined by the engine user.
+	*/
 	using VecsEntityTypeList = vtll::cat< VeEntityTypeListSystem, VeEntityTypeListUser >;
 
+	/**
+	* \brief Table size map: a VTLL map specifying the default sizes for component tables.
+	* 
+	* It is the sum of the maps of the engine part, and the maps as defined by the engine user
+	* Every entity type can have an entry, but does not have to have one.
+	* An entry is alwyas a vtll::value_list<A,B>, where A defines the default size of segments, and B defines
+	* the max number of entries allowed. Both A and B are actually exponents with base 2. So segemnts have size 2^A.
+	*/
 	using VecsTableSizeMap = vtll::cat< VeTableSizeMapSystem, VeTableSizeMapUser >;
 
+	/**
+	* \brief This struct implements the exponential function power of 2.
+	* 
+	* It is used to transfer table size entries to their real values, so we can compute max and sum of all values.
+	*/
 	template<typename T>
 	struct left_shift_1 {
 		using type = std::integral_constant<size_t, 1 << T::value>;
 	};
 
+	/**
+	* Table constants retrieves mappings for all entity types from the VecsTableSizeMap (which have the format vtll::value_list<A,B>).
+	* Then it turns the value lists to type lists, each value is stored in a std::integral_constant<size_t, V> type.
+	*/
 	using VecsTableConstants = vtll::transform < vtll::apply_map<VecsTableSizeMap, VecsEntityTypeList, VeTableSizeDefault>, vtll::value_to_type>;
 
-	using VecsTableMaxSeg = vtll::max< vtll::transform< VecsTableConstants, vtll::front > >;
+	/**
+	* Get the maximal exponent from the list of segment size exponents.
+	* 
+	* This is used as segment size (exponent) for the map table in the VecsRegistryBaseClass. Since this table holds info to 
+	* all entities in the ECS (the aggregate), it makes sense to take the maximum for segmentation.
+	*/
+	using VecsTableMaxSegExp	= vtll::max< vtll::transform< VecsTableConstants, vtll::front > >;
+	using VecsTableMaxSeg		= typename left_shift_1<VecsTableMaxSegExp>::type;
 
+	/**
+	* Compute the sum of all max sizes of for all entity types.
+	* 
+	* First get the second number (vtll::back) from the map, i.e. the exponents of the max number of entities of type E.
+	* Then use the 2^ function (vtll::function<L, left_shift_1>) to get the real max number. Then sum over all entity types.
+	*/
 	using VecsTableMaxSizeSum = vtll::sum< vtll::function< vtll::transform< VecsTableConstants, vtll::back >, left_shift_1 > >;
 
+	/**
+	* Since the sum of all max sizes is probably not divisible by the segment size, get the next multiple of the VecsTableMaxSeg.
+	*/
 	using VecsTableMaxSize = std::integral_constant<size_t, VecsTableMaxSeg::value * (VecsTableMaxSizeSum::value / VecsTableMaxSeg::value + 1)>;
 
-	//-------------------------------------------------------------------------
-	//definition of the types used in VECS
-
+	/**
+	* Declarations of the main VECS classes
+	*/
 	class VecsHandle;
 	template <typename E> class VecsEntity;
 	template<typename E> class VecsComponentTable;
@@ -60,9 +97,9 @@ namespace vecs {
 
 	/**
 	* \brief Handles are IDs of entities. Use them to access entitites.
-	* VecsHandle are used to ID entities of type E by storing their type as an index
+	* 
+	* VecsHandle are used to ID entities of type E by storing their type as an index.
 	*/
-
 	class VecsHandle {
 		friend VecsRegistryBaseClass;
 		template<typename E> friend class VecsRegistry;
@@ -70,15 +107,16 @@ namespace vecs {
 		template<typename E, typename C> friend class VecsComponentTableDerived;
 
 	protected:
-		index_t		m_entity_index{};			//the slot of the entity in the entity list
-		counter16_t	m_generation_counter{};		//generation counter
-		index16_t	m_type_index{};				//type index
+		index_t		m_entity_index{};			///<the slot of the entity in the entity list
+		counter16_t	m_generation_counter{};		///<generation counter
+		index16_t	m_type_index{};				///<type index
 
 	public:
 		VecsHandle() noexcept {};
 		VecsHandle(index_t idx, counter16_t cnt, index16_t type) noexcept
 			: m_entity_index{ idx }, m_generation_counter{ cnt }, m_type_index{ type } {};
 
+		/** \returns the type index of the handle. */
 		auto index() const noexcept -> uint32_t { return static_cast<uint32_t>(m_type_index.value); };
 
 		auto has_value() noexcept -> bool;
@@ -101,46 +139,57 @@ namespace vecs {
 	};
 
 
-	using handle_t = VecsHandle;
-
-
 	/**
-	* \brief This struct can hold the data of an entity of type E. This includes its handle
+	* \brief VecsEntity can hold a copy of the data of an entity of type E. This includes its handle
 	* and all components.
 	* 
 	* VecsEntity is a local copy of an entity of type E and all its components. The components can be retrieved and
-	* changes locally. By calling update() the local copies are stored in the ECS. By calling erase() the entity is
+	* changes locally. By calling update() the local copies are stored back into the ECS. By calling erase() the entity is
 	* erased from the ECS. 
 	*/
 
 	template <typename E>
 	class VecsEntity {
 	public:
-		using tuple_type = vtll::to_tuple<E>;
+		using tuple_type = vtll::to_tuple<E>;	///<A tuple holding all entity components.
 
 	protected:
-		VecsHandle	m_handle;
-		tuple_type	m_component_data;
+		VecsHandle	m_handle;			///<The entity handle.
+		tuple_type	m_component_data;	///<The local copy of the entity components.
 
 	public:
+
+		/**
+		* \brief Constructor of the VecsEntity class.
+		* 
+		* \param[in] h Handle of the entity.
+		* \param[in] tup The copy of the entity data to be stored in the instance.
+		*/
 		VecsEntity(VecsHandle h, const tuple_type& tup) noexcept : m_handle{ h }, m_component_data{ tup } {};
+		
+		/** \returns the handle of the entity. */
 		auto handle() const noexcept -> VecsHandle { return m_handle; }
+
 		auto has_value() noexcept	 -> bool;
 		auto update() noexcept		 -> bool;
 		auto erase() noexcept		 -> bool;
 		auto name() const noexcept	 -> std::string { return typeid(E).name(); };
 
+		/** \returns the Ith component of the entity. */
 		template<size_t I>
 		auto component() noexcept -> std::optional<vtll::Nth_type<E,I>> {
 			return { std::get<I>(m_component_data) };
 		};
 
+		/** \returns the first component of type C. */
 		template<typename C>
 		requires vtll::has_type<E, std::decay_t<C>>::value
 		auto component() noexcept -> C {
 			return std::get<vtll::index_of<E,std::decay_t<C>>::value>(m_component_data);
 		};
 
+		/** \brief Update the local copy with type C
+		* \param[in] comp A universal reference to the new component value. */
 		template<typename C>
 		requires vtll::has_type<E, std::decay_t<C>>::value
 		auto local_update( C&& comp ) noexcept -> void {
@@ -352,9 +401,9 @@ namespace vecs {
 		using types = vtll::type_list<map_t>;
 		static const uint32_t c_map_data{ 0 };
 
-		static inline VecsTable<types, VecsTableMaxSeg::value>	m_entity_table;
-		static inline index_t									m_first_free{};
-		static inline std::atomic<uint32_t>						m_size{0};
+		static inline VecsTable<types, VecsTableMaxSegExp::value>	m_entity_table;
+		static inline index_t										m_first_free{};
+		static inline std::atomic<uint32_t>							m_size{0};
 
 		static inline std::array<std::unique_ptr<VecsRegistryBaseClass>, vtll::size<VecsEntityTypeList>::value> m_dispatch;
 
@@ -475,7 +524,7 @@ namespace vecs {
 		static inline std::atomic<uint32_t> m_sizeE{0};
 		static const size_t c_max_size = vtll::back_value<vtll::map< VecsTableSizeMap, E, VeTableSizeDefault > >::value;
 
-		auto updateC(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept		-> bool ;
+		auto updateC(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept	-> bool ;
 		auto componentE(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept	-> bool;
 		auto clearE() noexcept		-> size_t { return VecsComponentTable<E>().clear(); };
 		auto compressE() noexcept	-> void   { return VecsComponentTable<E>().compress(); };
