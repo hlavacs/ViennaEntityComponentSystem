@@ -359,7 +359,7 @@ namespace vecs {
 
 		auto updateC(index_t entidx, size_t compidx, void* ptr, size_t size) noexcept -> bool {
 			if constexpr (vtll::has_type<E, std::decay_t<C>>::value) {
-				memcpy((void*)& this->m_data.comp_ref_idx<this->c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(entidx), ptr, size);
+				this->m_data.comp_ref_idx<this->c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(entidx) = *((C*)ptr);
 				return true;
 			}
 			return false;
@@ -367,7 +367,7 @@ namespace vecs {
 
 		auto componentE(index_t entidx, size_t compidx, void* ptr, size_t size)  noexcept -> bool {
 			if constexpr (vtll::has_type<E,C>::value) {
-				memcpy(ptr, (void*)& this->m_data.comp_ref_idx<this->c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(entidx), size);
+				*((C*)ptr) = this->m_data.comp_ref_idx<this->c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(entidx);
 				return true;
 			}
 			return false;
