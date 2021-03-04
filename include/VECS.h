@@ -676,6 +676,7 @@ namespace vecs {
 
 		auto operator=(const VecsIterator& v) noexcept			-> VecsIterator<Cs...>& {
 			m_current_iterator = v.m_current_iterator;
+			m_current_index = v.m_current_index;
 			for (int i = 0; i < m_dispatch.size(); ++i) { m_dispatch[i]->m_current_index = v.m_dispatch[i]->m_current_index; }
 			return *this;
 		}
@@ -687,10 +688,14 @@ namespace vecs {
 
 		virtual 
 		auto operator++() noexcept								-> VecsIterator<Cs...>& {
+			if (m_is_end ) return *this;
 			(*m_dispatch[m_current_iterator.value])++;
+
 			if (m_dispatch[m_current_iterator.value]->is_vector_end() && m_current_iterator.value < m_dispatch.size() - 1) {
 				++m_current_iterator.value;
+				m_current_index.value = 0;
 			}
+			m_current_index = m_dispatch[m_current_iterator.value]->m_current_index;
 			return *this;
 		};
 
@@ -699,18 +704,24 @@ namespace vecs {
 			return operator++(); 
 		};
 
-		auto operator+=(size_t N) noexcept -> void {
+		auto operator+=(size_t N) noexcept -> VecsIterator<Cs...>& {
+			if (m_is_end) return;
 			size_t left = N;
 			while (left > 0) {
-				int num = std::max(m_dispatch[m_current_iterator.value]->size() 
-									- m_dispatch[m_current_iterator.value]->m_current_index.value, 0);
+				int num = std::max(m_dispatch[m_current_iterator.value]->size() - m_current_index.value, 0);
 				left -= num;
 				m_dispatch[m_current_iterator.value]->m_current_index.value += num;
+				m_current_index = m_dispatch[m_current_iterator.value]->m_current_index;
+
 				if (m_dispatch[m_current_iterator.value]->is_vector_end()) {
-					if (m_current_iterator.value < m_dispatch.size() - 1) { ++m_current_iterator.value; }
-					else return;
+					if (m_current_iterator.value < m_dispatch.size() - 1) { 
+						++m_current_iterator.value; 
+						m_current_index.value = 0;
+					}
+					else return *this;
 				}
 			}
+			return *this;
 		}
 
 		auto operator+(size_t N) noexcept							-> VecsIterator<Cs...>& {
@@ -723,7 +734,7 @@ namespace vecs {
 			return !( *this == v );
 		}
 
-		auto operator==(const VecsIterator<Cs...>& v) noexcept		-> bool {
+		auto operator==(const VecsIterator<Cs...>& v) noexcept		-> bool {			
 			return	v.m_current_iterator == m_current_iterator && v.m_current_index == m_current_index;
 		}
 
@@ -768,11 +779,12 @@ namespace vecs {
 		};
 
 		auto operator++() noexcept		-> VecsIterator<Cs...>& { 
-			++this->m_current_index; 
-			return *this; };
+			if (!is_vector_end()) ++this->m_current_index; 
+			return *this; 
+		};
 		
 		auto operator++(int) noexcept	-> VecsIterator<Cs...>& { 
-			++this->m_current_index; 
+			if (!is_vector_end()) ++this->m_current_index;
 			return *this; 
 		};
 		
