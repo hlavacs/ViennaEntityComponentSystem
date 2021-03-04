@@ -662,8 +662,9 @@ namespace vecs {
 		VecsIterator() noexcept {};				//needed for derived iterator to call
 		VecsIterator( bool is_end ) noexcept ;
 		VecsIterator(const VecsIterator& v) noexcept : VecsIterator(v.m_is_end) {
+			m_current_iterator	= v.m_current_iterator;
+			m_current_index		= v.m_current_index;
 			if (m_is_end) return;
-			m_current_iterator = v.m_current_iterator;
 			for (int i = 0; i < m_dispatch.size(); ++i) { m_dispatch[i]->m_current_index = v.m_dispatch[i]->m_current_index; }
 		};
 
@@ -786,7 +787,7 @@ namespace vecs {
 	inline VecsIterator<Cs...>::VecsIterator(bool is_end) noexcept : m_is_end{ is_end } {
 		if (is_end) {
 			m_current_iterator.value = static_cast<decltype(m_current_iterator.value)>(m_dispatch.size() - 1);
-			m_current_index.value = static_cast<decltype(m_current_iterator.value)>(VecsRegistry<last_type>().size<last_type>());
+			m_current_index.value = static_cast<decltype(m_current_index.value)>(VecsRegistry<last_type>().size<last_type>());
 			return;
 		}
 
