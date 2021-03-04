@@ -107,12 +107,19 @@ namespace vecs {
 		template<typename E, typename C> friend class VecsComponentTableDerived;
 
 	protected:
-		index_t		m_entity_index{};			///<the slot of the entity in the entity list
-		counter16_t	m_generation_counter{};		///<generation counter
-		index16_t	m_type_index{};				///<type index
+		index_t		m_entity_index{};			///< The slot of the entity in the entity list
+		counter16_t	m_generation_counter{};		///< Generation counter
+		index16_t	m_type_index{};				///< Type index
 
 	public:
-		VecsHandle() noexcept {};
+		VecsHandle() noexcept {}; ///< Empty constructor of class VecsHandle
+
+		/** 
+		* \brief Constructor of class VecsHandle.
+		* \param[in] idx The index of the handle in the aggregate slot map of class VecsRegistryBaseClass
+		* \param[in] cnt Current generation counter identifying this entity on in the slot.
+		* \param[in] type Type index for the entity type E.
+		*/
 		VecsHandle(index_t idx, counter16_t cnt, index16_t type) noexcept
 			: m_entity_index{ idx }, m_generation_counter{ cnt }, m_type_index{ type } {};
 
@@ -151,11 +158,11 @@ namespace vecs {
 	template <typename E>
 	class VecsEntity {
 	public:
-		using tuple_type = vtll::to_tuple<E>;	///<A tuple holding all entity components.
+		using tuple_type = vtll::to_tuple<E>;	///< A tuple holding all entity components.
 
 	protected:
-		VecsHandle	m_handle;			///<The entity handle.
-		tuple_type	m_component_data;	///<The local copy of the entity components.
+		VecsHandle	m_handle;			///< The entity handle.
+		tuple_type	m_component_data;	///< The local copy of the entity components.
 
 	public:
 
@@ -205,31 +212,42 @@ namespace vecs {
 	/**
 	* \brief This class stores all components of entities of type E
 	*/
-
 	template<typename E>
 	class VecsComponentTable : public VecsMonostate<VecsComponentTable<E>> {
 		friend class VecsRegistryBaseClass;
 		template<typename E> friend class VecsRegistry;
 
 	public:
-		using value_type = vtll::to_tuple<E>;
+		using value_type = vtll::to_tuple<E>;		///< A tuple storing all components of entity of type E
 
-		using info = vtll::type_list<VecsHandle>;
-		static const size_t c_handle = 0;
-		static const size_t c_info_size = 1;
+		using info = vtll::type_list<VecsHandle>;	///< List of management data per entity (only a handle)
+		static const size_t c_handle = 0;			///< Component index of the handle info
+		static const size_t c_info_size = 1;		///< Index where the entity data starts
 
-		using types = vtll::cat< info, E >;
-		using types_deleted = vtll::type_list< index_t >;
+		using types = vtll::cat< info, E >;					///< List with management and component types
+		using types_deleted = vtll::type_list< index_t >;	///< List with types for holding info about erased entities 
 
+		/** Power of 2 exponent for the size of segments inthe tables */
 		static const size_t c_segment_size	= vtll::front_value< vtll::map< VecsTableSizeMap, E, VeTableSizeDefault > >::value;
+		/** Power of 2 exponent for the max number of entries in the tables */
 		static const size_t c_max_size		= vtll::back_value<  vtll::map< VecsTableSizeMap, E, VeTableSizeDefault > >::value;
 
 	protected:
-		static inline VecsTable<types, c_segment_size>			m_data;
-		static inline VecsTable<types_deleted, c_segment_size>	m_deleted;
+		static inline VecsTable<types, c_segment_size>			m_data;		///< Data per entity
+		static inline VecsTable<types_deleted, c_segment_size>	m_deleted;	///< Table holding the indices of erased entities
 
-		static inline std::array<std::unique_ptr<VecsComponentTable<E>>, vtll::size<VecsComponentTypeList>::value> m_dispatch; //one for each component type
+		/** Each component type C of the entity type E gets its own specialized class instance */
+		static inline std::array<std::unique_ptr<VecsComponentTable<E>>, vtll::size<VecsComponentTypeList>::value> m_dispatch;
 
+		/** 
+		* \brief Dispatch an update call to the correct specialized class instance.
+		* 
+		* \param[in] entidx Entity index in the component table.
+		* \param[in] compidx Index of the component of the entity.
+		* \param[in] ptr Pointer to the component data to use.
+		* \param[in] size Size of the component data.
+		* \returns true if the update was successful
+		*/
 		virtual auto updateC(index_t entidx, size_t compidx, void* ptr, size_t size) noexcept -> bool {
 			return m_dispatch[compidx]->updateC(entidx, compidx, ptr, size);
 		}
