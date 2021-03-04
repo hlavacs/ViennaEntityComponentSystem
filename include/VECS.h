@@ -88,7 +88,7 @@ namespace vecs {
 	class VecsHandle;
 	template <typename E> class VecsEntity;
 	template<typename E> class VecsComponentTable;
-	template<typename E, typename C> class VecsComponentTableDerived;
+	template<typename E, size_t I> class VecsComponentTableDerived;
 	class VecsRegistryBaseClass;
 	template<typename E> class VecsRegistry;
 
@@ -104,7 +104,7 @@ namespace vecs {
 		friend VecsRegistryBaseClass;
 		template<typename E> friend class VecsRegistry;
 		template<typename E> friend class VecsComponentTable;
-		template<typename E, typename C> friend class VecsComponentTableDerived;
+		template<typename E, size_t I> friend class VecsComponentTableDerived;
 
 	protected:
 		index_t		m_entity_index{};			///< The slot of the entity in the entity list
@@ -344,9 +344,11 @@ namespace vecs {
 	* return components C of entities of type E
 	*/
 
-	template<typename E, typename C>
+	template<typename E, size_t I>
 	class VecsComponentTableDerived : public VecsComponentTable<E> {
 	public:
+		using C = vtll::Nth_type<VecsComponentTypeList,I>;
+
 		VecsComponentTableDerived( size_t r = 1 << VecsComponentTable<E>::c_max_size) noexcept : VecsComponentTable<E>(r) {};
 
 		auto update(const index_t index, C&& comp) noexcept -> bool {
@@ -382,8 +384,7 @@ namespace vecs {
 
 		vtll::static_for<size_t, 0, vtll::size<VecsComponentTypeList>::value >(
 			[&](auto i) {
-				using type = vtll::Nth_type<VecsComponentTypeList, i>;
-				m_dispatch[i] = std::make_unique<VecsComponentTableDerived<E, type>>(r);
+				m_dispatch[i] = std::make_unique<VecsComponentTableDerived<E, i>>(r);
 			}
 		);
 	};

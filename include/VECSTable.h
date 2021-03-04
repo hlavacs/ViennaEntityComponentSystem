@@ -14,7 +14,7 @@ namespace vecs {
 	class VecsTable {
 		template<typename E> friend class VecsRegistry;
 		template<typename E> friend class VecsComponentTable;
-		template<typename E, typename C> friend class VecsComponentTableDerived;
+		template<typename E, size_t I> friend class VecsComponentTableDerived;
 
 		static const size_t N = 1 << L;
 		static const uint64_t BIT_MASK = N - 1;
