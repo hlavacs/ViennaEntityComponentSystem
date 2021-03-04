@@ -201,7 +201,7 @@ namespace vecs {
 		auto size() noexcept									-> size_t { return m_data.size(); };
 		auto erase(const index_t idx) noexcept					-> bool;
 		auto compress() noexcept								-> void;
-		auto clear(const index_t idx) noexcept					-> size_t ;
+		auto clear() noexcept									-> size_t ;
 
 		template<typename C>
 		requires vtll::has_type<E, C>::value
@@ -264,16 +264,6 @@ namespace vecs {
 		m_data.comp_ref_idx<c_handle>(index) = {};	//invalidate handle	
 		m_deleted.push_back(std::make_tuple(index));
 		return true;
-	}
-
-	template<typename E>
-	inline auto VecsComponentTable<E>::compress() noexcept -> void {
-
-	}
-
-	template<typename E>
-	inline auto VecsComponentTable<E>::clear(const index_t idx) noexcept -> size_t {
-		return 0;
 	}
 
 
@@ -485,8 +475,8 @@ namespace vecs {
 
 		auto updateC(const VecsHandle& handle, size_t compidx, void* ptr, size_t size) noexcept		-> bool ;
 		auto componentE(const VecsHandle& handle, size_t compidx, void* ptr, size_t size) noexcept	-> bool;
-		auto clearE() noexcept		-> size_t;
-		auto compressE() noexcept	-> void;
+		auto clearE() noexcept		-> size_t { return VecsComponentTable<E>().clear(); };
+		auto compressE() noexcept	-> void   { return VecsComponentTable<E>().compress(); };
 
 	public:
 		VecsRegistry(size_t r = 1 << c_max_size) noexcept : VecsRegistryBaseClass() { VecsComponentTable<E>{r}; };
@@ -543,7 +533,7 @@ namespace vecs {
 		return VecsComponentTable<E>().componentE(m_entity_table.comp_ref_idx<c_map_data>(handle.m_entity_index).m_index, compidx, ptr, size);
 	}
 
-	template<typename E> 
+	template<typename E>
 	template<typename... Cs> 
 	requires vtll::is_same<E, std::decay_t<Cs>...>::value [[nodiscard]]
 	inline auto VecsRegistry<E>::insert(Cs&&... args) noexcept	-> VecsHandle {
@@ -612,16 +602,6 @@ namespace vecs {
 		if (!contains(handle)) return false;
 		VecsComponentTable<E>().update<C>(handle.m_entity_index, std::forward<C>(comp));
 		return true;
-	}
-
-	template<typename E>
-	inline auto VecsRegistry<E>::clearE() noexcept -> size_t {
-		return 0;
-	}
-
-	template<typename E>
-	inline auto VecsRegistry<E>::compressE() noexcept	-> void {
-
 	}
 
 	template<typename E>
@@ -828,6 +808,24 @@ namespace vecs {
 	//left over implementations that depend on definition of classes
 
 	//-------------------------------------------------------------------------
+	//VecsComponentTable
+
+	template<typename E>
+	inline auto VecsComponentTable<E>::compress() noexcept -> void {
+
+	}
+
+	template<typename E>
+	inline auto VecsComponentTable<E>::clear() noexcept -> size_t {
+		size_t num = 0;
+		for (size_t i = 0; i < m_data.size(); ++i) {
+			auto& handle = m_data.comp_ref_idx<c_handle>(index_t{ i });
+			if( VecsRegistry<E>().erase(handle) ) ++num;
+		}
+		return num;
+	}
+
+	//-------------------------------------------------------------------------
 	//VecsRegistryBaseClass
 
 	inline VecsRegistryBaseClass::VecsRegistryBaseClass(size_t r) noexcept {
@@ -843,28 +841,26 @@ namespace vecs {
 	}
 
 	template<typename E>
-	inline auto VecsRegistryBaseClass::entity(const VecsHandle& handle) noexcept			-> std::optional<VecsEntity<E>> {
+	inline auto VecsRegistryBaseClass::entity(const VecsHandle& handle) noexcept -> std::optional<VecsEntity<E>> {
 		return VecsRegistry<E>().entity(handle);
 	}
 
-	inline auto VecsRegistryBaseClass::clear() noexcept -> size_t {
+	inline auto VecsRegistryBaseClass::clear() noexcept			-> size_t {
 		size_t num = 0;
 		vtll::static_for<size_t, 0, vtll::size<VecsEntityTypeList>::value >(
 			[&](auto i) {
 				num += VecsRegistry<vtll::Nth_type<VecsEntityTypeList,i>>().clearE();
 			}
 		);
-		m_size.store(m_size.load() - static_cast<uint32_t>(num));
 		return num;
 	}
 
 	template<typename E>
-	inline auto VecsRegistryBaseClass::clear() noexcept -> size_t {
-		size_t num = VecsRegistry<E>().clearE();
-		m_size.store(m_size.load() - static_cast<uint32_t>(num));
+	inline auto VecsRegistryBaseClass::clear() noexcept			-> size_t {
+		return VecsRegistry<E>().clearE();
 	}
 
-	inline auto VecsRegistryBaseClass::compress() noexcept -> void {
+	inline auto VecsRegistryBaseClass::compress() noexcept		-> void {
 		vtll::static_for<size_t, 0, vtll::size<VecsEntityTypeList>::value >(
 			[&](auto i) {
 				VecsRegistry<vtll::Nth_type<VecsEntityTypeList, i>>().compressE();
@@ -873,7 +869,7 @@ namespace vecs {
 	}
 
 	template<typename E>
-	inline auto VecsRegistryBaseClass::compress() noexcept -> void {
+	inline auto VecsRegistryBaseClass::compress() noexcept		-> void {
 		VecsRegistry<E>().compressE();
 	}
 
