@@ -748,10 +748,12 @@ namespace vecs {
 	template<typename E, typename... Cs>
 	class VecsIteratorDerived : public VecsIterator<Cs...> {
 	protected:
+		size_t m_size{0};
 
 	public:
 		VecsIteratorDerived(bool is_end = false) noexcept { //empty constructor does not create new children
-			if (is_end) this->m_current_index.value = static_cast<decltype(this->m_current_index.value)>(VecsComponentTable<E>().size());
+			m_size = VecsComponentTable<E>().size();
+			if (is_end) this->m_current_index.value = static_cast<decltype(this->m_current_index.value)>(m_size);
 		};
 
 		auto has_value() noexcept		-> bool {
@@ -762,14 +764,18 @@ namespace vecs {
 			return std::make_tuple(VecsComponentTable<E>().handle(this->m_current_index), std::ref(VecsComponentTable<E>().component<Cs>(this->m_current_index))...);
 		};
 
-		auto operator++() noexcept		-> VecsIterator<Cs...>& { ++this->m_current_index.value; return *this; };
+		auto operator++() noexcept		-> VecsIterator<Cs...>& { 
+			++this->m_current_index; 
+			return *this; };
 		
-		auto operator++(int) noexcept	-> VecsIterator<Cs...>& { ++this->m_current_index.value; return *this; };
+		auto operator++(int) noexcept	-> VecsIterator<Cs...>& { 
+			++this->m_current_index; 
+			return *this; 
+		};
 		
-		auto is_vector_end() noexcept	-> bool { return this->m_current_index.value >= VecsComponentTable<E>().size(); };
+		auto is_vector_end() noexcept	-> bool { return this->m_current_index.value >= m_size; };
 
-		virtual 
-		auto size() noexcept			-> size_t { return VecsComponentTable<E>().size(); }
+		auto size() noexcept			-> size_t { return m_size; }
 
 	};
 
