@@ -425,6 +425,11 @@ namespace vecs {
 			return m_dispatch[handle.index()]->erase(handle);
 		}
 
+		auto compress() noexcept -> void;
+
+		template<typename E = void>
+		auto compress() noexcept -> void;
+
 		//-------------------------------------------------------------------------
 		//utility
 
@@ -476,13 +481,12 @@ namespace vecs {
 
 	protected:
 		static inline std::atomic<uint32_t> m_sizeE{0};
+		static const size_t c_max_size = vtll::back_value<vtll::map< VecsTableSizeMap, E, VeTableSizeDefault > >::value;
 
 		auto updateC(const VecsHandle& handle, size_t compidx, void* ptr, size_t size) noexcept		-> bool ;
 		auto componentE(const VecsHandle& handle, size_t compidx, void* ptr, size_t size) noexcept	-> bool;
-
-		static const size_t c_max_size = vtll::back_value<vtll::map< VecsTableSizeMap, E, VeTableSizeDefault > >::value;
-
-		auto clearE() noexcept -> size_t;
+		auto clearE() noexcept		-> size_t;
+		auto compressE() noexcept	-> void;
 
 	public:
 		VecsRegistry(size_t r = 1 << c_max_size) noexcept : VecsRegistryBaseClass() { VecsComponentTable<E>{r}; };
@@ -616,6 +620,11 @@ namespace vecs {
 	}
 
 	template<typename E>
+	inline auto VecsRegistry<E>::compressE() noexcept	-> void {
+
+	}
+
+	template<typename E>
 	inline auto VecsRegistry<E>::erase(const VecsHandle& handle) noexcept -> bool {
 		if (!contains(handle)) return false;
 		m_size--;
@@ -628,25 +637,6 @@ namespace vecs {
 		m_first_free = handle.m_entity_index;
 
 		return true; 
-
-		/*
-		auto [corr_hndl, corr_index] = VecsComponentTable<E>().erase( m_entity_table.comp_ref_idx < c_next>(handle.m_entity_index) );
-		
-		if (corr_index.has_value()) {
-			m_entity_table.comp_ref_idx<c_next>(corr_hndl.m_entity_index) = corr_index; 
-		}
-
-		m_entity_table.comp_ref_idx<c_counter>(handle.m_entity_index).value++;		//>invalidate the entity handle
-		
-		if (!m_entity_table.comp_ref_idx<c_counter>(handle.m_entity_index).has_value()) {
-			m_entity_table.comp_ref_idx<c_counter>(handle.m_entity_index).value = 0;	//wrap to zero
-		}
-		
-		m_entity_table.comp_ref_idx<c_next>(handle.m_entity_index) = m_first_free;		//>put old entry into free list
-		
-		m_first_free = handle.m_entity_index;
-		
-		return true;*/
 	}
 
 
@@ -874,6 +864,18 @@ namespace vecs {
 		m_size.store(m_size.load() - static_cast<uint32_t>(num));
 	}
 
+	inline auto VecsRegistryBaseClass::compress() noexcept -> void {
+		vtll::static_for<size_t, 0, vtll::size<VecsEntityTypeList>::value >(
+			[&](auto i) {
+				VecsRegistry<vtll::Nth_type<VecsEntityTypeList, i>>().compressE();
+			}
+		);
+	}
+
+	template<typename E>
+	inline auto VecsRegistryBaseClass::compress() noexcept -> void {
+		VecsRegistry<E>().compressE();
+	}
 
 	template<typename ET>
 	inline auto VecsRegistryBaseClass::update(const VecsHandle& handle, ET&& ent) noexcept	-> bool {
