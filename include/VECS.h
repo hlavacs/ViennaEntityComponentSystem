@@ -154,6 +154,7 @@ namespace vecs {
 		auto has_value() noexcept -> bool;
 
 		template<typename E>
+		requires is_entity_type<E>
 		auto entity() noexcept -> std::optional<VecsEntity<E>>;
 
 		template<typename C>
@@ -1342,21 +1343,25 @@ namespace vecs {
 	inline auto VecsComponentTable<E>::compress() noexcept -> void {
 		for (size_t i = 0; i < m_data.size(); ++i) {
 			remove_deleted_tail();											///< Remove invalid entities at end of table
-			auto& index = m_deleted.comp_ref_idx<0>(index_t{i});			///< Get next deleted entity frmo deleted table
+			auto& index = m_deleted.comp_ref_idx<0>(index_t{i});			///< Get next deleted entity from deleted table
 			if (index.value < m_data.size()) {								///< Is it inside the table still?
 				auto tup = m_data.tuple_value(index_t{ m_data.size() - 1 });///< Yes, move last entity to this position
 				m_data.update(index, tup);
-				VecsRegistryBaseClass().m_entity_table.comp_ref_idx<0>(index).m_index = index; ///< Change map entry of moved last entity
+
+				auto& handle = m_data.comp_ref_idx<c_handle>(index);		///< Handle of moved entity
+				VecsRegistryBaseClass().m_entity_table.comp_ref_idx<0>(handle.m_entity_index).m_index = index; ///< Change map entry of moved last entity
 			}
 		}
 		m_deleted.clear();
 	}
 
 	/**
-	* \brief
-	*
-	* \param[in]
-	* \returns
+	* \brief Erase all entries of type E from the component table.
+	* 
+	* The entities are not really removed, but rather invalidated. Call compress()
+	* to actually remove the entities.
+	* 
+	* \returns the number of erased entities.
 	*/
 	template<typename E>
 	inline auto VecsComponentTable<E>::clear() noexcept -> size_t {
@@ -1372,9 +1377,10 @@ namespace vecs {
 	//VecsRegistryBaseClass
 
 	/**
-	* \brief
+	* \brief Constructor of class VecsRegistryBaseClass.
+	* Creates the dispatch table, one entry for each VecsRegistry<E> sub type.
 	*
-	* \param[in]
+	* \param[in] r Max size of all entities stored in the ECS.
 	*/
 	inline VecsRegistryBaseClass::VecsRegistryBaseClass(size_t r) noexcept {
 		if (!this->init()) return;
@@ -1389,10 +1395,10 @@ namespace vecs {
 	}
 
 	/**
-	* \brief
+	* \brief Retrieve the data for an entity from the ECS. The data is stored in an instance of VecsEntity<E>.
 	*
-	* \param[in]
-	* \returns
+	* \param[in] handle The entity handle.
+	* \returns a std::optional with the entity if the entity exists, else an empty std::optional.
 	*/
 	template<typename E>
 	inline auto VecsRegistryBaseClass::entity( VecsHandle handle) noexcept -> std::optional<VecsEntity<E>> {
@@ -1400,12 +1406,14 @@ namespace vecs {
 	}
 
 	/**
-	* \brief
-	*
-	* \param[in]
-	* \returns
+	* \brief Erase all entities from the ECS.
+	* 
+	* The entities are not really removed, but rather invalidated. Call compress()
+	* to actually remove the entities.
+	* 
+	* \returns the total number of erased entities.
 	*/
-	inline auto VecsRegistryBaseClass::clear() noexcept			-> size_t {
+	inline auto VecsRegistryBaseClass::clear() noexcept	 -> size_t {
 		size_t num = 0;
 		vtll::static_for<size_t, 0, vtll::size<VecsEntityTypeList>::value >(
 			[&](auto i) {
@@ -1416,10 +1424,12 @@ namespace vecs {
 	}
 
 	/**
-	* \brief
+	* \brief Erase all entities of type E from the ECS.
 	*
-	* \param[in]
-	* \returns
+	* The entities are not really removed, but rather invalidated. Call compress()
+	* to actually remove the entities.
+	* 
+	* \returns the number of erased entities.
 	*/
 	template<typename E>
 	requires is_entity_type<E>
@@ -1428,10 +1438,7 @@ namespace vecs {
 	}
 
 	/**
-	* \brief
-	*
-	* \param[in]
-	* \returns
+	* \brief Compress all component tables. This removes all invalidated entities.
 	*/
 	inline auto VecsRegistryBaseClass::compress() noexcept		-> void {
 		vtll::static_for<size_t, 0, vtll::size<VecsEntityTypeList>::value >(
@@ -1442,10 +1449,8 @@ namespace vecs {
 	}
 
 	/**
-	* \brief
-	*
-	* \param[in]
-	* \returns
+	* \brief Compress the component table for entities of type E.
+	* This removes all invalidated entities.
 	*/
 	template<typename E>
 	requires is_entity_type<E>
@@ -1454,9 +1459,10 @@ namespace vecs {
 	}
 
 	/**
-	* \brief
+	* \brief Update the components of an entity. The call is forwarded to the correct VecsRegistry<E>.
 	*
-	* \param[in]
+	* \param[in] handle The entity handle.
+	* \param[in] ent The entity data.
 	* \returns true if the operation was successful.
 	*/
 	template<typename ET>
@@ -1465,10 +1471,8 @@ namespace vecs {
 	}
 
 	/**
-	* \brief
-	*
-	* \param[in]
-	* \returns
+	* \brief Return an iterator that points to the first entity in the ECS that contains all given components Cs.
+	* \returns an iterator that points to the first entity in the ECS that contains all given components Cs.
 	*/
 	template<typename... Cs>
 	inline auto VecsRegistryBaseClass::begin() noexcept			-> VecsIterator<Cs...> {
@@ -1476,10 +1480,8 @@ namespace vecs {
 	}
 
 	/**
-	* \brief
-	*
-	* \param[in]
-	* \returns
+	* \brief Returns an end iterator.
+	* \returns an end iterator.
 	*/
 	template<typename... Cs>
 	inline auto VecsRegistryBaseClass::end() noexcept			-> VecsIterator<Cs...> {
@@ -1491,10 +1493,8 @@ namespace vecs {
 	//VecsHandle
 
 	/**
-	* \brief
-	*
-	* \param[in]
-	* \returns
+	* \brief Check whether a handle belongs to an entity that is still in the ECS.
+	* \returns true if the entity this handle belongs to is still in the ECS.
 	*/
 	inline auto VecsHandle::has_value() noexcept				-> bool {
 		if (!m_entity_index.has_value() || !m_generation_counter.has_value() || !m_type_index.has_value()) return false;
@@ -1502,21 +1502,18 @@ namespace vecs {
 	}
 
 	/**
-	* \brief
-	*
-	* \param[in]
-	* \returns
+	* \brief Get an entity of type E, the handle belongs to.
+	* \returns an entity of type E.
 	*/
 	template<typename E>
+	requires is_entity_type<E>
 	inline auto VecsHandle::entity() noexcept					-> std::optional<VecsEntity<E>> {
 		return VecsRegistry<E>().entity(*this);
 	}
 
 	/**
-	* \brief
-	*
-	* \param[in]
-	* \returns
+	* \brief Get the component of type C from the entity this handle belongs to.
+	* \returns std::optional containing the component, or an empty std::optional.
 	*/
 	template<typename C>
 	requires is_component_type<C>
@@ -1525,9 +1522,9 @@ namespace vecs {
 	}
 
 	/**
-	* \brief
+	* \brief Update the data for the entity this handle belongs to.
 	*
-	* \param[in]
+	* \param[in] ent Universal reference to the data that is to be copied over the old data.
 	* \returns true if the operation was successful.
 	*/
 	template<typename ET>
@@ -1538,9 +1535,9 @@ namespace vecs {
 	}
 
 	/**
-	* \brief
+	* \brief Update a component of type C for the entity that this handle belongs to.
 	*
-	* \param[in]
+	* \param[in] comp Universal reference to the component data.
 	* \returns true if the operation was successful.
 	*/
 	template<typename C>
@@ -1550,9 +1547,8 @@ namespace vecs {
 	}
 
 	/**
-	* \brief
+	* \brief Erase the entity this handle belongs to, from the ECS.
 	*
-	* \param[in]
 	* \returns true if the operation was successful.
 	*/
 	inline auto VecsHandle::erase() noexcept					-> bool {
@@ -1563,10 +1559,9 @@ namespace vecs {
 	//VecsEntity
 
 	/**
-	* \brief
+	* \brief Check whether the entity that this local copy represents is still valid.
 	*
-	* \param[in]
-	* \returns
+	* \returns true if the entity that this local copy represents is still valid.
 	*/
 	template <typename E>
 	auto VecsEntity<E>::has_value() noexcept -> bool { 
@@ -1574,9 +1569,8 @@ namespace vecs {
 	}
 
 	/**
-	* \brief
+	* \brief Update all components for the entity this local copy represents.
 	*
-	* \param[in]
 	* \returns true if the operation was successful.
 	*/
 	template <typename E>
@@ -1585,9 +1579,8 @@ namespace vecs {
 	};
 
 	/**
-	* \brief
+	* \brief Erase the entity this local copy represents.
 	*
-	* \param[in]
 	* \returns true if the operation was successful.
 	*/
 	template <typename E>
