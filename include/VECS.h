@@ -572,7 +572,8 @@ namespace vecs {
 
 		auto clear() noexcept -> size_t;
 
-		template<typename E = void>
+		template<typename E>
+		requires is_entity_type<E>
 		auto clear() noexcept -> size_t;
 
 		virtual
@@ -580,7 +581,8 @@ namespace vecs {
 
 		auto compress() noexcept -> void;
 
-		template<typename E = void>
+		template<typename E>
+		requires is_entity_type<E>
 		auto compress() noexcept -> void;
 
 		//-------------------------------------------------------------------------
@@ -718,7 +720,7 @@ namespace vecs {
 		//insert data
 
 		template<typename... Cs> 
-		requires vtll::is_same<E, std::decay_t<Cs>...>::value [[nodiscard]] 
+		requires is_composed_of<E, Cs...> [[nodiscard]] 
 		auto insert(Cs&&... args) noexcept					-> VecsHandle;
 
 		//-------------------------------------------------------------------------
@@ -727,18 +729,18 @@ namespace vecs {
 		auto entity(VecsHandle h) noexcept					-> std::optional<VecsEntity<E>>;
 
 		template<typename C>
-		requires (vtll::has_type<E, std::decay_t<C>>::value)
+		requires is_component_of<E, C>
 		auto component(VecsHandle handle) noexcept			->std::optional<C> ;
 
 		//-------------------------------------------------------------------------
 		//update data
 
 		template<typename ET>
-		requires (std::is_same_v<E, vtll::front<std::decay_t<ET>>>)
+		requires is_entity<ET, E>
 		auto update(VecsHandle handle, ET&& ent) noexcept	-> bool;
 
 		template<typename C> 
-		requires (vtll::has_type<E, std::decay_t<C>>::value)
+		requires is_component_of<E, C>
 		auto update(VecsHandle handle, C&& comp) noexcept	-> bool;
 
 		//-------------------------------------------------------------------------
@@ -794,7 +796,7 @@ namespace vecs {
 	*/
 	template<typename E>
 	template<typename... Cs> 
-	requires vtll::is_same<E, std::decay_t<Cs>...>::value [[nodiscard]]
+	requires is_composed_of<E, Cs...> [[nodiscard]]
 	inline auto VecsRegistry<E>::insert(Cs&&... args) noexcept	-> VecsHandle {
 		index_t idx{};
 		if (m_first_free.has_value()) {
@@ -854,7 +856,7 @@ namespace vecs {
 	*/
 	template<typename E>
 	template<typename C>
-	requires (vtll::has_type<E, std::decay_t<C>>::value)
+	requires is_component_of<E, C>
 	inline auto VecsRegistry<E>::component( VecsHandle handle) noexcept -> std::optional<C> {
 		if constexpr (!vtll::has_type<E, std::decay_t<C>>::value) return {};
 		if (!contains(handle)) return {};	///< Return the empty std::optional
@@ -871,7 +873,7 @@ namespace vecs {
 	*/
 	template<typename E>
 	template<typename ET>
-	requires (std::is_same_v<E, vtll::front<std::decay_t<ET>>>)
+	requires is_entity<ET, E>
 	inline auto VecsRegistry<E>::update( VecsHandle handle, ET&& ent) noexcept -> bool {
 		if (!contains(handle)) return false;
 		VecsComponentTable<E>().update(handle.m_entity_index, std::forward<ET>(ent));
@@ -887,7 +889,7 @@ namespace vecs {
 	*/
 	template<typename E>
 	template<typename C> 
-	requires (vtll::has_type<E, std::decay_t<C>>::value)
+	requires is_component_of<E, C>
 	inline auto VecsRegistry<E>::update( VecsHandle handle, C&& comp) noexcept -> bool {
 		if constexpr (!vtll::has_type<E, std::decay_t<C>>::value) { return false; }
 		if (!contains(handle)) return false;
@@ -1170,7 +1172,6 @@ namespace vecs {
 	};
 
 
-
 	/**
 	* \brief Constructor of class VecsIteratorDerived<E, Cs...>. Calls empty constructor of base class.
 	*
@@ -1412,7 +1413,8 @@ namespace vecs {
 	* \returns
 	*/
 	template<typename E>
-	inline auto VecsRegistryBaseClass::clear() noexcept			-> size_t {
+	requires is_entity_type<E>
+	inline auto VecsRegistryBaseClass::clear() noexcept		-> size_t {
 		return VecsRegistry<E>().clearE();
 	}
 
@@ -1437,7 +1439,8 @@ namespace vecs {
 	* \returns
 	*/
 	template<typename E>
-	inline auto VecsRegistryBaseClass::compress() noexcept		-> void {
+	requires is_entity_type<E>
+	inline auto VecsRegistryBaseClass::compress() noexcept	-> void {
 		VecsRegistry<E>().compressE();
 	}
 
