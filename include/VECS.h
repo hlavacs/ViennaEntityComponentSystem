@@ -114,7 +114,7 @@ namespace vecs {
 	concept is_composed_of = (vtll::is_same<E, std::decay_t<Cs>...>::value);
 
 	template<typename ET, typename E = vtll::front<ET>>
-	concept is_entity = (is_entity_type<E> && std::is_same_v<ET, VecsEntity<E>>);
+	concept is_entity = (is_entity_type<E> && std::is_same_v<std::decay_t<ET>, VecsEntity<E>>);
 
 
 	//-------------------------------------------------------------------------
@@ -276,7 +276,7 @@ namespace vecs {
 		VecsComponentTable(size_t r = 1 << c_max_size) noexcept;
 
 		template<typename... Cs>
-		requires vtll::is_same<E, std::decay_t<Cs>...>::value [[nodiscard]]
+		requires is_composed_of<E, Cs...> [[nodiscard]]
 		auto insert(VecsHandle handle, Cs&&... args) noexcept	-> index_t;
 
 		auto values(const index_t index) noexcept				-> value_type;
@@ -289,7 +289,7 @@ namespace vecs {
 		auto clear() noexcept									-> size_t ;
 
 		template<typename C>
-		requires vtll::has_type<E, C>::value
+		requires is_component_of<E, C>
 		auto component(const index_t index) noexcept			-> C&;
 
 		template<typename ET>
@@ -334,7 +334,7 @@ namespace vecs {
 	*/
 	template<typename E> 
 	template<typename... Cs>
-	requires vtll::is_same<E, std::decay_t<Cs>...>::value [[nodiscard]]
+	requires is_composed_of<E, Cs...> [[nodiscard]]
 	inline auto VecsComponentTable<E>::insert(VecsHandle handle, Cs&&... args) noexcept -> index_t {
 		auto idx = m_data.push_back();			///< Allocate space a the end of the table
 		if (!idx.has_value()) return idx;		///< Check if the allocation was successfull
@@ -370,7 +370,7 @@ namespace vecs {
 	*/
 	template<typename E>
 	template<typename C>
-	requires vtll::has_type<E, C>::value
+	requires is_component_of<E, C>
 	inline auto VecsComponentTable<E>::component(const index_t index) noexcept -> C& {
 		assert(index.value < m_data.size());
 		return m_data.comp_ref_idx<c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(index); ///< Get ref to the entity and return component
