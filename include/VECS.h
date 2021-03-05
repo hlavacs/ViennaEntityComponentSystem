@@ -931,170 +931,196 @@ namespace vecs {
 	public:
 		using value_type = std::tuple<VecsHandle, Cs&...>; ///< Tuple containing all component values
 
-		VecsIterator( bool is_end ) noexcept ;	///< Constructor that should be called always from outside
+		VecsIterator( bool is_end ) noexcept ;				///< Constructor that should be called always from outside
+		VecsIterator(const VecsIterator& v) noexcept;		///< Copy constructor
 
-		/**
-		* \brief
-		*
-		* \param[in]
-		*/
-		VecsIterator(const VecsIterator& v) noexcept : VecsIterator(v.m_is_end) {
-			m_current_iterator	= v.m_current_iterator;
-			m_current_index		= v.m_current_index;
-			if (m_is_end) return;
-			for (int i = 0; i < m_dispatch.size(); ++i) { m_dispatch[i]->m_current_index = v.m_dispatch[i]->m_current_index; }
-		};
+		auto operator=(const VecsIterator& v) noexcept			-> VecsIterator<Cs...>&;	///< Copy
+		auto operator+=(size_t N) noexcept						-> VecsIterator<Cs...>&;	///< Increase and set
+		auto operator+(size_t N) noexcept						-> VecsIterator<Cs...>&;	///< Increase
+		auto operator!=(const VecsIterator<Cs...>& v) noexcept	-> bool;	///< Unqequal
+		auto operator==(const VecsIterator<Cs...>& v) noexcept	-> bool;	///< Equal
 
-		/**
-		* \brief
-		*
-		* \param[in]
-		* \returns
-		*/
-		virtual
-		auto has_value() noexcept								-> bool {
-			if (m_is_end || is_vector_end()) return false;
-			return m_dispatch[m_current_iterator.value]->has_value();
-		}
-
-		/**
-		* \brief
-		*
-		* \param[in]
-		* \returns
-		*/
-		auto operator=(const VecsIterator& v) noexcept			-> VecsIterator<Cs...>& {
-			m_current_iterator = v.m_current_iterator;
-			m_current_index = v.m_current_index;
-			for (int i = 0; i < m_dispatch.size(); ++i) { m_dispatch[i]->m_current_index = v.m_dispatch[i]->m_current_index; }
-			return *this;
-		}
-
-		/**
-		* \brief
-		*
-		* \param[in]
-		* \returns
-		*/
-		virtual
-		auto operator*() noexcept								-> value_type {
-			return *(*m_dispatch[m_current_iterator.value]);
-		};
-
-		/**
-		* \brief
-		*
-		* \param[in]
-		* \returns
-		*/
-		virtual
-		auto operator++() noexcept								-> VecsIterator<Cs...>& {
-			if (m_is_end ) return *this;
-			(*m_dispatch[m_current_iterator.value])++;
-
-			if (m_dispatch[m_current_iterator.value]->is_vector_end() && m_current_iterator.value < m_dispatch.size() - 1) {
-				++m_current_iterator.value;
-				m_current_index.value = 0;
-			}
-			m_current_index = m_dispatch[m_current_iterator.value]->m_current_index;
-			return *this;
-		};
-
-		/**
-		* \brief
-		*
-		* \param[in]
-		* \returns
-		*/
-		virtual
-		auto operator++(int) noexcept							-> VecsIterator<Cs...>& { 
-			return operator++(); 
-		};
-
-		/**
-		* \brief
-		*
-		* \param[in]
-		* \returns
-		*/
-		auto operator+=(size_t N) noexcept -> VecsIterator<Cs...>& {
-			if (m_is_end) return;
-			size_t left = N;
-			while (left > 0) {
-				int num = std::max(m_dispatch[m_current_iterator.value]->size() - m_current_index.value, 0);
-				left -= num;
-				m_dispatch[m_current_iterator.value]->m_current_index.value += num;
-				m_current_index = m_dispatch[m_current_iterator.value]->m_current_index;
-
-				if (m_dispatch[m_current_iterator.value]->is_vector_end()) {
-					if (m_current_iterator.value < m_dispatch.size() - 1) { 
-						++m_current_iterator.value; 
-						m_current_index.value = 0;
-					}
-					else return *this;
-				}
-			}
-			return *this;
-		}
-
-		/**
-		* \brief
-		*
-		* \param[in]
-		* \returns
-		*/
-		auto operator+(size_t N) noexcept							-> VecsIterator<Cs...>& {
-			VecsIterator<Cs...> temp{ *this };
-			temp += N;
-			return temp;
-		}
-
-		/**
-		* \brief
-		*
-		* \param[in]
-		* \returns
-		*/
-		auto operator!=(const VecsIterator<Cs...>& v) noexcept		-> bool {
-			return !( *this == v );
-		}
-
-		/**
-		* \brief
-		*
-		* \param[in]
-		* \returns
-		*/
-		auto operator==(const VecsIterator<Cs...>& v) noexcept		-> bool {
-			return	v.m_current_iterator == m_current_iterator && v.m_current_index == m_current_index;
-		}
-
-		/**
-		* \brief
-		*
-		* \param[in]
-		* \returns
-		*/
-		virtual
-		auto is_vector_end() noexcept								-> bool { 
-			return m_dispatch[m_current_iterator.value]->is_vector_end(); 
-		}
-
-		/**
-		* \brief
-		*
-		* \param[in]
-		* \returns
-		*/
-		virtual
-		auto size() noexcept										-> size_t {
-			size_t sum = 0;
-			for (int i = 0; i < m_dispatch.size(); ++i) { sum += m_dispatch[i]->size(); };
-			return sum;
-		}
+		virtual auto has_value() noexcept		-> bool;					///< Is currently pointint to a valid entity
+		virtual	auto operator*() noexcept		-> value_type;				///< Access the data
+		virtual auto operator++() noexcept		-> VecsIterator<Cs...>&;	///< Increase by 1
+		virtual auto operator++(int) noexcept	-> VecsIterator<Cs...>&;	///< Increse by 1
+		virtual auto is_vector_end() noexcept	-> bool;					///< Is currently at the end of any sub iterator
+		virtual auto size() noexcept			-> size_t;					///< Number of valid entities
 	};
 
 
+	/**
+	* \brief
+	*
+	* \param[in]
+	*/
+	template<typename... Cs>
+	inline VecsIterator<Cs...>::VecsIterator(const VecsIterator& v) noexcept : VecsIterator(v.m_is_end) {
+		m_current_iterator = v.m_current_iterator;
+		m_current_index = v.m_current_index;
+		if (m_is_end) return;
+		for (int i = 0; i < m_dispatch.size(); ++i) { m_dispatch[i]->m_current_index = v.m_dispatch[i]->m_current_index; }
+	};
+
+	/**
+	* \brief
+	*
+	* \param[in]
+	* \returns
+	*/
+	template<typename... Cs>
+	inline auto VecsIterator<Cs...>::has_value() noexcept		-> bool {
+		if (m_is_end || is_vector_end()) return false;
+		return m_dispatch[m_current_iterator.value]->has_value();
+	}
+
+	/**
+	* \brief
+	*
+	* \param[in]
+	* \returns
+	*/
+	template<typename... Cs>
+	inline auto VecsIterator<Cs...>::operator=(const VecsIterator& v) noexcept	-> VecsIterator<Cs...>& {
+		m_current_iterator = v.m_current_iterator;
+		m_current_index = v.m_current_index;
+		for (int i = 0; i < m_dispatch.size(); ++i) { m_dispatch[i]->m_current_index = v.m_dispatch[i]->m_current_index; }
+		return *this;
+	}
+
+	/**
+	* \brief
+	*
+	* \param[in]
+	* \returns
+	*/
+	template<typename... Cs>
+	inline auto VecsIterator<Cs...>::operator*() noexcept	-> value_type {
+		return *(*m_dispatch[m_current_iterator.value]);
+	};
+
+	/**
+	* \brief
+	*
+	* \param[in]
+	* \returns
+	*/
+	template<typename... Cs>
+	inline auto VecsIterator<Cs...>::operator++() noexcept		-> VecsIterator<Cs...>& {
+		if (m_is_end) return *this;
+		(*m_dispatch[m_current_iterator.value])++;
+
+		if (m_dispatch[m_current_iterator.value]->is_vector_end() && m_current_iterator.value < m_dispatch.size() - 1) {
+			++m_current_iterator.value;
+			m_current_index.value = 0;
+		}
+		m_current_index = m_dispatch[m_current_iterator.value]->m_current_index;
+		return *this;
+	};
+
+	/**
+	* \brief
+	*
+	* \param[in]
+	* \returns
+	*/
+	template<typename... Cs>
+	inline auto VecsIterator<Cs...>::operator++(int) noexcept		-> VecsIterator<Cs...>& {
+		return operator++();
+	};
+
+	/**
+	* \brief
+	*
+	* \param[in]
+	* \returns
+	*/
+	template<typename... Cs>
+	inline auto VecsIterator<Cs...>::operator+=(size_t N) noexcept -> VecsIterator<Cs...>& {
+		if (m_is_end) return;
+		size_t left = N;
+		while (left > 0) {
+			int num = std::max(m_dispatch[m_current_iterator.value]->size() - m_current_index.value, 0);
+			left -= num;
+			m_dispatch[m_current_iterator.value]->m_current_index.value += num;
+			m_current_index = m_dispatch[m_current_iterator.value]->m_current_index;
+
+			if (m_dispatch[m_current_iterator.value]->is_vector_end()) {
+				if (m_current_iterator.value < m_dispatch.size() - 1) {
+					++m_current_iterator.value;
+					m_current_index.value = 0;
+				}
+				else return *this;
+			}
+		}
+		return *this;
+	}
+
+	/**
+	* \brief
+	*
+	* \param[in]
+	* \returns
+	*/
+	template<typename... Cs>
+	inline auto VecsIterator<Cs...>::operator+(size_t N) noexcept	-> VecsIterator<Cs...>& {
+		VecsIterator<Cs...> temp{ *this };
+		temp += N;
+		return temp;
+	}
+
+	/**
+	* \brief
+	*
+	* \param[in]
+	* \returns
+	*/
+	template<typename... Cs>
+	inline auto VecsIterator<Cs...>::operator!=(const VecsIterator<Cs...>& v) noexcept	-> bool {
+		return !(*this == v);
+	}
+
+	/**
+	* \brief
+	*
+	* \param[in]
+	* \returns
+	*/
+	template<typename... Cs>
+	inline auto VecsIterator<Cs...>::operator==(const VecsIterator<Cs...>& v) noexcept	-> bool {
+		return	v.m_current_iterator == m_current_iterator && v.m_current_index == m_current_index;
+	}
+
+	/**
+	* \brief
+	*
+	* \param[in]
+	* \returns
+	*/
+	template<typename... Cs>
+	inline auto VecsIterator<Cs...>::is_vector_end() noexcept		-> bool {
+		return m_dispatch[m_current_iterator.value]->is_vector_end();
+	}
+
+	/**
+	* \brief
+	*
+	* \param[in]
+	* \returns
+	*/
+	template<typename... Cs>
+	inline auto VecsIterator<Cs...>::size() noexcept	-> size_t {
+		size_t sum = 0;
+		for (int i = 0; i < m_dispatch.size(); ++i) { sum += m_dispatch[i]->size(); };
+		return sum;
+	}
+
+
+
+
+
+
+	//----------------------------------------------------------------------------------------------
 
 	/**
 	* \brief Iterator that iterates over a VecsComponentTable of type E
