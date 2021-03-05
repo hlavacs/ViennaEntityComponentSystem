@@ -512,6 +512,9 @@ namespace vecs {
 	*/
 
 	class VecsRegistryBaseClass : public VecsMonostate<VecsRegistryBaseClass> {
+
+		template<typename E> friend class VecsComponentTable;
+
 	protected:
 
 		/** \brief Entity info stored in the main table. All info can be accessed with at most one cache miss. */
@@ -1254,9 +1257,11 @@ namespace vecs {
 	using Functor = void(VecsIterator<Cs...>&);
 
 	/**
-	* \brief
+	* \brief takes two iterators and loops from begin to end, and for each entity calls the provided function.
 	*
-	* \param[in]
+	* \param[in] b Begin iterator.
+	* \param[in] e End iterator.
+	* \param[in] f Functor to be called for every entity the iterator visits.
 	*/
 	template<typename... Cs>
 	requires (vtll::has_type<VecsComponentTypeList, Cs>::value && ...)
@@ -1267,9 +1272,8 @@ namespace vecs {
 	}
 
 	/**
-	* \brief
-	*
-	* \param[in]
+	* \brief Visits all entities in the ECS that have the given components CS...
+	* \param[in] f Functor to be called for every visited entity.
 	*/
 	template<typename... Cs>
 	requires (vtll::has_type<VecsComponentTypeList, Cs>::value && ...)
@@ -1288,9 +1292,9 @@ namespace vecs {
 	//VecsIterator
 
 	/**
-	* \brief
-	*
-	* \param[in]
+	* \brief Constructor of class VecsIterator. If its not an end iterator then it also
+	* creates subiterators for all entity types that have all component types.
+	* \param[in] is_end If true then this iterator is an end iterator.
 	*/
 	template<typename... Cs>
 	inline VecsIterator<Cs...>::VecsIterator(bool is_end) noexcept : m_is_end{ is_end } {
@@ -1313,34 +1317,39 @@ namespace vecs {
 	//VecsComponentTable
 
 	/**
-	* \brief
-	*
-	* \param[in]
+	* \brief Remove invalid entity data at the end of the component table.
 	*/
 	template<typename E>
 	inline auto VecsComponentTable<E>::remove_deleted_tail() noexcept -> void {
 		while (m_data.size() > 0) {
 			auto & handle = m_data.comp_ref_idx<c_handle>(index_t{ m_data.size() - 1 });
-			if (handle.has_value()) return;
-			m_data.pop_back();
+			if (handle.has_value()) return; ///< is last entity is valid, then return
+			m_data.pop_back();				///< Else remove it and continue the loop
 		}
 	}
 
 	/**
-	* \brief
+	* \brief Remove all invalid entities from the component table.
+	* 
+	* The algorithm makes sure that there are no deleted entities at the end of the table.
+	* Then it runs trough all deleted entities (m_deleted table) and tests whether it lies
+	* inside the table. if it does, it is swapped with the last entity, which must be valid.
+	* Then all invalid entities at the end are again removed.
 	*
 	* \param[in]
 	*/
 	template<typename E>
 	inline auto VecsComponentTable<E>::compress() noexcept -> void {
 		for (size_t i = 0; i < m_data.size(); ++i) {
-			remove_deleted_tail();
-			auto& index = m_deleted.comp_ref_idx<0>(index_t{i});
-			if (index.value < m_data.size()) {
-				auto tup = m_data.tuple_value(index_t{ m_data.size() - 1 });
+			remove_deleted_tail();											///< Remove invalid entities at end of table
+			auto& index = m_deleted.comp_ref_idx<0>(index_t{i});			///< Get next deleted entity frmo deleted table
+			if (index.value < m_data.size()) {								///< Is it inside the table still?
+				auto tup = m_data.tuple_value(index_t{ m_data.size() - 1 });///< Yes, move last entity to this position
 				m_data.update(index, tup);
+				VecsRegistryBaseClass().m_entity_table.comp_ref_idx<0>(index).m_index = index; ///< Change map entry of moved last entity
 			}
 		}
+		m_deleted.clear();
 	}
 
 	/**
@@ -1488,6 +1497,7 @@ namespace vecs {
 	* \returns
 	*/
 	inline auto VecsHandle::has_value() noexcept				-> bool {
+		if (!m_entity_index.has_value() || !m_generation_counter.has_value() || !m_type_index.has_value()) return false;
 		return VecsRegistryBaseClass().contains(*this);
 	}
 

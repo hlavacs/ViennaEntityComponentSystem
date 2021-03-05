@@ -36,6 +36,7 @@ namespace vecs {
 			: m_segment{ mr }  { max_capacity(r); };
 
 		size_t size() { return m_size.load(); };
+		void clear() { m_size = 0; };
 
 		//Externally synchronized
 		template<size_t I, typename C = vtll::Nth_type<DATA,I>>
