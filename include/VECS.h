@@ -293,7 +293,7 @@ namespace vecs {
 		auto component(const index_t index) noexcept			-> C&;
 
 		template<typename ET>
-		requires (std::is_same_v<VecsEntity<E>, std::decay_t<ET>>)
+		requires is_entity<ET, E>
 		auto update(const index_t index, ET&& ent) noexcept		-> bool;
 	};
 
@@ -384,7 +384,7 @@ namespace vecs {
 	*/
 	template<typename E>
 	template<typename ET>
-	requires (std::is_same_v<VecsEntity<E>, std::decay_t<ET>>)
+	requires is_entity<ET, E>
 	inline auto VecsComponentTable<E>::update(const index_t index, ET&& ent) noexcept -> bool {
 		vtll::static_for<size_t, 0, vtll::size<E>::value >(	///< Loop over all components
 			[&](auto i) {
@@ -467,6 +467,7 @@ namespace vecs {
 			return false;
 		};
 	};
+
 
 	/**
 	* \brief Constructor of class VecsComponentTable.
@@ -553,7 +554,7 @@ namespace vecs {
 		auto entity(VecsHandle handle) noexcept -> std::optional<VecsEntity<E>>;
 
 		template<typename C>
-		requires vtll::has_type<VecsComponentTypeList, std::decay_t<C>>::value
+		requires is_component_type<C>
 		auto component(VecsHandle handle) noexcept -> std::optional<C>;
 
 		//-------------------------------------------------------------------------
@@ -563,7 +564,7 @@ namespace vecs {
 		auto update(VecsHandle handle, ET&& ent) noexcept -> bool;
 
 		template<typename C>
-		requires vtll::has_type<VecsComponentTypeList, std::decay_t<C>>::value
+		requires is_component_type<C>
 		auto update(VecsHandle handle, C&& comp) noexcept -> bool;
 
 		//-------------------------------------------------------------------------
@@ -629,7 +630,7 @@ namespace vecs {
 	* \returns a std::optional holding the desired data, or an empty std::optional if the data is not available.
 	*/
 	template<typename C>
-	requires vtll::has_type<VecsComponentTypeList, std::decay_t<C>>::value
+	requires is_component_type<C>
 	auto VecsRegistryBaseClass::component(VecsHandle handle) noexcept -> std::optional<C> {
 		if (!handle.m_type_index.has_value() || handle.m_type_index.value >= vtll::size<VecsEntityTypeList>::value) return {};
 		C res{};
@@ -648,7 +649,7 @@ namespace vecs {
 	* \returns true if the update was successful.
 	*/
 	template<typename C>
-	requires vtll::has_type<VecsComponentTypeList, std::decay_t<C>>::value
+	requires is_component_type<C>
 	auto VecsRegistryBaseClass::update(VecsHandle handle, C&& comp) noexcept -> bool {
 		if (!handle.m_type_index.has_value() || handle.m_type_index.value >= vtll::size<VecsEntityTypeList>::value) return false;
 
