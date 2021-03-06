@@ -1591,18 +1591,23 @@ namespace vecs {
 	//locking
 
 	class VecsLock {
-		std::atomic_flag* m_flag;
+		std::atomic_flag* m_flag{nullptr};
 
 	public:
 		VecsLock(VecsHandle handle) {
+			if (!handle.is_valid()) return;
 			m_flag = &VecsRegistryBaseClass::m_entity_table.comp_ref_idx<0>(handle.m_entity_index).m_flag;
 			while (m_flag->test_and_set(std::memory_order_acquire)) {
 				while (m_flag->test(std::memory_order_relaxed));
 			}
 		}
 
+		bool is_valid() {
+			return m_flag != nullptr;
+		}
+
 		~VecsLock() {
-			m_flag->clear(std::memory_order_release);
+			if(m_flag) m_flag->clear(std::memory_order_release);
 		}
 	};
 
@@ -1624,11 +1629,9 @@ namespace vecs {
 		inline auto for_each(VecsIterator<Cs...>& b, VecsIterator<Cs...>& e, std::function<Functor<Cs...>> f) -> void {
 		for (; b != e; b++) {
 			VecsHandle handle = b.handle();
-			if (handle.is_valid()) {
-				VecsLock{ handle };
-				if (handle.has_value()) {
-					f(b);
-				}
+			VecsLock lock{ handle };
+			if (lock.is_valid() && handle.has_value()) {
+				f(b);
 			}
 		}
 	}
