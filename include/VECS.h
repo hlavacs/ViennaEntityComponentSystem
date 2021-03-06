@@ -153,7 +153,8 @@ namespace vecs {
 		/** \returns the type index of the handle. */
 		auto type() const noexcept -> uint32_t { return static_cast<uint32_t>(m_type_index.value); };
 
-		auto has_value() noexcept -> bool;
+		auto is_valid() noexcept -> bool;	///< The data in the handle is non null
+		auto has_value() noexcept -> bool;	///< The entity that is pointed to exists in the ECS
 
 		template<typename E>
 		requires is_entity_type<E>
@@ -1480,12 +1481,19 @@ namespace vecs {
 	//VecsHandle
 
 	/**
+	* \brief Check whether the data in a handle is non null
+	* \returns true if the data in the handle is not null
+	*/
+	inline auto VecsHandle::is_valid() noexcept				-> bool {
+		return m_entity_index.has_value() && m_generation_counter.has_value() && m_type_index.has_value();
+	}
+
+	/**
 	* \brief Check whether a handle belongs to an entity that is still in the ECS.
 	* \returns true if the entity this handle belongs to is still in the ECS.
 	*/
 	inline auto VecsHandle::has_value() noexcept				-> bool {
-		if (!m_entity_index.has_value() || !m_generation_counter.has_value() || !m_type_index.has_value()) return false;
-		return VecsRegistryBaseClass().contains(*this);
+		return is_valid() && VecsRegistryBaseClass().contains(*this);
 	}
 
 	/**
@@ -1583,11 +1591,10 @@ namespace vecs {
 	//locking
 
 	class VecsLock {
-		VecsHandle			m_handle;
-		std::atomic_flag*	m_flag;
+		std::atomic_flag* m_flag;
 
 	public:
-		VecsLock(VecsHandle handle) : m_handle(handle) {
+		VecsLock(VecsHandle handle) {
 			m_flag = &VecsRegistryBaseClass::m_entity_table.comp_ref_idx<0>(handle.m_entity_index).m_flag;
 			while (m_flag->test_and_set(std::memory_order_acquire)) {
 				while (m_flag->test(std::memory_order_relaxed));
@@ -1616,9 +1623,12 @@ namespace vecs {
 	requires (vtll::has_type<VecsComponentTypeList, Cs>::value && ...)
 		inline auto for_each(VecsIterator<Cs...>& b, VecsIterator<Cs...>& e, std::function<Functor<Cs...>> f) -> void {
 		for (; b != e; b++) {
-			if (b.has_value()) {
-				VecsLock(b.handle());
-				f(b);
+			VecsHandle handle = b.handle();
+			if (handle.is_valid()) {
+				VecsLock{ handle };
+				if (handle.has_value()) {
+					f(b);
+				}
 			}
 		}
 	}
