@@ -251,9 +251,10 @@ namespace vecs {
 	public:
 		using value_type = vtll::to_tuple<E>;		///< A tuple storing all components of entity of type E
 
-		using info = vtll::type_list<VecsHandle>;	///< List of management data per entity (only a handle)
-		static const size_t c_handle = 0;			///< Component index of the handle info
-		static const size_t c_info_size = 1;		///< Index where the entity data starts
+		using info = vtll::type_list<VecsHandle, std::atomic_flag*>;	///< List of management data per entity (only a handle)
+		static const size_t c_handle = 0;		///< Component index of the handle info
+		static const size_t c_flag = 1;			///< Component index of the handle info
+		static const size_t c_info_size = 2;	///< Index where the entity data starts
 
 		using types = vtll::cat< info, E >;					///< List with management and component types
 		using types_deleted = vtll::type_list< index_t >;	///< List with types for holding info about erased entities 
@@ -281,10 +282,11 @@ namespace vecs {
 
 		template<typename... Cs>
 		requires is_composed_of<E, Cs...> [[nodiscard]]
-		auto insert(VecsHandle handle, Cs&&... args) noexcept	-> index_t;
+		auto insert(VecsHandle handle, std::atomic_flag* flag, Cs&&... args) noexcept	-> index_t;
 
 		auto values(const index_t index) noexcept				-> value_type;
 		auto handle(const index_t index) noexcept				-> VecsHandle;
+		auto flag(const index_t index) noexcept					-> std::atomic_flag*;
 
 		/** \returns the number of entries currently in the table, can also be invalid ones */
 		auto size() noexcept									-> size_t { return m_data.size(); };
@@ -339,10 +341,11 @@ namespace vecs {
 	template<typename E> 
 	template<typename... Cs>
 	requires is_composed_of<E, Cs...> [[nodiscard]]
-	inline auto VecsComponentTable<E>::insert(VecsHandle handle, Cs&&... args) noexcept -> index_t {
+	inline auto VecsComponentTable<E>::insert(VecsHandle handle, std::atomic_flag* flag, Cs&&... args) noexcept -> index_t {
 		auto idx = m_data.push_back();			///< Allocate space a the end of the table
 		if (!idx.has_value()) return idx;		///< Check if the allocation was successfull
 		m_data.update<c_handle>(idx, handle);	///< Update the handle data
+		m_data.update<c_flag>(idx, flag);		///< Update the flag
 		(m_data.update<c_info_size + vtll::index_of<E,std::decay_t<Cs>>::value> (idx, std::forward<Cs>(args)), ...); ///< Update the entity components
 		return idx;								///< Return the index of the new data
 	};
@@ -366,6 +369,16 @@ namespace vecs {
 	inline auto VecsComponentTable<E>::handle(const index_t index) noexcept -> VecsHandle {
 		assert(index.value < m_data.size());
 		return m_data.comp_ref_idx<c_handle>(index);	///< Get ref to the handle and return it
+	}
+
+	/**
+	* \param[in] index The index of the entity in the component table.
+	* \returns pointer to the sync flag of the entity.
+	*/
+	template<typename E>
+	inline auto VecsComponentTable<E>::flag(const index_t index) noexcept -> std::atomic_flag* {
+		assert(index.value < m_data.size());
+		return m_data.comp_ref_idx<c_flag>(index);	///< Get ref to the flag and return it
 	}
 
 	/**
@@ -820,8 +833,11 @@ namespace vecs {
 		m_entity_table.comp_ref_idx<c_map_data>(idx).m_type_index = index16_t{ vtll::index_of<VecsEntityTypeList, E>::value };
 
 		VecsHandle handle{ idx, m_entity_table.comp_ref_idx<c_map_data>(idx).m_generation_counter, index16_t{ vtll::index_of<VecsEntityTypeList, E>::value } };
-		index_t compidx = VecsComponentTable<E>().insert(handle, args...);	//add data as tuple
-		m_entity_table.comp_ref_idx<c_map_data>(idx).m_index = compidx;						//index in component vector 
+		
+		std::atomic_flag* flag = &m_entity_table.comp_ref_idx<c_map_data>(idx).m_flag;
+
+		index_t compidx = VecsComponentTable<E>().insert(handle, flag, args...);		//add data as tuple
+		m_entity_table.comp_ref_idx<c_map_data>(idx).m_index = compidx;			//index in component vector 
 		m_size++;
 		m_sizeE++;
 		return handle;
@@ -984,6 +1000,7 @@ namespace vecs {
 		auto operator==(const VecsIterator<Cs...>& v) noexcept	-> bool;	///< Equal
 
 		virtual auto handle() noexcept			-> VecsHandle;
+		virtual auto flag() noexcept			-> std::atomic_flag*;
 		virtual auto has_value() noexcept		-> bool;					///< Is currently pointint to a valid entity
 		virtual	auto operator*() noexcept		-> value_type;				///< Access the data
 		virtual auto operator++() noexcept		-> VecsIterator<Cs...>&;	///< Increase by 1
@@ -1027,6 +1044,14 @@ namespace vecs {
 		return m_dispatch[m_current_iterator.value]->handle();
 	}
 
+	/**
+	* \brief Retrieve the handle of the current entity.
+	* \returns the handle of the current entity.
+	*/
+	template<typename... Cs>
+	inline auto VecsIterator<Cs...>::flag() noexcept	-> std::atomic_flag* {
+		return m_dispatch[m_current_iterator.value]->flag();
+	}
 
 	/**
 	* \brief Copy assignment operator.
@@ -1182,6 +1207,7 @@ namespace vecs {
 	public:
 		VecsIteratorDerived(bool is_end = false) noexcept;
 		auto handle() noexcept			-> VecsHandle;
+		auto flag() noexcept			-> std::atomic_flag*;
 		auto has_value() noexcept		-> bool;
 		auto operator*() noexcept		-> typename VecsIterator<Cs...>::value_type;
 		auto operator++() noexcept		-> VecsIterator<Cs...>&;
@@ -1204,7 +1230,6 @@ namespace vecs {
 		}
 	};
 
-
 	/**
 	* \brief Test whether the iterator points to a valid entity.
 	* \returns true if the iterator points to a valid entity.
@@ -1221,6 +1246,15 @@ namespace vecs {
 	template<typename E, typename... Cs>
 	inline auto VecsIteratorDerived<E, Cs...>::handle() noexcept		-> VecsHandle {
 		return VecsComponentTable<E>().handle(this->m_current_index);
+	}
+
+	/**
+	* \brief
+	* \returns
+	*/
+	template<typename E, typename... Cs>
+	inline auto VecsIteratorDerived<E, Cs...>::flag() noexcept		-> std::atomic_flag* {
+		return VecsComponentTable<E>().flag(this->m_current_index);
 	}
 
 	/**
@@ -1593,13 +1627,22 @@ namespace vecs {
 	class VecsLock {
 		std::atomic_flag* m_flag{nullptr};
 
-	public:
-		VecsLock(VecsHandle handle) {
-			if (!handle.is_valid()) return;
-			m_flag = &VecsRegistryBaseClass::m_entity_table.comp_ref_idx<0>(handle.m_entity_index).m_flag;
+		void lock() {
+			if (m_flag == nullptr) return;
 			while (m_flag->test_and_set(std::memory_order_acquire)) {
 				while (m_flag->test(std::memory_order_relaxed));
 			}
+		}
+
+	public:
+		VecsLock(std::atomic_flag* flag) : m_flag(flag) {
+			lock();
+		}
+
+		VecsLock(VecsHandle handle) {
+			if (!handle.is_valid()) return;
+			m_flag = &VecsRegistryBaseClass::m_entity_table.comp_ref_idx<0>(handle.m_entity_index).m_flag;
+			lock();
 		}
 
 		bool is_valid() {
@@ -1628,9 +1671,8 @@ namespace vecs {
 	requires (vtll::has_type<VecsComponentTypeList, Cs>::value && ...)
 		inline auto for_each(VecsIterator<Cs...>& b, VecsIterator<Cs...>& e, std::function<Functor<Cs...>> f) -> void {
 		for (; b != e; b++) {
-			VecsHandle handle = b.handle();
-			VecsLock lock{ handle };
-			if (lock.is_valid() && handle.has_value()) {
+			VecsLock lock{ b.flag() };	///< Might belong to another entity, but there is for sure a flag 
+			if (b.has_value()) {
 				f(b);
 			}
 		}
