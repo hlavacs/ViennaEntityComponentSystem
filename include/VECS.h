@@ -153,7 +153,7 @@ namespace vecs {
 			: m_entity_index{ idx }, m_generation_counter{ cnt }, m_type_index{ type } {};
 
 		/** \returns the type index of the handle. */
-		auto type() const noexcept -> uint32_t { return static_cast<uint32_t>(m_type_index.value); };
+		auto type() const noexcept -> uint32_t { return static_cast<uint32_t>(m_type_index); };
 
 		auto is_valid() noexcept -> bool;	///< The data in the handle is non null
 		auto has_value() noexcept -> bool;	///< The entity that is pointed to exists in the ECS
@@ -875,7 +875,7 @@ namespace vecs {
 	*/
 	template<typename E>
 	inline auto VecsRegistry<E>::contains(VecsHandle handle) noexcept -> bool {
-		if (!handle.is_valid() || handle.m_type_index.value != vtll::index_of<VecsEntityTypeList,E>::value ) return false;
+		if (!handle.is_valid() || handle.m_type_index != vtll::index_of<VecsEntityTypeList,E>::value ) return false;
 		map_t& ref = m_entity_table.comp_ref_idx<c_map_data>(handle.m_entity_index);
 		if ( handle.m_generation_counter != ref.m_generation_counter || handle.m_type_index	!= ref.m_type_index ) return false;
 		return true;
@@ -1064,7 +1064,7 @@ namespace vecs {
 	template<typename... Cs>
 	inline auto VecsIterator<Cs...>::has_value() noexcept	-> bool {
 		if (m_is_end || is_vector_end()) return false;
-		return m_dispatch[m_current_iterator.value]->has_value();
+		return m_dispatch[m_current_iterator]->has_value();
 	}
 
 	/**
@@ -1073,7 +1073,7 @@ namespace vecs {
 	*/
 	template<typename... Cs>
 	inline auto VecsIterator<Cs...>::handle() noexcept	-> VecsHandle {
-		return m_dispatch[m_current_iterator.value]->handle();
+		return m_dispatch[m_current_iterator]->handle();
 	}
 
 	/**
@@ -1082,7 +1082,7 @@ namespace vecs {
 	*/
 	template<typename... Cs>
 	inline auto VecsIterator<Cs...>::flag() noexcept	-> std::atomic_flag* {
-		return m_dispatch[m_current_iterator.value]->flag();
+		return m_dispatch[m_current_iterator]->flag();
 	}
 
 	/**
@@ -1106,7 +1106,7 @@ namespace vecs {
 	*/
 	template<typename... Cs>
 	inline auto VecsIterator<Cs...>::operator*() noexcept	-> value_type {
-		return *(*m_dispatch[m_current_iterator.value]);
+		return *(*m_dispatch[m_current_iterator]);
 	};
 
 	/**
@@ -1117,13 +1117,13 @@ namespace vecs {
 	template<typename... Cs>
 	inline auto VecsIterator<Cs...>::operator++() noexcept		-> VecsIterator<Cs...>& {
 		if (m_is_end) return *this;
-		(*m_dispatch[m_current_iterator.value])++;
+		(*m_dispatch[m_current_iterator])++;
 
-		if (m_dispatch[m_current_iterator.value]->is_vector_end() && m_current_iterator.value < m_dispatch.size() - 1) {
-			++m_current_iterator.value;
-			m_current_index.value = 0;
+		if (m_dispatch[m_current_iterator]->is_vector_end() && m_current_iterator.value < m_dispatch.size() - 1) {
+			++m_current_iterator;
+			m_current_index = 0;
 		}
-		m_current_index = m_dispatch[m_current_iterator.value]->m_current_index;
+		m_current_index = m_dispatch[m_current_iterator]->m_current_index;
 		return *this;
 	};
 
@@ -1150,15 +1150,15 @@ namespace vecs {
 		if (m_is_end) return;
 		size_t left = N;
 		while (left > 0) {
-			int num = std::max(m_dispatch[m_current_iterator.value]->size() - m_current_index.value, 0);
+			int num = std::max(m_dispatch[m_current_iterator]->size() - m_current_index.value, 0);
 			left -= num;
-			m_dispatch[m_current_iterator.value]->m_current_index.value += num;
-			m_current_index = m_dispatch[m_current_iterator.value]->m_current_index;
+			m_dispatch[m_current_iterator]->m_current_index.value += num;
+			m_current_index = m_dispatch[m_current_iterator]->m_current_index;
 
-			if (m_dispatch[m_current_iterator.value]->is_vector_end()) {
+			if (m_dispatch[m_current_iterator]->is_vector_end()) {
 				if (m_current_iterator.value < m_dispatch.size() - 1) {
 					++m_current_iterator.value;
-					m_current_index.value = 0;
+					m_current_index = 0;
 				}
 				else return *this;
 			}
@@ -1207,7 +1207,7 @@ namespace vecs {
 	*/
 	template<typename... Cs>
 	inline auto VecsIterator<Cs...>::is_vector_end() noexcept		-> bool {
-		return m_dispatch[m_current_iterator.value]->is_vector_end();
+		return m_dispatch[m_current_iterator]->is_vector_end();
 	}
 
 	/**
@@ -1258,7 +1258,7 @@ namespace vecs {
 	inline VecsIteratorDerived<E, Cs...>::VecsIteratorDerived(bool is_end) noexcept { 
 		m_sizeE = VecsComponentTable<E>().size(); ///< iterate over ALL entries, also the invalid ones!
 		if (is_end) {
-			this->m_current_index.value = static_cast<decltype(this->m_current_index.value)>(m_sizeE);
+			this->m_current_index = static_cast<decltype(this->m_current_index)>(m_sizeE);
 		}
 	};
 
@@ -1352,8 +1352,8 @@ namespace vecs {
 	template<typename... Cs>
 	inline VecsIterator<Cs...>::VecsIterator(bool is_end) noexcept : m_is_end{ is_end } {
 		if (is_end) {
-			m_current_iterator.value = static_cast<decltype(m_current_iterator.value)>(m_dispatch.size() - 1);
-			m_current_index.value = static_cast<decltype(m_current_index.value)>(VecsRegistry<last_type>().size<last_type>());
+			m_current_iterator = static_cast<decltype(m_current_iterator)>(m_dispatch.size() - 1);
+			m_current_index = static_cast<decltype(m_current_index)>(VecsRegistry<last_type>().size<last_type>());
 			return;
 		}
 

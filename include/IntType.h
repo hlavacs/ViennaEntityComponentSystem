@@ -26,7 +26,8 @@ struct int_type {
 	requires std::is_convertible_v<U, T>
 	void operator=(const U& rhs) noexcept { value = static_cast<T>(rhs); };
 
-	T operator()() { return value; };
+	operator const T& () const { return value; } 
+	operator T& () { return value; }
 
 	auto operator<=>(const int_type<T, P, D>& v) const = default;
 
