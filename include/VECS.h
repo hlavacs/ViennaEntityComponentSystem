@@ -673,7 +673,7 @@ namespace vecs {
 	template<typename C>
 	requires is_component_type<C>
 	auto VecsRegistryBaseClass::component(VecsHandle handle) noexcept -> std::optional<C> {
-		if (!handle.m_type_index.has_value() || handle.m_type_index >= vtll::size<VecsEntityTypeList>::value) return {};
+		if (!handle.is_valid()) return {};
 		C res{};
 
 		///< Dispatch to the correct subclass
@@ -692,7 +692,7 @@ namespace vecs {
 	template<typename C>
 	requires is_component_type<C>
 	auto VecsRegistryBaseClass::update(VecsHandle handle, C&& comp) noexcept -> bool {
-		if (!handle.m_type_index.has_value() || handle.m_type_index >= vtll::size<VecsEntityTypeList>::value) return false;
+		if (!handle.is_valid()) return false;
 
 		/// Dispatch the call to the correct subclass and return result
 		return m_dispatch[handle.type()]->updateC(handle, vtll::index_of<VecsComponentTypeList, std::decay_t<C>>::value, (void*)&comp, sizeof(C));
@@ -704,7 +704,7 @@ namespace vecs {
 	* \returns true if the operation was successful.
 	*/
 	auto VecsRegistryBaseClass::erase(VecsHandle handle) noexcept -> bool {
-		if (!handle.m_type_index.has_value() || handle.m_type_index >= vtll::size<VecsEntityTypeList>::value) return false;
+		if (!handle.is_valid()) return false;
 		return m_dispatch[handle.type()]->erase(handle); ///< Dispatch to the correct subclass for type E
 	}
 
@@ -716,7 +716,7 @@ namespace vecs {
 	* \returns true if the ECS contains this entity.
 	*/
 	auto VecsRegistryBaseClass::contains(VecsHandle handle) noexcept	-> bool {
-		if (!handle.m_type_index.has_value() || handle.m_type_index >= vtll::size<VecsEntityTypeList>::value) return false;
+		if (!handle.is_valid()) return false;
 		return m_dispatch[handle.type()]->contains(handle);
 	}
 
@@ -1397,7 +1397,7 @@ namespace vecs {
 	inline auto VecsComponentTable<E>::compress() noexcept -> void {
 		for (size_t i = 0; i < m_data.size(); ++i) {
 			remove_deleted_tail();											///< Remove invalid entities at end of table
-			auto& index = m_deleted.comp_ref_idx<0>(index_t{i});			///< Get next deleted entity from deleted table
+			auto index = m_deleted.comp_ref_idx<0>(index_t{i});			///< Get next deleted entity from deleted table
 			if (index.value < m_data.size()) {								///< Is it inside the table still?
 				auto tup = m_data.tuple_value(index_t{ m_data.size() - 1 });///< Yes, move last entity to this position
 				m_data.update(index, tup);
@@ -1551,7 +1551,8 @@ namespace vecs {
 	* \returns true if the data in the handle is not null
 	*/
 	inline auto VecsHandle::is_valid() noexcept				-> bool {
-		return m_entity_index.has_value() && m_generation_counter.has_value() && m_type_index.has_value();
+		return m_entity_index.has_value() && m_generation_counter.has_value() 
+			&& m_type_index.has_value() && m_type_index.value < vtll::size<VecsEntityTypeList>::value;
 	}
 
 	/**
