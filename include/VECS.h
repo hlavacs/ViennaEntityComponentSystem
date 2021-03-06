@@ -178,14 +178,17 @@ namespace vecs {
 	//-------------------------------------------------------------------------
 	//locking
 
+	/**
+	* VecsLock is used to lock access to single entities. 
+	*/
 	class VecsLock {
-		std::atomic_flag* m_flag{ nullptr };
-		auto lock() noexcept -> void;
+		std::atomic_flag* m_flag{ nullptr };	///< Flag used for locking access
+		auto lock() noexcept -> void;			///< Acquire the lock
 	public:
-		VecsLock(std::atomic_flag* flag) noexcept;
-		VecsLock(VecsHandle handle) noexcept;
+		VecsLock(std::atomic_flag* flag) noexcept;	///< Acquire the lock
+		VecsLock(VecsHandle handle) noexcept;		///< Acquire the lock
 		auto is_valid() noexcept -> bool;
-		~VecsLock() noexcept;
+		~VecsLock() noexcept;						///< Release the lock
 	};
 
 	/**
@@ -1633,27 +1636,44 @@ namespace vecs {
 	//-------------------------------------------------------------------------
 	//locking
 
-	 inline auto VecsLock::lock() noexcept -> void {
+	/**
+	* \brief Acquire a lock to an entity
+	*/
+	inline auto VecsLock::lock() noexcept -> void {
 		if (m_flag == nullptr) return;
 		while (m_flag->test_and_set(std::memory_order_acquire)) {
 			while (m_flag->test(std::memory_order_relaxed));
 		}
 	}
 
+	/**
+	* \brief Constructor of class VecsLock. Acquires a lock to an entity.
+	* \param[in] flag Pointer to an atomic flag used for locking an entity.
+	*/
 	inline VecsLock::VecsLock(std::atomic_flag* flag) noexcept : m_flag(flag) {
 		lock();
 	}
 
+	/**
+	* \brief Constructor of class VecsLock. Acquires a lock to an entity.
+	* \param[in] handle The handle to an entity that should be locked.
+	*/
 	inline VecsLock::VecsLock(VecsHandle handle) noexcept {
 		if (!handle.is_valid()) return;
-		m_flag = &VecsRegistryBaseClass::m_entity_table.comp_ref_idx<0>(handle.m_entity_index).m_flag;
+		m_flag = &VecsRegistryBaseClass::m_entity_table.comp_ref_idx<VecsRegistryBaseClass::c_map_data>(handle.m_entity_index).m_flag;
 		lock();
 	}
 
+	/**
+	* \returns true if the lock has locked to a valid entity.
+	*/
 	inline auto VecsLock::is_valid() noexcept -> bool {
 		return m_flag != nullptr;
 	}
 
+	/**
+	* \brief Destructor of class VecsLock. Releases the lock.
+	*/
 	inline VecsLock::~VecsLock() noexcept {
 		if (m_flag) m_flag->clear(std::memory_order_release);
 	}
