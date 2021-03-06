@@ -291,8 +291,7 @@ namespace vecs {
 		static inline std::array<std::unique_ptr<VecsComponentTable<E>>, vtll::size<VecsComponentTypeList>::value> m_dispatch;
 
 		virtual auto updateC(index_t entidx, size_t compidx, void* ptr, size_t size) noexcept		-> bool;
-		virtual auto componentE(index_t entidx, size_t compidx, void* ptr, size_t size)  noexcept -> bool;
-
+		virtual auto componentE(index_t entidx, size_t compidx, void* ptr, size_t size)  noexcept	-> bool;
 		auto remove_deleted_tail() noexcept -> void;
 
 		VecsComponentTable(size_t r = 1 << c_max_size) noexcept;
