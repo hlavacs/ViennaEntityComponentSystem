@@ -70,7 +70,13 @@ int main() {
 			(h1.component<VeComponentPosition>().value().m_position == glm::vec3{ -99.0f, -22.0f, -33.0f }), );
 
 		TESTRESULT(++number, "erase handle", h1.erase(), (!h1.has_value() && VecsRegistry().size() == 1), );
+		TESTRESULT(++number, "size", ,	(VecsRegistry().size<VeEntityTypeNode>() == 0), );
+
 		TESTRESULT(++number, "erase handle", h2.erase(), (!h2.has_value() && VecsRegistry().size() == 0), );
+		TESTRESULT(++number, "size", , (VecsRegistry().size<VeEntityTypeDraw>() == 0), );
+
+		auto b = VecsRegistry().begin<VeComponentName>();
+		auto e = VecsRegistry().end<VeComponentName>();
 
 		int i = 0;
 		bool test = true;
@@ -86,11 +92,16 @@ int main() {
 
 
 	{
-		for (int i = 0; i < 1000; i++) {
+		const int num = 1000;
+
+		for (int i = 0; i < num; i++) {
 			auto h1 = VecsRegistry{}.insert(VeComponentName{ "Node" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentTransform{});
 			auto h2 = VecsRegistry{}.insert(VeComponentName{ "Draw" }, VeComponentMaterial{ 1 }, VeComponentGeometry{ 1 });
 		}
-		TESTRESULT(++number, "system create", , (VecsRegistry().size() == 2000), );
+		TESTRESULT(++number, "system create", , (VecsRegistry().size() == 2*num), );
+
+		auto b = VecsRegistry().begin<VeComponentName>();
+		auto e = VecsRegistry().end<VeComponentName>();
 
 		int i = 0;
 		bool test = true;
@@ -98,11 +109,11 @@ int main() {
 			++i;
 			auto [handle, name] = *iter;
 			if (name.m_name != "Node" && name.m_name != "Draw") {	test = false; }
-			//std::cout << "Entity " << name << "\n";
+			//std::cout << "Entity " << name.m_name << " " << i << "\n";
 		});
-		TESTRESULT(++number, "system run", , (test && i == 2000), );
+		TESTRESULT(++number, "system run", , (test && i == 2 * num), );
 
-		TESTRESULT(++number, "clear", VecsRegistry().clear(), (VecsRegistry().size() == 0), );
+		TESTRESULT(++number, "clear", VecsRegistry().clear(), (VecsRegistry().size() == 0 && VecsRegistry().size<VeEntityTypeNode>()), );
 
 	}
 

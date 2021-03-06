@@ -88,6 +88,7 @@ namespace vecs {
 	*/
 
 	class VecsHandle;
+	class VecsLock;
 	template <typename E> class VecsEntity;
 	template<typename E> class VecsComponentTable;
 	template<typename E, size_t I> class VecsComponentTableDerived;
@@ -126,6 +127,7 @@ namespace vecs {
 	* VecsHandle are used to ID entities of type E by storing their type as an index.
 	*/
 	class VecsHandle {
+		friend class VecsLock;
 		friend VecsRegistryBaseClass;
 		template<typename E> friend class VecsRegistry;
 		template<typename E> friend class VecsComponentTable;
@@ -514,16 +516,17 @@ namespace vecs {
 
 	class VecsRegistryBaseClass : public VecsMonostate<VecsRegistryBaseClass> {
 
+		friend class VecsLock;
 		template<typename E> friend class VecsComponentTable;
 
 	protected:
 
 		/** \brief Entity info stored in the main table. All info can be accessed with at most one cache miss. */
 		struct map_t{
-			index_t				m_index{};				///< Index in component table, or next free entry
-			counter16_t			m_generation_counter{};	///< Generation counter for determining if handle still valid
-			index16_t			m_type_index{};			///< Index of entity type 
-			std::atomic_flag	m_flag;					///< Synchronize read and write access to entity
+			index_t				m_index{};					///< Index in component table, or next free entry
+			counter16_t			m_generation_counter{};		///< Generation counter for determining if handle still valid
+			index16_t			m_type_index{};				///< Index of entity type 
+			std::atomic_flag	m_flag = ATOMIC_FLAG_INIT;	///< Synchronize read and write access to entity
 		};
 
 		using types = vtll::type_list<map_t>;	///< Type for the table
@@ -938,7 +941,6 @@ namespace vecs {
 	};
 
 
-
 	//-------------------------------------------------------------------------
 	//iterator
 
@@ -980,10 +982,11 @@ namespace vecs {
 		auto operator!=(const VecsIterator<Cs...>& v) noexcept	-> bool;	///< Unqequal
 		auto operator==(const VecsIterator<Cs...>& v) noexcept	-> bool;	///< Equal
 
+		virtual auto handle() noexcept			-> VecsHandle;
 		virtual auto has_value() noexcept		-> bool;					///< Is currently pointint to a valid entity
 		virtual	auto operator*() noexcept		-> value_type;				///< Access the data
 		virtual auto operator++() noexcept		-> VecsIterator<Cs...>&;	///< Increase by 1
-		virtual auto operator++(int) noexcept	-> VecsIterator<Cs...>&;	///< Increse by 1
+		virtual auto operator++(int) noexcept	-> VecsIterator<Cs...>&;	///< Increase by 1
 		virtual auto is_vector_end() noexcept	-> bool;					///< Is currently at the end of any sub iterator
 		virtual auto size() noexcept			-> size_t;					///< Number of valid entities
 	};
@@ -1013,6 +1016,16 @@ namespace vecs {
 		if (m_is_end || is_vector_end()) return false;
 		return m_dispatch[m_current_iterator.value]->has_value();
 	}
+
+	/**
+	* \brief Retrieve the handle of the current entity.
+	* \returns the handle of the current entity.
+	*/
+	template<typename... Cs>
+	inline auto VecsIterator<Cs...>::handle() noexcept	-> VecsHandle {
+		return m_dispatch[m_current_iterator.value]->handle();
+	}
+
 
 	/**
 	* \brief Copy assignment operator.
@@ -1167,6 +1180,7 @@ namespace vecs {
 
 	public:
 		VecsIteratorDerived(bool is_end = false) noexcept;
+		auto handle() noexcept			-> VecsHandle;
 		auto has_value() noexcept		-> bool;
 		auto operator*() noexcept		-> typename VecsIterator<Cs...>::value_type;
 		auto operator++() noexcept		-> VecsIterator<Cs...>&;
@@ -1183,7 +1197,7 @@ namespace vecs {
 	*/
 	template<typename E, typename... Cs>
 	inline VecsIteratorDerived<E, Cs...>::VecsIteratorDerived(bool is_end) noexcept { 
-		m_sizeE = VecsComponentTable<E>().size();
+		m_sizeE = VecsComponentTable<E>().size(); ///< iterate over ALL entries, also the invalid ones!
 		if (is_end) {
 			this->m_current_index.value = static_cast<decltype(this->m_current_index.value)>(m_sizeE);
 		}
@@ -1197,6 +1211,15 @@ namespace vecs {
 	template<typename E, typename... Cs>
 	inline auto VecsIteratorDerived<E, Cs...>::has_value() noexcept		-> bool {
 		return VecsComponentTable<E>().handle(this->m_current_index).has_value();
+	}
+
+	/**
+	* \brief 
+	* \returns
+	*/
+	template<typename E, typename... Cs>
+	inline auto VecsIteratorDerived<E, Cs...>::handle() noexcept		-> VecsHandle {
+		return VecsComponentTable<E>().handle(this->m_current_index);
 	}
 
 	/**
@@ -1224,7 +1247,7 @@ namespace vecs {
 	*/
 	template<typename E, typename... Cs>
 	inline auto VecsIteratorDerived<E, Cs...>::operator++(int) noexcept	-> VecsIterator<Cs...>& {
-		if (!is_vector_end())++this->m_current_index;
+		if (!is_vector_end()) ++this->m_current_index;
 		return *this;
 	};
 
@@ -1246,44 +1269,6 @@ namespace vecs {
 	inline auto VecsIteratorDerived<E, Cs...>::size() noexcept			-> size_t {
 		return m_sizeE;
 	}
-
-
-
-	//-------------------------------------------------------------------------
-	//for_each loop
-
-	/** General functor type that can hold any function, and depends in a number of component types.	*/
-	template<typename... Cs>
-	requires (vtll::has_type<VecsComponentTypeList, Cs>::value && ...)
-	using Functor = void(VecsIterator<Cs...>&);
-
-	/**
-	* \brief takes two iterators and loops from begin to end, and for each entity calls the provided function.
-	*
-	* \param[in] b Begin iterator.
-	* \param[in] e End iterator.
-	* \param[in] f Functor to be called for every entity the iterator visits.
-	*/
-	template<typename... Cs>
-	requires (vtll::has_type<VecsComponentTypeList, Cs>::value && ...)
-	inline auto for_each(VecsIterator<Cs...>& b, VecsIterator<Cs...>& e, std::function<Functor<Cs...>> f) -> void {
-		for (; b != e; b++) {
-			if(b.has_value()) f(b);
-		}
-	}
-
-	/**
-	* \brief Visits all entities in the ECS that have the given components CS...
-	* \param[in] f Functor to be called for every visited entity.
-	*/
-	template<typename... Cs>
-	requires (vtll::has_type<VecsComponentTypeList, Cs>::value && ...)
-	inline auto for_each(std::function<Functor<Cs...>> f) -> void {
-		auto b = VecsRegistry().begin<Cs...>();
-		auto e = VecsRegistry().end<Cs...>();
-		for_each(b, e, f);
-	}
-
 
 
 	//-------------------------------------------------------------------------
@@ -1309,7 +1294,9 @@ namespace vecs {
 			[&](auto i) {
 				using type = vtll::Nth_type<entity_types, i>;
 				m_dispatch[i] = std::make_unique<VecsIteratorDerived<type, Cs...>>(is_end);
-				m_size += m_dispatch[i]->size();
+				auto size = m_dispatch[i]->size();
+				m_size += size;
+				if (size == 0 && i + 1 < vtll::size<entity_types>::value) m_current_iterator++;
 			}
 		);
 	};
@@ -1590,7 +1577,68 @@ namespace vecs {
 
 
 	//-------------------------------------------------------------------------
+	//for_each loop
+
+	//-------------------------------------------------------------------------
+	//locking
+
+	class VecsLock {
+		VecsHandle			m_handle;
+		std::atomic_flag*	m_flag;
+
+	public:
+		VecsLock(VecsHandle handle) : m_handle(handle) {
+			m_flag = &VecsRegistryBaseClass::m_entity_table.comp_ref_idx<0>(handle.m_entity_index).m_flag;
+			while (m_flag->test_and_set(std::memory_order_acquire)) {
+				while (m_flag->test(std::memory_order_relaxed));
+			}
+		}
+
+		~VecsLock() {
+			m_flag->clear(std::memory_order_release);
+		}
+	};
+
+
+	/** General functor type that can hold any function, and depends in a number of component types.	*/
+	template<typename... Cs>
+	requires (vtll::has_type<VecsComponentTypeList, Cs>::value && ...)
+	using Functor = void(VecsIterator<Cs...>&);
+
+	/**
+	* \brief takes two iterators and loops from begin to end, and for each entity calls the provided function.
+	*
+	* \param[in] b Begin iterator.
+	* \param[in] e End iterator.
+	* \param[in] f Functor to be called for every entity the iterator visits.
+	*/
+	template<typename... Cs>
+	requires (vtll::has_type<VecsComponentTypeList, Cs>::value && ...)
+		inline auto for_each(VecsIterator<Cs...>& b, VecsIterator<Cs...>& e, std::function<Functor<Cs...>> f) -> void {
+		for (; b != e; b++) {
+			if (b.has_value()) {
+				VecsLock(b.handle());
+				f(b);
+			}
+		}
+	}
+
+	/**
+	* \brief Visits all entities in the ECS that have the given components CS...
+	* \param[in] f Functor to be called for every visited entity.
+	*/
+	template<typename... Cs>
+	requires (vtll::has_type<VecsComponentTypeList, Cs>::value && ...)
+		inline auto for_each(std::function<Functor<Cs...>> f) -> void {
+		auto b = VecsRegistry().begin<Cs...>();
+		auto e = VecsRegistry().end<Cs...>();
+		for_each(b, e, f);
+	}
+
+
+	//-------------------------------------------------------------------------
 	//system
+
 
 	/**
 	* \brief Systems can access all components in sequence
