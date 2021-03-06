@@ -94,6 +94,8 @@ namespace vecs {
 	template<typename E, size_t I> class VecsComponentTableDerived;
 	class VecsRegistryBaseClass;
 	template<typename E> class VecsRegistry;
+	template<typename... Cs> class VecsIterator;
+	template<typename E, typename... Cs> class VecsIteratorDerived;
 
 	/** basic concepts */
 	template<typename C>
@@ -262,8 +264,10 @@ namespace vecs {
 	class VecsComponentTable : public VecsMonostate<VecsComponentTable<E>> {
 		friend class VecsRegistryBaseClass;
 		template<typename E> friend class VecsRegistry;
+		template<typename... Cs> friend class VecsIterator;
+		template<typename E, typename... Cs> friend class VecsIteratorDerived;
 
-	public:
+	protected:
 		using value_type = vtll::to_tuple<E>;		///< A tuple storing all components of entity of type E
 
 		using info = vtll::type_list<VecsHandle, std::atomic_flag*>;	///< List of management data per entity (only a handle)
@@ -280,7 +284,6 @@ namespace vecs {
 		/** Power of 2 exponent for the max number of entries in the tables */
 		static const size_t c_max_size		= vtll::back_value<  vtll::map< VecsTableSizeMap, E, VeTableSizeDefault > >::value;
 
-	protected:
 		static inline VecsTable<types, c_segment_size>			m_data;		///< Data per entity
 		static inline VecsTable<types_deleted, c_segment_size>	m_deleted;	///< Table holding the indices of erased entities
 
@@ -292,7 +295,6 @@ namespace vecs {
 
 		auto remove_deleted_tail() noexcept -> void;
 
-	public:
 		VecsComponentTable(size_t r = 1 << c_max_size) noexcept;
 
 		template<typename... Cs>
@@ -459,6 +461,7 @@ namespace vecs {
 		*	\param[in] r Max number of entries allowed in the component table */
 		VecsComponentTableDerived( size_t r = 1 << VecsComponentTable<E>::c_max_size) noexcept : VecsComponentTable<E>(r) {};
 
+	protected:
 		/** \brief Update the component C of entity E
 		* \param[in] index Index of the entity in the component table.
 		* \param[in] comp Universal reference to the new component data.
@@ -561,6 +564,7 @@ namespace vecs {
 		using types = vtll::type_list<map_t>;	///< Type for the table
 		static const uint32_t c_map_data{ 0 };	///< Index for accessing the map data
 
+		static inline std::mutex									m_mutex;
 		static inline VecsTable<types, VecsTableMaxSegExp::value>	m_entity_table;	///< The main mapping table
 		static inline index_t										m_first_free{};	///< First free entry to be reused
 		static inline std::atomic<uint32_t>							m_size{0};		///< Number of valid entities in the map
@@ -803,6 +807,7 @@ namespace vecs {
 	*/
 	template<typename E>
 	inline auto VecsRegistry<E>::updateC(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept -> bool {
+		VecsLock lock(handle);
 		if (!contains(handle)) return {};
 		return VecsComponentTable<E>().updateC(m_entity_table.comp_ref_idx<c_map_data>(handle.m_entity_index).m_index, compidx, ptr, size);
 	}
@@ -819,6 +824,7 @@ namespace vecs {
 	*/
 	template<typename E>
 	inline auto VecsRegistry<E>::componentE(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept -> bool {
+		VecsLock lock(handle);
 		if (!contains(handle)) return {};
 		return VecsComponentTable<E>().componentE(m_entity_table.comp_ref_idx<c_map_data>(handle.m_entity_index).m_index, compidx, ptr, size);
 	}
@@ -835,24 +841,28 @@ namespace vecs {
 	requires is_composed_of<E, Cs...> [[nodiscard]]
 	inline auto VecsRegistry<E>::insert(Cs&&... args) noexcept	-> VecsHandle {
 		index_t idx{};
+		map_t* ptr = nullptr;
+
+		std::lock_guard<std::mutex> guard(m_mutex);
+
 		if (m_first_free.has_value()) {
 			idx = m_first_free;
-			m_first_free = m_entity_table.comp_ref_idx<c_map_data>(m_first_free).m_index;
+			ptr = &m_entity_table.comp_ref_idx<c_map_data>(idx);
+			m_first_free = ptr->m_index;
 		}
 		else {
-			idx = m_entity_table.push_back();	
+			idx = m_entity_table.push_back();
 			if (!idx.has_value()) return {};
-			m_entity_table.comp_ref_idx<c_map_data>(idx).m_generation_counter = counter16_t{ 0 };		//start with counter 0
+			ptr = &m_entity_table.comp_ref_idx<c_map_data>(idx);
+			ptr->m_generation_counter = counter16_t{ 0 };		//start with counter 0
 		}
 
-		m_entity_table.comp_ref_idx<c_map_data>(idx).m_type_index = index16_t{ vtll::index_of<VecsEntityTypeList, E>::value };
-
-		VecsHandle handle{ idx, m_entity_table.comp_ref_idx<c_map_data>(idx).m_generation_counter, index16_t{ vtll::index_of<VecsEntityTypeList, E>::value } };
+		ptr->m_type_index = index16_t{ vtll::index_of<VecsEntityTypeList, E>::value };
 		
-		std::atomic_flag* flag = &m_entity_table.comp_ref_idx<c_map_data>(idx).m_flag;
+		VecsHandle handle{ idx, ptr->m_generation_counter, ptr->m_type_index };
+		
+		ptr->m_index = VecsComponentTable<E>().insert(handle, &ptr->m_flag, args...);		//add data as tuple
 
-		index_t compidx = VecsComponentTable<E>().insert(handle, flag, args...);		//add data as tuple
-		m_entity_table.comp_ref_idx<c_map_data>(idx).m_index = compidx;			//index in component vector 
 		m_size++;
 		m_sizeE++;
 		return handle;
@@ -866,11 +876,9 @@ namespace vecs {
 	*/
 	template<typename E>
 	inline auto VecsRegistry<E>::contains(VecsHandle handle) noexcept -> bool {
-		if (!handle.m_entity_index.has_value() || !handle.m_generation_counter.has_value() || !handle.m_type_index.has_value()) return false;
-		if (handle.m_type_index.value != vtll::index_of<VecsEntityTypeList, E>::value ) return false;
-		if (handle.m_entity_index.value >= m_entity_table.size()) return false;
-		if (handle.m_generation_counter != m_entity_table.comp_ref_idx<c_map_data>(handle.m_entity_index).m_generation_counter) return false;
-		if (handle.m_type_index != m_entity_table.comp_ref_idx<c_map_data>(handle.m_entity_index).m_type_index) return false;
+		if (!handle.is_valid() || handle.m_type_index.value != vtll::index_of<VecsEntityTypeList,E>::value ) return false;
+		map_t& ref = m_entity_table.comp_ref_idx<c_map_data>(handle.m_entity_index);
+		if ( handle.m_generation_counter != ref.m_generation_counter || handle.m_type_index	!= ref.m_type_index ) return false;
 		return true;
 	}
 
@@ -882,6 +890,7 @@ namespace vecs {
 	*/
 	template<typename E>
 	inline auto VecsRegistry<E>::entity(VecsHandle handle) noexcept -> std::optional<VecsEntity<E>> {
+		VecsLock lock(handle);
 		if (!contains(handle)) return {};
 		VecsEntity<E> res(handle, VecsComponentTable<E>().values(m_entity_table.comp_ref_idx<c_map_data>(handle.m_entity_index).m_index));
 		return { res };
@@ -897,6 +906,7 @@ namespace vecs {
 	template<typename C>
 	requires is_component_of<E, C>
 	inline auto VecsRegistry<E>::component( VecsHandle handle) noexcept -> std::optional<C> {
+		VecsLock lock(handle);
 		if constexpr (!vtll::has_type<E, std::decay_t<C>>::value) return {};
 		if (!contains(handle)) return {};	///< Return the empty std::optional
 		auto& comp_table_idx = m_entity_table.comp_ref_idx<c_map_data>(handle.m_entity_index).m_index; ///< Get reference to component
@@ -914,6 +924,7 @@ namespace vecs {
 	template<typename ET>
 	requires is_entity<ET, E>
 	inline auto VecsRegistry<E>::update( VecsHandle handle, ET&& ent) noexcept -> bool {
+		VecsLock lock(handle);
 		if (!contains(handle)) return false;
 		VecsComponentTable<E>().update(handle.m_entity_index, std::forward<ET>(ent));
 		return true;
@@ -930,6 +941,7 @@ namespace vecs {
 	template<typename C> 
 	requires is_component_of<E, C>
 	inline auto VecsRegistry<E>::update( VecsHandle handle, C&& comp) noexcept -> bool {
+		VecsLock lock(handle);
 		if constexpr (!vtll::has_type<E, std::decay_t<C>>::value) { return false; }
 		if (!contains(handle)) return false;
 		VecsComponentTable<E>().update<C>(handle.m_entity_index, std::forward<C>(comp));
@@ -944,15 +956,21 @@ namespace vecs {
 	*/
 	template<typename E>
 	inline auto VecsRegistry<E>::erase( VecsHandle handle) noexcept -> bool {
+		VecsLock lock(handle);
 		if (!contains(handle)) return false;
-		m_size--;	///< Decrease sizes
-		m_sizeE--;
 
-		VecsComponentTable<E>().erase(m_entity_table.comp_ref_idx <c_map_data>(handle.m_entity_index).m_index); ///< Erase from comp table
+		{
+			std::lock_guard<std::mutex> mlock(m_mutex);
 
-		m_entity_table.comp_ref_idx<c_map_data>(handle.m_entity_index).m_generation_counter++;		///< Invalidate the entity handle
-		m_entity_table.comp_ref_idx<c_map_data>(handle.m_entity_index).m_index = m_first_free;		///< Put old entry into free list
-		m_first_free = handle.m_entity_index;
+			m_size--;	///< Decrease sizes
+			m_sizeE--;
+
+			VecsComponentTable<E>().erase(m_entity_table.comp_ref_idx <c_map_data>(handle.m_entity_index).m_index); ///< Erase from comp table
+
+			m_entity_table.comp_ref_idx<c_map_data>(handle.m_entity_index).m_generation_counter++;		///< Invalidate the entity handle
+			m_entity_table.comp_ref_idx<c_map_data>(handle.m_entity_index).m_index = m_first_free;		///< Put old entry into free list
+			m_first_free = handle.m_entity_index;
+		}
 
 		return true; 
 	}

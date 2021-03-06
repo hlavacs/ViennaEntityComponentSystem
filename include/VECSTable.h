@@ -29,7 +29,6 @@ namespace vecs {
 		std::atomic<size_t>			m_size = 0;
 		std::atomic<size_t>			m_seg_allocated = 0;
 		size_t						m_seg_max = 0;
-		std::mutex					m_mutex;
 
 	public:
 		VecsTable(size_t r = 1 << 16, std::pmr::memory_resource* mr = std::pmr::new_delete_resource()) noexcept
@@ -65,7 +64,7 @@ namespace vecs {
 			return f(std::make_index_sequence<vtll::size<DATA>::value>{});
 		};
 
-		//Internally synchronized
+		//Externally synchronized
 		inline auto push_back() -> index_t {
 			auto idx = m_size.fetch_add(1);
 			if (!reserve(idx+1)) {
@@ -89,7 +88,7 @@ namespace vecs {
 			return index_t{ static_cast<decltype(index_t::value)>(idx) };
 		}
 
-		//Internally synchronized
+		//Externally synchronized
 		inline auto pop_back() -> void {
 			m_size--;
 		}
@@ -121,11 +120,10 @@ namespace vecs {
 			return true;
 		}
 
-		//Internally synchronized
+		//Externally synchronized
 		auto reserve(size_t r) noexcept -> bool {
 			if (r == 0 || r > m_seg_max * N) return false;
 			if (m_seg_allocated.load() * N < r) {
-				const std::lock_guard<std::mutex> lock(m_mutex);
 				if (m_seg_allocated.load() * N < r) {
 					while (m_segment.size() * N < r) { m_segment.push_back(std::make_unique<array_tuple_t>()); }
 					m_seg_allocated = m_segment.size();
