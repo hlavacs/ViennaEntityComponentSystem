@@ -175,6 +175,18 @@ namespace vecs {
 		auto erase() noexcept -> bool;
 	};
 
+	//-------------------------------------------------------------------------
+	//locking
+
+	class VecsLock {
+		std::atomic_flag* m_flag{ nullptr };
+		auto lock() noexcept -> void;
+	public:
+		VecsLock(std::atomic_flag* flag) noexcept;
+		VecsLock(VecsHandle handle) noexcept;
+		auto is_valid() noexcept -> bool;
+		~VecsLock() noexcept;
+	};
 
 	/**
 	* \brief VecsEntity can hold a copy of the data of an entity of type E. This includes its handle
@@ -1619,40 +1631,36 @@ namespace vecs {
 
 
 	//-------------------------------------------------------------------------
-	//for_each loop
-
-	//-------------------------------------------------------------------------
 	//locking
 
-	class VecsLock {
-		std::atomic_flag* m_flag{nullptr};
-
-		void lock() {
-			if (m_flag == nullptr) return;
-			while (m_flag->test_and_set(std::memory_order_acquire)) {
-				while (m_flag->test(std::memory_order_relaxed));
-			}
+	 inline auto VecsLock::lock() noexcept -> void {
+		if (m_flag == nullptr) return;
+		while (m_flag->test_and_set(std::memory_order_acquire)) {
+			while (m_flag->test(std::memory_order_relaxed));
 		}
+	}
 
-	public:
-		VecsLock(std::atomic_flag* flag) : m_flag(flag) {
-			lock();
-		}
+	inline VecsLock::VecsLock(std::atomic_flag* flag) noexcept : m_flag(flag) {
+		lock();
+	}
 
-		VecsLock(VecsHandle handle) {
-			if (!handle.is_valid()) return;
-			m_flag = &VecsRegistryBaseClass::m_entity_table.comp_ref_idx<0>(handle.m_entity_index).m_flag;
-			lock();
-		}
+	inline VecsLock::VecsLock(VecsHandle handle) noexcept {
+		if (!handle.is_valid()) return;
+		m_flag = &VecsRegistryBaseClass::m_entity_table.comp_ref_idx<0>(handle.m_entity_index).m_flag;
+		lock();
+	}
 
-		bool is_valid() {
-			return m_flag != nullptr;
-		}
+	inline auto VecsLock::is_valid() noexcept -> bool {
+		return m_flag != nullptr;
+	}
 
-		~VecsLock() {
-			if(m_flag) m_flag->clear(std::memory_order_release);
-		}
-	};
+	inline VecsLock::~VecsLock() noexcept {
+		if (m_flag) m_flag->clear(std::memory_order_release);
+	}
+
+
+	//-------------------------------------------------------------------------
+	//for_each loop
 
 
 	/** General functor type that can hold any function, and depends in a number of component types.	*/
@@ -1671,8 +1679,8 @@ namespace vecs {
 	requires (vtll::has_type<VecsComponentTypeList, Cs>::value && ...)
 		inline auto for_each(VecsIterator<Cs...>& b, VecsIterator<Cs...>& e, std::function<Functor<Cs...>> f) -> void {
 		for (; b != e; b++) {
-			VecsLock lock{ b.flag() };	///< Might belong to another entity, but there is for sure a flag 
-			if (b.has_value()) {
+			VecsLock lock{ b.flag() };		///< Might belong to another entity, but there is for sure a flag 
+			if (b.handle().is_valid()) {	
 				f(b);
 			}
 		}
