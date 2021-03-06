@@ -115,6 +115,8 @@ int main() {
 
 		TESTRESULT(++number, "clear", VecsRegistry().clear(), (VecsRegistry().size() == 0 && VecsRegistry().size<VeEntityTypeNode>()), );
 
+		TESTRESULT(++number, "compress", VecsRegistry().compress(), true , );
+
 	}
 
 

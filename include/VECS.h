@@ -372,7 +372,7 @@ namespace vecs {
 	*/
 	template<typename E>
 	inline auto VecsComponentTable<E>::values(const index_t index) noexcept -> typename VecsComponentTable<E>::value_type {
-		assert(index.value < m_data.size());
+		assert(index < m_data.size());
 		auto tup = m_data.tuple_value(index);											///< Get the whole data from the data
 		return vtll::sub_tuple< c_info_size, std::tuple_size_v<decltype(tup)> >(tup);	///< Return only entity components
 	}
@@ -383,7 +383,7 @@ namespace vecs {
 	*/
 	template<typename E> 
 	inline auto VecsComponentTable<E>::handle(const index_t index) noexcept -> VecsHandle {
-		assert(index.value < m_data.size());
+		assert(index < m_data.size());
 		return m_data.comp_ref_idx<c_handle>(index);	///< Get ref to the handle and return it
 	}
 
@@ -393,7 +393,7 @@ namespace vecs {
 	*/
 	template<typename E>
 	inline auto VecsComponentTable<E>::flag(const index_t index) noexcept -> std::atomic_flag* {
-		assert(index.value < m_data.size());
+		assert(index < m_data.size());
 		return m_data.comp_ref_idx<c_flag>(index);	///< Get ref to the flag and return it
 	}
 
@@ -405,7 +405,7 @@ namespace vecs {
 	template<typename C>
 	requires is_component_of<E, C>
 	inline auto VecsComponentTable<E>::component(const index_t index) noexcept -> C& {
-		assert(index.value < m_data.size());
+		assert(index < m_data.size());
 		return m_data.comp_ref_idx<c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(index); ///< Get ref to the entity and return component
 	}
 
@@ -436,7 +436,7 @@ namespace vecs {
 	*/
 	template<typename E>
 	inline auto VecsComponentTable<E>::erase(const index_t index) noexcept -> bool {
-		assert(index.value < m_data.size());
+		assert(index < m_data.size());
 		m_data.comp_ref_idx<c_handle>(index) = {};		///< Invalidate handle	
 		m_deleted.push_back(std::make_tuple(index));	///< Push the index to the deleted table.
 		return true;
@@ -673,7 +673,7 @@ namespace vecs {
 	template<typename C>
 	requires is_component_type<C>
 	auto VecsRegistryBaseClass::component(VecsHandle handle) noexcept -> std::optional<C> {
-		if (!handle.m_type_index.has_value() || handle.m_type_index.value >= vtll::size<VecsEntityTypeList>::value) return {};
+		if (!handle.m_type_index.has_value() || handle.m_type_index >= vtll::size<VecsEntityTypeList>::value) return {};
 		C res{};
 
 		///< Dispatch to the correct subclass
@@ -692,7 +692,7 @@ namespace vecs {
 	template<typename C>
 	requires is_component_type<C>
 	auto VecsRegistryBaseClass::update(VecsHandle handle, C&& comp) noexcept -> bool {
-		if (!handle.m_type_index.has_value() || handle.m_type_index.value >= vtll::size<VecsEntityTypeList>::value) return false;
+		if (!handle.m_type_index.has_value() || handle.m_type_index >= vtll::size<VecsEntityTypeList>::value) return false;
 
 		/// Dispatch the call to the correct subclass and return result
 		return m_dispatch[handle.type()]->updateC(handle, vtll::index_of<VecsComponentTypeList, std::decay_t<C>>::value, (void*)&comp, sizeof(C));
@@ -704,7 +704,7 @@ namespace vecs {
 	* \returns true if the operation was successful.
 	*/
 	auto VecsRegistryBaseClass::erase(VecsHandle handle) noexcept -> bool {
-		if (!handle.m_type_index.has_value() || handle.m_type_index.value >= vtll::size<VecsEntityTypeList>::value) return false;
+		if (!handle.m_type_index.has_value() || handle.m_type_index >= vtll::size<VecsEntityTypeList>::value) return false;
 		return m_dispatch[handle.type()]->erase(handle); ///< Dispatch to the correct subclass for type E
 	}
 
@@ -716,7 +716,7 @@ namespace vecs {
 	* \returns true if the ECS contains this entity.
 	*/
 	auto VecsRegistryBaseClass::contains(VecsHandle handle) noexcept	-> bool {
-		if (!handle.m_type_index.has_value() || handle.m_type_index.value >= vtll::size<VecsEntityTypeList>::value) return false;
+		if (!handle.m_type_index.has_value() || handle.m_type_index >= vtll::size<VecsEntityTypeList>::value) return false;
 		return m_dispatch[handle.type()]->contains(handle);
 	}
 
@@ -1150,14 +1150,14 @@ namespace vecs {
 		if (m_is_end) return;
 		size_t left = N;
 		while (left > 0) {
-			int num = std::max(m_dispatch[m_current_iterator]->size() - m_current_index.value, 0);
+			int num = std::max(m_dispatch[m_current_iterator]->size() - m_current_index, 0);
 			left -= num;
-			m_dispatch[m_current_iterator]->m_current_index.value += num;
+			m_dispatch[m_current_iterator]->m_current_index += num;
 			m_current_index = m_dispatch[m_current_iterator]->m_current_index;
 
 			if (m_dispatch[m_current_iterator]->is_vector_end()) {
 				if (m_current_iterator.value < m_dispatch.size() - 1) {
-					++m_current_iterator.value;
+					++m_current_iterator;
 					m_current_index = 0;
 				}
 				else return *this;
@@ -1325,7 +1325,7 @@ namespace vecs {
 	*/
 	template<typename E, typename... Cs>
 	inline auto VecsIteratorDerived<E, Cs...>::is_vector_end() noexcept	-> bool {
-		return this->m_current_index.value >= m_sizeE;
+		return this->m_current_index >= m_sizeE;
 	};
 
 	/**
