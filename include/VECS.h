@@ -287,8 +287,8 @@ namespace vecs {
 		/** Power of 2 exponent for the max number of entries in the tables */
 		static const size_t c_max_size		= vtll::back_value<  vtll::map< VecsTableSizeMap, E, VeTableSizeDefault > >::value;
 
-		static inline VecsTable<types, c_segment_size, layout_type::value>	m_data;		///< Data per entity
-		static inline VecsTable<types_deleted, c_segment_size>				m_deleted;	///< Table holding the indices of erased entities
+		static inline VecsTable<types,			c_segment_size, layout_type::value>		m_data;		///< Data per entity
+		static inline VecsTable<types_deleted,  c_segment_size, VECS_LAYOUT_ROW::value>	m_deleted;	///< Table holding the indices of erased entities
 
 		/** Each component type C of the entity type E gets its own specialized class instance */
 		static inline std::array<std::unique_ptr<VecsComponentTable<E>>, vtll::size<VecsComponentTypeList>::value> m_dispatch;
@@ -557,15 +557,15 @@ namespace vecs {
 	protected:
 
 		using types = vtll::type_list<index_t, counter16_t, index16_t, std::atomic_flag>;	///< Type for the table
-		static const uint32_t c_index{ 0 };		///< Index for accessing the map data
-		static const uint32_t c_counter{ 1 };	///< Index for accessing the map data
-		static const uint32_t c_type{ 2 };		///< Index for accessing the map data
-		static const uint32_t c_flag{ 3 };		///< Index for accessing the map data
+		static const uint32_t c_index{ 0 };		///< Index for accessing the index to nex free or entry in component table
+		static const uint32_t c_counter{ 1 };	///< Index for accessing the generation counter
+		static const uint32_t c_type{ 2 };		///< Index for accessing the type index
+		static const uint32_t c_flag{ 3 };		///< Index for accessing the lock flag
 
-		static inline VecsTable<types, VecsTableMaxSegExp::value>	m_entity_table;	///< The main mapping table
-		static inline std::mutex									m_mutex;
-		static inline index_t										m_first_free{};	///< First free entry to be reused
-		static inline std::atomic<uint32_t>							m_size{0};		///< Number of valid entities in the map
+		static inline VecsTable<types, VecsTableMaxSegExp::value, VECS_LAYOUT_ROW::value> m_entity_table;	///< The main mapping table
+		static inline std::mutex				m_mutex;
+		static inline index_t					m_first_free{};	///< First free entry to be reused
+		static inline std::atomic<uint32_t>		m_size{0};		///< Number of valid entities in the map
 
 		/** Every subclass for entity type E has an entry in this table. */
 		static inline std::array<std::unique_ptr<VecsRegistryBaseClass>, vtll::size<VecsEntityTypeList>::value> m_dispatch;
@@ -844,7 +844,7 @@ namespace vecs {
 
 		if (m_first_free.has_value()) {
 			idx = m_first_free;
-			m_first_free = m_entity_table.comp_ref_idx<c_index>(idx); // ptr->m_index;
+			m_first_free = m_entity_table.comp_ref_idx<c_index>(idx); 
 		}
 		else {
 			idx = m_entity_table.push_back();

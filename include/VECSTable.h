@@ -162,12 +162,10 @@ namespace vecs {
 		//Externally synchronized
 		auto reserve(size_t r) noexcept -> bool {
 			if (r == 0 || r > m_seg_max * N) return false;
-			if (m_seg_allocated.load() * N < r) {
-				if (m_seg_allocated.load() * N < r) {
-					while (m_segment.size() * N < r) { m_segment.push_back(std::make_unique<array_tuple_t>()); }
-					m_seg_allocated = m_segment.size();
-				}
+			while (m_segment.size() * N < r) { 
+				m_segment.push_back(std::make_unique<array_tuple_t>()); 
 			}
+			m_seg_allocated = m_segment.size();
 			return true;
 		}
 
