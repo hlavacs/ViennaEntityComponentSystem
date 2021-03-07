@@ -107,7 +107,9 @@ namespace vecs {
 				return index_t{};
 			}
 			decltype(auto) ref = tuple_ref(index_t{ idx });
-			vtll::static_for<size_t, 0, vtll::size<DATA>::value >([&](auto i) { std::get<i>(ref) = std::get<i>(data); });
+			vtll::static_for<size_t, 0, vtll::size<DATA>::value >([&](auto i) { 
+				std::get<i>(ref) = std::get<i>(data); 
+			});
 			return index_t{ static_cast<decltype(index_t::value)>(idx) };
 		}
 
