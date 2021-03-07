@@ -10,7 +10,7 @@
 
 namespace vecs {
 
-	template<typename DATA, size_t L = 10>
+	template<typename DATA, size_t L = 10, bool ROW = false>
 	class VecsTable {
 		template<typename E> friend class VecsRegistry;
 		template<typename E> friend class VecsComponentTable;
@@ -19,9 +19,12 @@ namespace vecs {
 		static const size_t N = 1 << L;
 		static const uint64_t BIT_MASK = N - 1;
 
-		using array_tuple_t		= vtll::to_tuple<vtll::transform_size_t<DATA,std::array,N>>;
-		using data_tuple_t		= vtll::to_tuple<DATA>;
-		using ref_tuple_t		= vtll::to_ref_tuple<DATA>;
+		using tuple_value_t = vtll::to_tuple<DATA>;
+		using tuple_ref_t = vtll::to_ref_tuple<DATA>;
+
+		using array_tuple_t1 = std::array<tuple_value_t, N>;
+		using array_tuple_t2 = vtll::to_tuple<vtll::transform_size_t<DATA,std::array,N>>;
+		using array_tuple_t  = std::conditional_t<ROW, array_tuple_t1, array_tuple_t2>;
 
 		using seg_ptr = std::unique_ptr<array_tuple_t>;
 
@@ -40,26 +43,46 @@ namespace vecs {
 		//Externally synchronized
 		template<size_t I, typename C = vtll::Nth_type<DATA,I>>
 		inline auto comp_ref_idx(index_t n) noexcept -> C& { 
-			return std::get<I>(*m_segment[n.value >> L])[n.value & BIT_MASK]; 
+			if constexpr (ROW) {
+				return std::get<I>((*m_segment[n.value >> L])[n.value & BIT_MASK]);
+			}
+			else {
+				return std::get<I>(*m_segment[n.value >> L])[n.value & BIT_MASK];
+			}
 		};
 
 		template<typename C>
 		inline auto comp_ref_type(index_t n) noexcept -> C& { 
-			return std::get<vtll::index_of<DATA,C>::value>(*m_segment[n.value >> L])[n.value & BIT_MASK]; 
+			if constexpr (ROW) {
+				return std::get<vtll::index_of<DATA, C>::value>((*m_segment[n.value >> L])[n.value & BIT_MASK]);
+			}
+			else {
+				return std::get<vtll::index_of<DATA, C>::value>(*m_segment[n.value >> L])[n.value & BIT_MASK];
+			}
 		};
 
 		//Externally synchronized
-		inline auto tuple_ref(index_t n) noexcept -> ref_tuple_t {
+		inline auto tuple_ref(index_t n) noexcept -> tuple_ref_t {
 			auto f = [&]<size_t... Is>(std::index_sequence<Is...>) {
-				return std::make_tuple(std::ref(std::get<Is>(*m_segment[n.value >> L])[n.value & BIT_MASK])... );
+				if constexpr (ROW) {
+					return std::make_tuple(std::ref(std::get<Is>((*m_segment[n.value >> L])[n.value & BIT_MASK]))...);
+				}
+				else {
+					return std::make_tuple(std::ref(std::get<Is>(*m_segment[n.value >> L])[n.value & BIT_MASK])...);
+				}
 			};
 			return f(std::make_index_sequence<vtll::size<DATA>::value>{});
 		};
 
 		//Externally synchronized
-		inline auto tuple_value(index_t n) noexcept -> data_tuple_t {
+		inline auto tuple_value(index_t n) noexcept -> tuple_value_t {
 			auto f = [&]<size_t... Is>(std::index_sequence<Is...>) {
-				return std::make_tuple( std::get<Is>(*m_segment[n.value >> L])[n.value & BIT_MASK]... );
+				if constexpr (ROW) {
+					return std::make_tuple(std::get<Is>((*m_segment[n.value >> L])[n.value & BIT_MASK])...);
+				}
+				else {
+					return std::make_tuple(std::get<Is>(*m_segment[n.value >> L])[n.value & BIT_MASK]...);
+				}
 			};
 			return f(std::make_index_sequence<vtll::size<DATA>::value>{});
 		};
@@ -76,7 +99,7 @@ namespace vecs {
 
 		//Externally synchronized
 		template<typename TDATA>
-		requires std::is_same_v<TDATA, data_tuple_t>
+		requires std::is_same_v<TDATA, tuple_value_t>
 		inline auto push_back(TDATA&& data) -> index_t {
 			auto idx = m_size.fetch_add(1);
 			if (!reserve(idx + 1)) {
