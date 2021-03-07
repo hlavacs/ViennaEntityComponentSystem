@@ -464,6 +464,7 @@ namespace vecs {
 		VecsComponentTableDerived( size_t r = 1 << VecsComponentTable<E>::c_max_size) noexcept : VecsComponentTable<E>(r) {};
 
 	protected:
+
 		/** \brief Update the component C of entity E
 		* \param[in] index Index of the entity in the component table.
 		* \param[in] comp Universal reference to the new component data.
@@ -838,7 +839,6 @@ namespace vecs {
 	requires is_composed_of<E, Cs...> [[nodiscard]]
 	inline auto VecsRegistry<E>::insert(Cs&&... args) noexcept	-> VecsHandle {
 		index_t idx{};
-		//map_t* ptr = nullptr;
 
 		std::lock_guard<std::mutex> guard(m_mutex);
 
@@ -1623,6 +1623,7 @@ namespace vecs {
 	*/
 	template <typename E>
 	auto VecsEntity<E>::has_value() noexcept -> bool { 
+		VecsLock(*this);
 		return VecsRegistry<E>().contains(m_handle); 
 	}
 
