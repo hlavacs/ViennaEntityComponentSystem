@@ -557,13 +557,13 @@ namespace vecs {
 	protected:
 
 		using types = vtll::type_list<index_t, counter16_t, index16_t, std::atomic_flag>;	///< Type for the table
-		static const uint32_t c_index{ 0 };		///< Index for accessing the index to nex free or entry in component table
+		static const uint32_t c_index{ 0 };		///< Index for accessing the index to next free or entry in component table
 		static const uint32_t c_counter{ 1 };	///< Index for accessing the generation counter
 		static const uint32_t c_type{ 2 };		///< Index for accessing the type index
 		static const uint32_t c_flag{ 3 };		///< Index for accessing the lock flag
 
 		static inline VecsTable<types, VecsTableMaxSegExp::value, VECS_LAYOUT_ROW::value> m_entity_table;	///< The main mapping table
-		static inline std::mutex				m_mutex;
+		static inline std::mutex				m_mutex;		///< Mutex for syncing insert and erase
 		static inline index_t					m_first_free{};	///< First free entry to be reused
 		static inline std::atomic<uint32_t>		m_size{0};		///< Number of valid entities in the map
 
