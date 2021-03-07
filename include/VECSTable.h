@@ -10,7 +10,7 @@
 
 namespace vecs {
 
-	template<typename DATA, size_t L = 10, bool ROW = false>
+	template<typename DATA, size_t L = 10, bool ROW = true>
 	class VecsTable {
 		template<typename E> friend class VecsRegistry;
 		template<typename E> friend class VecsComponentTable;

@@ -82,6 +82,8 @@ namespace vecs {
 	*/
 	using VecsTableMaxSize = std::integral_constant<size_t, VecsTableMaxSeg::value * (VecsTableMaxSizeSum::value / VecsTableMaxSeg::value + 1)>;
 
+	using VecsTableLayoutMap = vtll::cat< VeTableLayoutMapSystem, VeTableLayoutMapUser >;
+
 
 	/**
 	* Declarations of the main VECS classes
@@ -269,6 +271,7 @@ namespace vecs {
 
 	protected:
 		using value_type = vtll::to_tuple<E>;		///< A tuple storing all components of entity of type E
+		using layout_type = vtll::map<VecsTableLayoutMap, E, VECS_LAYOUT_DEFAULT>;
 
 		using info = vtll::type_list<VecsHandle, std::atomic_flag*>;	///< List of management data per entity (only a handle)
 		static const size_t c_handle = 0;		///< Component index of the handle info
@@ -284,8 +287,8 @@ namespace vecs {
 		/** Power of 2 exponent for the max number of entries in the tables */
 		static const size_t c_max_size		= vtll::back_value<  vtll::map< VecsTableSizeMap, E, VeTableSizeDefault > >::value;
 
-		static inline VecsTable<types, c_segment_size>			m_data;		///< Data per entity
-		static inline VecsTable<types_deleted, c_segment_size>	m_deleted;	///< Table holding the indices of erased entities
+		static inline VecsTable<types, c_segment_size, layout_type::value>	m_data;		///< Data per entity
+		static inline VecsTable<types_deleted, c_segment_size>				m_deleted;	///< Table holding the indices of erased entities
 
 		/** Each component type C of the entity type E gets its own specialized class instance */
 		static inline std::array<std::unique_ptr<VecsComponentTable<E>>, vtll::size<VecsComponentTypeList>::value> m_dispatch;
@@ -563,8 +566,8 @@ namespace vecs {
 		using types = vtll::type_list<map_t>;	///< Type for the table
 		static const uint32_t c_map_data{ 0 };	///< Index for accessing the map data
 
-		static inline std::mutex									m_mutex;
 		static inline VecsTable<types, VecsTableMaxSegExp::value>	m_entity_table;	///< The main mapping table
+		static inline std::mutex									m_mutex;
 		static inline index_t										m_first_free{};	///< First free entry to be reused
 		static inline std::atomic<uint32_t>							m_size{0};		///< Number of valid entities in the map
 

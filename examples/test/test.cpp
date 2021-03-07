@@ -53,6 +53,8 @@ int main() {
 
 		TESTRESULT(++number, "component handle", auto comp2 = h1.component<VeComponentMaterial>(), (!comp2.has_value()), );
 
+		TESTRESULT(++number, "component handle", auto comp3 = h2.component<VeComponentMaterial>().value(), (comp3.i == 99), );
+
 		TESTRESULT(++number, "local_update", ent1.local_update(VeComponentPosition{ glm::vec3{-99.0f, -22.0f, -33.0f} }),
 			(ent1.component<VeComponentPosition>().m_position == glm::vec3{ -99.0f, -22.0f, -33.0f }), );
 

@@ -67,6 +67,9 @@ namespace vecs {
 	template <typename... Ts>
 	struct VeEntityType {};
 
+	using VECS_LAYOUT_ROW = std::integral_constant<bool, true>;
+	using VECS_LAYOUT_COLUMN = std::integral_constant<bool, false>;
+	using VECS_LAYOUT_DEFAULT = VECS_LAYOUT_COLUMN;
 
 	//-------------------------------------------------------------------------
 	//engine entity types
@@ -91,6 +94,14 @@ namespace vecs {
 		, vtll::type_list< VeEntityTypeAnimation,	vtll::value_list< 8, 10 > >
 		//, ...
 	>;
+
+	using VeTableLayoutMapSystem = vtll::type_list<
+		  vtll::type_list< VeEntityTypeNode, VECS_LAYOUT_COLUMN >
+		, vtll::type_list< VeEntityTypeDraw, VECS_LAYOUT_COLUMN >
+		, vtll::type_list< VeEntityTypeAnimation, VECS_LAYOUT_COLUMN >
+		//, ...
+	>;
+
 
 }
 

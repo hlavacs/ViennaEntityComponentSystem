@@ -38,6 +38,11 @@ namespace vecs {
 		//, ...
 	>;
 
+	using VeTableLayoutMapUser = vtll::type_list<
+		vtll::type_list< VeEntityUser1, VECS_LAYOUT_COLUMN >
+		//, ...
+	>;
+
 
 }
 
