@@ -101,25 +101,25 @@ namespace vecs {
 
 	/** basic concepts */
 	template<typename C>
-	concept is_component_type = (vtll::has_type<VecsComponentTypeList, std::decay_t<C>>::value);
+	concept is_component_type = (vtll::has_type<VecsComponentTypeList, std::decay_t<C>>::value); ///< C is a component
 
 	template<typename... Cs>
-	concept are_component_types = (is_component_type<Cs> && ...);
+	concept are_component_types = (is_component_type<Cs> && ...);	///< Cs are all components
 
 	template<typename E>
-	concept is_entity_type = (vtll::has_type<VecsEntityTypeList, std::decay_t<E>>::value);
+	concept is_entity_type = (vtll::has_type<VecsEntityTypeList, std::decay_t<E>>::value); ///< E is an entity type
 
 	template<typename E, typename C>
-	concept is_component_of = (vtll::has_type<E, std::decay_t<C>>::value);
+	concept is_component_of = (vtll::has_type<E, std::decay_t<C>>::value);	///< C is a component of E
 
 	template<typename E, typename... Cs>
-	concept are_components_of = (is_component_of<E, Cs> && ...);
+	concept are_components_of = (is_component_of<E, Cs> && ...);	///< Cs are all components of E
 
 	template<typename E, typename... Cs>
-	concept is_composed_of = (vtll::is_same<E, std::decay_t<Cs>...>::value);
+	concept is_composed_of = (vtll::is_same<E, std::decay_t<Cs>...>::value);	///< E is composed of Cs
 
 	template<typename ET, typename E = vtll::front<ET>>
-	concept is_entity = (is_entity_type<E> && std::is_same_v<std::decay_t<ET>, VecsEntity<E>>);
+	concept is_entity = (is_entity_type<E> && std::is_same_v<std::decay_t<ET>, VecsEntity<E>>); ///< ET is a VecsEntity
 
 
 	//-------------------------------------------------------------------------
@@ -162,21 +162,21 @@ namespace vecs {
 
 		template<typename E>
 		requires is_entity_type<E>
-		auto entity() noexcept -> std::optional<VecsEntity<E>>;
+		auto entity() noexcept -> std::optional<VecsEntity<E>>; ///< Get local copy (VecsEntity) of entity data
 
 		template<typename C>
 		requires is_component_type<C> 
-		auto component() noexcept -> std::optional<C>;
+		auto component() noexcept -> std::optional<C>;		///< Get a component of type C of the entity (first found is copied)
 
 		template<typename ET>
 		requires is_entity<ET>
-		auto update(ET&& ent) noexcept -> bool;
+		auto update(ET&& ent) noexcept -> bool;				///< Update this entity using a VecsEntity of the same type
 
 		template<typename C>
 		requires is_component_type<C>
-		auto update(C&& comp) noexcept -> bool;
+		auto update(C&& comp) noexcept -> bool;				///< Update a component of type C
 
-		auto erase() noexcept -> bool;
+		auto erase() noexcept -> bool;						///< Erase the entity
 	};
 
 	//-------------------------------------------------------------------------
@@ -223,29 +223,29 @@ namespace vecs {
 		*/
 		VecsEntity(VecsHandle h, const tuple_type& tup) noexcept : m_handle{ h }, m_component_data{ tup } {};
 		
-		/** \returns the handle of the entity. */
-		auto handle() const noexcept -> VecsHandle { return m_handle; }
+		auto handle() const noexcept -> VecsHandle {	///< \returns the handle of the entity. 
+			return m_handle; 
+		}
 
-		auto has_value() noexcept	 -> bool;
-		auto update() noexcept		 -> bool;
-		auto erase() noexcept		 -> bool;
-		auto name() const noexcept	 -> std::string { return typeid(E).name(); };
+		auto has_value() noexcept	 -> bool;			///< Check whether the entity still exists in the ECS
+		auto update() noexcept		 -> bool;			///< Update the entity in the ECS
+		auto erase() noexcept		 -> bool;			///< Erase the entity from the ECS
 
-		/** \returns the Ith component of the entity. */
 		template<size_t I>
-		auto component() noexcept -> std::optional<vtll::Nth_type<E,I>> {
+		auto component() noexcept -> std::optional<vtll::Nth_type<E,I>> {	///< \returns the Ith component of the entity.
 			return { std::get<I>(m_component_data) };
 		};
-
-		/** \returns the first component of type C. */
+		
 		template<typename C>
 		requires is_component_of<E,C>
-		auto component() noexcept -> C {
+		auto component() noexcept -> C {	///< \returns the first component of type C. 
 			return std::get<vtll::index_of<E,std::decay_t<C>>::value>(m_component_data);
 		};
 
-		/** \brief Update the local copy with type C
-		* \param[in] comp A universal reference to the new component value. */
+		/** 
+		* \brief Update the local copy with type C
+		* \param[in] comp A universal reference to the new component value. 
+		*/
 		template<typename C>
 		requires is_component_of<E, C>
 		auto local_update( C&& comp ) noexcept -> void {
@@ -260,7 +260,7 @@ namespace vecs {
 
 
 	/**
-	* \brief This class stores all components of entities of type E
+	* \brief This class stores all components of entities of type E.
 	*/
 	template<typename E>
 	class VecsComponentTable : public VecsMonostate<VecsComponentTable<E>> {
@@ -459,46 +459,54 @@ namespace vecs {
 	public:
 		using C = vtll::Nth_type<VecsComponentTypeList,I>;	///< Component type
 
-		/** \brief Constructor of class VecsComponentTableDerived 
-		*	\param[in] r Max number of entries allowed in the component table */
+		/** 
+		* \brief Constructor of class VecsComponentTableDerived 
+		* \param[in] r Max number of entries allowed in the component table 
+		*/
 		VecsComponentTableDerived( size_t r = 1 << VecsComponentTable<E>::c_max_size) noexcept : VecsComponentTable<E>(r) {};
 
 	protected:
 
-		/** \brief Update the component C of entity E
+		/** 
+		* \brief Update the component C of entity E
 		* \param[in] index Index of the entity in the component table.
 		* \param[in] comp Universal reference to the new component data.
-		* \returns true if the update was successful. */
+		* \returns true if the update was successful. 
+		*/
 		auto update(const index_t index, C&& comp) noexcept -> bool {
-			if constexpr (vtll::has_type<E, std::decay_t<C>>::value) {
+			if constexpr (is_component_of<E,C>) {
 				this->m_data.comp_ref_idx<this->c_info_size + vtll::index_of<E, std::decay_t<C>>::value>() = comp;
 				return true;
 			}
 			return false;
 		}
 
-		/** \brief Update the component C of entity E.
+		/** 
+		* \brief Update the component C of entity E.
 		* \param[in] index Index of the entity in the component table.
 		* \param[in] compidx Component index incomponent type list.
 		* \param[in] ptr Pointer to where the data comes from.
 		* \param[in] size Size of the component data.
-		* \returns true if the update was successful. */
+		* \returns true if the update was successful. 
+		*/
 		auto updateC(index_t index, size_t compidx, void* ptr, size_t size) noexcept -> bool {
-			if constexpr (vtll::has_type<E, std::decay_t<C>>::value) {
+			if constexpr (is_component_of<E,C>) {
 				this->m_data.comp_ref_idx<this->c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(index) = *((C*)ptr);
 				return true;
 			}
 			return false;
 		};
 
-		/** \brief Get component data.
+		/** 
+		* \brief Get component data.
 		* \param[in] index Index of the entity in the component table.
 		* \param[in] compidx Component index incomponent type list.
 		* \param[in] ptr Pointer to where the data should be copied to.
 		* \param[in] size Size of the component data.
-		* \returns true if the retrieval was successful. */
+		* \returns true if the retrieval was successful. 
+		*/
 		auto componentE(index_t entidx, size_t compidx, void* ptr, size_t size)  noexcept -> bool {
-			if constexpr (vtll::has_type<E,C>::value) {
+			if constexpr (is_component_of<E, C>) {
 				*((C*)ptr) = this->m_data.comp_ref_idx<this->c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(entidx);
 				return true;
 			}
@@ -519,10 +527,10 @@ namespace vecs {
 	template<typename E>
 	inline VecsComponentTable<E>::VecsComponentTable(size_t r) noexcept {
 		if (!this->init()) return;
-		m_data.max_capacity(r);			//set max capacities
+		m_data.max_capacity(r);			///< Set max capacities
 		m_deleted.max_capacity(r);
 
-		vtll::static_for<size_t, 0, vtll::size<VecsComponentTypeList>::value >(
+		vtll::static_for<size_t, 0, vtll::size<VecsComponentTypeList>::value >( ///< Create dispatch table for all component types
 			[&](auto i) {
 				m_dispatch[i] = std::make_unique<VecsComponentTableDerived<E, i>>(r);
 			}
@@ -583,45 +591,45 @@ namespace vecs {
 		//insert data
 
 		template<typename... Cs> [[nodiscard]]
-		auto insert(Cs&&... args) noexcept	-> VecsHandle;
+		auto insert(Cs&&... args) noexcept	-> VecsHandle;	///< Insert a new entity into the ECS
 
 		//-------------------------------------------------------------------------
 		//get data
 
 		template<typename E>
-		auto entity(VecsHandle handle) noexcept -> std::optional<VecsEntity<E>>;
+		auto entity(VecsHandle handle) noexcept -> std::optional<VecsEntity<E>>;	///< Get a local copy of an entity
 
 		template<typename C>
 		requires is_component_type<C>
-		auto component(VecsHandle handle) noexcept -> std::optional<C>;
+		auto component(VecsHandle handle) noexcept -> std::optional<C>;		///< Get a component of type C
 
 		//-------------------------------------------------------------------------
 		//update data
 
 		template<typename ET>
-		auto update(VecsHandle handle, ET&& ent) noexcept -> bool;
+		auto update(VecsHandle handle, ET&& ent) noexcept -> bool;		///< Update an entity 
 
 		template<typename C>
 		requires is_component_type<C>
-		auto update(VecsHandle handle, C&& comp) noexcept -> bool;
+		auto update(VecsHandle handle, C&& comp) noexcept -> bool;		///< Update component of type C of an entity
 
 		//-------------------------------------------------------------------------
 		//erase
 
-		auto clear() noexcept -> size_t;
+		auto clear() noexcept -> size_t;					///< Clear the whole ECS
 
 		template<typename E>
 		requires is_entity_type<E>
-		auto clear() noexcept -> size_t;
+		auto clear() noexcept -> size_t;					///< Erase all entities of type E
 
 		virtual
-		auto erase(VecsHandle handle) noexcept -> bool;
+		auto erase(VecsHandle handle) noexcept -> bool;		///< Erase a specific entity
 
-		auto compress() noexcept -> void;
+		auto compress() noexcept -> void;					///< Compress all component tables
 
 		template<typename E>
 		requires is_entity_type<E>
-		auto compress() noexcept -> void;
+		auto compress() noexcept -> void;					///< Compress component table for entities of type E
 
 		//-------------------------------------------------------------------------
 		//utility
@@ -637,13 +645,13 @@ namespace vecs {
 		};
 
 		template<typename... Cs>
-		auto begin() noexcept		-> VecsIterator<Cs...>;
+		auto begin() noexcept		-> VecsIterator<Cs...>;		///< Get iterator pointing to first entity with all components
 
 		template<typename... Cs>
-		auto end() noexcept			-> VecsIterator<Cs...>;
+		auto end() noexcept			-> VecsIterator<Cs...>;		///< Get an end iterator for entities with all components
 
 		virtual
-		auto contains(VecsHandle handle) noexcept	-> bool;
+		auto contains(VecsHandle handle) noexcept	-> bool;	///< \returns true if the ECS still holds this entity (externally synced)
 	};
 
 
@@ -675,7 +683,7 @@ namespace vecs {
 		if (!handle.is_valid()) return {};
 		C res{};
 
-		///< Dispatch to the correct subclass
+		/// Dispatch to the correct subclass and return result
 		if (m_dispatch[handle.type()]->componentE(handle, vtll::index_of<VecsComponentTypeList, std::decay_t<C>>::value, (void*)&res, sizeof(C))) {
 			return { res };
 		}
@@ -704,7 +712,7 @@ namespace vecs {
 	*/
 	auto VecsRegistryBaseClass::erase(VecsHandle handle) noexcept -> bool {
 		if (!handle.is_valid()) return false;
-		return m_dispatch[handle.type()]->erase(handle); ///< Dispatch to the correct subclass for type E
+		return m_dispatch[handle.type()]->erase(handle); ///< Dispatch to the correct subclass for type E and return result
 	}
 
 	/**
@@ -716,7 +724,7 @@ namespace vecs {
 	*/
 	auto VecsRegistryBaseClass::contains(VecsHandle handle) noexcept	-> bool {
 		if (!handle.is_valid()) return false;
-		return m_dispatch[handle.type()]->contains(handle);
+		return m_dispatch[handle.type()]->contains(handle); ///< Dispatch to the correct subclass for type E and return result
 	}
 
 
@@ -744,9 +752,12 @@ namespace vecs {
 		auto componentE(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept	-> bool;
 		auto compressE() noexcept	-> void { return VecsComponentTable<E>().compress(); };	///< Forward to component table of type E
 
+		/**
+		* \brief Erase all entites of type E
+		*/
 		auto clearE() noexcept		-> size_t { 		///< Forward to component table of type E
 			m_sizeE = 0;
-			return VecsComponentTable<E>().clear(); 
+			return VecsComponentTable<E>().clear();		///< Call clear() in the correct component table
 		};
 
 	public:
@@ -952,20 +963,19 @@ namespace vecs {
 	*/
 	template<typename E>
 	inline auto VecsRegistry<E>::erase( VecsHandle handle) noexcept -> bool {
-		VecsLock lock(handle);
-		if (!contains(handle)) return false;
-
 		{
-			std::lock_guard<std::mutex> mlock(m_mutex);
-
-			m_size--;	///< Decrease sizes
-			m_sizeE--;
-
+			VecsLock lock(handle);
+			if (!contains(handle)) return false;
 			VecsComponentTable<E>().erase(m_entity_table.comp_ref_idx <c_index>(handle.m_entity_index)); ///< Erase from comp table
-			m_entity_table.comp_ref_idx<c_counter>(handle.m_entity_index)++;		///< Invalidate the entity handle
-			m_entity_table.comp_ref_idx<c_index>(handle.m_entity_index) = m_first_free;		///< Put old entry into free list
-			m_first_free = handle.m_entity_index;
+			m_entity_table.comp_ref_idx<c_counter>(handle.m_entity_index)++;				///< Invalidate the entity handle
 		}
+
+		m_size--;	///< Decrease sizes
+		m_sizeE--;
+
+		std::lock_guard<std::mutex> mlock(m_mutex);										///< Protect free list
+		m_entity_table.comp_ref_idx<c_index>(handle.m_entity_index) = m_first_free;		///< Put old entry into free list
+		m_first_free = handle.m_entity_index;
 
 		return true; 
 	}
@@ -1416,8 +1426,12 @@ namespace vecs {
 	template<typename E>
 	inline auto VecsComponentTable<E>::clear() noexcept -> size_t {
 		size_t num = 0;
+		VecsHandle handle;
 		for (size_t i = 0; i < m_data.size(); ++i) {
-			auto& handle = m_data.comp_ref_idx<c_handle>(index_t{ i });
+			{
+				VecsLock(m_data.comp_ref_idx<c_flag>(index_t{ i }));
+				handle = m_data.comp_ref_idx<c_handle>(index_t{ i });
+			}
 			if( VecsRegistry<E>().erase(handle) ) ++num;
 		}
 		return num;

@@ -54,7 +54,11 @@ namespace vecs {
 		size_t size() { return m_size.load(); };	///< \returns the current numbers of rows in the table
 		void clear() { m_size = 0; };				///< Set the number if rows to zero - effectively clear the table
 
-		//Externally synchronized
+		/**
+		* \brief Get a reference to a particular component with index I.
+		* \param[in] n Index to the entry.
+		* \returns a reference to the Ith component of entry n.
+		*/
 		template<size_t I, typename C = vtll::Nth_type<DATA,I>>
 		inline auto comp_ref_idx(index_t n) noexcept -> C& { 
 			if constexpr (ROW) {
@@ -65,6 +69,13 @@ namespace vecs {
 			}
 		};
 
+		/**
+		* \brief Get a reference to a particular component with type C. 
+		* The first component found having this type is used.
+		* 
+		* \param[in] n Index to the entry.
+		* \returns a reference to component with type C of entry n.
+		*/
 		template<typename C>
 		inline auto comp_ref_type(index_t n) noexcept -> C& { 
 			if constexpr (ROW) {
@@ -75,7 +86,11 @@ namespace vecs {
 			}
 		};
 
-		//Externally synchronized
+		/**
+		* \brief Get a tuple with references to all components of an entry.
+		* \param[in] n Index to the entry.
+		* \returns a tuple with references to all components of entry n.
+		*/
 		inline auto tuple_ref(index_t n) noexcept -> tuple_ref_t {
 			auto f = [&]<size_t... Is>(std::index_sequence<Is...>) {
 				if constexpr (ROW) {
@@ -88,7 +103,11 @@ namespace vecs {
 			return f(std::make_index_sequence<vtll::size<DATA>::value>{});
 		};
 
-		//Externally synchronized
+		/**
+		* \brief Get a tuple with valuesof all components of an entry.
+		* \param[in] n Index to the entry.
+		* \returns a tuple with values of all components of entry n.
+		*/
 		inline auto tuple_value(index_t n) noexcept -> tuple_value_t {
 			auto f = [&]<size_t... Is>(std::index_sequence<Is...>) {
 				if constexpr (ROW) {
@@ -101,85 +120,123 @@ namespace vecs {
 			return f(std::make_index_sequence<vtll::size<DATA>::value>{});
 		};
 
-		//Externally synchronized
+		/**
+		* \brief Create a new entry at the end of the table.
+		* Must be externally synchronized!
+		* \returns the index of the new entry.
+		*/
 		inline auto push_back() -> index_t {
-			auto idx = m_size.fetch_add(1);
-			if (!reserve(idx+1)) {
+			auto idx = m_size.fetch_add(1);		///< Increase table size and get old size.
+			if (!reserve(idx+1)) {				///< Make sure there is enough space in the table
 				m_size--;
-				return index_t{};
+				return index_t{};				///< If not return an invalid index.
 			}
-			return index_t{ static_cast<decltype(index_t::value)>(idx)};
+			return index_t{ static_cast<decltype(index_t::value)>(idx)}; ///< Return index of new entry
 		}
 
-		//Externally synchronized
+		/**
+		* \brief Create a new entry at end of table and fill it with data.
+		* Must be externally synchronized!
+		* \param[in] data Universal references to the new data.
+		* \returns index of new entry.
+		*/
 		template<typename TDATA>
 		requires std::is_same_v<TDATA, tuple_value_t>
 		inline auto push_back(TDATA&& data) -> index_t {
-			auto idx = m_size.fetch_add(1);
-			if (!reserve(idx + 1)) {
+			auto idx = m_size + 1;		///< Increase table size and get old size.
+			if (!reserve(idx + 1)) {	///< Make sure there is enough space in the table
 				m_size--;
-				return index_t{};
+				return index_t{};		///< If not return an invalid index.
 			}
-			decltype(auto) ref = tuple_ref(index_t{ idx });
+			decltype(auto) ref = tuple_ref(index_t{ idx });						///< Get references to components
 			vtll::static_for<size_t, 0, vtll::size<DATA>::value >([&](auto i) { 
-				std::get<i>(ref) = std::get<i>(data); 
+				std::get<i>(ref) = std::get<i>(data);							///< Copy/move data over components
 			});
-			return index_t{ static_cast<decltype(index_t::value)>(idx) };
+			m_size++;															///< Publish new entry
+			return index_t{ static_cast<decltype(index_t::value)>(idx) };		///< Return new index
 		}
 
-		//Externally synchronized
+		/**
+		* \brief Remove the last entry from the table.
+		*/
 		inline auto pop_back() -> void {
 			m_size--;
 		}
 
-		//Externally synchronized
-		template<size_t I>
-		inline auto update(index_t index, const vtll::Nth_type<DATA,I>& data) -> bool {
-			if (index.value >= m_size) return false;
-			comp_ref_idx<I>(index) = data;
+		/**
+		* \brief Update the component with index I of an entry.
+		* \param[in] n Index of entry holding the component.
+		* \param[in] C Universal reference to the component holding the data.
+		* \returns true if the operation was successful.
+		*/
+		template<size_t I, typename C = vtll::Nth_type<DATA, I>>
+		inline auto update(index_t n, C&& data) -> bool {
+			if (n >= m_size) return false;
+			comp_ref_idx<I>(n) = data;
 			return true;
 		}
 
-		//Externally synchronized
+		/**
+		* \brief Update the component with type C of an entry. The first component with this type is used.
+		* \param[in] n Index of entry holding the component.
+		* \param[in] C Universal reference to the component holding the data.
+		* \returns true if the operation was successful.
+		*/
 		template<typename C>
 		requires vtll::has_type<DATA,std::decay_t<C>>::value
-		inline auto update(index_t index, C&& data) -> bool {
-			if (index.value >= m_size) return false;
-			comp_ref_type<std::decay_t<C>>(index) = data;
+		inline auto update(index_t n, C&& data) -> bool {
+			if (n >= m_size) return false;
+			comp_ref_type<std::decay_t<C>>(n) = data;
 			return true;
 		}
 
-		//Externally synchronized
+		/**
+		* \brief Update all components of an entry.
+		* \param[in] n Index of entry holding the component.
+		* \param[in] C Universal reference to tuple holding the components with the data.
+		* \returns true if the operation was successful.
+		*/
 		template<typename T>
 		requires std::is_same_v<vtll::to_tuple<DATA>, std::decay_t<T>>
-		inline auto update(index_t index, T&& data ) -> bool {
-			if (index.value >= m_size) return false;
-			decltype(auto) ref = tuple_ref(index);
+		inline auto update(index_t n, T&& data ) -> bool {
+			if (n >= m_size) return false;
+			decltype(auto) ref = tuple_ref(n);
 			vtll::static_for<size_t, 0, vtll::size<DATA>::value >([&](auto i) { std::get<i>(ref) = std::get<i>(data); } );
 			return true;
 		}
 
-		//Externally synchronized
+		/**
+		* \brief Allocate segements to make sure enough memory is available.
+		* \param[in] r Number of entries to be stored in the table.
+		* \returns true if the operation was successful.
+		*/
 		auto reserve(size_t r) noexcept -> bool {
-			if (r == 0 || r > m_seg_max * N) return false;
+			if (r > m_seg_max * N) return false;
 			while (m_segment.size() * N < r) { 
-				m_segment.push_back(std::make_unique<array_tuple_t>()); 
+				m_segment.push_back(std::make_unique<array_tuple_t>()); ///< Create new segment
 			}
-			m_seg_allocated = m_segment.size();
+			m_seg_allocated = m_segment.size();	///< Publish new size
 			return true;
 		}
 
-		//Externally synchronized
+		/**
+		* \brief Set capacity of the segment table. This might reallocate the whole vector.
+		* No parallel processing is allowed when calling this function!
+		* \param[in] r Max number of entities to be allowed in the table.
+		*/
 		auto max_capacity(size_t r) noexcept -> void {
 			if (r == 0) return;
-			auto segs = (r-1) / N + 1;
-			if (segs > m_segment.capacity()) {
-				m_segment.reserve(segs);
+			auto segs = (r-1) / N + 1;				///< Number of segments necessary
+			if (segs > m_segment.capacity()) {		///< Is it larger than the one we have?
+				m_segment.reserve(segs);			///< If yes, reallocate the vector.
 			}
-			m_seg_max = m_segment.capacity();
+			m_seg_max = m_segment.capacity();		///< Publish the new capacity.
 		}
 
-		//Externally synchronized
+		/**
+		* \brief Deallocate segments that are currently not used. 
+		* No parallel processing allowed when calling this function.
+		*/
 		auto compress() noexcept -> void {
 			while (m_segment.size() > 1 && m_size + N <= m_segment.size() * N) {
 				m_segment.pop_back();
