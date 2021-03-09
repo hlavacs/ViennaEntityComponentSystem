@@ -225,8 +225,6 @@ namespace vecs {
 
 		VecsEntityProxy() {};	///< Empty constructor results in an invalid proxy
 
-		~VecsEntityProxy() { update(); };	///< RAII destructor automatically updates the local data into the ECS
-
 		auto handle() const noexcept -> VecsHandle {	///< \returns the handle of the entity. 
 			return m_handle; 
 		}
