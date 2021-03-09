@@ -91,7 +91,7 @@ namespace vecs {
 
 	class VecsHandle;
 	class VecsLock;
-	template <typename E> class VecsEntity;
+	template <typename E> class VecsEntityProxy;
 	template<typename E> class VecsComponentTable;
 	template<typename E, size_t I> class VecsComponentTableDerived;
 	class VecsRegistryBaseClass;
@@ -119,7 +119,7 @@ namespace vecs {
 	concept is_composed_of = (vtll::is_same<E, std::decay_t<Cs>...>::value);	///< E is composed of Cs
 
 	template<typename ET, typename E = vtll::front<ET>>
-	concept is_entity = (is_entity_type<E> && std::is_same_v<std::decay_t<ET>, VecsEntity<E>>); ///< ET is a VecsEntity
+	concept is_entity = (is_entity_type<E> && std::is_same_v<std::decay_t<ET>, VecsEntityProxy<E>>); ///< ET is a VecsEntityProxy
 
 
 	//-------------------------------------------------------------------------
@@ -162,7 +162,7 @@ namespace vecs {
 
 		template<typename E>
 		requires is_entity_type<E>
-		auto entity() noexcept -> std::optional<VecsEntity<E>>; ///< Get local copy (VecsEntity) of entity data
+		auto entity() noexcept -> std::optional<VecsEntityProxy<E>>; ///< Get local copy (VecsEntityProxy) of entity data
 
 		template<typename C>
 		requires is_component_type<C> 
@@ -170,7 +170,7 @@ namespace vecs {
 
 		template<typename ET>
 		requires is_entity<ET>
-		auto update(ET&& ent) noexcept -> bool;				///< Update this entity using a VecsEntity of the same type
+		auto update(ET&& ent) noexcept -> bool;				///< Update this entity using a VecsEntityProxy of the same type
 
 		template<typename C>
 		requires is_component_type<C>
@@ -196,16 +196,16 @@ namespace vecs {
 	};
 
 	/**
-	* \brief VecsEntity can hold a copy of the data of an entity of type E. This includes its handle
+	* \brief VecsEntityProxy can hold a copy of the data of an entity of type E. This includes its handle
 	* and all components.
 	* 
-	* VecsEntity is a local copy of an entity of type E and all its components. The components can be retrieved and
+	* VecsEntityProxy is a local copy of an entity of type E and all its components. The components can be retrieved and
 	* changes locally. By calling update() the local copies are stored back into the ECS. By calling erase() the entity is
 	* erased from the ECS. 
 	*/
 
 	template <typename E>
-	class VecsEntity {
+	class VecsEntityProxy {
 	public:
 		using tuple_type = vtll::to_tuple<E>;	///< A tuple holding all entity components.
 
@@ -216,12 +216,12 @@ namespace vecs {
 	public:
 
 		/**
-		* \brief Constructor of the VecsEntity class.
+		* \brief Constructor of the VecsEntityProxy class.
 		* 
 		* \param[in] h Handle of the entity.
 		* \param[in] tup The copy of the entity data to be stored in the instance.
 		*/
-		VecsEntity(VecsHandle h, const tuple_type& tup) noexcept : m_handle{ h }, m_component_data{ tup } {};
+		VecsEntityProxy(VecsHandle h, const tuple_type& tup) noexcept : m_handle{ h }, m_component_data{ tup } {};
 		
 		auto handle() const noexcept -> VecsHandle {	///< \returns the handle of the entity. 
 			return m_handle; 
@@ -413,7 +413,7 @@ namespace vecs {
 	}
 
 	/**
-	* \brief Update all components using a reference to a VecsEntity instance.
+	* \brief Update all components using a reference to a VecsEntityProxy instance.
 	* \param[in] index Index of the entity to be updated in the component table.
 	* \param[in] ent Universal reference to the new entity data.
 	* \returns true if the update was successful.
@@ -597,7 +597,7 @@ namespace vecs {
 		//get data
 
 		template<typename E>
-		auto entity(VecsHandle handle) noexcept -> std::optional<VecsEntity<E>>;	///< Get a local copy of an entity
+		auto entity(VecsHandle handle) noexcept -> std::optional<VecsEntityProxy<E>>;	///< Get a local copy of an entity
 
 		template<typename C>
 		requires is_component_type<C>
@@ -775,7 +775,7 @@ namespace vecs {
 		//-------------------------------------------------------------------------
 		//get data
 
-		auto entity(VecsHandle h) noexcept					-> std::optional<VecsEntity<E>>;
+		auto entity(VecsHandle h) noexcept					-> std::optional<VecsEntityProxy<E>>;
 
 		template<typename C>
 		requires is_component_of<E, C>
@@ -893,13 +893,13 @@ namespace vecs {
 	* \brief Retrieve all values for a given entity.
 	*
 	* \param[in] handle The entity handle.
-	* \returns a std::optional that either contains the VecsEntity<E>, or is empty.
+	* \returns a std::optional that either contains the VecsEntityProxy<E>, or is empty.
 	*/
 	template<typename E>
-	inline auto VecsRegistry<E>::entity(VecsHandle handle) noexcept -> std::optional<VecsEntity<E>> {
+	inline auto VecsRegistry<E>::entity(VecsHandle handle) noexcept -> std::optional<VecsEntityProxy<E>> {
 		VecsLock lock(handle);
 		if (!contains(handle)) return {};
-		VecsEntity<E> res(handle, VecsComponentTable<E>().values(m_entity_table.comp_ref_idx<c_index>(handle.m_entity_index)));
+		VecsEntityProxy<E> res(handle, VecsComponentTable<E>().values(m_entity_table.comp_ref_idx<c_index>(handle.m_entity_index)));
 		return { res };
 	}
 
@@ -921,10 +921,10 @@ namespace vecs {
 	}
 
 	/**
-	* \brief Update all components of an entity of type E from a VecsEntity<E>
+	* \brief Update all components of an entity of type E from a VecsEntityProxy<E>
 	*
 	* \param[in] handle The Enity handle. 
-	* \param[in] ent A universal reference to the VecsEntity<E> that contains the data.
+	* \param[in] ent A universal reference to the VecsEntityProxy<E> that contains the data.
 	* \returns true if the operation was successful.
 	*/
 	template<typename E>
@@ -1459,13 +1459,13 @@ namespace vecs {
 	}
 
 	/**
-	* \brief Retrieve the data for an entity from the ECS. The data is stored in an instance of VecsEntity<E>.
+	* \brief Retrieve the data for an entity from the ECS. The data is stored in an instance of VecsEntityProxy<E>.
 	*
 	* \param[in] handle The entity handle.
 	* \returns a std::optional with the entity if the entity exists, else an empty std::optional.
 	*/
 	template<typename E>
-	inline auto VecsRegistryBaseClass::entity( VecsHandle handle) noexcept -> std::optional<VecsEntity<E>> {
+	inline auto VecsRegistryBaseClass::entity( VecsHandle handle) noexcept -> std::optional<VecsEntityProxy<E>> {
 		return VecsRegistry<E>().entity(handle);
 	}
 
@@ -1579,7 +1579,7 @@ namespace vecs {
 	*/
 	template<typename E>
 	requires is_entity_type<E>
-	inline auto VecsHandle::entity() noexcept					-> std::optional<VecsEntity<E>> {
+	inline auto VecsHandle::entity() noexcept					-> std::optional<VecsEntityProxy<E>> {
 		return VecsRegistry<E>().entity(*this);
 	}
 
@@ -1628,7 +1628,7 @@ namespace vecs {
 	}
 
 	//-------------------------------------------------------------------------
-	//VecsEntity
+	//VecsEntityProxy
 
 	/**
 	* \brief Check whether the entity that this local copy represents is still valid.
@@ -1636,7 +1636,7 @@ namespace vecs {
 	* \returns true if the entity that this local copy represents is still valid.
 	*/
 	template <typename E>
-	auto VecsEntity<E>::has_value() noexcept -> bool { 
+	auto VecsEntityProxy<E>::has_value() noexcept -> bool {
 		VecsLock(*this);
 		return VecsRegistry<E>().contains(m_handle); 
 	}
@@ -1647,7 +1647,7 @@ namespace vecs {
 	* \returns true if the operation was successful.
 	*/
 	template <typename E>
-	auto VecsEntity<E>::update() noexcept -> bool {
+	auto VecsEntityProxy<E>::update() noexcept -> bool {
 		return VecsRegistry<E>().update(m_handle, *this); 
 	};
 
@@ -1657,7 +1657,7 @@ namespace vecs {
 	* \returns true if the operation was successful.
 	*/
 	template <typename E>
-	auto VecsEntity<E>::erase() noexcept -> bool {
+	auto VecsEntityProxy<E>::erase() noexcept -> bool {
 		return VecsRegistry<E>().erase(m_handle);
 	};
 
