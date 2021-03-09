@@ -40,13 +40,13 @@ int main() {
 			auto h2 = VecsRegistry<VeEntityTypeDraw>{}.insert(VeComponentName{ "Draw" }, mat, geo),
 				h2.has_value() && VecsRegistry().size() == 2, );
 		
-		TESTRESULT(++number, "component entity", auto ent1  = h1.entity<VeEntityTypeNode>(),	   
+		TESTRESULT(++number, "component entity", auto ent1  = h1.proxy<VeEntityTypeNode>(),
 			(ent1.component<VeComponentPosition>().m_position == glm::vec3{ 9.0f, 2.0f, 3.0f }), );
 
-		TESTRESULT(++number, "component entity", auto ent2 = h2.entity<VeEntityTypeDraw>(),
+		TESTRESULT(++number, "component entity", auto ent2 = h2.proxy<VeEntityTypeDraw>(),
 			(ent2.component<VeComponentMaterial>().i == 99), );
 
-		TESTRESULT(++number, "component entity", auto ent3 = h1.entity<VeEntityTypeDraw>(), !ent3.has_value(), );
+		TESTRESULT(++number, "component entity", auto ent3 = h1.proxy<VeEntityTypeDraw>(), !ent3.has_value(), );
 
 		TESTRESULT(++number, "component handle", auto comp1 = h1.component<VeComponentPosition>().value(), 
 			(comp1.m_position == glm::vec3{ 9.0f, 2.0f, 3.0f }), );

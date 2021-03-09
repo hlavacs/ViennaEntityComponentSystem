@@ -162,7 +162,7 @@ namespace vecs {
 
 		template<typename E>
 		requires is_entity_type<E>
-		auto entity() noexcept -> VecsEntityProxy<E>; ///< Get local copy (VecsEntityProxy) of entity data
+		auto proxy() noexcept -> VecsEntityProxy<E>; ///< Get local copy (VecsEntityProxy) of entity data
 
 		template<typename C>
 		requires is_component_type<C> 
@@ -601,7 +601,7 @@ namespace vecs {
 		//get data
 
 		template<typename E>
-		auto entity(VecsHandle handle) noexcept -> VecsEntityProxy<E>;	///< Get a local copy of an entity
+		auto proxy(VecsHandle handle) noexcept -> VecsEntityProxy<E>;	///< Get a local copy of an entity
 
 		template<typename C>
 		requires is_component_type<C>
@@ -779,7 +779,7 @@ namespace vecs {
 		//-------------------------------------------------------------------------
 		//get data
 
-		auto entity(VecsHandle h) noexcept					-> VecsEntityProxy<E>;
+		auto proxy(VecsHandle h) noexcept					-> VecsEntityProxy<E>;
 
 		template<typename C>
 		requires is_component_of<E, C>
@@ -897,10 +897,10 @@ namespace vecs {
 	* \brief Retrieve all values for a given entity.
 	*
 	* \param[in] handle The entity handle.
-	* \returns a std::optional that either contains the VecsEntityProxy<E>, or is empty.
+	* \returns a VecsEntityProxy<E>
 	*/
 	template<typename E>
-	inline auto VecsRegistry<E>::entity(VecsHandle handle) noexcept -> VecsEntityProxy<E> {
+	inline auto VecsRegistry<E>::proxy(VecsHandle handle) noexcept -> VecsEntityProxy<E> {
 		VecsLock lock(handle);
 		if (!contains(handle)) return {};
 		return VecsEntityProxy<E>(handle, VecsComponentTable<E>().values(m_entity_table.comp_ref_idx<c_index>(handle.m_entity_index)));
@@ -1468,8 +1468,8 @@ namespace vecs {
 	* \returns a VecsEntityProxy<E>.
 	*/
 	template<typename E>
-	inline auto VecsRegistryBaseClass::entity( VecsHandle handle) noexcept -> VecsEntityProxy<E> {
-		return VecsRegistry<E>().entity(handle);
+	inline auto VecsRegistryBaseClass::proxy( VecsHandle handle) noexcept -> VecsEntityProxy<E> {
+		return VecsRegistry<E>().proxy(handle);
 	}
 
 	/**
@@ -1582,8 +1582,8 @@ namespace vecs {
 	*/
 	template<typename E>
 	requires is_entity_type<E>
-	inline auto VecsHandle::entity() noexcept					-> VecsEntityProxy<E> {
-		return VecsRegistry<E>().entity(*this);
+	inline auto VecsHandle::proxy() noexcept					-> VecsEntityProxy<E> {
+		return VecsRegistry<E>().proxy(*this);
 	}
 
 	/**

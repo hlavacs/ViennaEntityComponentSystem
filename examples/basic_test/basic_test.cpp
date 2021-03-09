@@ -17,7 +17,7 @@ int main() {
     auto h1 = VecsRegistry{}.insert(VeComponentName{ "Node" }, VeComponentPosition{ glm::vec3{9.0f, 2.0f, 3.0f} }, VeComponentOrientation{}, VeComponentTransform{});
     std::cout << typeid(VeEntityTypeNode).hash_code() << " " << typeid(VeEntityTypeNode).name() << std::endl;
 
-    auto data1b = h1.entity<VeEntityTypeNode>();
+    auto data1b = h1.proxy<VeEntityTypeNode>();
     auto comp1_1 = data1b.component<VeComponentPosition>();
 
     auto comp1_2 = h1.component<VeComponentPosition>();
@@ -33,7 +33,7 @@ int main() {
     auto h2 = VecsRegistry{}.insert(VeComponentName{ "Draw" }, VeComponentMaterial{ 99 }, VeComponentGeometry{});
     std::cout << typeid(VeEntityTypeDraw).hash_code() << " " << typeid(VeEntityTypeDraw).name() << std::endl;
 
-    auto data2b = h2.entity<VeEntityTypeDraw>(); 
+    auto data2b = h2.proxy<VeEntityTypeDraw>();
     auto comp2_1 = data2b.component<VeComponentMaterial>();
     auto comp2_2 = h2.component<VeComponentMaterial>();
 
@@ -52,7 +52,7 @@ int main() {
     auto comp1_6 = h1.component<VeComponentPosition>().value();
 
     h1.erase();
-    auto data1c = h1.entity<VeEntityTypeNode>();
+    auto data1c = h1.proxy<VeEntityTypeNode>();
     h2.erase();
 
     return 0;
