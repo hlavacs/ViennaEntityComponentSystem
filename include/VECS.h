@@ -223,7 +223,9 @@ namespace vecs {
 		*/
 		VecsEntityProxy(VecsHandle h, const tuple_type& tup) noexcept : m_handle{ h }, m_component_data{ tup } {};
 
-		VecsEntityProxy() {};
+		VecsEntityProxy() {};	///< Empty constructor results in an invalid proxy
+
+		~VecsEntityProxy() { update(); };	///< RAII destructor automatically updates the local data into the ECS
 
 		auto handle() const noexcept -> VecsHandle {	///< \returns the handle of the entity. 
 			return m_handle; 
