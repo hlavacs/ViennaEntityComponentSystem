@@ -122,7 +122,9 @@ namespace vecs {
 	concept is_entity = (is_entity_type<E> && std::is_same_v<std::decay_t<ET>, VecsEntityProxy<E>>); ///< ET is a VecsEntityProxy
 
 
-	/** General functor type that can hold any function, and depends in a number of component types.	*/
+	/** 
+	* \brief General functor type that can hold any function, and depends in a number of component types.
+	*/
 	template<typename... Cs>
 	requires are_component_types<Cs...>
 	using Functor = void(VecsHandle, Cs&...);
@@ -189,7 +191,7 @@ namespace vecs {
 	//locking
 
 	/**
-	* VecsLock is used to lock access to single entities. 
+	* \brief VecsLock is used to lock access to single entities. 
 	*/
 	class VecsLock {
 		std::atomic_flag* m_flag{ nullptr };	///< Flag used for locking access
@@ -1584,12 +1586,14 @@ namespace vecs {
 		for (; b != e; ++b) {
 			typename VecsIterator<Cs...>::value_type tup;
 			{
-				VecsLock lock{ b.flag() };
+				VecsLock lock{ b.flag() };		///< Make a local copy
 				if (!b.has_value()) continue;
 				tup = *b;
 			}
-			std::apply(f, tup);
-			VecsLock lock{ b.flag() };
+			std::apply(f, tup);					///< Run the function on the copy
+
+			VecsLock lock{ b.flag() };			///< Copy back to ECS
+			if (!b.has_value()) continue;
 			*b = tup;
 		}
 	}

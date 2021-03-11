@@ -95,7 +95,7 @@ int main() {
 
 
 	{
-		const int num = 100;
+		const int num = 10;
 
 		for (int i = 0; i < num; i++) {
 			auto h1 = VecsRegistry{}.insert(VeComponentName{ "Node" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentTransform{});
@@ -103,23 +103,20 @@ int main() {
 		}
 		TESTRESULT(++number, "system create", , (VecsRegistry().size() == 2*num), );
 
-		auto b = VecsRegistry().begin<VeComponentName>();
-		auto e = VecsRegistry().end<VeComponentName>();
-
 		int i = 0;
 		bool test = true;
 
 		VecsRegistry().for_each<VeComponentName>([&](auto handle, auto& name) {
 			++i;
 			if (name.m_name != "Node" && name.m_name != "Draw") { test = false; }
-			name.m_name = "Name Holder";
+			name.m_name = "Name Holder " + std::to_string(i);
 			//std::cout << "Entity " << name.m_name << " " << i << "\n";
 		});
 
 		i = 0;
 		VecsRegistry().for_each<VeComponentName>([&](auto handle, auto& name) {
 			++i;
-			if (name.m_name != "Name Holder") { test = false; }
+			if (name.m_name != "Name Holder " + std::to_string(i)) { test = false; }
 			//std::cout << "Entity " << name.m_name << " " << i << "\n";
 		});
 
@@ -132,18 +129,43 @@ int main() {
 			VecsLock lock{handle};
 			if (!handle.is_valid()) continue;
 			++i;
-			name.m_name = "Name Holder 2";
+			name.m_name = "Name Holder 2 " + std::to_string(i);
 			//std::cout << "Entity " << name.m_name << " " << i << "\n";
 		}
 
 		i = 0;
 		VecsRegistry().for_each<VeComponentName>([&](auto handle, auto& name) {
 			++i;
-			if (name.m_name != "Name Holder 2") { test = false; }
+			if (name.m_name != ("Name Holder 2 " + std::to_string(i))) { test = false; }
 			//std::cout << "Entity " << name.m_name << " " << i << "\n";
 		});
 
 		TESTRESULT(++number, "system run 2", , test, );
+
+		test = true;
+		auto f = [&]<typename B, typename E>(B&& b, E&& e, auto& self, int& i) {
+			if (b == e) return false;
+			auto [handle, name] = *b;
+			if (!handle.is_valid()) {
+				--i;
+				return true;
+			}
+
+			//std::cout << "Entity IN " << name.m_name << " " << i << "\n";
+			auto ii = i;
+			while (self.template operator()(b++, e, self, ++i)) { };
+
+			if (name.m_name != ("Name Holder 2 " + std::to_string(ii))) { test = false; }
+			//std::cout << "Entity " << name.m_name << " " << ii << "\n";
+			return false;
+		};
+
+		auto b = VecsRegistry().begin<VeComponentName>();
+		auto e = VecsRegistry().end<VeComponentName>();
+		i = 1;
+		while (f(b++, e, f, i)) {};
+
+		TESTRESULT(++number, "system run 3", , test, );
 
 		TESTRESULT(++number, "clear", VecsRegistry().clear(), (VecsRegistry().size() == 0 && VecsRegistry().size<VeEntityTypeNode>()), );
 

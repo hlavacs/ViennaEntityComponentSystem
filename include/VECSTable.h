@@ -11,7 +11,9 @@
 namespace vecs {
 
 	/**
-	* VecsTable is a data container similar to std::vector, but with three additional properties
+	* \brief VecsTable is a data container similar to std::vector, but with additional properties
+	* 
+	* VecsTable has the following properties:
 	* 1) It stores tuples of data, thus the result is a table.
 	* 2) The memory layout can be row-oriented or column-oriented.
 	* 3) It can grow even when used with multiple threads. This is achieved by storing data in segements,

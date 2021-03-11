@@ -26,3 +26,12 @@ include_directories (${INCLUDE})
 add_subdirectory (examples/basic_test)
 add_subdirectory (examples/test)
 add_subdirectory (examples/performance)
+
+find_package(Doxygen)
+if (DOXYGEN_FOUND)
+  set(DOXYGEN_USE_MDFILE_AS_MAINPAGE "README.md")
+  doxygen_add_docs(doxygen
+    ${CMAKE_SOURCE_DIR}/README.md
+    ${CMAKE_SOURCE_DIR}/include
+  )
+endif(DOXYGEN_FOUND)

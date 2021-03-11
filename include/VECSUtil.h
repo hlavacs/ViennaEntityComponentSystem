@@ -10,7 +10,6 @@
 #include <thread>
 
 #include <IntType.h>
-#include <VECSMutex.h>
 
 using namespace std::chrono_literals;
 
@@ -28,6 +27,9 @@ namespace vecs {
 
 	//https://www.fluentcpp.com/2017/05/19/crtp-helper/
 
+	/**
+	* \brief Base class for CRTP, provides easy access to underlying derived class.
+	*/
 	template <typename T, template<typename...> class crtpType>
 	struct VecsCRTP {
 		T& underlying() { return static_cast<T&>(*this); }
@@ -39,6 +41,9 @@ namespace vecs {
 	};
 
 
+	/**
+	* \brief Base class for all mono state classes, provides functionality for initialization.
+	*/
 	template<typename T>
 	class VecsMonostate : VecsCRTP<T,VecsMonostate> {
 	protected:
@@ -52,8 +57,6 @@ namespace vecs {
 		};
 
 	};
-
-
 
 
 };

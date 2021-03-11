@@ -7,7 +7,6 @@ set(HEADERS
   basic_test.h
   ${INCLUDE}/VTLL.h
   ${INCLUDE}/IntType.h
-  ${INCLUDE}/VECSMutex.h
   ${INCLUDE}/VECSUtil.h
   ${INCLUDE}/VECSTable.h
   ${INCLUDE}/VECSCompSystem.h
