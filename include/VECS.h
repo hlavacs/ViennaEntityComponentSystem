@@ -1024,13 +1024,16 @@ namespace vecs {
 		bool	m_is_end{ false };			///< True if this is an end iterator (for stopping the loop)
 		size_t	m_size{0};					///< Number of entities max covered by the iterator
 
-		VecsIterator() noexcept {};			///< Needed for derived iterator to call
+		VecsIterator(std::nullopt_t n) noexcept {};			///< Needed for derived iterator to call
 
 	public:
 		using value_type = std::tuple<VecsHandle, Cs&...>; ///< Tuple containing all component values
 
-		VecsIterator( bool is_end ) noexcept ;				///< Constructor that should be called always from outside
+		VecsIterator( bool is_end = false ) noexcept ;		///< Constructor that should be called always from outside
 		VecsIterator(const VecsIterator& v) noexcept;		///< Copy constructor
+
+		auto begin() { return *this; };
+		auto end() { return VecsRegistryBaseClass().end<Cs...>(); };
 
 		auto operator=(const VecsIterator& v) noexcept			-> VecsIterator<Cs...>&;	///< Copy
 		auto operator+=(size_t N) noexcept						-> VecsIterator<Cs...>&;	///< Increase and set
@@ -1262,7 +1265,7 @@ namespace vecs {
 	* \param[in] is_end If true, then the iterator belongs to an end-iterator.
 	*/
 	template<typename E, typename... Cs>
-	inline VecsIteratorDerived<E, Cs...>::VecsIteratorDerived(bool is_end) noexcept { 
+	inline VecsIteratorDerived<E, Cs...>::VecsIteratorDerived(bool is_end) noexcept : VecsIterator<Cs...>(std::nullopt) {
 		m_sizeE = VecsComponentTable<E>().size(); ///< iterate over ALL entries, also the invalid ones!
 		if (is_end) {
 			this->m_current_index = static_cast<decltype(this->m_current_index)>(m_sizeE);
@@ -1727,10 +1730,10 @@ namespace vecs {
 	*/
 	template<typename... Cs>
 	requires (vtll::has_type<VecsComponentTypeList, Cs>::value && ...)
-		inline auto for_each(VecsIterator<Cs...>& b, VecsIterator<Cs...>& e, std::function<Functor<Cs...>> f) -> void {
+	inline auto for_each(VecsIterator<Cs...>& b, VecsIterator<Cs...>& e, std::function<Functor<Cs...>> f) -> void {
 		for (; b != e; b++) {
 			VecsLock lock{ b.flag() };		///< Might belong to another entity, but there is for sure a flag 
-			if (b.handle().is_valid()) {	
+			if (b.has_value()) {	
 				f(b);
 			}
 		}
@@ -1742,7 +1745,7 @@ namespace vecs {
 	*/
 	template<typename... Cs>
 	requires (vtll::has_type<VecsComponentTypeList, Cs>::value && ...)
-		inline auto for_each(std::function<Functor<Cs...>> f) -> void {
+	inline auto for_each(std::function<Functor<Cs...>> f) -> void {
 		auto b = VecsRegistry().begin<Cs...>();
 		auto e = VecsRegistry().end<Cs...>();
 		for_each(b, e, f);
