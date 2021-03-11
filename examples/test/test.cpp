@@ -110,12 +110,11 @@ int main() {
 		int i = 0;
 		bool test = true;
 
-		for_each<VeComponentName>([&](auto& iter) {
+		for_each<VeComponentName>([&](auto handle, auto& name) {
 			++i;
-			auto [handle, name] = *iter;
 			if (name.m_name != "Node" && name.m_name != "Draw") { test = false; }
 			//std::cout << "Entity " << name.m_name << " " << i << "\n";
-			});
+		});
 
 		TESTRESULT(++number, "system run", , (test && i == 2 * num), );
 

@@ -1157,12 +1157,12 @@ namespace vecs {
 	*/
 	template<typename... Cs>
 	inline auto VecsIterator<Cs...>::operator+=(size_t N) noexcept -> VecsIterator<Cs...>& {
-		if (m_is_end) return;
+		if (m_is_end) return *this;
 		size_t left = N;
 		while (left > 0) {
 			int num = std::max(m_dispatch[m_current_iterator]->size() - m_current_index, 0);
 			left -= num;
-			m_dispatch[m_current_iterator]->m_current_index += num;
+			m_dispatch[m_current_iterator]->m_current_index += static_cast<decltype(m_current_index.value)>(num);
 			m_current_index = m_dispatch[m_current_iterator]->m_current_index;
 
 			if (m_dispatch[m_current_iterator]->is_vector_end()) {
@@ -1717,9 +1717,13 @@ namespace vecs {
 
 
 	/** General functor type that can hold any function, and depends in a number of component types.	*/
+	//template<typename... Cs>
+	//requires are_component_types<Cs...>
+	//using Functor = void(VecsIterator<Cs...>&);
+
 	template<typename... Cs>
-	requires (vtll::has_type<VecsComponentTypeList, Cs>::value && ...)
-	using Functor = void(VecsIterator<Cs...>&);
+	requires are_component_types<Cs...>
+	using Functor = void(VecsHandle, Cs&...);
 
 	/**
 	* \brief takes two iterators and loops from begin to end, and for each entity calls the provided function.
@@ -1734,7 +1738,7 @@ namespace vecs {
 		for (; b != e; b++) {
 			VecsLock lock{ b.flag() };		///< Might belong to another entity, but there is for sure a flag 
 			if (b.has_value()) {	
-				f(b);
+				std::apply(f, *b);
 			}
 		}
 	}
