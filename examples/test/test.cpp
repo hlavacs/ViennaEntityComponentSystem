@@ -95,7 +95,7 @@ int main() {
 
 
 	{
-		const int num = 10;
+		const int num = 100;
 
 		for (int i = 0; i < num; i++) {
 			auto h1 = VecsRegistry{}.insert(VeComponentName{ "Node" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentTransform{});
