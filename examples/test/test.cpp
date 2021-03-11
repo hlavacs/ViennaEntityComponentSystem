@@ -84,7 +84,7 @@ int main() {
 		bool test = true;
 
 		for(auto [handle, name] : VecsIterator<VeComponentName>() ) {
-			if (!handle.has_value()) continue;
+			if (!handle.is_valid()) continue;
 			++i;
 			if (name.m_name != "Node" && name.m_name != "Draw") { test = false; }
 			//std::cout << "Entity " << name << "\n";

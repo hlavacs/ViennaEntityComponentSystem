@@ -1131,7 +1131,6 @@ namespace vecs {
 
 		if (m_dispatch[m_current_iterator]->is_vector_end() && m_current_iterator.value < m_dispatch.size() - 1) {
 			++m_current_iterator;
-			m_current_index = 0;
 		}
 		m_current_index = m_dispatch[m_current_iterator]->m_current_index;
 		return *this;
@@ -1717,10 +1716,6 @@ namespace vecs {
 
 
 	/** General functor type that can hold any function, and depends in a number of component types.	*/
-	//template<typename... Cs>
-	//requires are_component_types<Cs...>
-	//using Functor = void(VecsIterator<Cs...>&);
-
 	template<typename... Cs>
 	requires are_component_types<Cs...>
 	using Functor = void(VecsHandle, Cs&...);
