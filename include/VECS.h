@@ -122,6 +122,12 @@ namespace vecs {
 	concept is_entity = (is_entity_type<E> && std::is_same_v<std::decay_t<ET>, VecsEntityProxy<E>>); ///< ET is a VecsEntityProxy
 
 
+	/** General functor type that can hold any function, and depends in a number of component types.	*/
+	template<typename... Cs>
+	requires are_component_types<Cs...>
+	using Functor = void(VecsHandle, Cs&...);
+
+
 	//-------------------------------------------------------------------------
 	//entity handle
 
@@ -651,6 +657,14 @@ namespace vecs {
 
 		template<typename... Cs>
 		auto end() noexcept			-> VecsIterator<Cs...>;		///< Get an end iterator for entities with all components
+
+		template<typename... Cs>
+		requires are_component_types<Cs...>
+		auto for_each(VecsIterator<Cs...>& b, VecsIterator<Cs...>& e, std::function<Functor<Cs...>> f) -> void;
+
+		template<typename... Cs>
+		requires are_component_types<Cs...>
+		auto for_each(std::function<Functor<Cs...>> f) -> void;
 
 		virtual
 		auto contains(VecsHandle handle) noexcept	-> bool;	///< \returns true if the ECS still holds this entity (externally synced)
@@ -1557,6 +1571,43 @@ namespace vecs {
 	}
 
 
+	/**
+* \brief takes two iterators and loops from begin to end, and for each entity calls the provided function.
+*
+* \param[in] b Begin iterator.
+* \param[in] e End iterator.
+* \param[in] f Functor to be called for every entity the iterator visits.
+*/
+	template<typename... Cs>
+	requires are_component_types<Cs...>
+	inline auto VecsRegistryBaseClass::for_each(VecsIterator<Cs...>& b, VecsIterator<Cs...>& e, std::function<Functor<Cs...>> f) -> void {
+		for (; b != e; ++b) {
+			typename VecsIterator<Cs...>::value_type tup;
+			{
+				VecsLock lock{ b.flag() };
+				if (!b.has_value()) continue;
+				tup = *b;
+			}
+			std::apply(f, tup);
+			VecsLock lock{ b.flag() };
+			*b = tup;
+		}
+	}
+
+	/**
+	* \brief Visits all entities in the ECS that have the given components CS...
+	* \param[in] f Functor to be called for every visited entity.
+	*/
+	template<typename... Cs>
+	requires are_component_types<Cs...>
+	inline auto VecsRegistryBaseClass::for_each(std::function<Functor<Cs...>> f) -> void {
+		auto b = begin<Cs...>();
+		auto e = end<Cs...>();
+		for_each(b, e, f);
+	}
+
+
+
 	//-------------------------------------------------------------------------
 	//VecsHandle
 
@@ -1709,53 +1760,6 @@ namespace vecs {
 	*/
 	inline VecsLock::~VecsLock() noexcept {
 		if (m_flag) m_flag->clear(std::memory_order_release);
-	}
-
-
-	//-------------------------------------------------------------------------
-	//for_each loop
-
-
-	/** General functor type that can hold any function, and depends in a number of component types.	*/
-	template<typename... Cs>
-	requires are_component_types<Cs...>
-	using Functor = void(VecsHandle, Cs&...);
-
-	/**
-	* \brief takes two iterators and loops from begin to end, and for each entity calls the provided function.
-	*
-	* \param[in] b Begin iterator.
-	* \param[in] e End iterator.
-	* \param[in] f Functor to be called for every entity the iterator visits.
-	*/
-	template<typename... Cs>
-	requires (vtll::has_type<VecsComponentTypeList, Cs>::value && ...)
-	inline auto for_each(VecsIterator<Cs...>& b, VecsIterator<Cs...>& e, std::function<Functor<Cs...>> f) -> void {
-		for (; b != e; ++b) {
-			{
-				typename VecsIterator<Cs...>::value_type tup;
-				{
-					VecsLock lock{ b.flag() };
-					if (!b.has_value()) continue;
-					tup = *b;
-				}
-				std::apply(f, tup);
-				VecsLock lock{ b.flag() };
-				*b = tup;
-			}
-		}
-	}
-
-	/**
-	* \brief Visits all entities in the ECS that have the given components CS...
-	* \param[in] f Functor to be called for every visited entity.
-	*/
-	template<typename... Cs>
-	requires (vtll::has_type<VecsComponentTypeList, Cs>::value && ...)
-	inline auto for_each(std::function<Functor<Cs...>> f) -> void {
-		auto b = VecsRegistry().begin<Cs...>();
-		auto e = VecsRegistry().end<Cs...>();
-		for_each(b, e, f);
 	}
 
 

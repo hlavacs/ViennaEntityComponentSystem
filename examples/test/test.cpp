@@ -83,7 +83,7 @@ int main() {
 		int i = 0;
 		bool test = true;
 
-		for (auto&& [handle, name] : VecsIterator<VeComponentName>()) {
+		for (auto&& [handle, name] : VecsRegistry().begin<VeComponentName>()) {
 			if (!handle.is_valid()) continue;
 			++i;
 			if (name.m_name != "Node" && name.m_name != "Draw") { test = false; }
@@ -109,7 +109,7 @@ int main() {
 		int i = 0;
 		bool test = true;
 
-		for_each<VeComponentName>([&](auto handle, auto& name) {
+		VecsRegistry().for_each<VeComponentName>([&](auto handle, auto& name) {
 			++i;
 			if (name.m_name != "Node" && name.m_name != "Draw") { test = false; }
 			name.m_name = "Name Holder";
@@ -117,7 +117,7 @@ int main() {
 		});
 
 		i = 0;
-		for_each<VeComponentName>([&](auto handle, auto& name) {
+		VecsRegistry().for_each<VeComponentName>([&](auto handle, auto& name) {
 			++i;
 			if (name.m_name != "Name Holder") { test = false; }
 			//std::cout << "Entity " << name.m_name << " " << i << "\n";
@@ -128,7 +128,8 @@ int main() {
 
 		i = 0;
 		test = true;
-		for (auto&& [handle, name] : VecsIterator<VeComponentName>()) {
+		for (auto&& [handle, name] : VecsRegistry().begin<VeComponentName>()) {
+			VecsLock lock{handle};
 			if (!handle.is_valid()) continue;
 			++i;
 			name.m_name = "Name Holder 2";
@@ -136,7 +137,7 @@ int main() {
 		}
 
 		i = 0;
-		for_each<VeComponentName>([&](auto handle, auto& name) {
+		VecsRegistry().for_each<VeComponentName>([&](auto handle, auto& name) {
 			++i;
 			if (name.m_name != "Name Holder 2") { test = false; }
 			//std::cout << "Entity " << name.m_name << " " << i << "\n";
