@@ -83,20 +83,19 @@ int main() {
 		int i = 0;
 		bool test = true;
 
-		for(auto [handle, name] : VecsIterator<VeComponentName>() ) {
+		for (auto&& [handle, name] : VecsIterator<VeComponentName>()) {
 			if (!handle.is_valid()) continue;
 			++i;
 			if (name.m_name != "Node" && name.m_name != "Draw") { test = false; }
 			//std::cout << "Entity " << name << "\n";
 		}
-
 		TESTRESULT(++number, "system create", , (test && i == 0), );
 
 	}
 
 
 	{
-		const int num = 1000;
+		const int num = 10;
 
 		for (int i = 0; i < num; i++) {
 			auto h1 = VecsRegistry{}.insert(VeComponentName{ "Node" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentTransform{});
@@ -113,10 +112,37 @@ int main() {
 		for_each<VeComponentName>([&](auto handle, auto& name) {
 			++i;
 			if (name.m_name != "Node" && name.m_name != "Draw") { test = false; }
+			name.m_name = "Name Holder";
 			//std::cout << "Entity " << name.m_name << " " << i << "\n";
 		});
 
-		TESTRESULT(++number, "system run", , (test && i == 2 * num), );
+		i = 0;
+		for_each<VeComponentName>([&](auto handle, auto& name) {
+			++i;
+			if (name.m_name != "Name Holder") { test = false; }
+			//std::cout << "Entity " << name.m_name << " " << i << "\n";
+		});
+
+
+		TESTRESULT(++number, "system run 1", , (test && i == 2 * num), );
+
+		i = 0;
+		test = true;
+		for (auto&& [handle, name] : VecsIterator<VeComponentName>()) {
+			if (!handle.is_valid()) continue;
+			++i;
+			name.m_name = "Name Holder 2";
+			//std::cout << "Entity " << name.m_name << " " << i << "\n";
+		}
+
+		i = 0;
+		for_each<VeComponentName>([&](auto handle, auto& name) {
+			++i;
+			if (name.m_name != "Name Holder 2") { test = false; }
+			//std::cout << "Entity " << name.m_name << " " << i << "\n";
+		});
+
+		TESTRESULT(++number, "system run 2", , test, );
 
 		TESTRESULT(++number, "clear", VecsRegistry().clear(), (VecsRegistry().size() == 0 && VecsRegistry().size<VeEntityTypeNode>()), );
 

@@ -1027,7 +1027,8 @@ namespace vecs {
 		VecsIterator(std::nullopt_t n) noexcept {};			///< Needed for derived iterator to call
 
 	public:
-		using value_type = std::tuple<VecsHandle, Cs&...>; ///< Tuple containing all component values
+		using value_type = std::tuple<VecsHandle, Cs...>; ///< Tuple containing all component values
+		using ref_type = std::tuple<VecsHandle, Cs&...>; ///< Tuple containing all component values
 
 		VecsIterator( bool is_end = false ) noexcept ;		///< Constructor that should be called always from outside
 		VecsIterator(const VecsIterator& v) noexcept;		///< Copy constructor
@@ -1044,7 +1045,7 @@ namespace vecs {
 		virtual auto handle() noexcept			-> VecsHandle;
 		virtual auto flag() noexcept			-> std::atomic_flag*;
 		virtual auto has_value() noexcept		-> bool;					///< Is currently pointint to a valid entity
-		virtual	auto operator*() noexcept		-> value_type;				///< Access the data
+		virtual	auto operator*() noexcept		-> ref_type;				///< Access the data
 		virtual auto operator++() noexcept		-> VecsIterator<Cs...>&;	///< Increase by 1
 		virtual auto operator++(int) noexcept	-> VecsIterator<Cs...>&;	///< Increase by 1
 		virtual auto is_vector_end() noexcept	-> bool;					///< Is currently at the end of any sub iterator
@@ -1115,7 +1116,7 @@ namespace vecs {
 	* \returns a tuple holding the components Cs of the entity the iterator is currently pointing to.
 	*/
 	template<typename... Cs>
-	inline auto VecsIterator<Cs...>::operator*() noexcept	-> value_type {
+	inline auto VecsIterator<Cs...>::operator*() noexcept	-> ref_type {
 		return *(*m_dispatch[m_current_iterator]);
 	};
 
@@ -1250,7 +1251,7 @@ namespace vecs {
 		auto handle() noexcept			-> VecsHandle;
 		auto flag() noexcept			-> std::atomic_flag*;
 		auto has_value() noexcept		-> bool;
-		auto operator*() noexcept		-> typename VecsIterator<Cs...>::value_type;
+		auto operator*() noexcept		-> typename VecsIterator<Cs...>::ref_type;
 		auto operator++() noexcept		-> VecsIterator<Cs...>&;
 		auto operator++(int) noexcept	-> VecsIterator<Cs...>&;
 		auto is_vector_end() noexcept	-> bool;
@@ -1303,8 +1304,8 @@ namespace vecs {
 	* \returns all components Cs from the entity the iterator points to.
 	*/
 	template<typename E, typename... Cs>
-	inline auto VecsIteratorDerived<E, Cs...>::operator*() noexcept		-> typename VecsIterator<Cs...>::value_type {
-		return std::make_tuple(VecsComponentTable<E>().handle(this->m_current_index), std::ref(VecsComponentTable<E>().component<Cs>(this->m_current_index))...);
+	inline auto VecsIteratorDerived<E, Cs...>::operator*() noexcept		-> typename VecsIterator<Cs...>::ref_type {
+		return std::forward_as_tuple(VecsComponentTable<E>().handle(this->m_current_index), VecsComponentTable<E>().component<Cs>(this->m_current_index)...);
 	};
 
 	/**
@@ -1730,10 +1731,17 @@ namespace vecs {
 	template<typename... Cs>
 	requires (vtll::has_type<VecsComponentTypeList, Cs>::value && ...)
 	inline auto for_each(VecsIterator<Cs...>& b, VecsIterator<Cs...>& e, std::function<Functor<Cs...>> f) -> void {
-		for (; b != e; b++) {
-			VecsLock lock{ b.flag() };		///< Might belong to another entity, but there is for sure a flag 
-			if (b.has_value()) {	
-				std::apply(f, *b);
+		for (; b != e; ++b) {
+			{
+				typename VecsIterator<Cs...>::value_type tup;
+				{
+					VecsLock lock{ b.flag() };
+					if (!b.has_value()) continue;
+					tup = *b;
+				}
+				std::apply(f, tup);
+				VecsLock lock{ b.flag() };
+				*b = tup;
 			}
 		}
 	}
