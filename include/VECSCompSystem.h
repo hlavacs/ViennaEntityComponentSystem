@@ -75,7 +75,7 @@ namespace vecs {
 	//engine entity types
 
 	using VeEntityTypeNode = VeEntityType<VeComponentName, VeComponentPosition, VeComponentOrientation, VeComponentTransform>;
-	using VeEntityTypeDraw = VeEntityType<VeComponentName, VeComponentMaterial, VeComponentGeometry>;
+	using VeEntityTypeDraw = VeEntityType<VeComponentName, VeComponentPosition, VeComponentOrientation, VeComponentTransform, VeComponentMaterial, VeComponentGeometry>;
 	using VeEntityTypeAnimation = VeEntityType<VeComponentName, VeComponentAnimation>;
 	//...
 

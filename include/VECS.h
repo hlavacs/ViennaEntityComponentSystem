@@ -121,6 +121,8 @@ namespace vecs {
 	template<typename ET, typename E = vtll::front<ET>>
 	concept is_entity = (is_entity_type<E> && std::is_same_v<std::decay_t<ET>, VecsEntityProxy<E>>); ///< ET is a VecsEntityProxy
 
+	template<typename E, typename... Cs>
+	concept is_iterator = (std::is_same_v<std::decay_t<E>, VecsIterator<Cs...>>);	///< E is composed of Cs
 
 	/** 
 	* \brief General functor type that can hold any function, and depends in a number of component types.
@@ -163,10 +165,9 @@ namespace vecs {
 			: m_entity_index{ idx }, m_generation_counter{ cnt }, m_type_index{ type } {};
 
 		/** \returns the type index of the handle. */
-		auto type() const noexcept -> uint32_t { return static_cast<uint32_t>(m_type_index); };
-
-		auto is_valid() noexcept -> bool;	///< The data in the handle is non null
-		auto has_value() noexcept -> bool;	///< The entity that is pointed to exists in the ECS
+		auto type() const noexcept	-> uint32_t { return static_cast<uint32_t>(m_type_index); };
+		auto is_valid() noexcept	-> bool;	///< The data in the handle is non null
+		auto has_value() noexcept	-> bool;	///< The entity that is pointed to exists in the ECS
 
 		template<typename E>
 		requires is_entity_type<E>
@@ -230,16 +231,19 @@ namespace vecs {
 		* \param[in] tup The copy of the entity data to be stored in the instance.
 		*/
 		VecsEntityProxy(VecsHandle h, const tuple_type& tup) noexcept : m_handle{ h }, m_component_data{ tup } {};
+		
+		template<typename... Cs>
+		requires are_components_of<E, Cs...>
+		VecsEntityProxy(Cs&&... args) noexcept;					///< Insert this into the ECS, get a new entity
 
 		VecsEntityProxy() {};	///< Empty constructor results in an invalid proxy
 
 		auto handle() const noexcept -> VecsHandle {	///< \returns the handle of the entity. 
 			return m_handle; 
 		}
-
-		auto has_value() noexcept	 -> bool;			///< Check whether the entity still exists in the ECS
-		auto update() noexcept		 -> bool;			///< Update the entity in the ECS
-		auto erase() noexcept		 -> bool;			///< Erase the entity from the ECS
+		auto has_value() noexcept			-> bool;			///< Check whether the entity still exists in the ECS
+		auto update() noexcept				-> bool;			///< Update the entity in the ECS
+		auto erase() noexcept				-> bool;			///< Erase the entity from the ECS
 
 		template<size_t I>
 		auto component() noexcept -> std::optional<vtll::Nth_type<E,I>> {	///< \returns the Ith component of the entity.
@@ -600,7 +604,8 @@ namespace vecs {
 		//-------------------------------------------------------------------------
 		//insert data
 
-		template<typename... Cs> [[nodiscard]]
+		template<typename E, typename... Cs>
+		requires is_composed_of<E, Cs...> [[nodiscard]]
 		auto insert(Cs&&... args) noexcept	-> VecsHandle;	///< Insert a new entity into the ECS
 
 		//-------------------------------------------------------------------------
@@ -681,10 +686,11 @@ namespace vecs {
 	* \param[in] args The components for the entity.
 	* \returns the handle of thw new entity.
 	*/
-	template<typename... Cs> [[nodiscard]]
+	template<typename E, typename... Cs>
+	requires is_composed_of<E, Cs...> [[nodiscard]]
 	auto VecsRegistryBaseClass::insert(Cs&&... args) noexcept	-> VecsHandle {
 		static_assert(vtll::is_same<VeEntityType<std::decay_t<Cs>...>, std::decay_t<Cs>...>::value);
-		return VecsRegistry<VeEntityType<std::decay_t<Cs>...>>().insert(std::forward<Cs>(args)...);
+		return VecsRegistry<E>().insert(std::forward<Cs>(args)...);
 	}
 
 	/**
@@ -1688,6 +1694,14 @@ namespace vecs {
 
 	//-------------------------------------------------------------------------
 	//VecsEntityProxy
+
+	template <typename E>
+	template<typename... Cs>
+	requires are_components_of<E,Cs...>
+	VecsEntityProxy<E>::VecsEntityProxy(Cs&&... args) noexcept	{
+		m_component_data = std::forward_as_tuple(args...);
+		m_handle = VecsRegistry<E>().insert(std::forward<Cs>(args)...);
+	}
 
 	/**
 	* \brief Check whether the entity that this local copy represents is still valid.

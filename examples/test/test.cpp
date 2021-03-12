@@ -33,13 +33,17 @@ int main() {
 
 	{
 		TESTRESULT(++number, "insert", 
-			auto h1 = VecsRegistry{}.insert(VeComponentName{ "Node" }, pos, orient, trans),
+			auto h1 = VecsRegistry{}.insert<VeEntityTypeNode>(VeComponentName{ "Node" }, pos, orient, trans),
 				h1.has_value() && VecsRegistry().size() == 1, );
 
 		TESTRESULT(++number, "insert<type>", 
-			auto h2 = VecsRegistry<VeEntityTypeDraw>{}.insert(VeComponentName{ "Draw" }, mat, geo),
+			auto h2 = VecsRegistry<VeEntityTypeDraw>{}.insert(VeComponentName{ "Draw" }, pos, orient, trans, mat, geo),
 				h2.has_value() && VecsRegistry().size() == 2, );
-		
+
+		TESTRESULT(++number, "insert per proxy",
+			auto pr1 = VecsEntityProxy<VeEntityTypeDraw>(VeComponentName{ "Draw" }, pos, orient, trans, mat, geo),
+			pr1.has_value() && VecsRegistry().size() == 3, );
+
 		TESTRESULT(++number, "component entity", auto ent1  = h1.proxy<VeEntityTypeNode>(),
 			(ent1.component<VeComponentPosition>().m_position == glm::vec3{ 9.0f, 2.0f, 3.0f }), );
 
@@ -71,6 +75,9 @@ int main() {
 		TESTRESULT(++number, "update handle", h1.update<VeComponentPosition>(VeComponentPosition{ glm::vec3{-99.0f, -22.0f, -33.0f} }),
 			(h1.component<VeComponentPosition>().value().m_position == glm::vec3{ -99.0f, -22.0f, -33.0f }), );
 
+		TESTRESULT(++number, "erase handle per entity", pr1.erase(), (!pr1.has_value() && VecsRegistry().size() == 2), );
+		TESTRESULT(++number, "size", , (VecsRegistry().size<VeEntityTypeDraw>() == 1), );
+
 		TESTRESULT(++number, "erase handle", h1.erase(), (!h1.has_value() && VecsRegistry().size() == 1), );
 		TESTRESULT(++number, "size", ,	(VecsRegistry().size<VeEntityTypeNode>() == 0), );
 
@@ -98,8 +105,8 @@ int main() {
 		const int num = 1000;
 
 		for (int i = 0; i < num; i++) {
-			auto h1 = VecsRegistry{}.insert(VeComponentName{ "Node" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentTransform{});
-			auto h2 = VecsRegistry{}.insert(VeComponentName{ "Draw" }, VeComponentMaterial{ 1 }, VeComponentGeometry{ 1 });
+			auto h1 = VecsRegistry<VeEntityTypeNode>{}.insert(VeComponentName{ "Node" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentTransform{});
+			auto h2 = VecsRegistry<VeEntityTypeDraw>{}.insert(VeComponentName{ "Draw" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentTransform{}, VeComponentMaterial{ 1 }, VeComponentGeometry{ 1 });
 		}
 		TESTRESULT(++number, "system create", , (VecsRegistry().size() == 2*num), );
 
@@ -152,7 +159,7 @@ int main() {
 
 			//std::cout << "Entity IN " << name.m_name << " " << i << "\n";
 			auto ii = i;
-			while (self.template operator()(b++, e, self, ++i)) { --i; };
+			while (self(b++, e, self, ++i)) { --i; };
 
 			if (name.m_name != ("Name Holder 2 " + std::to_string(ii))) { test = false; }
 			//std::cout << "Entity " << name.m_name << " " << ii << "\n";
