@@ -80,7 +80,8 @@ namespace vecs {
 	/**
 	* Since the sum of all max sizes is probably not divisible by the segment size, get the next multiple of the VecsTableMaxSeg.
 	*/
-	using VecsTableMaxSize = std::integral_constant<size_t, VecsTableMaxSeg::value * (VecsTableMaxSizeSum::value / VecsTableMaxSeg::value + 1)>;
+	//using VecsTableMaxSize = std::integral_constant<size_t, VecsTableMaxSeg::value * (VecsTableMaxSizeSum::value / VecsTableMaxSeg::value + 1)>;
+	using VecsTableMaxSize = vtll::smallest_pow2_larger_eq<VecsTableMaxSeg>;
 
 	using VecsTableLayoutMap = vtll::cat< VeTableLayoutMapSystem, VeTableLayoutMapUser >;
 
@@ -166,7 +167,7 @@ namespace vecs {
 
 		/** \returns the type index of the handle. */
 		auto type() const noexcept	-> uint32_t { return static_cast<uint32_t>(m_type_index); };
-		auto is_valid() noexcept	-> bool;	///< The data in the handle is non null
+		inline auto is_valid() noexcept	-> bool;	///< The data in the handle is non null
 		auto has_value() noexcept	-> bool;	///< The entity that is pointed to exists in the ECS
 
 		template<typename E>

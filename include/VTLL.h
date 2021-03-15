@@ -55,6 +55,98 @@ namespace vtll {
 	}
 
 	//-------------------------------------------------------------------------
+	//type_to_value: turn a list of std::integral_constant<> into a value list
+
+	namespace detail {
+		template<typename Seq>
+		struct type_to_value_impl;
+
+		template<template<typename...> typename Seq, typename... Ts>
+		struct type_to_value_impl<Seq<Ts...>> {
+			using type = value_list<Ts::value...>;
+		};
+	}
+
+	template<typename Seq>
+	using type_to_value = typename detail::type_to_value_impl<Seq>::type;
+
+	static_assert(
+		std::is_same_v<
+		type_to_value<
+		type_list< std::integral_constant<size_t, 2>, std::integral_constant<size_t, 4>, std::integral_constant<size_t, 6> > >
+		, value_list<2, 4, 6>
+		>,
+		"The implementation of type_to_value is bad");
+
+	//-------------------------------------------------------------------------
+	//value_to_type: turn a value list into a list of std::integral_constant<>
+
+	namespace detail {
+		template<typename Seq>
+		struct value_to_type_impl;
+
+		template<template<size_t...> typename Seq, size_t... Is>
+		struct value_to_type_impl<Seq<Is...>> {
+			using type = type_list<std::integral_constant<size_t, Is>...>;
+		};
+	}
+
+	template<typename Seq>
+	using value_to_type = typename detail::value_to_type_impl<Seq>::type;
+
+	static_assert(
+		std::is_same_v<
+		value_to_type< value_list<2, 4, 6> >
+		, type_list< std::integral_constant<size_t, 2>, std::integral_constant<size_t, 4>, std::integral_constant<size_t, 6> >
+		>,
+		"The implementation of value_to_type is bad");
+
+
+	//-------------------------------------------------------------------------
+	//index_to_value_impl: Convert a std::index_sequence to a value_list
+
+	namespace detail {
+		template<typename T>
+		struct index_to_value_impl;
+
+		template<template<class Ty, Ty... Is> typename Seq, typename Ty, Ty... Is>
+		struct index_to_value_impl<Seq<Ty, Is...>> {
+			using type = value_list<Is...>;
+		};
+	}
+
+	template<typename Seq>
+	struct index_to_value {
+		using type = typename detail::index_to_value_impl< Seq >::type;
+	};
+
+	static_assert( std::is_same_v< typename index_to_value<std::make_index_sequence<3> >::type , value_list<0,1,2>>
+		, "The implementation of intseq_to_value is bad");
+
+
+	//-------------------------------------------------------------------------
+	//value_to_index: 
+
+	namespace detail {
+		template<typename T>
+		struct value_to_index_impl;
+
+		template<template<size_t... Is> typename Seq, size_t... Is>
+		struct value_to_index_impl<Seq<Is...>> {
+			using type = std::index_sequence<Is...>;
+		};
+	}
+
+	template<typename Seq>
+	struct value_to_index {
+		using type = typename detail::value_to_index_impl< Seq >::type;
+	};
+
+	static_assert(std::is_same_v< typename value_to_index<value_list<0, 1, 2>>::type, std::make_index_sequence<3> >
+		, "The implementation of value_to_intseq is bad");
+
+
+	//-------------------------------------------------------------------------
 	//type list algorithms
 
 
@@ -323,6 +415,21 @@ namespace vtll {
 	static_assert( is_same<type_list<double, int>, double, int>::value, "The implementation of is_same is bad");
 
 	//-------------------------------------------------------------------------
+	//all_pow2: return a list of all possible powers of 2 with 64 bits
+
+	namespace detail {
+		template<typename T>
+		struct all_pow2_impl;
+
+		template<template<class Ty, Ty... Is> typename T, typename Ty, Ty... Is>
+		struct all_pow2_impl<T<Ty, Is...>> {
+			using type = type_list< std::integral_constant<size_t, (1ULL << Is)>... >;
+		};
+	}
+
+	using all_pow2 = typename detail::all_pow2_impl< std::make_index_sequence<64> >::type;
+
+	//-------------------------------------------------------------------------
 	//has_type: check whether a type list contains a type
 
 	namespace detail {
@@ -346,6 +453,31 @@ namespace vtll {
 
 	static_assert(has_type<type_list<double, int, char, double>, char>::value, "The implementation of has_type is bad");
 	static_assert(!has_type<type_list<double, int, char, double>, float>::value, "The implementation of has_type is bad");
+
+	//-------------------------------------------------------------------------
+	//is_pow2: test whether a std::integral_constant<size_t, I> is a power of 2
+
+	/*namespace detail {
+		template<typename T, uint64_t... Is>
+		constexpr auto is_pow2_impl(std::index_sequence<Is...>) {
+			return ((T::value == (1ULL << Is)) || ...);
+		}
+	}
+
+	template <typename T>
+	constexpr auto is_pow2() {
+		return detail::is_pow2_impl<T>(std::make_integer_sequence<size_t, 64>{ });
+	}*/
+
+	template <typename T>
+	constexpr auto is_pow2() {
+		return has_type<all_pow2, T>::value;
+	}
+
+	static_assert(is_pow2<std::integral_constant<size_t, 128>>(), "The implementation of is_pow2 is bad");
+	static_assert(is_pow2<std::integral_constant<size_t, 1 << 20>>(), "The implementation of is_pow2 is bad");
+	static_assert(!is_pow2<std::integral_constant<size_t, (1 << 20) + 1>>(), "The implementation of is_pow2 is bad");
+	static_assert(!is_pow2<std::integral_constant<size_t, 63>>(), "The implementation of is_pow2 is bad");
 
 	//-------------------------------------------------------------------------
 	//erase_type: erase a type C from a type list
@@ -655,6 +787,33 @@ namespace vtll {
 		"The implementation of min is bad");
 
 	//-------------------------------------------------------------------------
+	//smallest_pow2_larger_eq: find smallest power of 2 larger or equal than a given number
+
+	namespace detail {
+		template<typename P2, typename T>
+		struct smaller_or_max {
+			using max_t = std::integral_constant<size_t, std::numeric_limits<size_t>::max()>;
+			using type = typename std::conditional< (P2::value < T::value), max_t, P2 >::type;
+		};
+
+		template<typename Seq, typename T>
+		struct smallest_pow2_larger_eq_impl;
+
+		template<template<typename...> typename Seq, typename... Ps, typename T>
+		struct smallest_pow2_larger_eq_impl<Seq<Ps...>, T> {
+			using type = min< type_list< typename smaller_or_max<Ps, T>::type...> >;
+		};
+	}
+
+	template <typename T>
+	using smallest_pow2_larger_eq = typename detail::smallest_pow2_larger_eq_impl<all_pow2, T>::type;
+
+	static_assert( std::is_same_v< smallest_pow2_larger_eq< std::integral_constant<size_t, 62> >
+		, std::integral_constant<size_t, 64> >
+		, "The implementation of smallest_pow2_larger is bad");
+	
+
+	//-------------------------------------------------------------------------
 	//function: compute function on list of std::integral_constant<size_t, I>
 
 	namespace detail {
@@ -908,54 +1067,6 @@ namespace vtll {
 
 
 	//-------------------------------------------------------------------------
-	//type_to_value: turn a list of std::integral_constant<> into a value list
-
-	namespace detail {
-		template<typename Seq>
-		struct type_to_value_impl;
-
-		template<template<typename...> typename Seq, typename... Ts>
-		struct type_to_value_impl<Seq<Ts...>> {
-			using type = value_list<Ts::value...>;
-		};
-	}
-
-	template<typename Seq>
-	using type_to_value = typename detail::type_to_value_impl<Seq>::type;
-
-	static_assert(
-		std::is_same_v<
-			type_to_value<
-				type_list< std::integral_constant<size_t, 2>, std::integral_constant<size_t, 4>, std::integral_constant<size_t, 6> > >
-			, value_list<2, 4, 6>
-		>,
-		"The implementation of type_to_value is bad");
-
-	//-------------------------------------------------------------------------
-	//value_to_type: turn a value list into a list of std::integral_constant<>
-
-	namespace detail {
-		template<typename Seq>
-		struct value_to_type_impl;
-
-		template<template<size_t...> typename Seq, size_t... Is>
-		struct value_to_type_impl<Seq<Is...>> {
-			using type = type_list<std::integral_constant<size_t, Is>...>;
-		};
-	}
-
-	template<typename Seq>
-	using value_to_type = typename detail::value_to_type_impl<Seq>::type;
-
-	static_assert(
-		std::is_same_v<
-		value_to_type< value_list<2, 4, 6> >
-		, type_list< std::integral_constant<size_t, 2>, std::integral_constant<size_t, 4>, std::integral_constant<size_t, 6> >
-		>,
-		"The implementation of value_to_type is bad");
-
-
-	//-------------------------------------------------------------------------
 	//size_value: get the size of a value list
 
 	namespace detail {
@@ -1019,6 +1130,17 @@ namespace vtll {
 
 	static_assert(std::is_same_v< sum_value< 1, 2, 3>, std::integral_constant<size_t, 6> >,
 		"The implementation of sum_value is bad");
+
+	//-------------------------------------------------------------------------
+	//is_pow2_value: test whether a value is a power of 2
+
+	template <size_t I>
+	constexpr auto is_pow2_value() {
+		return is_pow2<std::integral_constant<size_t, I>>();
+	}
+
+	static_assert(is_pow2_value<64>(), "The implementation of is_pow2 is bad");
+	static_assert(!is_pow2_value<63>(), "The implementation of is_pow2 is bad");
 
 
 	//-------------------------------------------------------------------------
