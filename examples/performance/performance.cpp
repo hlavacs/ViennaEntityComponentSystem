@@ -43,13 +43,13 @@ void recursive() {
 void linear(std::vector<VeComponentPosition>& vec) {
 
 	int i = 0;
-	if (vec.size() > 0) {
+	/*if (vec.size() > 0) {
 		for (auto&& [handle, pos] : VecsRegistry().begin<VeComponentPosition>()) {
 			if (!handle.is_valid()) continue;
 			++i;
 			vec[i] = pos;
 		}
-	}
+	}*/
 
 	i = 0;
 	for (auto&& [handle, pos] : VecsRegistry().begin<VeComponentPosition>()) {
