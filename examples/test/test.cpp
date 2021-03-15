@@ -133,7 +133,7 @@ int main() {
 		i = 0;
 		test = true;
 		for (auto&& [handle, name] : VecsRegistry().begin<VeComponentName>()) {
-			VecsLock lock{handle};
+			VecsReadLock lock(handle.mutex());
 			if (!handle.is_valid()) continue;
 			++i;
 			name.m_name = "Name Holder 2 " + std::to_string(i);
