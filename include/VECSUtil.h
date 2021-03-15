@@ -59,6 +59,80 @@ namespace vecs {
 	};
 
 
+	class VecsReadLock {
+	protected:
+		std::atomic<uint32_t>& m_mutex;
+
+		static const uint32_t WRITE = 1 << 24;
+
+	public:
+		static void lock(std::atomic<uint32_t>& mutex) {
+			uint32_t val = mutex.fetch_add(1);
+			while (val >= WRITE) {
+				val = mutex.fetch_sub(1);
+				size_t cnt = 0;
+				do {
+					if (++cnt > 1000) { 
+						cnt = 0;
+						std::this_thread::sleep_for(1ns); 
+					}
+					val = mutex.load();
+				} while(val >= WRITE);
+				val = mutex.fetch_add(1);
+			}
+		}
+
+		static void unlock(std::atomic<uint32_t>& mutex) {
+			mutex--;
+		}
+
+		VecsReadLock(std::atomic<uint32_t>& mutex) : m_mutex(mutex) {
+			lock(mutex);
+		}
+
+		~VecsReadLock() {
+			unlock(m_mutex);
+		}
+	};
+
+
+	class VecsWriteLock {
+	protected:
+		std::atomic<uint32_t>& m_mutex;
+
+		static const uint32_t WRITE = 1 << 24;
+
+	public:
+		static void lock(std::atomic<uint32_t>& mutex) {
+			uint32_t val = mutex.fetch_add(WRITE);
+			while (val != 0) {
+				val = mutex.fetch_sub(WRITE);
+				size_t cnt = 0;
+				do {
+					if (++cnt > 1000) {
+						cnt = 0;
+						std::this_thread::sleep_for(1ns);
+					}
+					val = mutex.load();
+				} while (val != 0);
+				val = mutex.fetch_add(WRITE);
+			}
+		}
+
+		static void unlock(std::atomic<uint32_t>& mutex) {
+			mutex.fetch_sub(WRITE);
+		}
+
+		VecsWriteLock(std::atomic<uint32_t>& mutex) : m_mutex(mutex) {
+			lock(mutex);
+		}
+
+		~VecsWriteLock() {
+			unlock(m_mutex);
+		}
+	};
+
+
 };
 
 

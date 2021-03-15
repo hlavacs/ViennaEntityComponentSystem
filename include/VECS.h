@@ -12,8 +12,10 @@
 #include <chrono>
 #include "VTLL.h"
 #include "VECSTable.h"
+
+//user defined component types and entity types
 #include "VECSCompSystem.h"
-#include "VECSCompUser.h"  //user defined component types and entity types
+#include "VECSCompUser.h"  
 
 using namespace std::chrono_literals;
 
@@ -58,6 +60,7 @@ namespace vecs {
 	* Table constants retrieves mappings for all entity types from the VecsTableSizeMap (which have the format vtll::value_list<A,B>).
 	* Then it turns the value lists to type lists, each value is stored in a std::integral_constant<size_t, V> type.
 	*/
+	using VeTableSizeDefault = vtll::value_list< 10, 16 >;
 	using VecsTableConstants = vtll::transform < vtll::apply_map<VecsTableSizeMap, VecsEntityTypeList, VeTableSizeDefault>, vtll::value_to_type>;
 
 	/**
@@ -78,9 +81,8 @@ namespace vecs {
 	using VecsTableMaxSizeSum = vtll::sum< vtll::function< vtll::transform< VecsTableConstants, vtll::back >, left_shift_1 > >;
 
 	/**
-	* Since the sum of all max sizes is probably not divisible by the segment size, get the next multiple of the VecsTableMaxSeg.
+	* Since the sum of all max sizes is probably not divisible by the segment size, get the next power of 2 larger or equ VecsTableMaxSeg.
 	*/
-	//using VecsTableMaxSize = std::integral_constant<size_t, VecsTableMaxSeg::value * (VecsTableMaxSizeSum::value / VecsTableMaxSeg::value + 1)>;
 	using VecsTableMaxSize = vtll::smallest_pow2_larger_eq<VecsTableMaxSeg>;
 
 	using VecsTableLayoutMap = vtll::cat< VeTableLayoutMapSystem, VeTableLayoutMapUser >;
@@ -288,7 +290,7 @@ namespace vecs {
 		using value_type = vtll::to_tuple<E>;		///< A tuple storing all components of entity of type E
 		using layout_type = vtll::map<VecsTableLayoutMap, E, VECS_LAYOUT_DEFAULT>;
 
-		using info = vtll::type_list<VecsHandle, std::atomic_flag*>;	///< List of management data per entity (only a handle)
+		using info = vtll::type_list<VecsHandle, std::atomic_flag*>;	///< List of management data per entity (handle and sync flag)
 		static const size_t c_handle = 0;		///< Component index of the handle info
 		static const size_t c_flag = 1;			///< Component index of the handle info
 		static const size_t c_info_size = 2;	///< Index where the entity data starts
