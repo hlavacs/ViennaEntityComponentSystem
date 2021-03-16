@@ -25,7 +25,8 @@ void recursive() {
 		}
 
 		auto ii = i;
-		while (self(b++, e, self, ++i)) { --i; };
+		b++;
+		while (self(b, e, self, ++i)) { --i; };
 
 		pos.m_position = glm::vec3{ 4.0f + ii, 5.0f + ii, 6.0f + ii };
 
@@ -82,10 +83,10 @@ void init(size_t num) {
 
 int main() {
 
-	VecsRegistry{1 << 28};
-	VecsRegistry<VeEntityTypeNode>{1 << 25};
-	VecsRegistry<VeEntityTypeDraw>{1 << 25};
-	VecsRegistry<VeEntityTypeAnimation>{1 << 25};
+	VecsRegistry{};
+	VecsRegistry<VeEntityTypeNode>{};
+	VecsRegistry<VeEntityTypeDraw>{};
+	VecsRegistry<VeEntityTypeAnimation>{};
 
 	size_t num = 200000;
 	std::vector<VeComponentPosition> vec{ 2*num };
@@ -109,7 +110,7 @@ int main() {
 	double dt2 = d2.count() / 1.0;
 	double dt3 = d3.count() / 1.0;
 
-	std::cout << dt1 << " " << dt2 << " " << dt3 << "\n";
+	std::cout << "Init " << dt1 << " Recursive " << dt2 << " Linear " << dt3 << "\n";
 	std::cout << dt1 / VecsRegistry().size() << " " << dt2 / VecsRegistry().size() << " " << dt3 / VecsRegistry().size() << "\n";
 
     return 0;

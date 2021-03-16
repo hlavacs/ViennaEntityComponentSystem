@@ -159,7 +159,8 @@ int main() {
 
 			//std::cout << "Entity IN " << name.m_name << " " << i << "\n";
 			auto ii = i;
-			while (self(b++, e, self, ++i)) { --i; };
+			b++;
+			while (self(b, e, self, ++i)) { ++b;  --i; };
 
 			if (name.m_name != ("Name Holder 2 " + std::to_string(ii))) { test = false; }
 			//std::cout << "Entity " << name.m_name << " " << ii << "\n";
