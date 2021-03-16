@@ -27,6 +27,7 @@ include_directories (${INCLUDE})
 add_subdirectory (examples/basic_test)
 add_subdirectory (examples/test)
 add_subdirectory (examples/performance)
+add_subdirectory (examples/parallel)
 
 find_package(Doxygen)
 if (DOXYGEN_FOUND)

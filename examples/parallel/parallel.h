@@ -1,5 +1,5 @@
-#ifndef VECSUSER_H
-#define VECSUSER_H
+#ifndef PARALLEL_H
+#define PARALLEL_H
 
 
 #include <limits>
@@ -7,8 +7,9 @@
 #include <typeindex>
 #include "VECSUtil.h"
 
+#include "VECSCompSystem.h"
 
-#ifndef VECS_USER_DATA
+#define VECS_USER_DATA
 
 namespace vecs {
 
@@ -22,12 +23,13 @@ namespace vecs {
 	//...
 
 	//using VeComponentTypeListUser = vttl::type_list<VeComponentUser1>; //include all user components into this list
-	
+
 	using VeComponentTypeListUser = vtll::type_list<>; //default is no user define components
 
 
 	//-------------------------------------------------------------------------
 	//define user entity types here
+
 
 	using VeEntityUser1 = VeEntityType<VeComponentPosition, VeComponentUser1>; //can be any mix of component types
 
@@ -37,7 +39,7 @@ namespace vecs {
 	>;
 
 	using VeTableSizeMapUser = vtll::type_list<
-		  vtll::type_list< VeEntityUser1,	vtll::value_list< 10, 16 > >
+		vtll::type_list< VeEntityUser1, vtll::value_list< 10, 16 > >
 		//, ...
 	>;
 
@@ -46,10 +48,7 @@ namespace vecs {
 		//, ...
 	>;
 
-
 }
-
-#endif
 
 #endif
 
