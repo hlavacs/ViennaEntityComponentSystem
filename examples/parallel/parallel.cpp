@@ -71,15 +71,13 @@ void init(size_t num) {
 }
 
 
-vgjs::Coro<> start() {
+vgjs::Coro<> start( size_t num ) {
     std::cout << "Start \n";
 
 	VecsRegistry{ 1 << 23 };
 	VecsRegistry<VeEntityTypeNode>{ 1 << 20 };
 	VecsRegistry<VeEntityTypeDraw>{ 1 << 20 };
 	VecsRegistry<VeEntityTypeAnimation>{ 1 << 20 };
-
-	size_t num = 300000;
 
 	co_await [&]() { init(num); };
 
@@ -245,10 +243,12 @@ int main() {
 
 	//vgjs::JobSystem().enable_logging();
 
-	auto st = start()(vgjs::thread_index_t{}, vgjs::thread_type_t{ 1 }, vgjs::thread_id_t{ 999 });
+	size_t num = 100000;
+
+	auto st = start( num )(vgjs::thread_index_t{}, vgjs::thread_type_t{ 1 }, vgjs::thread_id_t{ 999 });
     vgjs::schedule( st );
 	
-	//vgjs::schedule( vgjs::Function( []() { func1( 100000 ); }, vgjs::thread_index_t{}, vgjs::thread_type_t{ 1 }, vgjs::thread_id_t{ 51 }) );
+	//vgjs::schedule( vgjs::Function( [=]() { func1( num ); }, vgjs::thread_index_t{}, vgjs::thread_type_t{ 1 }, vgjs::thread_id_t{ 51 }) );
 
 
     vgjs::wait_for_termination();
