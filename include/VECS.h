@@ -1064,8 +1064,8 @@ namespace vecs {
 		virtual auto mutex() noexcept			-> std::atomic<uint32_t>*;
 		virtual auto has_value() noexcept		-> bool;					///< Is currently pointint to a valid entity
 		virtual	auto operator*() noexcept		-> ref_type;				///< Access the data
-		virtual auto operator++() noexcept		-> void;					///< Increase by 1
-		virtual auto operator++(int) noexcept	-> void;					///< Increase by 1
+		virtual auto operator++() noexcept		-> VecsIterator<Cs...>&;	///< Increase by 1
+		virtual auto operator++(int) noexcept	-> VecsIterator<Cs...>&;	///< Increase by 1
 		virtual auto is_vector_end() noexcept	-> bool;					///< Is currently at the end of any sub iterator
 		virtual auto size() noexcept			-> size_t;					///< Number of valid entities
 	};
@@ -1183,14 +1183,15 @@ namespace vecs {
 	* \returns *this.
 	*/
 	template<typename... Cs>
-	inline auto VecsIterator<Cs...>::operator++() noexcept		-> void {
-		if (m_is_end) return;
+	inline auto VecsIterator<Cs...>::operator++() noexcept		-> VecsIterator<Cs...>& {
+		if (m_is_end) return *this;
 		(*m_dispatch[m_current_iterator])++;
 
 		if (m_dispatch[m_current_iterator]->is_vector_end() && m_current_iterator.value < m_dispatch.size() - 1) {
 			++m_current_iterator;
 		}
 		m_current_index = m_dispatch[m_current_iterator]->m_current_index;
+		return *this;
 	};
 
 	/**
@@ -1199,8 +1200,8 @@ namespace vecs {
 	* \returns *this.
 	*/
 	template<typename... Cs>
-	inline auto VecsIterator<Cs...>::operator++(int) noexcept	-> void {
-		operator++();
+	inline auto VecsIterator<Cs...>::operator++(int) noexcept	-> VecsIterator<Cs...>& {
+		return operator++();
 	};
 
 	/**

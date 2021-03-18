@@ -352,7 +352,7 @@ namespace vgjs {
     */
     class JobSystem {
         static inline const uint32_t c_queue_capacity = 1<<10; ///<save at most N Jobs for recycling
-        static inline const bool c_enable_logging = true;
+        static inline const bool c_enable_logging = false;
 
     private:
         static inline std::atomic<uint64_t>             m_init_counter = 0;
@@ -526,7 +526,7 @@ namespace vgjs {
         * \param[in] threadIndex Number of this thread
         */
         void thread_task(thread_index_t threadIndex = thread_index_t(0) ) noexcept {
-            constexpr uint32_t NOOP = 1<<5;                                   //number of empty loops until garbage collection
+            constexpr uint32_t NOOP = 1<<8;                                   //number of empty loops until garbage collection
             thread_local static uint32_t noop_counter = 0;
             m_thread_index = threadIndex;	                                //Remember your own thread index number
             static std::atomic<uint32_t> thread_counter = m_thread_count.load();	//Counted down when started
@@ -536,6 +536,9 @@ namespace vgjs {
 
             uint32_t next = rand() % m_thread_count;                        //initialize at random position for stealing
             auto start = high_resolution_clock::now();
+
+            std::unique_lock<std::mutex> lk(*m_mutex[m_thread_index.value]);
+
             while (!m_terminate) {			                                //Run until the job system is terminated
                 m_current_job = m_local_queues[m_thread_index.value].pop();       //try get a job from the local queue
                 if (m_current_job == nullptr) {
@@ -576,9 +579,9 @@ namespace vgjs {
                     noop_counter = 0;
                 }
                 else if (++noop_counter > NOOP) {   //if none found too longs let thread sleep
-                    m_delete.clear();       //delete jobs to reclaim memory
-                    std::unique_lock<std::mutex> lk(*m_mutex[m_thread_index.value]);
-                    m_cv[m_thread_index.value]->wait_for(lk, std::chrono::microseconds(100));
+                    m_delete.clear();       //delete jobs to reclaim memory                  
+                    m_cv[0]->wait_for(lk, std::chrono::microseconds(100));
+                    //m_cv[m_thread_index.value]->wait_for(lk, std::chrono::microseconds(100));
                     noop_counter = noop_counter / 2;
                 }
             };
@@ -692,13 +695,15 @@ namespace vgjs {
 
             if (job->m_thread_index.value < 0 || job->m_thread_index.value >= (int)m_thread_count ) {
                 thread_index.value = (++thread_index.value) >= (decltype(thread_index.value))m_thread_count ? 0 : thread_index.value;
-                m_global_queues[thread_index.value].push(job);
-                m_cv[thread_index.value]->notify_one();                    //wake up the thread
+                m_global_queues[thread_index].push(job);
+                //m_cv[thread_index.value]->notify_one();       //wake up the thread
+                m_cv[0]->notify_all();       //wake up the thread
                 return 1;
             }
 
             m_local_queues[job->m_thread_index.value].push(job); //to a specific thread
-            m_cv[job->m_thread_index.value]->notify_one();
+            //m_cv[job->m_thread_index]->notify_one();
+            m_cv[0]->notify_all();       //wake up the thread
             return 1;
         };
 
