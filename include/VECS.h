@@ -97,8 +97,10 @@ namespace vecs {
 	class VecsReadLock;
 	class VecsWriteLock;
 	template <typename E> class VecsEntityProxy;
+	template<typename E> class VecsComponentAccessor;
+	template<typename E, size_t I> class VecsComponentAccessorDerived;
 	template<typename E> class VecsComponentTable;
-	template<typename E, size_t I> class VecsComponentTableDerived;
+	//template<typename E, size_t I> class VecsComponentTableDerived;
 	class VecsRegistryBaseClass;
 	template<typename E> class VecsRegistry;
 	template<typename... Cs> class VecsIterator;
@@ -153,7 +155,7 @@ namespace vecs {
 		friend VecsRegistryBaseClass;
 		template<typename E> friend class VecsRegistry;
 		template<typename E> friend class VecsComponentTable;
-		template<typename E, size_t I> friend class VecsComponentTableDerived;
+		//template<typename E, size_t I> friend class VecsComponentTableDerived;
 
 	protected:
 		index_t		m_entity_index{};			///< The slot of the entity in the entity list
@@ -267,12 +269,24 @@ namespace vecs {
 	//-------------------------------------------------------------------------
 	//component vector - each entity type has them
 
+	/**
+	* \brief Base class for dispatching accesses to entity components if the entity type is not known.
+	*/
+	template<typename E>
+	class VecsComponentAccessor {
+	public:
+		VecsComponentAccessor() noexcept {};	///<Constructor
+		virtual auto updateC(index_t index, size_t compidx, void* ptr, size_t size) noexcept -> bool = 0;		///< Empty update
+		virtual auto componentE(index_t entidx, size_t compidx, void* ptr, size_t size)  noexcept -> bool = 0;	///< Empty component read
+	};
+
 
 	/**
 	* \brief This class stores all components of entities of type E.
 	*/
 	template<typename E>
 	class VecsComponentTable : public VecsMonostate<VecsComponentTable<E>> {
+		template<typename E, size_t I> friend class VecsComponentAccessorDerived;
 		friend class VecsRegistryBaseClass;
 		template<typename E> friend class VecsRegistry;
 		template<typename... Cs> friend class VecsIterator;
@@ -300,7 +314,7 @@ namespace vecs {
 		static inline VecsTable<types_deleted,  c_segment_size, VECS_LAYOUT_ROW::value>	m_deleted;	///< Table holding the indices of erased entities
 
 		/** Each component type C of the entity type E gets its own specialized class instance */
-		static inline std::array<std::unique_ptr<VecsComponentTable<E>>, vtll::size<VecsComponentTypeList>::value> m_dispatch;
+		static inline std::array<std::unique_ptr<VecsComponentAccessor<E>>, vtll::size<VecsComponentTypeList>::value> m_dispatch;
 
 		virtual auto updateC(index_t entidx, size_t compidx, void* ptr, size_t size) noexcept		-> bool;
 		virtual auto componentE(index_t entidx, size_t compidx, void* ptr, size_t size)  noexcept	-> bool;
@@ -459,68 +473,66 @@ namespace vecs {
 	//comnponent vector derived class
 
 	/**
-	* \brief This class is derived from the component vector and is used to update or
-	* return components C with indx I of entities of type E
+	* \brief For dispatching accesses to entity components if the entity type is not known.
 	*/
-
 	template<typename E, size_t I>
-	class VecsComponentTableDerived : public VecsComponentTable<E> {
+	class VecsComponentAccessorDerived : public VecsComponentAccessor<E> {
 	public:
-		using C = vtll::Nth_type<VecsComponentTypeList,I>;	///< Component type
+		using C = vtll::Nth_type<VecsComponentTypeList, I>;	///< Component type
 
-		/** 
-		* \brief Constructor of class VecsComponentTableDerived 
-		* \param[in] r Max number of entries allowed in the component table 
+		/**
+		* \brief Constructor of class VecsComponentAccessorDerived
+		* \param[in] r Max number of entries allowed in the component table
 		*/
-		VecsComponentTableDerived( size_t r = 1 << VecsComponentTable<E>::c_max_size) noexcept : VecsComponentTable<E>(r) {};
+		VecsComponentAccessorDerived() noexcept : VecsComponentAccessor<E>() {}
 
 	protected:
 
-		/** 
+		/**
 		* \brief Update the component C of entity E
 		* \param[in] index Index of the entity in the component table.
 		* \param[in] comp Universal reference to the new component data.
-		* \returns true if the update was successful. 
+		* \returns true if the update was successful.
 		*/
 		auto update(const index_t index, C&& comp) noexcept -> bool {
-			if constexpr (is_component_of<E,C>) {
-				this->m_data.comp_ref_idx<this->c_info_size + vtll::index_of<E, std::decay_t<C>>::value>() = comp;
+			if constexpr (is_component_of<E, C>) {
+				VecsComponentTable<E>().m_data.comp_ref_idx<VecsComponentTable<E>::c_info_size + vtll::index_of<E, std::decay_t<C>>::value>() = comp;
 				return true;
 			}
 			return false;
 		}
 
-		/** 
+		/**
 		* \brief Update the component C of entity E.
 		* \param[in] index Index of the entity in the component table.
 		* \param[in] compidx Component index incomponent type list.
 		* \param[in] ptr Pointer to where the data comes from.
 		* \param[in] size Size of the component data.
-		* \returns true if the update was successful. 
+		* \returns true if the update was successful.
 		*/
 		auto updateC(index_t index, size_t compidx, void* ptr, size_t size) noexcept -> bool {
-			if constexpr (is_component_of<E,C>) {
-				this->m_data.comp_ref_idx<this->c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(index) = *((C*)ptr);
+			if constexpr (is_component_of<E, C>) {
+				VecsComponentTable<E>().m_data.comp_ref_idx<VecsComponentTable<E>::c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(index) = *((C*)ptr);
 				return true;
 			}
 			return false;
-		};
+		}
 
-		/** 
+		/**
 		* \brief Get component data.
 		* \param[in] index Index of the entity in the component table.
 		* \param[in] compidx Component index incomponent type list.
 		* \param[in] ptr Pointer to where the data should be copied to.
 		* \param[in] size Size of the component data.
-		* \returns true if the retrieval was successful. 
+		* \returns true if the retrieval was successful.
 		*/
 		auto componentE(index_t entidx, size_t compidx, void* ptr, size_t size)  noexcept -> bool {
 			if constexpr (is_component_of<E, C>) {
-				*((C*)ptr) = this->m_data.comp_ref_idx<this->c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(entidx);
+				*((C*)ptr) = VecsComponentTable<E>().m_data.comp_ref_idx<VecsComponentTable<E>::c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(entidx);
 				return true;
 			}
 			return false;
-		};
+		}
 	};
 
 
@@ -541,7 +553,7 @@ namespace vecs {
 
 		vtll::static_for<size_t, 0, vtll::size<VecsComponentTypeList>::value >( ///< Create dispatch table for all component types
 			[&](auto i) {
-				m_dispatch[i] = std::make_unique<VecsComponentTableDerived<E, i>>(r);
+				m_dispatch[i] = std::make_unique<VecsComponentAccessorDerived<E, i>>();
 			}
 		);
 	};
