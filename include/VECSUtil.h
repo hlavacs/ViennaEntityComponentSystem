@@ -32,11 +32,11 @@ namespace vecs {
 	*/
 	template <typename T, template<typename...> class crtpType>
 	struct VecsCRTP {
-		T& underlying() { return static_cast<T&>(*this); }
-		T const& underlying() const { return static_cast<T const&>(*this); }
+		T& underlying() { return static_cast<T&>(*this); }						///< \brief Access to underlying type
+		T const& underlying() const { return static_cast<T const&>(*this); }	///< \brief Access to underlying type
 
 	protected:
-		VecsCRTP() {};
+		VecsCRTP() {};		///< Constructor
 		friend crtpType<T>;
 	};
 
@@ -49,6 +49,9 @@ namespace vecs {
 	protected:
 		static inline std::atomic_flag m_init = ATOMIC_FLAG_INIT;
 
+		/** 
+		* \brief Initialize only once.
+		*/
 		bool init() {
 			if (m_init.test()) return false;
 			auto init = m_init.test_and_set();
@@ -58,78 +61,107 @@ namespace vecs {
 
 	};
 
-
+	/**
+	* \brief Lock for read access that is guarded by an std::atomic<uint32_t>. Reads can happen in parallel.
+	*/
 	class VecsReadLock {
 	protected:
 	public:
-		std::atomic<uint32_t>* m_mutex;
-		static const uint32_t WRITE = 1 << 24;
+		std::atomic<uint32_t>* m_mutex;			///< Pointer to the guard
+		static const uint32_t WRITE = 1 << 24;	///< Bit offset for storing write access
 
+		/**
+		* \brief Create the read lock
+		*/
 		static void lock(std::atomic<uint32_t>* mutex) {
-			if (mutex == nullptr) return;
-			uint32_t val = mutex->fetch_add(1);
-			while (val >= WRITE) {
-				val = mutex->fetch_sub(1);
+			if (mutex == nullptr) return;					//Is the guard valid?
+			uint32_t val = mutex->fetch_add(1);				//fetch old value and add 1 atomically
+			while (val >= WRITE) {							//Is there a writer active?
+				val = mutex->fetch_sub(1);					//Yes - remove own value
 				size_t cnt = 0;
 				do {
-					if (++cnt > 1000) { 
+					if (++cnt > 1000) {						//sleep if too often in loop
 						cnt = 0;
 						std::this_thread::sleep_for(1ns); 
 					}
-					val = mutex->load();
-				} while(val >= WRITE);
-				val = mutex->fetch_add(1);
+					val = mutex->load();					//still a writer?
+				} while(val >= WRITE);						//if yes, stay in loop
+				val = mutex->fetch_add(1);					//if no, again try to add 1 to signal reader
 			}
 		}
 
+		/**
+		* \brief Remove the read lock
+		*/
 		static void unlock(std::atomic<uint32_t>* mutex) {
 			if (mutex == nullptr) return;
 			mutex->fetch_sub(1);
 		}
 
+		/**
+		* \brief Constructor
+		*/
 		VecsReadLock(std::atomic<uint32_t>* mutex) : m_mutex(mutex) {
 			lock(mutex);
 		}
 
+		/**
+		* \brief Destructor
+		*/
 		~VecsReadLock() {
 			unlock(m_mutex);
 		}
 	};
 
 
+	/**
+	* \brief Lock for write access that is guarded by an std::atomic<uint32_t>. Write blocks all other accesses.
+	*/
 	class VecsWriteLock {
 	protected:
 	public:
 
-		std::atomic<uint32_t>* m_mutex;
-		static const uint32_t WRITE = 1 << 24;
+		std::atomic<uint32_t>* m_mutex;			///< Pointer to the guard
+		static const uint32_t WRITE = 1 << 24;	///< Bit offset for storing write access
 
+		/**
+		* \brief Create the write lock
+		*/
 		static void lock(std::atomic<uint32_t>* mutex) {
-			if (mutex == nullptr) return;
-			uint32_t val = mutex->fetch_add(WRITE);
-			while (val != 0) {
-				val = mutex->fetch_sub(WRITE);
+			if (mutex == nullptr) return;				///< Check if guard ok
+			uint32_t val = mutex->fetch_add(WRITE);		///< Announce yourself as writer by adding WRITE
+			while (val != 0) {							///< Have there been others?
+				val = mutex->fetch_sub(WRITE);			///< If yes, remove announcement
 				size_t cnt = 0;
 				do {
 					if (++cnt > 1000) {
 						cnt = 0;
-						std::this_thread::sleep_for(1ns);
+						std::this_thread::sleep_for(1ns);	///< If too long in the loop, then sleep
 					}
-					val = mutex->load();
-				} while (val != 0);
-				val = mutex->fetch_add(WRITE);
+					val = mutex->load();				///< Are there still others?
+				} while (val != 0);						///< If yes stay in loop
+				val = mutex->fetch_add(WRITE);			///< Again get old value and add WRITE
 			}
 		}
 
+		/**
+		* \brief Remove the write lock
+		*/
 		static void unlock(std::atomic<uint32_t>* mutex) {
 			if (mutex == nullptr) return;
 			mutex->fetch_sub(WRITE);
 		}
 
+		/**
+		* \brief Constructor
+		*/
 		VecsWriteLock(std::atomic<uint32_t>* mutex) : m_mutex(mutex) {
 			lock(mutex);
 		}
 
+		/**
+		* \brief Destructor
+		*/
 		~VecsWriteLock() {
 			unlock(m_mutex);
 		}

@@ -1089,7 +1089,6 @@ namespace vecs {
 	* \brief Iterator that iterates over a VecsComponentTable of type E
 	* and that is intested into components Cs
 	*/
-
 	template<typename... Cs>
 	class VecsIteratorEntityBaseClass {
 		template<typename... Cs> friend class VecsIterator;
@@ -1346,6 +1345,9 @@ namespace vecs {
 	//-------------------------------------------------------------------------
 	//VecsIteratorEntity
 
+	/**
+	* \brief Iterator that iterates over a VecsComponentTable of type E and that is intested into components Cs
+	*/
 	template<typename E, typename... Cs>
 	class VecsIteratorEntity : public VecsIteratorEntityBaseClass<Cs...> {
 	public:

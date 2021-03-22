@@ -12,38 +12,47 @@ namespace vecs {
 	//-------------------------------------------------------------------------
 	//component types
 
+	/** \brief Example for a system component*/
 	struct VeComponentName {
 		std::string m_name;
 	};
 
+	/** \brief Example for a system component*/
 	struct VeComponentPosition {
 		glm::vec3 m_position;
 	};
 
+	/** \brief Example for a system component*/
 	struct VeComponentOrientation {
 		glm::quat m_orientation;
 	};
 
+	/** \brief Example for a system component*/
 	struct VeComponentTransform {
 		glm::mat4 m_transform;
 	};
 
+	/** \brief Example for a system component*/
 	struct VeComponentMaterial {
 		int i;
 	};
 
+	/** \brief Example for a system component*/
 	struct VeComponentGeometry {
 		int i;
 	};
 
+	/** \brief Example for a system component*/
 	struct VeComponentAnimation {
 		int i;
 	};
 
+	/** \brief Example for a system component*/
 	struct VeComponentCollisionShape {
 		int i;
 	};
 
+	/** \brief Example for a system component*/
 	struct VeComponentRigidBody {
 		int i;
 	};
@@ -64,6 +73,9 @@ namespace vecs {
 	//-------------------------------------------------------------------------
 	//entity types
 
+	/**
+	* \brief Base of all entity types
+	*/
 	template <typename... Ts>
 	struct VeEntityType {};
 

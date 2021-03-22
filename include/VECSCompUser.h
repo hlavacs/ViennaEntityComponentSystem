@@ -15,7 +15,7 @@ namespace vecs {
 	//-------------------------------------------------------------------------
 	//define user components here
 
-	//declare your own entity components
+	/** \brief Example for a user component*/
 	struct VeComponentUser1 {
 		//..
 	};
