@@ -47,12 +47,12 @@ namespace vecs {
 	template<typename T>
 	class VecsMonostate : VecsCRTP<T,VecsMonostate> {
 	protected:
-		static inline std::atomic<uint32_t> m_init_counter = 0;
+		static inline std::atomic_flag m_init = ATOMIC_FLAG_INIT;
 
 		bool init() {
-			if (m_init_counter > 0) return false;
-			auto cnt = m_init_counter.fetch_add(1);
-			if (cnt > 0) return false;
+			if (m_init.test()) return false;
+			auto init = m_init.test_and_set();
+			if (init) return false;
 			return true;
 		};
 
