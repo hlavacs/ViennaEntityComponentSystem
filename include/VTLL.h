@@ -249,6 +249,11 @@ namespace vtll {
 		template <typename Seq1, typename Seq2>
 		struct cat_impl;
 
+		template <template <typename...> typename Seq1, template <typename...> typename Seq2>
+		struct cat_impl<Seq1<>, Seq2<>> {
+			using type = Seq1<>;
+		};
+
 		template <template <typename...> typename Seq1, template <typename...> typename Seq2, typename... Ts>
 		struct cat_impl<Seq1<>, Seq2<Ts...>> {
 			using type = Seq1<Ts...>;

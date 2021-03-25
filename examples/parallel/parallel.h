@@ -1,7 +1,6 @@
 #ifndef PARALLEL_H
 #define PARALLEL_H
 
-
 #include <limits>
 #include <typeinfo>
 #include <typeindex>
@@ -16,35 +15,95 @@ namespace vecs {
 	//-------------------------------------------------------------------------
 	//define user components here
 
-	//declare your own entity components
-	struct VeComponentUser1 {
-		//..
+	/** \brief Example for a user component*/
+	struct VeComponentName {
+		std::string m_name;
 	};
-	//...
 
-	//using VeComponentTypeListUser = vttl::type_list<VeComponentUser1>; //include all user components into this list
+	/** \brief Example for a user component*/
+	struct VeComponentPosition {
+		glm::vec3 m_position;
+	};
 
-	using VeComponentTypeListUser = vtll::type_list<>; //default is no user define components
+	/** \brief Example for a user component*/
+	struct VeComponentOrientation {
+		glm::quat m_orientation;
+	};
 
+	/** \brief Example for a user component*/
+	struct VeComponentTransform {
+		glm::mat4 m_transform;
+	};
+
+	/** \brief Example for a user component*/
+	struct VeComponentMaterial {
+		int i;
+	};
+
+	/** \brief Example for a user component*/
+	struct VeComponentGeometry {
+		int i;
+	};
+
+	/** \brief Example for a user component*/
+	struct VeComponentAnimation {
+		int i;
+	};
+
+	/** \brief Example for a user component*/
+	struct VeComponentCollisionShape {
+		int i;
+	};
+
+	/** \brief Example for a user component*/
+	struct VeComponentRigidBody {
+		int i;
+	};
+
+	using VeUserComponentTypeList = vtll::type_list<
+		VeComponentName
+		, VeComponentPosition
+		, VeComponentOrientation
+		, VeComponentTransform
+		, VeComponentMaterial
+		, VeComponentGeometry
+		, VeComponentAnimation
+		, VeComponentCollisionShape
+		, VeComponentRigidBody
+		//, ...
+	>;
 
 	//-------------------------------------------------------------------------
 	//define user entity types here
 
+	using VeEntityTypeNode = VeEntityType<VeComponentName, VeComponentPosition, VeComponentOrientation, VeComponentTransform>;
+	using VeEntityTypeDraw = VeEntityType<VeComponentName, VeComponentPosition, VeComponentOrientation, VeComponentTransform, VeComponentMaterial, VeComponentGeometry>;
+	using VeEntityTypeAnimation = VeEntityType<VeComponentName, VeComponentAnimation>;
 
-	using VeEntityUser1 = VeEntityType<VeComponentPosition, VeComponentUser1>; //can be any mix of component types
-
-	using VeEntityTypeListUser = vtll::type_list<
-		//VeEntityeUser1
-		//, ...  
+	using VeUserEntityTypeList = vtll::type_list<
+		VeEntityTypeNode
+		, VeEntityTypeDraw
+		, VeEntityTypeAnimation
+		// ,... 
 	>;
 
+	//-------------------------------------------------------------------------
+	//user size maps
+
 	using VeTableSizeMapUser = vtll::type_list<
-		vtll::type_list< VeEntityUser1, vtll::value_list< 10, 16 > >
+		vtll::type_list< VeEntityTypeNode, vtll::value_list< 15, 20 > >
+		, vtll::type_list< VeEntityTypeDraw, vtll::value_list< 15, 20 > >
+		, vtll::type_list< VeEntityTypeAnimation, vtll::value_list< 15, 20 > >
 		//, ...
 	>;
 
+	//-------------------------------------------------------------------------
+	//user table layouts
+
 	using VeTableLayoutMapUser = vtll::type_list<
-		vtll::type_list< VeEntityUser1, VECS_LAYOUT_COLUMN >
+		vtll::type_list< VeEntityTypeNode, VECS_LAYOUT_COLUMN >
+		, vtll::type_list< VeEntityTypeDraw, VECS_LAYOUT_COLUMN >
+		, vtll::type_list< VeEntityTypeAnimation, VECS_LAYOUT_COLUMN >
 		//, ...
 	>;
 

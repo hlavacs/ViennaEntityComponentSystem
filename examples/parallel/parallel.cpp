@@ -10,7 +10,7 @@
 #include "VGJS.h"
 #include "VGJSCoro.h"
 
-#include "parallel.h"
+#include "parallel.h"	//define user components
 
 #include "VECS.h"
 

@@ -14,11 +14,14 @@
 #include "VTLL.h"
 #include "VECSTable.h"
 
+using namespace std::chrono_literals;
+
+
+
 //user defined component types and entity types
 #include "VECSCompSystem.h"
 #include "VECSCompUser.h"  
 
-using namespace std::chrono_literals;
 
 namespace vecs {
 
@@ -27,7 +30,7 @@ namespace vecs {
 	* 
 	* It is the sum of the components of the engine part, and the components as defined by the engine user
 	*/
-	using VecsComponentTypeList = vtll::cat< VeComponentTypeListSystem, VeComponentTypeListUser >;
+	using VecsComponentTypeList = vtll::cat< VeSystemComponentTypeList, VeUserComponentTypeList >;
 
 	/**
 	* \brief Entity type list: a list with all possible entity types the ECS can deal with.
@@ -35,7 +38,7 @@ namespace vecs {
 	* An entity type is a collection of component types. 
 	* The list is the sum of the entitiy types of the engine part, and the entity types as defined by the engine user.
 	*/
-	using VecsEntityTypeList = vtll::cat< VeEntityTypeListSystem, VeEntityTypeListUser >;
+	using VecsEntityTypeList = vtll::cat< VeSystemEntityTypeList, VeUserEntityTypeList >;
 
 	/**
 	* \brief Table size map: a VTLL map specifying the default sizes for component tables.
@@ -1511,10 +1514,10 @@ namespace vecs {
 		VecsHandle handle;
 		for (size_t i = 0; i < m_data.size(); ++i) {
 			{
-				VecsWriteLock lock( m_data.comp_ref_idx<c_mutex>(index_t{ i }) );
+				VecsReadLock lock( m_data.comp_ref_idx<c_mutex>(index_t{ i }) );
 				handle = m_data.comp_ref_idx<c_handle>(index_t{ i });
 			}
-			if( VecsRegistry<E>().erase(handle) ) ++num;
+			if( handle.is_valid() && VecsRegistry<E>().erase(handle) ) ++num;
 		}
 		return num;
 	}

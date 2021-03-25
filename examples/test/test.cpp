@@ -5,8 +5,10 @@
 #include <string>
 #include "glm.hpp"
 #include "gtc/quaternion.hpp"
-#include "VECS.h"
+
 #include "test.h"
+
+#include "VECS.h"
 
 using namespace vecs;
 

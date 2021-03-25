@@ -1,5 +1,5 @@
-#ifndef VECSUSER_H
-#define VECSUSER_H
+#ifndef VECSCOMPONENTUSER_H
+#define VECSCOMPONENTUSER_H
 
 
 #include <limits>

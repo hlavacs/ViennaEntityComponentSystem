@@ -3,8 +3,10 @@
 #include <utility>
 #include "glm.hpp"
 #include "gtc/quaternion.hpp"
-#include "VECS.h"
+
 #include "basic_test.h"
+
+#include "VECS.h"
 
 using namespace vecs;
 

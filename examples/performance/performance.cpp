@@ -4,8 +4,10 @@
 #include <chrono>
 #include "glm.hpp"
 #include "gtc/quaternion.hpp"
-#include "VECS.h"
+
 #include "performance.h"
+
+#include "VECS.h"
 
 using namespace vecs;
 
