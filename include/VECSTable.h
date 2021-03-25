@@ -96,10 +96,10 @@ namespace vecs {
 		inline auto tuple_ref(index_t n) noexcept -> tuple_ref_t {
 			auto f = [&]<size_t... Is>(std::index_sequence<Is...>) {
 				if constexpr (ROW) {
-					return std::make_tuple(std::ref(std::get<Is>((*m_segment[n >> L])[n & BIT_MASK]))...);
+					return std::tie(std::get<Is>((*m_segment[n >> L])[n & BIT_MASK])...);
 				}
 				else {
-					return std::make_tuple(std::ref(std::get<Is>(*m_segment[n >> L])[n & BIT_MASK])...);
+					return std::tie(std::get<Is>(*m_segment[n >> L])[n & BIT_MASK]...);
 				}
 			};
 			return f(std::make_index_sequence<vtll::size<DATA>::value>{});
@@ -199,7 +199,7 @@ namespace vecs {
 		* \returns true if the operation was successful.
 		*/
 		template<typename T>
-		requires std::is_same_v<vtll::to_tuple<DATA>, std::decay_t<T>>
+		//requires std::is_same_v<vtll::to_tuple<DATA>, std::decay_t<T>>
 		inline auto update(index_t n, T&& data ) -> bool {
 			if (n >= m_size) return false;
 			decltype(auto) ref = tuple_ref(n);

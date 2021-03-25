@@ -88,11 +88,9 @@ namespace vecs {
 
 	using VecsTableLayoutMap = vtll::cat< VeTableLayoutMapSystem, VeTableLayoutMapUser >;
 
-
 	/**
 	* Declarations of the main VECS classes
 	*/
-
 	class VecsHandle;
 	class VecsReadLock;
 	class VecsWriteLock;
@@ -135,6 +133,8 @@ namespace vecs {
 
 	/** 
 	* \brief General functor type that can hold any function, and depends in a number of component types.
+	* 
+	* Used in for_each to iterate over entities and call the functor for each entity.
 	*/
 	template<typename... Cs>
 	requires are_component_types<Cs...>
@@ -242,9 +242,9 @@ namespace vecs {
 		auto update() noexcept				-> bool;			///< Update the entity in the ECS
 		auto erase() noexcept				-> bool;			///< Erase the entity from the ECS
 
-		template<size_t I>
-		auto component() noexcept -> std::optional<vtll::Nth_type<E,I>> {	///< \returns the Ith component of the entity.
-			return { std::get<I>(m_component_data) };
+		template<size_t I, typename C = vtll::Nth_type<E, I>>
+		auto component() noexcept -> C {	///< \returns the Ith component of the entity.
+			return std::get<I>(m_component_data);
 		};
 		
 		template<typename C>
@@ -318,7 +318,7 @@ namespace vecs {
 
 		virtual auto updateC(index_t entidx, size_t compidx, void* ptr, size_t size) noexcept		-> bool;
 		virtual auto componentE(index_t entidx, size_t compidx, void* ptr, size_t size)  noexcept	-> bool;
-		auto remove_deleted_tail() noexcept -> void;
+		auto remove_deleted_tail() noexcept -> void;	///< Remove empty slots at the end of the table
 
 		VecsComponentTable(size_t r = 1 << c_max_size) noexcept;
 
@@ -328,13 +328,13 @@ namespace vecs {
 
 		auto values(const index_t index) noexcept				-> value_type;
 		auto handle(const index_t index) noexcept				-> VecsHandle;
-		auto mutex(const index_t index) noexcept					-> std::atomic<uint32_t>*;
+		auto mutex(const index_t index) noexcept				-> std::atomic<uint32_t>*;
 
 		/** \returns the number of entries currently in the table, can also be invalid ones */
 		auto size() noexcept									-> size_t { return m_data.size(); };
 		auto erase(const index_t idx) noexcept					-> bool;
 		auto compress() noexcept								-> void;
-		auto clear() noexcept									-> size_t ;
+		auto clear() noexcept									-> size_t;
 
 		template<typename C>
 		requires is_component_of<E, C>
@@ -387,8 +387,19 @@ namespace vecs {
 		auto idx = m_data.push_back();			///< Allocate space a the end of the table
 		if (!idx.has_value()) return idx;		///< Check if the allocation was successfull
 		m_data.update<c_handle>(idx, handle);	///< Update the handle data
-		m_data.update<c_mutex>(idx, mutex);		///< Update the mutex
-		(m_data.update<c_info_size + vtll::index_of<E,std::decay_t<Cs>>::value> (idx, std::forward<Cs>(args)), ...); ///< Update the entity components
+		m_data.update<c_mutex>(idx, mutex);		///< Update the mutex pointer
+
+		auto f = [&]<typename T>(T&& tup) {
+			vtll::static_for<size_t, 0, std::tuple_size<T>::value >(							///< Loop over all components
+				[&](auto i) {
+					using type = std::tuple_element_t<i, T>;
+					m_data.update<c_info_size + i>(idx, std::forward<type>(std::get<i>(tup))); ///< Update the entity components
+				}
+			);
+		};
+		f(std::forward_as_tuple(args...));
+
+		//(m_data.update<c_info_size + vtll::index_of<E,std::decay_t<Cs>>::value> (idx, std::forward<Cs>(args)), ...); ///< Update the entity components
 		return idx;								///< Return the index of the new data
 	};
 
@@ -400,7 +411,7 @@ namespace vecs {
 	inline auto VecsComponentTable<E>::values(const index_t index) noexcept -> typename VecsComponentTable<E>::value_type {
 		assert(index < m_data.size());
 		auto tup = m_data.tuple_value(index);											///< Get the whole data from the data
-		return vtll::sub_tuple< c_info_size, std::tuple_size_v<decltype(tup)> >(tup);	///< Return only entity components
+		return vtll::sub_tuple< c_info_size, std::tuple_size_v<decltype(tup)> >(tup);	///< Return only entity components in a subtuple
 	}
 
 	/**
@@ -420,7 +431,7 @@ namespace vecs {
 	template<typename E>
 	inline auto VecsComponentTable<E>::mutex(const index_t index) noexcept -> std::atomic<uint32_t>* {
 		assert(index < m_data.size());
-		return m_data.comp_ref_idx<c_mutex>(index);	///< Get ref to the mutex and return it
+		return m_data.comp_ref_idx<c_mutex>(index);		///< Get ref to the mutex and return it
 	}
 
 	/**
@@ -445,9 +456,10 @@ namespace vecs {
 	template<typename ET>
 	requires is_entity<ET, E>
 	inline auto VecsComponentTable<E>::update(const index_t index, ET&& ent) noexcept -> bool {
-		vtll::static_for<size_t, 0, vtll::size<E>::value >(	///< Loop over all components
+		vtll::static_for<size_t, 0, vtll::size<E>::value >(							///< Loop over all components
 			[&](auto i) {
-				m_data.update<c_info_size + i>(index, ent.component<i>().value()); ///< Update each component
+				using type = vtll::Nth_type<E,i>;
+				m_data.update<c_info_size + i>(index, std::forward<type>(ent.component<i>()));	///< Update each component
 			}
 		);
 		return true;
@@ -465,6 +477,16 @@ namespace vecs {
 		assert(index < m_data.size());
 		m_data.comp_ref_idx<c_handle>(index) = {};		///< Invalidate handle	
 		m_deleted.push_back(std::make_tuple(index));	///< Push the index to the deleted table.
+
+		vtll::static_for<size_t, 0, vtll::size<E>::value >(			///< Loop over all components
+			[&](auto i) {
+				using type = vtll::Nth_type<E, i>;
+				if constexpr (std::is_destructible_v<type> && !std::is_trivially_destructible_v<type>) {
+					m_data.comp_ref_idx<c_info_size + i>(index).~type();
+				}
+			}
+		);
+
 		return true;
 	}
 
@@ -473,17 +495,17 @@ namespace vecs {
 	//comnponent vector derived class
 
 	/**
-	* \brief For dispatching accesses to entity components if the entity type is not known.
+	* \brief For dispatching accesses to entity components if the entity type is not known at compile time by the caller.
+	* 
+	* It is used to access component I of entity type E. This is called through a dispatch table, one entry
+	* for each component of E. 
 	*/
 	template<typename E, size_t I>
 	class VecsComponentAccessorDerived : public VecsComponentAccessor<E> {
 	public:
 		using C = vtll::Nth_type<VecsComponentTypeList, I>;	///< Component type
 
-		/**
-		* \brief Constructor of class VecsComponentAccessorDerived
-		* \param[in] r Max number of entries allowed in the component table
-		*/
+		/** Constructor of class VecsComponentAccessorDerived */
 		VecsComponentAccessorDerived() noexcept : VecsComponentAccessor<E>() {}
 
 	protected:
@@ -774,7 +796,7 @@ namespace vecs {
 		friend class VecsRegistryBaseClass;
 
 	protected:
-		static inline std::atomic<uint32_t> m_sizeE{0};	///< Store the number of valid entities of type E currently in teh ECS
+		static inline std::atomic<uint32_t> m_sizeE{0};	///< Store the number of valid entities of type E currently in the ECS
 
 		/** Maximum number of entites of type E that can be stored. */
 		static const size_t c_max_size = vtll::back_value<vtll::map< VecsTableSizeMap, E, VeTableSizeDefault > >::value;
@@ -895,11 +917,12 @@ namespace vecs {
 			m_entity_table.comp_ref_idx<c_counter>(idx) = counter16_t{ 0 };		//start with counter 0
 		}
 
-		m_entity_table.comp_ref_idx<c_type>(idx) = index16_t{ vtll::index_of<VecsEntityTypeList, E>::value };
+		m_entity_table.comp_ref_idx<c_type>(idx) = index16_t{ vtll::index_of<VecsEntityTypeList, E>::value }; ///< Entity type index
 		
-		VecsHandle handle{ idx, m_entity_table.comp_ref_idx<c_counter>(idx), m_entity_table.comp_ref_idx<c_type>(idx) };
+		VecsHandle handle{ idx, m_entity_table.comp_ref_idx<c_counter>(idx), m_entity_table.comp_ref_idx<c_type>(idx) }; ///< The handle
 		
-		m_entity_table.comp_ref_idx<c_index>(idx) = VecsComponentTable<E>().insert(handle, &m_entity_table.comp_ref_idx<c_mutex>(idx), args...);		//add data as tuple
+		m_entity_table.comp_ref_idx<c_index>(idx) 
+			= VecsComponentTable<E>().insert(handle, &m_entity_table.comp_ref_idx<c_mutex>(idx), std::forward<Cs>(args)...);	///< add data into component table
 
 		m_size++;
 		m_sizeE++;
@@ -998,7 +1021,7 @@ namespace vecs {
 			VecsWriteLock lock(handle.mutex());
 			if (!contains(handle)) return false;
 			VecsComponentTable<E>().erase(m_entity_table.comp_ref_idx <c_index>(handle.m_entity_index)); ///< Erase from comp table
-			m_entity_table.comp_ref_idx<c_counter>(handle.m_entity_index)++;				///< Invalidate the entity handle
+			m_entity_table.comp_ref_idx<c_counter>(handle.m_entity_index)++;			///< Invalidate the entity handle
 		}
 
 		m_size--;	///< Decrease sizes
@@ -1063,8 +1086,8 @@ namespace vecs {
 		VecsIterator( bool is_end = false ) noexcept ;		///< Constructor that should be called always from outside
 		VecsIterator(const VecsIterator& v) noexcept;		///< Copy constructor
 
-		auto begin() { return *this; };
-		auto end() { return VecsRegistryBaseClass().end<Cs...>(); };
+		auto begin() { return *this; };									///< Return this iterator as iterator
+		auto end() { return VecsRegistryBaseClass().end<Cs...>(); };	///> Return an end iterator
 
 		auto operator=(const VecsIterator& v) noexcept			-> VecsIterator<Cs...>;	///< Copy
 		auto operator+=(size_t N) noexcept						-> VecsIterator<Cs...>;	///< Increase and set
@@ -1072,8 +1095,8 @@ namespace vecs {
 		auto operator!=(const VecsIterator<Cs...>& v) noexcept	-> bool;	///< Unqequal
 		auto operator==(const VecsIterator<Cs...>& v) noexcept	-> bool;	///< Equal
 
-		virtual auto handle() noexcept			-> VecsHandle;
-		virtual auto mutex() noexcept			-> std::atomic<uint32_t>*;
+		virtual auto handle() noexcept			-> VecsHandle;				///< Return handle of the current entity
+		virtual auto mutex() noexcept			-> std::atomic<uint32_t>*;	///< Return poiter to the mutex of this entity
 		virtual auto has_value() noexcept		-> bool;					///< Is currently pointint to a valid entity
 		virtual	auto operator*() noexcept		-> ref_type;				///< Access the data
 		virtual auto operator++() noexcept		-> VecsIterator<Cs...>&;	///< Increase by 1
@@ -1096,7 +1119,7 @@ namespace vecs {
 	protected:
 		index_t m_current_index{ 0 };		///< Current index in the VecsComponentTable<E>
 		bool	m_is_end{ false };			///< True if this is an end iterator (for stopping the loop)
-		size_t	m_sizeE{ 0 };
+		size_t	m_sizeE{ 0 };				///< Number of entities of type E
 
 	public:
 		VecsIteratorEntityBaseClass(bool is_end = false) noexcept : m_is_end(is_end) {};
@@ -1382,8 +1405,7 @@ namespace vecs {
 	}
 
 	/**
-	* \brief
-	* \returns
+	* \returns the handle of the current entity.
 	*/
 	template<typename E, typename... Cs>
 	inline auto VecsIteratorEntity<E, Cs...>::handle() noexcept		-> VecsHandle {
@@ -1391,8 +1413,7 @@ namespace vecs {
 	}
 
 	/**
-	* \brief
-	* \returns
+	* \returns the mutex of the current entity.
 	*/
 	template<typename E, typename... Cs>
 	inline auto VecsIteratorEntity<E, Cs...>::mutex() noexcept		-> std::atomic<uint32_t>* {
@@ -1443,13 +1464,13 @@ namespace vecs {
 	//VecsComponentTable
 
 	/**
-	* \brief Remove invalid entity data at the end of the component table.
+	* \brief Remove invalid erased entity data at the end of the component table.
 	*/
 	template<typename E>
 	inline auto VecsComponentTable<E>::remove_deleted_tail() noexcept -> void {
 		while (m_data.size() > 0) {
 			auto & handle = m_data.comp_ref_idx<c_handle>(index_t{ m_data.size() - 1 });
-			if (handle.has_value()) return; ///< is last entity is valid, then return
+			if (handle.is_valid()) return; ///< is last entity is valid, then return
 			m_data.pop_back();				///< Else remove it and continue the loop
 		}
 	}
@@ -1461,18 +1482,14 @@ namespace vecs {
 	* Then it runs trough all deleted entities (m_deleted table) and tests whether it lies
 	* inside the table. if it does, it is swapped with the last entity, which must be valid.
 	* Then all invalid entities at the end are again removed.
-	*
-	* \param[in]
 	*/
 	template<typename E>
 	inline auto VecsComponentTable<E>::compress() noexcept -> void {
-		for (size_t i = 0; i < m_data.size(); ++i) {
+		for (size_t i = 0; i < m_deleted.size(); ++i) {
 			remove_deleted_tail();											///< Remove invalid entities at end of table
-			auto index = m_deleted.comp_ref_idx<0>(index_t{i});			///< Get next deleted entity from deleted table
+			auto index = m_deleted.comp_ref_idx<0>(index_t{i});				///< Get next deleted entity from deleted table
 			if (index.value < m_data.size()) {								///< Is it inside the table still?
-				auto tup = m_data.tuple_value(index_t{ m_data.size() - 1 });///< Yes, move last entity to this position
-				m_data.update(index, tup);
-
+				m_data.update(index, std::move(m_data.tuple_ref(index_t{ m_data.size() - 1 })));	///< Yes, move last entity to this position
 				auto& handle = m_data.comp_ref_idx<c_handle>(index);		///< Handle of moved entity
 				VecsRegistryBaseClass().m_entity_table.comp_ref_idx<VecsRegistryBaseClass::c_index>(handle.m_entity_index) = index; ///< Change map entry of moved last entity
 			}
@@ -1635,9 +1652,9 @@ namespace vecs {
 				if (!b.has_value()) continue;
 				tup = *b;
 			}
-			std::apply(f, tup);					///< Run the function on the copy
+			std::apply(f, tup);						///< Run the function on the copy
 
-			VecsWriteLock lock{ b.mutex() };			///< Copy back to ECS
+			VecsWriteLock lock{ b.mutex() };		///< Copy back to ECS
 			if (!b.has_value()) continue;
 			*b = tup;
 		}
