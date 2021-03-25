@@ -90,7 +90,7 @@ namespace vecs {
 	//-------------------------------------------------------------------------
 	//user size maps
 
-	using VeTableSizeMapUser = vtll::type_list<
+	using VeUserTableSizeMap = vtll::type_list<
 		  vtll::type_list< VeEntityTypeNode, vtll::value_list< 15, 20 > >
 		, vtll::type_list< VeEntityTypeDraw, vtll::value_list< 15, 20 > >
 		, vtll::type_list< VeEntityTypeAnimation, vtll::value_list< 15, 20 > >
@@ -100,7 +100,7 @@ namespace vecs {
 	//-------------------------------------------------------------------------
 	//user table layouts
 
-	using VeTableLayoutMapUser = vtll::type_list<
+	using VeUserTableLayoutMap = vtll::type_list<
 		  vtll::type_list< VeEntityTypeNode, VECS_LAYOUT_COLUMN >
 		, vtll::type_list< VeEntityTypeDraw, VECS_LAYOUT_COLUMN >
 		, vtll::type_list< VeEntityTypeAnimation, VECS_LAYOUT_COLUMN >

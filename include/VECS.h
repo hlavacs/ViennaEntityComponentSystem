@@ -20,8 +20,10 @@ using namespace std::chrono_literals;
 
 //user defined component types and entity types
 #include "VECSCompSystem.h"
-#include "VECSCompUser.h"  
 
+#ifndef VECS_USER_DATA
+#include "VECSCompUser.h"  
+#endif
 
 namespace vecs {
 
@@ -48,7 +50,7 @@ namespace vecs {
 	* An entry is alwyas a vtll::value_list<A,B>, where A defines the default size of segments, and B defines
 	* the max number of entries allowed. Both A and B are actually exponents with base 2. So segemnts have size 2^A.
 	*/
-	using VecsTableSizeMap = vtll::cat< VeTableSizeMapSystem, VeTableSizeMapUser >;
+	using VecsTableSizeMap = vtll::cat< VeSystemTableSizeMap, VeUserTableSizeMap >;
 
 	/**
 	* \brief This struct implements the exponential function power of 2.
@@ -89,7 +91,7 @@ namespace vecs {
 	*/
 	using VecsTableMaxSize = vtll::smallest_pow2_larger_eq<VecsTableMaxSeg>;
 
-	using VecsTableLayoutMap = vtll::cat< VeTableLayoutMapSystem, VeTableLayoutMapUser >;
+	using VecsTableLayoutMap = vtll::cat< VeSystemTableLayoutMap, VeUserTableLayoutMap >;
 
 	/**
 	* Declarations of the main VECS classes

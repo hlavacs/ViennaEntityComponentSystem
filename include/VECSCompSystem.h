@@ -19,7 +19,7 @@ namespace vecs {
 
 	/** \brief List of all system components*/
 	using VeSystemComponentTypeList = vtll::type_list<
-		VeSystemComponentName
+		//VeSystemComponentName
 		//, ...
 	>;
 
@@ -44,7 +44,7 @@ namespace vecs {
 
 	/** \brief The list of all system entity types */
 	using VeSystemEntityTypeList = vtll::type_list<
-		VeSystemEntityTypeNode
+		//VeSystemEntityTypeNode
 		// ,... 
 	>;
 
@@ -57,8 +57,8 @@ namespace vecs {
 	* The entries A and B define the size of a table segment (2^A) and default maximum number of entities of this type possible (2^B).
 	* The maximum number can later be changed to a larger value. 
 	*/
-	using VeTableSizeMapSystem = vtll::type_list<
-  	    vtll::type_list< VeSystemEntityTypeNode, vtll::value_list< 15, 20 > >
+	using VeSystemTableSizeMap = vtll::type_list<
+  	    //vtll::type_list< VeSystemEntityTypeNode, vtll::value_list< 15, 20 > >
 		//, ...
 	>;
 
@@ -73,8 +73,8 @@ namespace vecs {
 	* In column wise, components are stored in separate arrays, and cache performance is optimal if
 	* only single components are accessed in for loops.
 	*/
-	using VeTableLayoutMapSystem = vtll::type_list<
-		vtll::type_list< VeSystemEntityTypeNode, VECS_LAYOUT_COLUMN >
+	using VeSystemTableLayoutMap = vtll::type_list<
+		//vtll::type_list< VeSystemEntityTypeNode, VECS_LAYOUT_COLUMN >
 		//, ...
 	>;
 
