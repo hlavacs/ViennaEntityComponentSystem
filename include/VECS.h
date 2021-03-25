@@ -1489,7 +1489,7 @@ namespace vecs {
 			remove_deleted_tail();											///< Remove invalid entities at end of table
 			auto index = m_deleted.comp_ref_idx<0>(index_t{i});				///< Get next deleted entity from deleted table
 			if (index.value < m_data.size()) {								///< Is it inside the table still?
-				m_data.update(index, std::move(m_data.tuple_ref(index_t{ m_data.size() - 1 })));	///< Yes, move last entity to this position
+				m_data.update(index, m_data.tuple_rvref(index_t{ m_data.size() - 1 }));	///< Yes, move last entity to this position
 				auto& handle = m_data.comp_ref_idx<c_handle>(index);		///< Handle of moved entity
 				VecsRegistryBaseClass().m_entity_table.comp_ref_idx<VecsRegistryBaseClass::c_index>(handle.m_entity_index) = index; ///< Change map entry of moved last entity
 			}

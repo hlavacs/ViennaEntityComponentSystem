@@ -37,6 +37,7 @@ namespace vecs {
 
 		using tuple_value_t = vtll::to_tuple<DATA>;		///< Tuple holding the entries as value
 		using tuple_ref_t = vtll::to_ref_tuple<DATA>;	///< Tuple holding references to the entries
+		using tuple_rvref_t = vtll::to_rvref_tuple<DATA>;	///< Tuple holding prvalue references to the entries
 
 		using array_tuple_t1 = std::array<tuple_value_t, N>;								///< ROW: an array of tuples
 		using array_tuple_t2 = vtll::to_tuple<vtll::transform_size_t<DATA,std::array,N>>;	///< COLUMN: a tuple of arrays
@@ -100,6 +101,23 @@ namespace vecs {
 				}
 				else {
 					return std::tie(std::get<Is>(*m_segment[n >> L])[n & BIT_MASK]...);
+				}
+			};
+			return f(std::make_index_sequence<vtll::size<DATA>::value>{});
+		};
+
+		/**
+		* \brief Get a tuple with prvalue references to all components of an entry.
+		* \param[in] n Index to the entry.
+		* \returns a tuple with prvalue references to all components of entry n.
+		*/
+		inline auto tuple_rvref(index_t n) noexcept -> tuple_rvref_t {
+			auto f = [&]<size_t... Is>(std::index_sequence<Is...>) {
+				if constexpr (ROW) {
+					return std::make_tuple(std::move(std::get<Is>((*m_segment[n >> L])[n & BIT_MASK]))...);
+				}
+				else {
+					return std::make_tuple(std::move(std::get<Is>(*m_segment[n >> L])[n & BIT_MASK])...);
 				}
 			};
 			return f(std::make_index_sequence<vtll::size<DATA>::value>{});
@@ -198,9 +216,9 @@ namespace vecs {
 		* \param[in] C Universal reference to tuple holding the components with the data.
 		* \returns true if the operation was successful.
 		*/
-		template<typename T>
-		//requires std::is_same_v<vtll::to_tuple<DATA>, std::decay_t<T>>
-		inline auto update(index_t n, T&& data ) -> bool {
+		template<template<typename... Cs> typename T, typename... Cs>
+		requires std::is_same_v<vtll::to_tuple<DATA>, std::tuple<std::decay_t<Cs>...>>
+		inline auto update(index_t n, T<Cs...>&& data ) -> bool {
 			if (n >= m_size) return false;
 			decltype(auto) ref = tuple_ref(n);
 			vtll::static_for<size_t, 0, vtll::size<DATA>::value >([&](auto i) { std::get<i>(ref) = std::get<i>(data); } );
