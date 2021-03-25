@@ -41,13 +41,34 @@ VGJS is not necessary to run VECS, and as stated it is only used as an example f
 
 ## The VECS API
 
-For including VECS into your project, there are two major use cases. If you create a game engine yourself, you should define components and entities as belonging to the system in file *VECSCompSystem.h*.
+An *Entity Component System* is a data structure that stores data components in some flat way, meaning that data is stored linearly in memory as a vector or table. The stored data is called *components*. Components can by in principle any type that in this case is *movable* and *default constructible*.
+This can be plain old data types, structs, classes, (smart) pointers etc.
+but not references since they must be bound to something when created. An example is given by
 
-If you are a user of a VECS based engine, then you can define your own types either in *VECSCompUser.h*, or in your own include files and by defining a macro prevent *VECSCompUser.h* from being loaded. Both cases are discussed in the following.
+    struct VeUserComponentName {
+      std::string m_name;
+    };
+
+    struct VeUserComponentPosition {
+      float x;
+      float y;
+      float z;
+    };
+
+As can be seen, these two components consist of a std::string and floats, and thus satisfy the conditions on components. Components are then used to define *entities*. Entities are composed of one or more components. This composition is defined using type lists, like
+
+    using VeSystemEntityTypeNode
+      = VeEntityType<VeSystemComponentName, VeSystemComponentPosition>;
+
+which defines the entity type *VeSystemEntityTypeNode* to be composed of the two components.
+
+For defining components and entities, there are two major use cases. If you *create a game engine* yourself, you should define components and entities as belonging to the *system* in file *VECSCompSystem.h*.
+
+If you are a *user of a VECS based engine*, then you can define your own types either in *VECSCompUser.h*, or in your own include files and by defining a macro prevent *VECSCompUser.h* from being loaded. Both cases are internally treated the same way and are discussed in the following.
 
 ### Using VECS in the Core of your Game engine
 
-If you create your own game engine and use VECS as its core ECS, simply include *VECS.h* in your CPP files. Also edit *VECSCompSystem.h* to define the components you use, and how entity types are composed of them. Initially, VECS comes with an empty list of system components, and you are free to define them as you like. Components should be structs or other data types that are *movable*.
+If you create your own game engine and use VECS as its core ECS, simply include *VECS.h* in your CPP files. Also edit *VECSCompSystem.h* to define the components you use, and how entity types are composed of them. Initially, VECS comes with an empty list of system components, and you are free to define them as you like. Components should be structs or other data types that are *movable* and *default constructible*.
 
     struct VeSystemComponentName {
       std::string m_name;
@@ -180,7 +201,7 @@ In your CPP file, make sure to include first your own include file, then afterwa
     #include "glm.hpp"
     #include "gtc/quaternion.hpp"
 
-    #include "basic_test.h" //your own definitions
+    #include "basic_test.h" //your own definitions, including VECS_USER_DATA
 
     #include "VECS.h"       //VECS
 
@@ -191,14 +212,6 @@ In your CPP file, make sure to include first your own include file, then afterwa
 
         //...
     }
-
-
-## The VECS API
-
-
-
-
-### Components and Entity Types
 
 
 ### The VECS Registry
