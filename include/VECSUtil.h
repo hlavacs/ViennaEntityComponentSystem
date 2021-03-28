@@ -25,6 +25,14 @@ namespace vecs {
 	using counter_t = counter32_t;
 
 
+	//-------------------------------------------------------------------------
+	//Table segment layout
+
+	using VECS_LAYOUT_ROW = std::integral_constant<bool, true>;		///< Layout is row wise. Good if all components of an entity are needed at once.
+	using VECS_LAYOUT_COLUMN = std::integral_constant<bool, false>;	///< Layout is column wise. Good is only single components of entities are needed.
+	using VECS_LAYOUT_DEFAULT = VECS_LAYOUT_COLUMN;					///< Default is column wise
+
+
 	//https://www.fluentcpp.com/2017/05/19/crtp-helper/
 
 	/**

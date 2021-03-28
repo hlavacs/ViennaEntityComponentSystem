@@ -1,6 +1,13 @@
 /**
 * \file VECSCompSystem.h
 * \brief Edit this file to define system entities and components for your game engine.
+* 
+* If you do not want this file to be included then define VECS_SYSTEM_DATA and make sure to include your own include
+* files to define system related components and entities for your game engine. This must be included before VECS.h.
+* 
+* VECS requires the following type lists:
+* VeSystemComponentTypeList, VeSystemEntityTypeList, VeSystemTableSizeMap, and VeSystemTableLayoutMap
+* 
 */
 
 #ifndef VECSCOMPONENTSYSTEM_H
@@ -24,13 +31,6 @@ namespace vecs {
 		//VeSystemComponentName
 		//, ...
 	>;
-
-	//-------------------------------------------------------------------------
-	//Table segment layout
-
-	using VECS_LAYOUT_ROW = std::integral_constant<bool, true>;		///< Layout is row wise. Good if all components of an entity are needed at once.
-	using VECS_LAYOUT_COLUMN = std::integral_constant<bool, false>;	///< Layout is column wise. Good is only single components of entities are needed.
-	using VECS_LAYOUT_DEFAULT = VECS_LAYOUT_COLUMN;					///< Default is column wise
 
 	//-------------------------------------------------------------------------
 	//engine entity types

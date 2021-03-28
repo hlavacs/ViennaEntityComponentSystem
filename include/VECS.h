@@ -17,10 +17,12 @@
 using namespace std::chrono_literals;
 
 
+//system related defined component types and entity types
+#ifndef VECS_SYSTEM_DATA
+#include "VECSCompSystem.h"
+#endif
 
 //user defined component types and entity types
-#include "VECSCompSystem.h"
-
 #ifndef VECS_USER_DATA
 #include "VECSCompUser.h"  
 #endif
