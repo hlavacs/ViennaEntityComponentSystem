@@ -76,9 +76,9 @@ namespace vecs {
 	//-------------------------------------------------------------------------
 	//define user entity types here
 
-	using VeEntityTypeNode = VeEntityType<VeComponentName, VeComponentPosition, VeComponentOrientation, VeComponentTransform>;
-	using VeEntityTypeDraw = VeEntityType<VeComponentName, VeComponentPosition, VeComponentOrientation, VeComponentTransform, VeComponentMaterial, VeComponentGeometry>;
-	using VeEntityTypeAnimation = VeEntityType<VeComponentName, VeComponentAnimation>;
+	using VeEntityTypeNode = vtll::type_list<VeComponentName, VeComponentPosition, VeComponentOrientation, VeComponentTransform>;
+	using VeEntityTypeDraw = vtll::type_list<VeComponentName, VeComponentPosition, VeComponentOrientation, VeComponentTransform, VeComponentMaterial, VeComponentGeometry>;
+	using VeEntityTypeAnimation = vtll::type_list<VeComponentName, VeComponentAnimation>;
 
 	using VeUserEntityTypeList = vtll::type_list<
 		VeEntityTypeNode

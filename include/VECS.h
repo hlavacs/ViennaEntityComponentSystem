@@ -724,7 +724,6 @@ namespace vecs {
 	template<typename E, typename... Cs>
 	requires is_composed_of<E, Cs...> [[nodiscard]]
 	auto VecsRegistryBaseClass::insert(Cs&&... args) noexcept	-> VecsHandle {
-		static_assert(vtll::is_same<VeEntityType<std::decay_t<Cs>...>, std::decay_t<Cs>...>::value);
 		return VecsRegistry<E>().insert(std::forward<Cs>(args)...);
 	}
 

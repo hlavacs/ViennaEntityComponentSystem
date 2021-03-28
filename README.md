@@ -30,7 +30,7 @@ VECS depends on two projects, the Vienna Type List Library (VTLL) and Vienna Gam
 
 ### Vienna Type List Library (VTLL)
 
-As stated, VECS is a compile time ECS. Compositions of entities are defined in source code only. VECS thus heavily relies on its partner project Vienna Type List Library (VTLL), a header-only meta-programming library that helps creating entity types, lists, compositions of components, accessing list elements, mapping data, etc. For more information goto https://github.com/hlavacs/ViennaTypeListLibrary.
+As stated, VECS is a compile time ECS. Compositions of entities are defined in source code only. VECS thus heavily relies on its partner project Vienna Type List Library (VTLL), a header-only meta-programming library that helps creating entity types, type lists, compositions of components, accessing list elements, mapping data, etc. Especially, entities are defined as *vtll::type_list<...>* and therefore are nothing more than a list of types. For more information goto https://github.com/hlavacs/ViennaTypeListLibrary.
 
 
 ### Vienna Game Job System (VGJS)
@@ -58,7 +58,7 @@ but not references since they must be bound to something when created. An exampl
 As can be seen, these two components consist of a std::string and floats, and thus satisfy the conditions on components. Components are then used to define *entities*. Entities are composed of one or more components. This composition is defined using type lists, like
 
     using VeSystemEntityTypeNode
-      = VeEntityType<VeSystemComponentName, VeSystemComponentPosition>;
+      = vtll::type_list<VeSystemComponentName, VeSystemComponentPosition>;
 
 which defines the entity type *VeSystemEntityTypeNode* to be composed of the two components.
 
@@ -93,7 +93,7 @@ You can define arbitrarily many components like this. All component types must b
 Once you have defined your component types, you can compose entities with them:
 
     using VeSystemEntityTypeNode
-      = VeEntityType<VeSystemComponentName, VeSystemComponentPosition>;
+      = vtll::type_list<VeSystemComponentName, VeSystemComponentPosition>;
 
 In this example, an entity type VeSystemEntityTypeNode is composed of the components VeSystemComponentName and VeSystemComponentPosition.
 You can define arbitrarily many entities like this. All entity
@@ -145,7 +145,7 @@ If you are a user of a given game engine using VECS, you can edit the file *VECS
       //, ...
     >;
 
-    using VeEntityTypeNode = VeEntityType< VeComponentName, VeComponentPosition, VeComponentOrientation >;
+    using VeEntityTypeNode = vtll::type_list< VeComponentName, VeComponentPosition, VeComponentOrientation >;
 
     using VeUserEntityTypeList = vtll::type_list<
       VeEntityTypeNode
