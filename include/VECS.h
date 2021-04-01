@@ -102,6 +102,7 @@ namespace vecs {
 	class VecsReadLock;
 	class VecsWriteLock;
 	template <typename E> class VecsEntityProxy;
+	template<typename E> class VecsEntityProxyAutoUpdate;
 	template<typename E> class VecsComponentAccessor;
 	template<typename E, size_t I> class VecsComponentAccessorDerived;
 	template<typename E> class VecsComponentTable;
@@ -218,6 +219,8 @@ namespace vecs {
 	*/
 	template <typename E>
 	class VecsEntityProxy {
+		template<typename E> friend class VecsEntityProxyAutoUpdate;
+
 	public:
 		using tuple_type = vtll::to_tuple<E>;	///< A tuple holding all entity components.
 
@@ -294,6 +297,16 @@ namespace vecs {
 		VecsEntityProxyAutoUpdate(Cs&&... args) noexcept : VecsEntityProxy( std::forward<Cs>(args)...) {}
 
 		VecsEntityProxyAutoUpdate() noexcept : VecsEntityProxy() {};	///< Empty constructor results in an invalid proxy
+
+		VecsEntityProxyAutoUpdate(const VecsEntityProxy<E>& rhs) {
+			this->m_handle = rhs.m_handle;
+			this->m_component_data = rhs.m_component_data;
+		}
+
+		void operator=( const VecsEntityProxy<E>& rhs ) {
+			this->m_handle = rhs.m_handle;
+			this->m_component_data = rhs.m_component_data;
+		}
 
 		~VecsEntityProxyAutoUpdate() noexcept { VecsEntityProxy<E>::update(); };
 	};
