@@ -216,7 +216,6 @@ namespace vecs {
 	* changes locally. By calling update() the local copies are stored back into the ECS. By calling erase() the entity is
 	* erased from the ECS. 
 	*/
-
 	template <typename E>
 	class VecsEntityProxy {
 	public:
@@ -240,7 +239,9 @@ namespace vecs {
 		requires are_components_of<E, Cs...>
 		VecsEntityProxy(Cs&&... args) noexcept;					///< Insert this into the ECS, get a new entity
 
-		VecsEntityProxy() {};	///< Empty constructor results in an invalid proxy
+		VecsEntityProxy() noexcept {};	///< Empty constructor results in an invalid proxy
+
+		virtual ~VecsEntityProxy() {};	///< Empty destructor
 
 		auto handle() const noexcept -> VecsHandle {	///< \returns the handle of the entity. 
 			return m_handle; 
@@ -269,6 +270,32 @@ namespace vecs {
 		auto local_update( C&& comp ) noexcept -> void {
 			std::get<vtll::index_of<E, std::decay_t<C>>::value>(m_component_data) = comp;
 		};
+	};
+
+
+	/**
+	* \brief VecsEntityProxyAutoUpdate is a VecsEntityProxy that updates its data if it is destructed
+	*/
+	template <typename E>
+	class VecsEntityProxyAutoUpdate : public VecsEntityProxy<E> {
+	public:
+
+		/**
+		* \brief Constructor of the VecsEntityProxyAutoUpdate class.
+		*
+		* \param[in] h Handle of the entity.
+		* \param[in] tup The copy of the entity data to be stored in the instance.
+		*/
+		VecsEntityProxyAutoUpdate(VecsHandle h, const VecsEntityProxy<E>::tuple_type& tup) noexcept
+			: VecsEntityProxy(h, tup) {};
+
+		template<typename... Cs>
+		requires are_components_of<E, Cs...>
+		VecsEntityProxyAutoUpdate(Cs&&... args) noexcept : VecsEntityProxy( std::forward<Cs>(args)...) {}
+
+		VecsEntityProxyAutoUpdate() noexcept : VecsEntityProxy() {};	///< Empty constructor results in an invalid proxy
+
+		~VecsEntityProxyAutoUpdate() noexcept { VecsEntityProxy<E>::update(); };
 	};
 
 
