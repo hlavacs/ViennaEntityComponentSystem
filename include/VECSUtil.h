@@ -61,7 +61,7 @@ namespace vecs {
 		* \brief Initialize only once.
 		*/
 		bool init() {
-			if (m_init.test()) return false;
+			if (m_init.test()) [[likely]] return false;
 			auto init = m_init.test_and_set();
 			if (init) return false;
 			return true;
