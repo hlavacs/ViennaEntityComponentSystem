@@ -1267,7 +1267,7 @@ namespace vecs {
 		if (m_is_end) return *this;
 		(*m_dispatch[m_current_iterator])++;
 
-		if (m_dispatch[m_current_iterator]->is_vector_end() && m_current_iterator.value < m_dispatch.size() - 1) {
+		if (m_dispatch[m_current_iterator]->is_vector_end() && m_current_iterator.value < m_dispatch.size() - 1) [[unlikely]] {
 			++m_current_iterator;
 		}
 		m_current_index = m_dispatch[m_current_iterator]->m_current_index;
@@ -1380,7 +1380,7 @@ namespace vecs {
 	*/
 	template<typename... Cs>
 	inline auto VecsIteratorEntityBaseClass<Cs...>::operator++() noexcept		-> void {
-		if (!is_vector_end()) ++this->m_current_index;
+		if (!is_vector_end()) [[likely]] ++this->m_current_index;
 	};
 
 	/**
@@ -1388,7 +1388,7 @@ namespace vecs {
 	*/
 	template<typename... Cs>
 	inline auto VecsIteratorEntityBaseClass<Cs...>::operator++(int) noexcept	-> void {
-		if (!is_vector_end()) ++this->m_current_index;
+		if (!is_vector_end()) [[likely]] ++this->m_current_index;
 	};
 
 	/**
