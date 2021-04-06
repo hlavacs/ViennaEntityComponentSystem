@@ -216,8 +216,60 @@ In your CPP file, make sure to include first your own include file, then afterwa
 
 ### The VECS Registry
 
+Entities are stored in the *VecsRegistry*. This data structure uses the *mono state* pattern, so if you want to use it you simply instantiate it:
 
-### Handles
+    VecsRegistry reg{};
+
+There is only one version, and you can instantiate it any number of times, the result is always the same version. In the first instantiation you can pass a parameter specifying the maximum number of entities to be stored in the ECS. If no parameter is given, then VecsTableMaxSize::value is used, which is the smallest power of 2 larger than the sum of the number of entities of any type E.
+If you just want to initialize the registry you can do it like this:
+
+    VecsRegistry{ 1 << 20 };
+
+Using *VecsRegistry* is not bound to a specific entity type, but commands evenmtually need this information. However, all calls are eventually passed on to *VecsRegistry<E>*, where *E* is an entity type. This is a specialized version of the registry made only for entity type *E*. It is recommended to always use this specialized version, if possible. For instance, if you want to create an entity of type *E*, you have at some point to specify the entity type. You can create an entity of type
+
+    using VeEntityTypeNode = vtll::type_list< VeComponentName, VeComponentPosition, VeComponentOrientation >;
+
+like so
+
+    auto handle = VecsRegistry{}.insert<VeEntityTypeNode>("Node1", {}, {});
+
+or like so:
+
+    VecsHandle handle = VecsRegistry<VeEntityTypeNode>{}.insert("Node1", {}, {});
+
+In fact, the first call simply calls the second call internally. The result of creating an entity is a *handle*. A handle is an 8-bytes structure that identifies the new entity and you can use it later to access the entity again. For instance, reading a component from a given entity goes like this:
+
+    std::optional<VeComponentPosition> pos = handle.component<VeComponentPosition>(handle);
+
+In this case, a *std::optional* is returned, since it could happen that the component is actually not part of the entity. Another way of accessing the component is by
+
+    auto pos = VecsRegistry{}.component<VeComponentPosition>(handle);
+
+or
+
+    std::optional<VeComponentPosition> pos = VecsRegistry<VeEntityTypeNode>{}.component<VeComponentPosition>(handle);
+
+Again, all calls are finally handed to the latter version, which then resolves the data.
+You can update the value of a component through the update function:
+
+    handle.update(VeComponentPosition{ glm::vec3{99.0f, 22.0f, 33.0f} };
+
+or
+
+    handle.update<VeComponentPosition>(VeComponentPosition{ glm::vec3{-99.0f, -22.0f, -33.0f} });
+
+or
+
+    VecsRegistry{}.update<VeComponentPosition>(handle, VeComponentPosition{ glm::vec3{-98.0f, -22.0f, -33.0f} });
+
+or
+
+    VecsRegistry<VeEntityTypeNode>{}.update<VeComponentPosition>(handle, VeComponentPosition{ glm::vec3{-97.0f, -22.0f, -33.0f} });
+
+Again, all calls are finally handed to the latter version. 
+
+
+
 
 
 ### Entity Proxy

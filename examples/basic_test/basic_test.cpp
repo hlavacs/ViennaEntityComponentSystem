@@ -32,7 +32,7 @@ int main() {
     data1b.update();
     auto comp1_5 = h1.component<VeComponentPosition>();
 
-    auto h2 = VecsRegistry<VeEntityTypeDraw>{}.insert(VeComponentName{ "Draw" }, VeComponentPosition{ glm::vec3{9.0f, 2.0f, 3.0f} }, VeComponentOrientation{}, VeComponentTransform{}, VeComponentMaterial{ 99 }, VeComponentGeometry{});
+    VecsHandle h2{ VecsRegistry<VeEntityTypeDraw>{}.insert(VeComponentName{ "Draw" }, VeComponentPosition{ glm::vec3{9.0f, 2.0f, 3.0f} }, VeComponentOrientation{}, VeComponentTransform{}, VeComponentMaterial{ 99 }, VeComponentGeometry{}) };
     std::cout << typeid(VeEntityTypeDraw).hash_code() << " " << typeid(VeEntityTypeDraw).name() << std::endl;
 
     auto data2b = h2.proxy<VeEntityTypeDraw>();

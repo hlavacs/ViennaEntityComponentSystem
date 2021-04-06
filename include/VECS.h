@@ -162,7 +162,6 @@ namespace vecs {
 		friend VecsRegistryBaseClass;
 		template<typename E> friend class VecsRegistry;
 		template<typename E> friend class VecsComponentTable;
-		//template<typename E, size_t I> friend class VecsComponentTableDerived;
 
 	protected:
 		index_t		m_entity_index{};			///< The slot of the entity in the entity list
@@ -353,6 +352,10 @@ namespace vecs {
 		template<typename ET>
 		requires is_entity<ET, E>
 		auto update(const index_t index, ET&& ent) noexcept		-> bool;
+
+		template<typename C>
+		requires is_component_of<E, C>
+		auto update(const index_t index, C&& comp) noexcept		-> bool;
 	};
 
 	/**
@@ -474,6 +477,21 @@ namespace vecs {
 		);
 		return true;
 	}
+
+	/**
+	* \brief Update a component of type C for an entity of type E.
+	*
+	* \param[in] handle The entity handle.
+	* \param[in] comp The component data.
+	* \returns true if the operation was successful.
+	*/
+	template<typename E>
+	template<typename C>
+	requires is_component_of<E, C>
+	inline auto VecsComponentTable<E>::update(const index_t index, C&& comp) noexcept -> bool {
+		return m_data.update(index, std::forward<C>(comp));
+	}
+
 
 	/**
 	* \brief Erase the component data for an entity.
@@ -655,7 +673,7 @@ namespace vecs {
 
 		template<typename C>
 		requires is_component_type<C>
-		auto component(VecsHandle handle) noexcept -> std::optional<C>;		///< Get a component of type C
+		auto component(VecsHandle handle) noexcept -> std::optional<C>;	///< Get a component of type C
 
 		//-------------------------------------------------------------------------
 		//update data
@@ -1014,7 +1032,7 @@ namespace vecs {
 		VecsWriteLock lock(handle.mutex());
 		if constexpr (!vtll::has_type<E, std::decay_t<C>>::value) { return false; }
 		if (!contains(handle)) return false;
-		VecsComponentTable<E>().update<C>(handle.m_entity_index, std::forward<C>(comp));
+		VecsComponentTable<E>{}.update<C>(handle.m_entity_index, std::forward<C>(comp));
 		return true;
 	}
 
@@ -1538,7 +1556,7 @@ namespace vecs {
 	* \param[in] r Max size of all entities stored in the ECS.
 	*/
 	inline VecsRegistryBaseClass::VecsRegistryBaseClass(size_t r) noexcept {
-		if (!this->init()) return;
+		if (!this->init()) [[likely]] return;
 		m_entity_table.max_capacity(r);
 
 		vtll::static_for<size_t, 0, vtll::size<VecsEntityTypeList>::value >(

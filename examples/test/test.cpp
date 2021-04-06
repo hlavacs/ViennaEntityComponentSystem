@@ -40,7 +40,7 @@ int main() {
 
 		TESTRESULT(++number, "insert<type>", 
 			auto h2 = VecsRegistry<VeEntityTypeDraw>{}.insert(VeComponentName{ "Draw" }, pos, orient, trans, mat, geo),
-				h2.has_value() && VecsRegistry().size() == 2, );
+				h2.has_value() && VecsRegistry().size() == 2,);
 
 		TESTRESULT(++number, "insert per proxy",
 			auto pr1 = VecsEntityProxy<VeEntityTypeDraw>(VeComponentName{ "Draw" }, pos, orient, trans, mat, geo),
@@ -78,6 +78,12 @@ int main() {
 
 		TESTRESULT(++number, "update handle", h1.update<VeComponentPosition>(VeComponentPosition{ glm::vec3{-99.0f, -22.0f, -33.0f} }),
 			(h1.component<VeComponentPosition>().value().m_position == glm::vec3{ -99.0f, -22.0f, -33.0f }), );
+
+		TESTRESULT(++number, "update registry", VecsRegistry{}.update<VeComponentPosition>(h1, VeComponentPosition{ glm::vec3{-98.0f, -22.0f, -33.0f} }),
+			(h1.component<VeComponentPosition>().value().m_position == glm::vec3{ -98.0f, -22.0f, -33.0f }), );
+
+		TESTRESULT(++number, "update registry", VecsRegistry<VeEntityTypeNode>{}.update<VeComponentPosition>(h1, VeComponentPosition{ glm::vec3{-97.0f, -22.0f, -33.0f} }),
+			(h1.component<VeComponentPosition>().value().m_position == glm::vec3{ -97.0f, -22.0f, -33.0f }), );
 
 		TESTRESULT(++number, "erase handle per entity", pr1.erase(), (!pr1.has_value() && VecsRegistry().size() == 2), );
 		TESTRESULT(++number, "size", , (VecsRegistry().size<VeEntityTypeDraw>() == 1), );
