@@ -102,7 +102,6 @@ namespace vecs {
 	class VecsReadLock;
 	class VecsWriteLock;
 	template <typename E> class VecsEntityProxy;
-	template<typename E> class VecsEntityProxyAutoUpdate;
 	template<typename E> class VecsComponentAccessor;
 	template<typename E, size_t I> class VecsComponentAccessorDerived;
 	template<typename E> class VecsComponentTable;
@@ -189,7 +188,7 @@ namespace vecs {
 
 		template<typename E>
 		requires is_entity_type<E>
-		auto proxy() noexcept -> VecsEntityProxy<E>; ///< Get local copy (VecsEntityProxy) of entity data
+		auto proxy(bool auto_update = false) noexcept -> VecsEntityProxy<E>; ///< Get local copy (VecsEntityProxy) of entity data
 
 		template<typename C>
 		requires is_component_type<C> 
@@ -219,14 +218,14 @@ namespace vecs {
 	*/
 	template <typename E>
 	class VecsEntityProxy {
-		template<typename E> friend class VecsEntityProxyAutoUpdate;
 
 	public:
 		using tuple_type = vtll::to_tuple<E>;	///< A tuple holding all entity components.
 
 	protected:
-		VecsHandle	m_handle{};			///< The entity handle.
-		tuple_type	m_component_data{};	///< The local copy of the entity components.
+		VecsHandle	m_handle{};				///< The entity handle.
+		tuple_type	m_component_data{};		///< The local copy of the entity components.
+		bool		m_auto_update = false;	///< If true then update in destructor
 
 	public:
 
@@ -236,22 +235,23 @@ namespace vecs {
 		* \param[in] h Handle of the entity.
 		* \param[in] tup The copy of the entity data to be stored in the instance.
 		*/
-		VecsEntityProxy(VecsHandle h, const tuple_type& tup) noexcept : m_handle{ h }, m_component_data{ tup } {};
+		VecsEntityProxy(VecsHandle h, const tuple_type& tup, bool auto_update = false) noexcept 
+			: m_handle{ h }, m_component_data{ tup }, m_auto_update{auto_update} {};
 		
 		template<typename... Cs>
 		requires are_components_of<E, Cs...>
-		VecsEntityProxy(Cs&&... args) noexcept;					///< Insert this into the ECS, get a new entity
+		VecsEntityProxy(Cs&&... args) noexcept;		///< Insert this into the ECS, get a new entity
 
-		VecsEntityProxy() noexcept {};	///< Empty constructor results in an invalid proxy
+		VecsEntityProxy(bool auto_update = false) noexcept : m_auto_update{ auto_update }  {};	///< Empty constructor results in an invalid proxy
 
-		virtual ~VecsEntityProxy() {};	///< Empty destructor
+		virtual ~VecsEntityProxy() { if (m_auto_update) update(); };	///< Empty destructor
 
 		auto handle() const noexcept -> VecsHandle {	///< \returns the handle of the entity. 
 			return m_handle; 
 		}
-		auto has_value() noexcept			-> bool;			///< Check whether the entity still exists in the ECS
-		auto update() noexcept				-> bool;			///< Update the entity in the ECS
-		auto erase() noexcept				-> bool;			///< Erase the entity from the ECS
+		auto has_value() noexcept			-> bool;	///< Check whether the entity still exists in the ECS
+		auto update() noexcept				-> bool;	///< Update the entity in the ECS
+		auto erase() noexcept				-> bool;	///< Erase the entity from the ECS
 
 		template<size_t I, typename C = vtll::Nth_type<E, I>>
 		auto component() noexcept -> C {	///< \returns the Ith component of the entity.
@@ -274,43 +274,6 @@ namespace vecs {
 			std::get<vtll::index_of<E, std::decay_t<C>>::value>(m_component_data) = comp;
 		};
 	};
-
-
-	/**
-	* \brief VecsEntityProxyAutoUpdate is a VecsEntityProxy that updates its data if it is destructed
-	*/
-	template <typename E>
-	class VecsEntityProxyAutoUpdate : public VecsEntityProxy<E> {
-	public:
-
-		/**
-		* \brief Constructor of the VecsEntityProxyAutoUpdate class.
-		*
-		* \param[in] h Handle of the entity.
-		* \param[in] tup The copy of the entity data to be stored in the instance.
-		*/
-		VecsEntityProxyAutoUpdate(VecsHandle h, const VecsEntityProxy<E>::tuple_type& tup) noexcept
-			: VecsEntityProxy(h, tup) {};
-
-		template<typename... Cs>
-		requires are_components_of<E, Cs...>
-		VecsEntityProxyAutoUpdate(Cs&&... args) noexcept : VecsEntityProxy( std::forward<Cs>(args)...) {}
-
-		VecsEntityProxyAutoUpdate() noexcept : VecsEntityProxy() {};	///< Empty constructor results in an invalid proxy
-
-		VecsEntityProxyAutoUpdate(const VecsEntityProxy<E>& rhs) {
-			this->m_handle = rhs.m_handle;
-			this->m_component_data = rhs.m_component_data;
-		}
-
-		void operator=( const VecsEntityProxy<E>& rhs ) {
-			this->m_handle = rhs.m_handle;
-			this->m_component_data = rhs.m_component_data;
-		}
-
-		~VecsEntityProxyAutoUpdate() noexcept { VecsEntityProxy<E>::update(); };
-	};
-
 
 
 	//-------------------------------------------------------------------------
@@ -345,7 +308,7 @@ namespace vecs {
 
 		using info = vtll::type_list<VecsHandle, std::atomic<uint32_t>*>;	///< List of management data per entity (handle and mutex)
 		static const size_t c_handle = 0;		///< Component index of the handle info
-		static const size_t c_mutex = 1;			///< Component index of the handle info
+		static const size_t c_mutex = 1;		///< Component index of the handle info
 		static const size_t c_info_size = 2;	///< Index where the entity data starts
 
 		using types = vtll::cat< info, E >;					///< List with management and component types
@@ -688,7 +651,7 @@ namespace vecs {
 		//get data
 
 		template<typename E>
-		auto proxy(VecsHandle handle) noexcept -> VecsEntityProxy<E>;	///< Get a local copy of an entity
+		auto proxy(VecsHandle handle, bool auto_update = false) noexcept -> VecsEntityProxy<E>;	///< Get a local copy of an entity
 
 		template<typename C>
 		requires is_component_type<C>
@@ -875,7 +838,7 @@ namespace vecs {
 		//-------------------------------------------------------------------------
 		//get data
 
-		auto proxy(VecsHandle h) noexcept					-> VecsEntityProxy<E>;
+		auto proxy(VecsHandle h, bool auto_update = false) noexcept	-> VecsEntityProxy<E>;
 
 		template<typename C>
 		requires is_component_of<E, C>
@@ -997,10 +960,10 @@ namespace vecs {
 	* \returns a VecsEntityProxy<E>
 	*/
 	template<typename E>
-	inline auto VecsRegistry<E>::proxy(VecsHandle handle) noexcept -> VecsEntityProxy<E> {
+	inline auto VecsRegistry<E>::proxy(VecsHandle handle, bool auto_update ) noexcept -> VecsEntityProxy<E> {
 		VecsReadLock lock(handle.mutex());
 		if (!contains(handle)) return {};
-		return VecsEntityProxy<E>(handle, VecsComponentTable<E>().values(m_entity_table.comp_ref_idx<c_index>(handle.m_entity_index)));
+		return VecsEntityProxy<E>(handle, VecsComponentTable<E>().values(m_entity_table.comp_ref_idx<c_index>(handle.m_entity_index)), auto_update);
 	}
 
 	/**
@@ -1593,8 +1556,8 @@ namespace vecs {
 	* \returns a VecsEntityProxy<E>.
 	*/
 	template<typename E>
-	inline auto VecsRegistryBaseClass::proxy( VecsHandle handle) noexcept -> VecsEntityProxy<E> {
-		return VecsRegistry<E>().proxy(handle);
+	inline auto VecsRegistryBaseClass::proxy( VecsHandle handle, bool auto_update) noexcept -> VecsEntityProxy<E> {
+		return VecsRegistry<E>().proxy(handle, auto_update);
 	}
 
 	/**
@@ -1745,8 +1708,8 @@ namespace vecs {
 	*/
 	template<typename E>
 	requires is_entity_type<E>
-	inline auto VecsHandle::proxy() noexcept					-> VecsEntityProxy<E> {
-		return VecsRegistry<E>().proxy(*this);
+	inline auto VecsHandle::proxy(bool auto_update) noexcept					-> VecsEntityProxy<E> {
+		return VecsRegistry<E>().proxy(*this, auto_update);
 	}
 
 	/**

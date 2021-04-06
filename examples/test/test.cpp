@@ -54,7 +54,7 @@ int main() {
 
 		TESTRESULT(++number, "component entity", auto ent3 = h1.proxy<VeEntityTypeDraw>(), !ent3.has_value(), );
 
-		TESTRESULT(++number, "component entity", VecsEntityProxyAutoUpdate<VeEntityTypeDraw> ent4 = h1.proxy<VeEntityTypeDraw>(), !ent4.has_value(), );
+		TESTRESULT(++number, "component entity", auto ent4 = h1.proxy<VeEntityTypeDraw>(true), !ent4.has_value(), );
 
 		TESTRESULT(++number, "component handle", auto comp1 = h1.component<VeComponentPosition>().value(), 
 			(comp1.m_position == glm::vec3{ 9.0f, 2.0f, 3.0f }), );
