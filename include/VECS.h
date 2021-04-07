@@ -195,7 +195,7 @@ namespace vecs {
 
 		template<typename C>
 		requires is_component_type<C> 
-		auto component() noexcept -> std::optional<C>;		///< Get a component of type C of the entity (first found is copied)
+		auto component() noexcept -> C;		///< Get a component of type C of the entity (first found is copied)
 
 		template<typename ET>
 		requires is_entity<ET>
@@ -717,7 +717,7 @@ namespace vecs {
 
 		template<typename C>
 		requires is_component_type<C>
-		auto component(VecsHandle handle) noexcept -> std::optional<C>;	///< Get a component of type C
+		auto component(VecsHandle handle) noexcept -> C;			///< Get a component of type C
 
 		//-------------------------------------------------------------------------
 		//update data
@@ -815,19 +815,16 @@ namespace vecs {
 	* The first component of type C is retrieved. So component types should be unique if you want to
 	* use this function. Then the call is dispatched to the correct subclass for entity type E.
 	* \param[in] handle The handle of the entity to get the data from.
-	* \returns a std::optional holding the desired data, or an empty std::optional if the data is not available.
+	* \returns a component of type C holding the desired data.
 	*/
 	template<typename C>
 	requires is_component_type<C>
-	auto VecsRegistryBaseClass::component(VecsHandle handle) noexcept -> std::optional<C> {
-		if (!handle.is_valid()) return {};
+	auto VecsRegistryBaseClass::component(VecsHandle handle) noexcept -> C {
 		C res{};
-
+		if (!handle.is_valid()) return res;
 		/// Dispatch to the correct subclass and return result
-		if (m_dispatch[handle.type()]->componentE(handle, vtll::index_of<VecsComponentTypeList, std::decay_t<C>>::value, (void*)&res, sizeof(C))) {
-			return { res };
-		}
-		return {};
+		m_dispatch[handle.type()]->componentE(handle, vtll::index_of<VecsComponentTypeList, std::decay_t<C>>::value, (void*)&res, sizeof(C));
+		return res;
 	}
 
 	/**
@@ -926,7 +923,7 @@ namespace vecs {
 
 		template<typename C>
 		requires is_component_of<E, C>
-		auto component(VecsHandle handle) noexcept			->std::optional<C> ;
+		auto component(VecsHandle handle) noexcept			-> C;
 
 		//-------------------------------------------------------------------------
 		//update data
@@ -1069,17 +1066,17 @@ namespace vecs {
 	* \brief Retrieve a component of type C from an entity of type E.
 	*
 	* \param[in] handle The entity handle.
-	* \returns std::optional containing the component, or is empty.
+	* \returns the component.
 	*/
 	template<typename E>
 	template<typename C>
 	requires is_component_of<E, C>
-	inline auto VecsRegistry<E>::component( VecsHandle handle) noexcept -> std::optional<C> {
+	inline auto VecsRegistry<E>::component( VecsHandle handle) noexcept -> C {
 		VecsReadLock lock(handle.mutex());
 		//if constexpr (!vtll::has_type<E, std::decay_t<C>>::value) return {};
-		if (!contains(handle)) return {};	///< Return the empty std::optional
+		if (!contains(handle)) return {};	///< Return the empty component
 		auto& comp_table_idx = m_entity_table.comp_ref_idx<c_index>(handle.m_entity_index); ///< Get reference to component
-		return { VecsComponentTable<E>().component<C>(comp_table_idx) };	///< Return the std::optional
+		return VecsComponentTable<E>().component<C>(comp_table_idx);	///< Return the component
 	}
 
 	/**
@@ -1824,11 +1821,11 @@ namespace vecs {
 
 	/**
 	* \brief Get the component of type C from the entity this handle belongs to.
-	* \returns std::optional containing the component, or an empty std::optional.
+	* \returns the component, or an empty component.
 	*/
 	template<typename C>
 	requires is_component_type<C>
-	inline auto VecsHandle::component() noexcept				-> std::optional<C> {
+	inline auto VecsHandle::component() noexcept				-> C {
 		return VecsRegistryBaseClass().component<C>(*this);
 	}
 

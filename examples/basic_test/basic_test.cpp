@@ -47,7 +47,7 @@ int main() {
         std::cout << "entity\n";
     });
 
-    auto comp1_6 = h1.component<VeComponentPosition>().value();
+    auto comp1_6 = h1.component<VeComponentPosition>();
 
     h1.erase();
     auto data1c = h1.proxy<VeEntityTypeNode>();
