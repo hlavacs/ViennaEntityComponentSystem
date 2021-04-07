@@ -183,7 +183,11 @@ namespace vecs {
 		/** \returns the type index of the handle. */
 		auto type() const noexcept	-> uint32_t { return static_cast<uint32_t>(m_type_index); };
 		inline auto is_valid() noexcept	-> bool;	///< The data in the handle is non null
-		auto has_value() noexcept	-> bool;	///< The entity that is pointed to exists in the ECS
+		auto has_value() noexcept		-> bool;	///< The entity that is pointed to exists in the ECS
+
+		template<typename C>
+		requires is_component_type<C>
+		auto has_component() noexcept	-> bool;	///< Return true if the entity type has a component C
 
 		template<typename E>
 		requires is_entity_type<E>
@@ -248,12 +252,19 @@ namespace vecs {
 		auto handle() const noexcept -> VecsHandle {	///< \returns the handle of the entity. 
 			return m_handle; 
 		}
-		auto has_value() noexcept			-> bool;	///< Check whether the entity still exists in the ECS
-		auto update() noexcept				-> bool;	///< Update the entity in the ECS
-		auto erase() noexcept				-> bool;	///< Erase the entity from the ECS
+		auto has_value() noexcept		-> bool;	///< Check whether the entity still exists in the ECS
+
+		template<typename C>
+		requires is_component_type<C>
+		auto has_component() noexcept	-> bool {	///< Return true if the entity type has a component C
+			return is_component_of<E,C>;
+		}
+
+		auto update() noexcept			-> bool;	///< Update the entity in the ECS
+		auto erase() noexcept			-> bool;	///< Erase the entity from the ECS
 
 		template<size_t I, typename C = vtll::Nth_type<E, I>>
-		auto component() noexcept -> C {	///< \returns the Ith component of the entity.
+		auto component() noexcept -> C {			///< \returns the Ith component of the entity.
 			return std::get<I>(m_component_data);
 		};
 		
@@ -285,8 +296,9 @@ namespace vecs {
 	class VecsComponentAccessor {
 	public:
 		VecsComponentAccessor() noexcept {};	///<Constructor
-		virtual auto updateC(index_t index, size_t compidx, void* ptr, size_t size) noexcept -> bool = 0;		///< Empty update
-		virtual auto componentE(index_t entidx, size_t compidx, void* ptr, size_t size)  noexcept -> bool = 0;	///< Empty component read
+		virtual auto updateC(index_t index, size_t compidx, void* ptr, size_t size) noexcept		-> bool = 0;		///< Empty update
+		virtual auto componentE(index_t entidx, size_t compidx, void* ptr, size_t size)  noexcept	-> bool = 0;	///< Empty component read
+		virtual auto has_componentE()  noexcept														-> bool = 0;	///< Test for component
 	};
 
 
@@ -325,8 +337,9 @@ namespace vecs {
 		/** Each component type C of the entity type E gets its own specialized class instance */
 		static inline std::array<std::unique_ptr<VecsComponentAccessor<E>>, vtll::size<VecsComponentTypeList>::value> m_dispatch;
 
-		virtual auto updateC(index_t entidx, size_t compidx, void* ptr, size_t size) noexcept		-> bool;
-		virtual auto componentE(index_t entidx, size_t compidx, void* ptr, size_t size)  noexcept	-> bool;
+		auto updateC(index_t entidx, size_t compidx, void* ptr, size_t size) noexcept		-> bool;
+		auto componentE(index_t entidx, size_t compidx, void* ptr, size_t size)  noexcept	-> bool;
+		auto has_componentE(size_t compidx)  noexcept										-> bool; ///< Test for component
 		auto remove_deleted_tail() noexcept -> void;	///< Remove empty slots at the end of the table
 
 		VecsComponentTable(size_t r = 1 << c_max_size) noexcept;
@@ -370,6 +383,18 @@ namespace vecs {
 	template<typename E> 
 	inline auto VecsComponentTable<E>::updateC(index_t entidx, size_t compidx, void* ptr, size_t size) noexcept -> bool {
 		return m_dispatch[compidx]->updateC(entidx, compidx, ptr, size);
+	}
+
+	/**
+	* \brief Test whether an entity has a component with an index
+	*
+	* \param[in] entidx Entity index in the component table.
+	* \param[in] compidx Index of the component of the entity.
+	* \returns true if the entity contains the component
+	*/
+	template<typename E>
+	inline auto VecsComponentTable<E>::has_componentE(size_t compidx)  noexcept -> bool {
+		return m_dispatch[compidx]->has_componentE();
 	}
 
 	/**
@@ -520,7 +545,7 @@ namespace vecs {
 
 
 	//-------------------------------------------------------------------------
-	//comnponent vector derived class
+	//component accessor derived class
 
 	/**
 	* \brief For dispatching accesses to entity components if the entity type is not known at compile time by the caller.
@@ -563,6 +588,17 @@ namespace vecs {
 		auto updateC(index_t index, size_t compidx, void* ptr, size_t size) noexcept -> bool {
 			if constexpr (is_component_of<E, C>) {
 				VecsComponentTable<E>().m_data.comp_ref_idx<VecsComponentTable<E>::c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(index) = *((C*)ptr);
+				return true;
+			}
+			return false;
+		}
+
+		/**
+		* \brief Test whether an entity of type E contains a component of type C.
+		* \returns true if the retrieval was successful.
+		*/
+		auto has_componentE()  noexcept -> bool {
+			if constexpr (is_component_of<E, C>) {
 				return true;
 			}
 			return false;
@@ -655,6 +691,9 @@ namespace vecs {
 		/** Virtual function for dispatching component reads to the correct subclass for entity type E. */
 		virtual auto componentE(VecsHandle handle, size_t compidx, void*ptr, size_t size) noexcept -> bool { return false; };
 
+		/** Virtual function for dispatching whether an entity type E contains a component type C */
+		virtual auto has_componentE(VecsHandle handle, size_t compidx) noexcept -> bool { return false; };
+
 	public:
 		VecsRegistryBaseClass( size_t r = VecsTableMaxSize::value ) noexcept;
 
@@ -669,7 +708,12 @@ namespace vecs {
 		//get data
 
 		template<typename E>
+		requires is_entity_type<E>
 		auto proxy(VecsHandle handle, bool auto_update = false) noexcept -> VecsEntityProxy<E>;	///< Get a local copy of an entity
+
+		template<typename C>
+		requires is_component_type<C>
+		auto has_component(VecsHandle handle) noexcept	-> bool;	///< \returns true if the entity of type E has a component of type C
 
 		template<typename C>
 		requires is_component_type<C>
@@ -748,6 +792,21 @@ namespace vecs {
 	requires is_composed_of<E, Cs...> [[nodiscard]]
 	auto VecsRegistryBaseClass::insert(Cs&&... args) noexcept	-> VecsHandle {
 		return VecsRegistry<E>().insert(std::forward<Cs>(args)...);
+	}
+
+
+	/**
+	* \brief Test whether an entity (pointed to by the handle) of type E contains a component of type C
+	*
+	* The call is dispatched to the correct subclass for entity type E.
+	* \param[in] handle The handle of the entity to get the data from.
+	* \returns true if entity type E contains component type C
+	*/
+	template<typename C>
+	requires is_component_type<C>
+	auto VecsRegistryBaseClass::has_component(VecsHandle handle) noexcept -> bool {
+		if (!handle.is_valid()) return false;
+		return m_dispatch[handle.type()]->has_componentE(handle, vtll::index_of<VecsComponentTypeList, std::decay_t<C>>::value);
 	}
 
 	/**
@@ -829,8 +888,9 @@ namespace vecs {
 		static const size_t c_max_size = vtll::back_value<vtll::map< VecsTableSizeMap, E, VeTableSizeDefault > >::value;
 
 		/** Implementations of functions that receive dispatches from the base class. */
-		auto updateC(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept	-> bool ;
+		auto updateC(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept	-> bool;
 		auto componentE(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept	-> bool;
+		auto has_componentE(VecsHandle handle, size_t compidx) noexcept						-> bool;
 		auto compressE() noexcept	-> void { return VecsComponentTable<E>().compress(); };	///< Forward to component table of type E
 
 		/**
@@ -857,6 +917,12 @@ namespace vecs {
 		//get data
 
 		auto proxy(VecsHandle h, bool auto_update = false) noexcept	-> VecsEntityProxy<E>;
+
+		template<typename C>
+		requires is_component_type<C>
+		auto has_component() noexcept	-> bool {	///< Return true if the entity type has a component C
+			return is_component_of<E,C>;
+		}
 
 		template<typename C>
 		requires is_component_of<E, C>
@@ -900,6 +966,21 @@ namespace vecs {
 		VecsWriteLock lock(handle.mutex());
 		if (!contains(handle)) return {};
 		return VecsComponentTable<E>().updateC(m_entity_table.comp_ref_idx<c_index>(handle.m_entity_index), compidx, ptr, size);
+	}
+
+	/**
+	* \brief Retrieve component data for an entity of type E.
+	* This call has been dispatched from base class using the entity type index.
+	*
+	* \param[in] handle The entity handle.
+	* \param[in] compidx The index of the component in the VecsComponentTypeList
+	* \returns true if the retrieval was sucessful.
+	*/
+	template<typename E>
+	inline auto VecsRegistry<E>::has_componentE(VecsHandle handle, size_t compidx) noexcept -> bool {
+		VecsReadLock lock(handle.mutex());
+		if (!contains(handle)) return false;
+		return VecsComponentTable<E>().has_componentE(compidx);
 	}
 
 	/**
@@ -995,7 +1076,7 @@ namespace vecs {
 	requires is_component_of<E, C>
 	inline auto VecsRegistry<E>::component( VecsHandle handle) noexcept -> std::optional<C> {
 		VecsReadLock lock(handle.mutex());
-		if constexpr (!vtll::has_type<E, std::decay_t<C>>::value) return {};
+		//if constexpr (!vtll::has_type<E, std::decay_t<C>>::value) return {};
 		if (!contains(handle)) return {};	///< Return the empty std::optional
 		auto& comp_table_idx = m_entity_table.comp_ref_idx<c_index>(handle.m_entity_index); ///< Get reference to component
 		return { VecsComponentTable<E>().component<C>(comp_table_idx) };	///< Return the std::optional
@@ -1574,6 +1655,7 @@ namespace vecs {
 	* \returns a VecsEntityProxy<E>.
 	*/
 	template<typename E>
+	requires is_entity_type<E>
 	inline auto VecsRegistryBaseClass::proxy( VecsHandle handle, bool auto_update) noexcept -> VecsEntityProxy<E> {
 		return VecsRegistry<E>().proxy(handle, auto_update);
 	}
@@ -1726,8 +1808,18 @@ namespace vecs {
 	*/
 	template<typename E>
 	requires is_entity_type<E>
-	inline auto VecsHandle::proxy(bool auto_update) noexcept					-> VecsEntityProxy<E> {
+	inline auto VecsHandle::proxy(bool auto_update) noexcept		-> VecsEntityProxy<E> {
 		return VecsRegistry<E>().proxy(*this, auto_update);
+	}
+
+	/**
+	* \brief Test whether an entity of type E contains a component of type C.
+	* \returns true if the entity type E has a component C
+	*/
+	template<typename C>
+	requires is_component_type<C>
+	inline auto VecsHandle::has_component() noexcept				-> bool {
+		return VecsRegistryBaseClass().has_component<C>(*this);
 	}
 
 	/**
