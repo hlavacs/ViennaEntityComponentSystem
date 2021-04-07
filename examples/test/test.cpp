@@ -79,11 +79,17 @@ int main() {
 		TESTRESULT(++number, "update handle", h1.update<VeComponentPosition>(VeComponentPosition{ glm::vec3{-99.0f, -22.0f, -33.0f} }),
 			(h1.component<VeComponentPosition>().m_position == glm::vec3{ -99.0f, -22.0f, -33.0f }), );
 
-		TESTRESULT(++number, "update registry", VecsRegistry{}.update<VeComponentPosition>(h1, VeComponentPosition{ glm::vec3{-98.0f, -22.0f, -33.0f} }),
-			(h1.component<VeComponentPosition>().m_position == glm::vec3{ -98.0f, -22.0f, -33.0f }), );
+		TESTRESULT(++number, "update registry", VecsRegistry{}.update(h1, VeComponentPosition{ glm::vec3{-90.0f, -22.0f, -33.0f} }),
+			(h1.component<VeComponentPosition>().m_position == glm::vec3{ -90.0f, -22.0f, -33.0f }), );
 
-		TESTRESULT(++number, "update registry", VecsRegistry<VeEntityTypeNode>{}.update<VeComponentPosition>(h1, VeComponentPosition{ glm::vec3{-97.0f, -22.0f, -33.0f} }),
+		TESTRESULT(++number, "update registry", VecsRegistry{}.update<VeComponentPosition>(h1, VeComponentPosition{ glm::vec3{-98.0f, -20.0f, -33.0f} }),
+			(h1.component<VeComponentPosition>().m_position == glm::vec3{ -98.0f, -20.0f, -33.0f }), );
+
+		TESTRESULT(++number, "update registry", VecsRegistry<VeEntityTypeNode>{}.update(h1, VeComponentPosition{ glm::vec3{-97.0f, -22.0f, -33.0f} }),
 			(h1.component<VeComponentPosition>().m_position == glm::vec3{ -97.0f, -22.0f, -33.0f }), );
+
+		TESTRESULT(++number, "update registry", VecsRegistry<VeEntityTypeNode>{}.update<VeComponentPosition>(h1, VeComponentPosition{ glm::vec3{-97.0f, -22.0f, -30.0f} }),
+			(h1.component<VeComponentPosition>().m_position == glm::vec3{ -97.0f, -22.0f, -30.0f }), );
 
 		TESTRESULT(++number, "erase handle per entity", pr1.erase(), (!pr1.has_value() && VecsRegistry().size() == 2), );
 		TESTRESULT(++number, "size", , (VecsRegistry().size<VeEntityTypeDraw>() == 1), );

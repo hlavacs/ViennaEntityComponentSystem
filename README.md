@@ -229,54 +229,46 @@ Using *VecsRegistry* is not bound to a specific entity type, but commands evenmt
 
     using VeEntityTypeNode = vtll::type_list< VeComponentName, VeComponentPosition, VeComponentOrientation >;
 
-like so
+with any of these two methods:
 
-    auto handle = VecsRegistry{}.insert<VeEntityTypeNode>("Node1", {}, {});
+    VecsHandle handle1 = VecsRegistry{}.insert<VeEntityTypeNode>("Node1", VeComponentPosition{}, VeComponentOrientation{});
+    auto       handle2 = VecsRegistry<VeEntityTypeNode>{}.insert("Node2", {}, {});
 
-or like so:
+In fact, the first call simply calls the second call internally. Obviously, the parameters for this call must match the list of components that the entity is composed of.
 
-    VecsHandle handle = VecsRegistry<VeEntityTypeNode>{}.insert("Node1", {}, {});
+The result of creating an entity is a *handle*. A handle is an 8-bytes structure that uniquely identifies the new entity and you can use it later to access the entity again. For instance, reading a component from a given entity can be done by any of these methods:
 
-In fact, the first call simply calls the second call internally. The result of creating an entity is a *handle*. A handle is an 8-bytes structure that identifies the new entity and you can use it later to access the entity again. For instance, reading a component from a given entity goes like this:
+    VeComponentPosition pos1 = handle.component<VeComponentPosition>(handle);
+    auto pos2 = VecsRegistry{}.component<VeComponentPosition>(handle);
+    auto pos3 = VecsRegistry<VeEntityTypeNode>{}.component<VeComponentPosition>(handle);
 
-    VeComponentPosition pos = handle.component<VeComponentPosition>(handle);
+Again, all calls are finally handed to the last version, which then resolves the data. Only the last version is actually checked by the compiler at compile time, and the first two version thus could result in an empty component being returned. You can call *has_component<C()* to check whether an entity pointed represented by a handle does contain a specific component of type *C* using any of these methods:
 
-or
-    auto pos = VecsRegistry{}.component<VeComponentPosition>(handle);
+    bool b1 = handle.has_component<VeComponentPosition>();
+    bool b2 = VecsRegistry{}.has_component<VeComponentPosition>(handle);
+    bool b3 = VecsRegistry<VeEntityTypeNode>{}.has_component<VeComponentPosition>();
+The last call is only a wrapper for the concept *is_component_of<VeEntityTypeNode,VeComponentPosition>* which is evaluated at compile time.
 
-or
-
-    auto pos = VecsRegistry<VeEntityTypeNode>{}.component<VeComponentPosition>(handle);
-
-Again, all calls are finally handed to the latter version, which then resolves the data. Only the last version is actually checked by the compiler at compile time, and the first two version thus could result in an empty component being returned. You can call *has_component<C()* to check whether an entity pointed represented by a handle does contain a specific component of type *C*:
-
-    bool b = handle.has_component<VeComponentPosition>();
-
-or
-
-    auto b = VecsRegistry{}.has_component<VeComponentPosition>(handle);
-
-or
-
-    auto b = VecsRegistry<VeComponentPosition>{}.has_component(handle);
-
-You can update the value of a component through the update function:
+You can update the value of a component through any of these update functions:
 
     handle.update(VeComponentPosition{ glm::vec3{99.0f, 22.0f, 33.0f} };
-
-or
-
     handle.update<VeComponentPosition>(VeComponentPosition{ glm::vec3{-99.0f, -22.0f, -33.0f} });
 
-or
-
+    VecsRegistry{}.update(handle, VeComponentPosition{ glm::vec3{-98.0f, -22.0f, -33.0f} });
     VecsRegistry{}.update<VeComponentPosition>(handle, VeComponentPosition{ glm::vec3{-98.0f, -22.0f, -33.0f} });
 
-or
-
+    VecsRegistry<VeEntityTypeNode>{}.update(handle, VeComponentPosition{ glm::vec3{-97.0f, -22.0f, -33.0f} });
     VecsRegistry<VeEntityTypeNode>{}.update<VeComponentPosition>(handle, VeComponentPosition{ glm::vec3{-97.0f, -22.0f, -33.0f} });
 
-Again, all calls are finally handed to the latter version.
+Again, all calls are finally forwarded to the last version, which should only be called if it is certain that the entity does contain the component.
+
+Finally, you can erase entities from VECS using any of these calls:
+
+    handle.erase();
+    VecsRegistry{}.erase(handle);
+    VecsRegistry<VeEntityTypeNode>{}.erase(handle);
+
+
 
 
 
