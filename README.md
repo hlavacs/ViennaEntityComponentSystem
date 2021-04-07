@@ -239,17 +239,27 @@ or like so:
 
 In fact, the first call simply calls the second call internally. The result of creating an entity is a *handle*. A handle is an 8-bytes structure that identifies the new entity and you can use it later to access the entity again. For instance, reading a component from a given entity goes like this:
 
-    std::optional<VeComponentPosition> pos = handle.component<VeComponentPosition>(handle);
+    VeComponentPosition pos = handle.component<VeComponentPosition>(handle);
 
-In this case, a *std::optional* is returned, since it could happen that the component is actually not part of the entity. Another way of accessing the component is by
-
+or
     auto pos = VecsRegistry{}.component<VeComponentPosition>(handle);
 
 or
 
-    std::optional<VeComponentPosition> pos = VecsRegistry<VeEntityTypeNode>{}.component<VeComponentPosition>(handle);
+    auto pos = VecsRegistry<VeEntityTypeNode>{}.component<VeComponentPosition>(handle);
 
-Again, all calls are finally handed to the latter version, which then resolves the data.
+Again, all calls are finally handed to the latter version, which then resolves the data. Only the last version is actually checked by the compiler at compile time, and the first two version thus could result in an empty component being returned. You can call *has_component<C()* to check whether an entity pointed represented by a handle does contain a specific component of type *C*:
+
+    bool b = handle.has_component<VeComponentPosition>();
+
+or
+
+    auto b = VecsRegistry{}.has_component<VeComponentPosition>(handle);
+
+or
+
+    auto b = VecsRegistry<VeComponentPosition>{}.has_component(handle);
+
 You can update the value of a component through the update function:
 
     handle.update(VeComponentPosition{ glm::vec3{99.0f, 22.0f, 33.0f} };
@@ -266,7 +276,7 @@ or
 
     VecsRegistry<VeEntityTypeNode>{}.update<VeComponentPosition>(handle, VeComponentPosition{ glm::vec3{-97.0f, -22.0f, -33.0f} });
 
-Again, all calls are finally handed to the latter version. 
+Again, all calls are finally handed to the latter version.
 
 
 
