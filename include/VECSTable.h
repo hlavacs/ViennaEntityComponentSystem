@@ -221,9 +221,48 @@ namespace vecs {
 		inline auto update(index_t n, T<Cs...>&& data ) -> bool {
 			if (n >= m_size) return false;
 			decltype(auto) ref = tuple_ref(n);
-			vtll::static_for<size_t, 0, vtll::size<DATA>::value >([&](auto i) { std::get<i>(ref) = std::get<i>(data); } );
+			vtll::static_for<size_t, 0, vtll::size<DATA>::value >([&](auto i) { 
+				std::get<i>(ref) = std::get<i>(data); 
+			} );
 			return true;
 		}
+
+		/**
+		* \brief Move one row to another row.
+		* \param[in] idst Index of destination row.
+		* \param[in] isrc Index of source row.
+		* \returns true if the operation was successful.
+		*/
+		inline auto move(index_t idst, index_t isrc) -> bool {
+			if (idst >= m_size || isrc >= m_size) return false;
+			decltype(auto) src = tuple_ref(isrc);
+			decltype(auto) dst = tuple_rvref(idst);
+			vtll::static_for<size_t, 0, vtll::size<DATA>::value >([&](auto i) { 
+				std::get<i>(dst) = std::move(std::get<i>(src)); 
+			});
+			return true;
+		}
+
+		/**
+		* \brief Swap the values of two rows.
+		* \param[in] n1 Index of first row.
+		* \param[in] n2 Index of second row.
+		* \returns true if the operation was successful.
+		*/
+		inline auto swap(index_t n1, index_t n2) -> bool {
+			if (n1 >= m_size || n2 >= m_size) return false;
+			tuple_value_t  tmp;
+			decltype(auto) t1 = tuple_rvref(n1);
+
+			vtll::static_for<size_t, 0, vtll::size<DATA>::value >([&](auto i) {
+				std::get<i>(tmp) = std::move(std::get<i>(t1));
+			});
+
+			move(n1, n2);
+			update(n2, std::move(tmp));
+			return true;
+		}
+
 
 		/**
 		* \brief Allocate segements to make sure enough memory is available.

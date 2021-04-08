@@ -207,7 +207,13 @@ namespace vecs {
 
 		auto erase() noexcept -> bool;						///< Erase the entity
 
+		auto index() noexcept -> index_t;					///< Get index of this entity in the component table
+
 		std::atomic<uint32_t>* mutex();
+
+		bool operator==(const VecsHandle& rhs) {
+			return m_entity_index == rhs.m_entity_index && m_generation_counter == rhs.m_generation_counter && m_type_index == rhs.m_type_index;
+		}
 	};
 
 
@@ -369,6 +375,9 @@ namespace vecs {
 		template<typename C>
 		requires is_component_of<E, C>
 		auto update(const index_t index, C&& comp) noexcept		-> bool;
+
+		auto swap(index_t n1, index_t n2) -> bool { return m_data.swap(n1, n2); }
+
 	};
 
 	/**
@@ -646,7 +655,7 @@ namespace vecs {
 
 
 	//-------------------------------------------------------------------------
-	//entity table base class
+	//entity registry base class
 
 	template<typename... Cs>
 	class VecsIterator;
@@ -775,6 +784,11 @@ namespace vecs {
 		requires are_component_types<Cs...>
 		auto for_each(std::function<Functor<Cs...>> f) -> void;
 
+		auto index(VecsHandle h) noexcept -> index_t;
+
+		virtual
+		auto swap( VecsHandle h1, VecsHandle h2 ) noexcept -> bool;
+
 		virtual
 		auto contains(VecsHandle handle) noexcept	-> bool;	///< \returns true if the ECS still holds this entity (externally synced)
 	};
@@ -793,7 +807,6 @@ namespace vecs {
 	auto VecsRegistryBaseClass::insert(Cs&&... args) noexcept	-> VecsHandle {
 		return VecsRegistry<E>().insert(std::forward<Cs>(args)...);
 	}
-
 
 	/**
 	* \brief Test whether an entity (pointed to by the handle) of type E contains a component of type C
@@ -850,6 +863,29 @@ namespace vecs {
 	auto VecsRegistryBaseClass::erase(VecsHandle handle) noexcept -> bool {
 		if (!handle.is_valid()) return false;
 		return m_dispatch[handle.type()]->erase(handle); ///< Dispatch to the correct subclass for type E and return result
+	}
+
+	/**
+	* \brief Return index of an entity in the component table.
+	* \param[in] handle The entity handle.
+	* \returns the index of the entity in the component table.
+	*/
+	auto VecsRegistryBaseClass::index(VecsHandle h) noexcept -> index_t {
+		if (!h.is_valid()) return {};
+		return m_entity_table.comp_ref_idx<VecsRegistryBaseClass::c_index>(h.m_entity_index);
+	}
+
+	/**
+	* \brief Swap the rows of two entities of the same type.
+	* The call is dispatched to the correct subclass for entity type E.
+	*
+	* \param[in] h1 First entity.
+	* \param[in] h2 Second entity.
+	* \returns true if operation was successful.
+	*/
+	auto VecsRegistryBaseClass::swap(VecsHandle h1, VecsHandle h2) noexcept	-> bool {
+		if (!h1.is_valid() || !h1.is_valid() || h1.type() != h2.type()) return false;
+		return m_dispatch[h1.type()]->swap(h1, h2);				///< Dispatch to the correct subclass for type E and return result
 	}
 
 	/**
@@ -944,6 +980,8 @@ namespace vecs {
 		//-------------------------------------------------------------------------
 		//utility
 
+		auto swap(VecsHandle h1, VecsHandle h2) noexcept	-> bool;
+
 		auto contains(VecsHandle handle) noexcept			-> bool;
 	};
 
@@ -1033,6 +1071,30 @@ namespace vecs {
 		m_sizeE++;
 		return handle;
 	};
+
+	/**
+	* \brief Swap the rows of two entities of the same type.
+	* The call is dispatched to the correct subclass for entity type E.
+	*
+	* \param[in] h1 First entity.
+	* \param[in] h2 Second entity.
+	* \returns true if operation was successful.
+	*/
+	template<typename E>
+	inline auto VecsRegistry<E>::swap(VecsHandle h1, VecsHandle h2) noexcept -> bool {
+		if (h1 == h2) return false;
+		if (!h1.is_valid() || !h1.is_valid() || h1.type() != h2.type()) return false;
+		if (h1.m_type_index != vtll::index_of<VecsEntityTypeList, E>::value) return false;
+		if (h2.m_type_index != vtll::index_of<VecsEntityTypeList, E>::value) return false;
+
+		VecsReadLock lock1(h1.mutex());
+		VecsReadLock lock2(h2.mutex());
+
+		index_t i1 = m_entity_table.comp_ref_idx<c_index>(h1.m_entity_index);
+		index_t i2 = m_entity_table.comp_ref_idx<c_index>(h2.m_entity_index);
+		
+		return VecsComponentTable<E>().swap(i1, i2);
+	}
 
 	/**
 	* \brief Check whether the ECS contains an entity. 
@@ -1593,8 +1655,8 @@ namespace vecs {
 		for (size_t i = 0; i < m_deleted.size(); ++i) {
 			remove_deleted_tail();											///< Remove invalid entities at end of table
 			auto index = m_deleted.comp_ref_idx<0>(index_t{i});				///< Get next deleted entity from deleted table
-			if (index.value < m_data.size()) {								///< Is it inside the table still?
-				m_data.update(index, m_data.tuple_rvref(index_t{ m_data.size() - 1 }));	///< Yes, move last entity to this position
+			if (index.value < m_data.size()) {								///< Is it inside the table still?		
+				m_data.move(index, index_t{ m_data.size() - 1 });			///< Yes, move last entity to this position
 				auto& handle = m_data.comp_ref_idx<c_handle>(index);		///< Handle of moved entity
 				VecsRegistryBaseClass().m_entity_table.comp_ref_idx<VecsRegistryBaseClass::c_index>(handle.m_entity_index) = index; ///< Change map entry of moved last entity
 			}
@@ -1863,6 +1925,20 @@ namespace vecs {
 		return VecsRegistryBaseClass().erase(*this);
 	}
 
+	/**
+	* \brief Get index of this entity in the component table.
+	*
+	* \returns index of this entity in the component table.
+	*/
+	auto VecsHandle::index() noexcept -> index_t {
+		return VecsRegistryBaseClass{}.index(*this);
+	}
+
+	/**
+	* \brief Return a pointer to the mutex of this entity.
+	*
+	* \returns a pointer to the mutex of this entity.
+	*/
 	inline std::atomic<uint32_t>* VecsHandle::mutex() {
 		if (!is_valid()) return nullptr;
 		return &VecsRegistryBaseClass::m_entity_table.comp_ref_idx<VecsRegistryBaseClass::c_mutex>(m_entity_index);

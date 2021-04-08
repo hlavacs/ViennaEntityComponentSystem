@@ -268,8 +268,12 @@ Finally, you can erase entities from VECS using any of these calls:
     VecsRegistry{}.erase(handle);
     VecsRegistry<VeEntityTypeNode>{}.erase(handle);
 
+When an entity is erased, for any component its *destructor* is called, if it has one and it is not trivially destructible. However, the space in the component table is *not* removed. Thus, erasing entities produces gaps in the data and iterating through all entities gets increasingly less efficient. In order to compress the component table, you have to
 
+* stop multithreaded access to VECS, and
+* call *VecsRegistry::compress()* (all tables) or *VecsRegistry<E>::compress()* (only table for entity type *E*)
 
+This will remove any gap in the component table(s) to speed up iterating through the entities in VECS. In a game, this can be done typically once per game loop iteration.
 
 
 
