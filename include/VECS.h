@@ -759,14 +759,8 @@ namespace vecs {
 		//-------------------------------------------------------------------------
 		//utility
 
-		template<typename E = void>
-		requires (is_entity_type<E> || std::is_void_v<E>)
-		auto size() noexcept		-> size_t {		///< \returns the number of valid entities of type E
-			return VecsRegistry<E>::m_sizeE.load(); 
-		};
-
-		template<>
-		auto size<>() noexcept		-> size_t {		///< \returns the total number of valid entities
+		virtual
+		auto size() noexcept		-> size_t {		///< \returns the total number of valid entities
 			return m_size.load(); 
 		};
 
@@ -930,14 +924,13 @@ namespace vecs {
 		* \brief Erase all entites of type E
 		*/
 		auto clearE() noexcept		-> size_t { 		///< Forward to component table of type E
-			m_sizeE = 0;
 			return VecsComponentTable<E>().clear();		///< Call clear() in the correct component table
 		};
 
 	public:
 		/** Constructors for class VecsRegistry<E>. */
 		VecsRegistry(size_t r = 1 << c_max_size) noexcept : VecsRegistryBaseClass() { VecsComponentTable<E>{r}; };
-		VecsRegistry(std::nullopt_t u) noexcept : VecsRegistryBaseClass() {};
+		VecsRegistry(std::nullopt_t u) noexcept : VecsRegistryBaseClass() { m_sizeE = 0; };
 
 		//-------------------------------------------------------------------------
 		//insert data
@@ -979,6 +972,10 @@ namespace vecs {
 
 		//-------------------------------------------------------------------------
 		//utility
+
+		auto size() noexcept								-> size_t {		///< \returns the number of valid entities of type E
+			return VecsRegistry<E>::m_sizeE.load();
+		};
 
 		auto swap(VecsHandle h1, VecsHandle h2) noexcept	-> bool;
 
@@ -1615,7 +1612,7 @@ namespace vecs {
 	inline VecsIterator<Cs...>::VecsIterator(bool is_end) noexcept : m_is_end{ is_end } {
 		if (is_end) {
 			m_current_iterator = static_cast<decltype(m_current_iterator)>(m_dispatch.size() - 1);
-			m_current_index = static_cast<decltype(m_current_index)>(VecsRegistry<last_type>().size<last_type>());
+			m_current_index = static_cast<decltype(m_current_index)>(VecsRegistry<last_type>().size());
 		}
 
 		vtll::static_for<size_t, 0, vtll::size<entity_types>::value >(
@@ -1733,7 +1730,8 @@ namespace vecs {
 		size_t num = 0;
 		vtll::static_for<size_t, 0, vtll::size<VecsEntityTypeList>::value >(
 			[&](auto i) {
-				num += VecsRegistry<vtll::Nth_type<VecsEntityTypeList,i>>().clearE();
+				using type = vtll::Nth_type<VecsEntityTypeList, i>;
+				num += VecsRegistry<type>().clearE();
 			}
 		);
 		return num;
