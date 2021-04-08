@@ -274,15 +274,15 @@ When an entity is erased, for any component its *destructor* is called, if it ha
 * stop multithreaded access to VECS, and
 * call *VecsRegistry::compress()* (all tables) or *VecsRegistry<E>::compress()* (only table for entity type *E*).
 
-This will remove any gap in the component table(s) to speed up iterating through the entities in VECS. In a game, this can be done typically once per game loop iteration. Compressing may reshuffle rows, and if the ordering of entities is important, you may want to go through the entities once more and make sure that the ordering is ensured. An example for this is a scene graph, where nodes in a scene can have siblings and children, thus spanning up a tree that is stored in a flat table. When calculating the world matrices of the nodes, it is important to compute in the order from the tree root down to the leaves. Thus, when looping through the table, parent nodes must occur before child nodes. You can compare the positions in the component table using with the function *index()*, use either of these:
+This will remove any gap in the component table(s) to speed up iterating through the entities in VECS. In a game, this can be done typically once per game loop iteration. Compressing may reshuffle rows, and if the ordering of entities is important, you may want to go through the entities once more and make sure that the ordering is ensured. An example for this is a scene graph, where nodes in a scene can have siblings and children, thus spanning up a tree that is stored in a flat table. When calculating the world matrices of the nodes, it is important to compute in the order from the tree root down to the leaves. Thus, when looping through the node entities, parent nodes must occur before child nodes. You can compare the positions in the component table using the function *index()*, use either of these:
 
     index_t first = handle.index();
-    index_t second = VecsRegistry{}.index(handle); //if handle of type VeEntityTypeNode
+    index_t second = VecsRegistry{}.index(handle);
 
-You can swap the places of two entities using either
+If a child comes before a parent then you can swap the places of two entities using either
 
     VecsRegistry{}.swap(handle1, handle2);
-    VecsRegistry<VeEntityTypeNode>{}.swap(handle1, handle2);
+    VecsRegistry<VeEntityTypeNode>{}.swap(handle1, handle2); //if both handles of type VeEntityTypeNode
 
 The entities are swapped only if they are of the same type.
 
