@@ -37,7 +37,6 @@ namespace vecs {
 
 		using tuple_value_t = vtll::to_tuple<DATA>;		///< Tuple holding the entries as value
 		using tuple_ref_t = vtll::to_ref_tuple<DATA>;	///< Tuple holding references to the entries
-		using tuple_rvref_t = vtll::to_rvref_tuple<DATA>;	///< Tuple holding prvalue references to the entries
 
 		using array_tuple_t1 = std::array<tuple_value_t, N>;								///< ROW: an array of tuples
 		using array_tuple_t2 = vtll::to_tuple<vtll::transform_size_t<DATA,std::array,N>>;	///< COLUMN: a tuple of arrays
@@ -106,22 +105,6 @@ namespace vecs {
 			return f(std::make_index_sequence<vtll::size<DATA>::value>{});
 		};
 
-		/**
-		* \brief Get a tuple with prvalue references to all components of an entry.
-		* \param[in] n Index to the entry.
-		* \returns a tuple with prvalue references to all components of entry n.
-		*/
-		inline auto tuple_rvref(index_t n) noexcept -> tuple_rvref_t {
-			auto f = [&]<size_t... Is>(std::index_sequence<Is...>) {
-				if constexpr (ROW) {
-					return std::make_tuple(std::move(std::get<Is>((*m_segment[n >> L])[n & BIT_MASK]))...);
-				}
-				else {
-					return std::make_tuple(std::move(std::get<Is>(*m_segment[n >> L])[n & BIT_MASK])...);
-				}
-			};
-			return f(std::make_index_sequence<vtll::size<DATA>::value>{});
-		};
 
 		/**
 		* \brief Get a tuple with valuesof all components of an entry.
@@ -236,7 +219,7 @@ namespace vecs {
 		inline auto move(index_t idst, index_t isrc) -> bool {
 			if (idst >= m_size || isrc >= m_size) return false;
 			decltype(auto) src = tuple_ref(isrc);
-			decltype(auto) dst = tuple_rvref(idst);
+			decltype(auto) dst = tuple_ref(idst);
 			vtll::static_for<size_t, 0, vtll::size<DATA>::value >([&](auto i) { 
 				std::get<i>(dst) = std::move(std::get<i>(src)); 
 			});
@@ -251,13 +234,7 @@ namespace vecs {
 		*/
 		inline auto swap(index_t n1, index_t n2) -> bool {
 			if (n1 >= m_size || n2 >= m_size) return false;
-			tuple_value_t  tmp;
-			decltype(auto) t1 = tuple_rvref(n1);
-
-			vtll::static_for<size_t, 0, vtll::size<DATA>::value >([&](auto i) {
-				std::get<i>(tmp) = std::move(std::get<i>(t1));
-			});
-
+			tuple_value_t tmp = std::move(tuple_ref(n1));
 			move(n1, n2);
 			update(n2, std::move(tmp));
 			return true;

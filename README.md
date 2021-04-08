@@ -232,7 +232,7 @@ Using *VecsRegistry* is not bound to a specific entity type, but commands evenmt
 with any of these two methods:
 
     VecsHandle handle1 = VecsRegistry{}.insert<VeEntityTypeNode>("Node1", VeComponentPosition{}, VeComponentOrientation{});
-    auto       handle2 = VecsRegistry<VeEntityTypeNode>{}.insert("Node2", {}, {});
+    auto       handle2 = VecsRegistry<VeEntityTypeNode>{}.insert("Node2", {}, {}); //if handle of type VeEntityTypeNode
 
 In fact, the first call simply calls the second call internally. Obviously, the parameters for this call must match the list of components that the entity is composed of.
 
@@ -240,13 +240,14 @@ The result of creating an entity is a *handle*. A handle is an 8-bytes structure
 
     VeComponentPosition pos1 = handle.component<VeComponentPosition>(handle);
     auto pos2 = VecsRegistry{}.component<VeComponentPosition>(handle);
-    auto pos3 = VecsRegistry<VeEntityTypeNode>{}.component<VeComponentPosition>(handle);
+    auto pos3 = VecsRegistry<VeEntityTypeNode>{}.component<VeComponentPosition>(handle); //if handle of type VeEntityTypeNode
 
 Again, all calls are finally handed to the last version, which then resolves the data. Only the last version is actually checked by the compiler at compile time, and the first two version thus could result in an empty component being returned. You can call *has_component<C()* to check whether an entity pointed represented by a handle does contain a specific component of type *C* using any of these methods:
 
     bool b1 = handle.has_component<VeComponentPosition>();
     bool b2 = VecsRegistry{}.has_component<VeComponentPosition>(handle);
     bool b3 = VecsRegistry<VeEntityTypeNode>{}.has_component<VeComponentPosition>();
+
 The last call is only a wrapper for the concept *is_component_of<VeEntityTypeNode,VeComponentPosition>* which is evaluated at compile time.
 
 You can update the value of a component through any of these update functions:
@@ -258,7 +259,7 @@ You can update the value of a component through any of these update functions:
     VecsRegistry{}.update<VeComponentPosition>(handle, VeComponentPosition{ glm::vec3{-98.0f, -22.0f, -33.0f} });
 
     VecsRegistry<VeEntityTypeNode>{}.update(handle, VeComponentPosition{ glm::vec3{-97.0f, -22.0f, -33.0f} });
-    VecsRegistry<VeEntityTypeNode>{}.update<VeComponentPosition>(handle, VeComponentPosition{ glm::vec3{-97.0f, -22.0f, -33.0f} });
+    VecsRegistry<VeEntityTypeNode>{}.update<VeComponentPosition>(handle, VeComponentPosition{ glm::vec3{-97.0f, -22.0f, -33.0f} }); //if handle of type VeEntityTypeNode
 
 Again, all calls are finally forwarded to the last version, which should only be called if it is certain that the entity does contain the component.
 
@@ -266,15 +267,24 @@ Finally, you can erase entities from VECS using any of these calls:
 
     handle.erase();
     VecsRegistry{}.erase(handle);
-    VecsRegistry<VeEntityTypeNode>{}.erase(handle);
+    VecsRegistry<VeEntityTypeNode>{}.erase(handle); //if handle of type VeEntityTypeNode
 
 When an entity is erased, for any component its *destructor* is called, if it has one and it is not trivially destructible. However, the space in the component table is *not* removed. Thus, erasing entities produces gaps in the data and iterating through all entities gets increasingly less efficient. In order to compress the component table, you have to
 
 * stop multithreaded access to VECS, and
-* call *VecsRegistry::compress()* (all tables) or *VecsRegistry<E>::compress()* (only table for entity type *E*)
+* call *VecsRegistry::compress()* (all tables) or *VecsRegistry<E>::compress()* (only table for entity type *E*).
 
-This will remove any gap in the component table(s) to speed up iterating through the entities in VECS. In a game, this can be done typically once per game loop iteration.
+This will remove any gap in the component table(s) to speed up iterating through the entities in VECS. In a game, this can be done typically once per game loop iteration. Compressing may reshuffle rows, and if the ordering of entities is important, you may want to go through the entities once more and make sure that the ordering is ensured. An example for this is a scene graph, where nodes in a scene can have siblings and children, thus spanning up a tree that is stored in a flat table. When calculating the world matrices of the nodes, it is important to compute in the order from the tree root down to the leaves. Thus, when looping through the table, parent nodes must occur before child nodes. You can compare the positions in the component table using with the function *index()*, use either of these:
 
+    index_t first = handle.index();
+    index_t second = VecsRegistry{}.index(handle); //if handle of type VeEntityTypeNode
+
+You can swap the places of two entities using either
+
+    VecsRegistry{}.swap(handle1, handle2);
+    VecsRegistry<VeEntityTypeNode>{}.swap(handle1, handle2);
+
+The entities are swapped only if they are of the same type.
 
 
 

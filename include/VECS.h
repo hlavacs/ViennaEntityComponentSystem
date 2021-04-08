@@ -1090,8 +1090,10 @@ namespace vecs {
 		VecsReadLock lock1(h1.mutex());
 		VecsReadLock lock2(h2.mutex());
 
-		index_t i1 = m_entity_table.comp_ref_idx<c_index>(h1.m_entity_index);
-		index_t i2 = m_entity_table.comp_ref_idx<c_index>(h2.m_entity_index);
+		index_t& i1 = m_entity_table.comp_ref_idx<c_index>(h1.m_entity_index);
+		index_t& i2 = m_entity_table.comp_ref_idx<c_index>(h2.m_entity_index);
+
+		std::swap(i1, i2);
 		
 		return VecsComponentTable<E>().swap(i1, i2);
 	}
