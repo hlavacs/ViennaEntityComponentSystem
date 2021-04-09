@@ -249,7 +249,7 @@ namespace vecs {
 		
 		template<typename... Cs>
 		requires are_components_of<E, Cs...>
-		VecsEntityProxy(Cs&&... args) noexcept;		///< Insert this into the ECS, get a new entity
+		VecsEntityProxy(bool auto_update, Cs&&... args) noexcept;		///< Insert this into the ECS, get a new entity
 
 		VecsEntityProxy(bool auto_update = false) noexcept : m_auto_update{ auto_update }  {};	///< Empty constructor results in an invalid proxy
 
@@ -266,7 +266,18 @@ namespace vecs {
 			return is_component_of<E,C>;
 		}
 
+		/**
+		* \brief Update the local copy with type C
+		* \param[in] comp A universal reference to the new component value.
+		*/
+		template<typename C = void>
+		requires is_component_of<E, C>
+		auto update(C&& comp) noexcept -> void {
+			std::get<vtll::index_of<E, std::decay_t<C>>::value>(m_component_data) = comp;
+		};
+
 		auto update() noexcept			-> bool;	///< Update the entity in the ECS
+
 		auto erase() noexcept			-> bool;	///< Erase the entity from the ECS
 
 		template<size_t I, typename C = vtll::Nth_type<E, I>>
@@ -280,15 +291,6 @@ namespace vecs {
 			return std::get<vtll::index_of<E,std::decay_t<C>>::value>(m_component_data);
 		};
 
-		/** 
-		* \brief Update the local copy with type C
-		* \param[in] comp A universal reference to the new component value. 
-		*/
-		template<typename C>
-		requires is_component_of<E, C>
-		auto local_update( C&& comp ) noexcept -> void {
-			std::get<vtll::index_of<E, std::decay_t<C>>::value>(m_component_data) = comp;
-		};
 	};
 
 
@@ -716,10 +718,6 @@ namespace vecs {
 		//-------------------------------------------------------------------------
 		//get data
 
-		template<typename E>
-		requires is_entity_type<E>
-		auto proxy(VecsHandle handle, bool auto_update = false) noexcept -> VecsEntityProxy<E>;	///< Get a local copy of an entity
-
 		template<typename C>
 		requires is_component_type<C>
 		auto has_component(VecsHandle handle) noexcept	-> bool;	///< \returns true if the entity of type E has a component of type C
@@ -732,6 +730,7 @@ namespace vecs {
 		//update data
 
 		template<typename ET>
+		requires is_entity<ET>
 		auto update(VecsHandle handle, ET&& ent) noexcept -> bool;		///< Update an entity 
 
 		template<typename C>
@@ -950,6 +949,10 @@ namespace vecs {
 			return is_component_of<E,C>;
 		}
 
+		template<size_t I, typename C = vtll::Nth_type<E, I>>
+		requires is_component_of<E, C>
+		auto component(VecsHandle handle) noexcept							-> C;
+
 		template<typename C>
 		requires is_component_of<E, C>
 		auto component(VecsHandle handle) noexcept			-> C;
@@ -1123,6 +1126,23 @@ namespace vecs {
 		return VecsEntityProxy<E>(handle, VecsComponentTable<E>().values(m_entity_table.comp_ref_idx<c_index>(handle.m_entity_index)), auto_update);
 	}
 
+
+	/**
+	* \brief Retrieve a component of type C from an entity of type E.
+	*
+	* \param[in] handle The entity handle.
+	* \returns the component.
+	*/
+	template<typename E>
+	template<size_t I, typename C>
+	requires is_component_of<E, C>
+	auto VecsRegistry<E>::component(VecsHandle handle) noexcept							-> C {
+		VecsReadLock lock(handle.mutex());
+		if (!contains(handle)) return {};	///< Return the empty component
+		auto& comp_table_idx = m_entity_table.comp_ref_idx<c_index>(handle.m_entity_index); ///< Get reference to component
+		return VecsComponentTable<E>().component<C>(comp_table_idx);	///< Return the component
+	}
+
 	/**
 	* \brief Retrieve a component of type C from an entity of type E.
 	*
@@ -1132,12 +1152,8 @@ namespace vecs {
 	template<typename E>
 	template<typename C>
 	requires is_component_of<E, C>
-	inline auto VecsRegistry<E>::component( VecsHandle handle) noexcept -> C {
-		VecsReadLock lock(handle.mutex());
-		//if constexpr (!vtll::has_type<E, std::decay_t<C>>::value) return {};
-		if (!contains(handle)) return {};	///< Return the empty component
-		auto& comp_table_idx = m_entity_table.comp_ref_idx<c_index>(handle.m_entity_index); ///< Get reference to component
-		return VecsComponentTable<E>().component<C>(comp_table_idx);	///< Return the component
+	inline auto VecsRegistry<E>::component(VecsHandle handle) noexcept -> C {
+		return component<vtll::index_of<E,C>>();
 	}
 
 	/**
@@ -1707,18 +1723,6 @@ namespace vecs {
 	}
 
 	/**
-	* \brief Retrieve the data for an entity from the ECS. The data is stored in an instance of VecsEntityProxy<E>.
-	*
-	* \param[in] handle The entity handle.
-	* \returns a VecsEntityProxy<E>.
-	*/
-	template<typename E>
-	requires is_entity_type<E>
-	inline auto VecsRegistryBaseClass::proxy( VecsHandle handle, bool auto_update) noexcept -> VecsEntityProxy<E> {
-		return VecsRegistry<E>().proxy(handle, auto_update);
-	}
-
-	/**
 	* \brief Erase all entities from the ECS.
 	* 
 	* The entities are not really removed, but rather invalidated. Call compress()
@@ -1780,6 +1784,7 @@ namespace vecs {
 	* \returns true if the operation was successful.
 	*/
 	template<typename ET>
+	requires is_entity<ET>
 	inline auto VecsRegistryBaseClass::update( VecsHandle handle, ET&& ent) noexcept	-> bool {
 		return VecsRegistry<vtll::front<ET>>().update({ handle }, std::forward<ET>(ent));
 	}
@@ -1950,9 +1955,10 @@ namespace vecs {
 	template <typename E>
 	template<typename... Cs>
 	requires are_components_of<E,Cs...>
-	VecsEntityProxy<E>::VecsEntityProxy(Cs&&... args) noexcept	{
+	VecsEntityProxy<E>::VecsEntityProxy(bool auto_update, Cs&&... args) noexcept	{
 		m_component_data = std::forward_as_tuple(args...);
 		m_handle = VecsRegistry<E>().insert(std::forward<Cs>(args)...);
+		m_auto_update = auto_update;
 	}
 
 	/**

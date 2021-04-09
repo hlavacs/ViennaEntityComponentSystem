@@ -52,7 +52,7 @@ int main() {
 			h2.has_value() && VecsRegistry().size() == 3, );
 
 		TESTRESULT(++number, "insert per proxy",
-			auto pr1 = VecsEntityProxy<VeEntityTypeDraw>(VeComponentName{ "Draw" }, pos, orient, trans, mat, geo),
+			auto pr1 = VecsEntityProxy<VeEntityTypeDraw>(false, VeComponentName{ "Draw" }, pos, orient, trans, mat, geo),
 			pr1.has_value() && VecsRegistry().size() == 4, );
 
 		//--------------------------------------------------------------------------------------------------------------------------
@@ -76,12 +76,12 @@ int main() {
 
 		//--------------------------------------------------------------------------------------------------------------------------
 
-		TESTRESULT(++number, "local_update", ent1.local_update(VeComponentPosition{ glm::vec3{-99.0f, -22.0f, -33.0f} }),
+		TESTRESULT(++number, "local_update", ent1.update(VeComponentPosition{ glm::vec3{-99.0f, -22.0f, -33.0f} }),
 			(ent1.component<VeComponentPosition>().m_position == glm::vec3{ -99.0f, -22.0f, -33.0f }), );
 
 		TESTRESULT(++number, "update entity", ent1.update(), (h1.component<VeComponentPosition>().m_position == glm::vec3{ -99.0f, -22.0f, -33.0f }), );
 
-		TESTRESULT(++number, "local_update", ent1.local_update<VeComponentPosition>(VeComponentPosition{ glm::vec3{-9.0f, -2.0f, -3.0f} }),
+		TESTRESULT(++number, "local_update", ent1.update<VeComponentPosition>(VeComponentPosition{ glm::vec3{-9.0f, -2.0f, -3.0f} }),
 			(ent1.component<VeComponentPosition>().m_position == glm::vec3{ -9.0f, -2.0f, -3.0f }), );
 
 		TESTRESULT(++number, "update entity", ent1.update(), (h1.component<VeComponentPosition>().m_position == glm::vec3{ -9.0f, -2.0f, -3.0f }), );

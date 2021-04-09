@@ -19,7 +19,7 @@ Important features of VECS are:
 ## The VECS Include Files
 
 VECS is a header only library, consisting of the following header files:
-* *IntType.h*: Template for strong integral types like *index_t*. Such types enforce to use them explicitly as function parameters and prevent users from mixing them up with *int* or *unsigned long*. Also such a type can store a NULL value, and can be tested with *is_valid()*.
+* *IntType.h*: Template for strong integral types like *index_t* or *counter16_t*. Such types enforce to use them explicitly as function parameters and prevent users from mixing them up with *size_t, int* or *unsigned long*. Also such a type can store a NULL value, and can be tested with *is_valid()*.
 * *VECSUtil.h*: Contains utility classes such as a class for implementing CRTP, mono state, and simple low-overhead read and write locks.
 * *VECS.h*: The main include file containing most of VECS functionality.
 * *VECSCompSystem.h*: Examples for component types and entity types used in a game engine itself.
@@ -220,27 +220,45 @@ Entities are stored in the *VecsRegistry*. This data structure uses the *mono st
 
     VecsRegistry reg{};
 
-There is only one version, and you can instantiate it any number of times, the result is always the same version. In the first instantiation you can pass a parameter specifying the maximum number of entities to be stored in the ECS. If no parameter is given, then VecsTableMaxSize::value is used, which is the smallest power of 2 larger than the sum of the number of entities of any type E.
+There is only one version, and you can instantiate it any number of times, the result is always the same version. In the first instantiation you can pass a parameter specifying the maximum number of entities to be stored in the ECS. If no parameter is given, then *VecsTableMaxSize::value* is used, which is the smallest power of 2 larger than the sum of the number of entities of any type E.
 If you just want to initialize the registry you can do it like this:
 
     VecsRegistry{ 1 << 20 };
 
-Using *VecsRegistry* is not bound to a specific entity type, but commands evenmtually need this information. However, all calls are eventually passed on to *VecsRegistry<E>*, where *E* is an entity type. This is a specialized version of the registry made only for entity type *E*. It is recommended to always use this specialized version, if possible. For instance, if you want to create an entity of type *E*, you have at some point to specify the entity type. You can create an entity of type
+Using *VecsRegistry* is not bound to a specific entity type, but commands evenmtually need this information. However, all calls are eventually passed on to *VecsRegistry<E>*, where *E* is an entity type. This is a specialized version of the registry made only for entity type *E*. It is recommended to always use this specialized version, if possible. For instance, if you want to create an entity of type *E*, you have at some point to specify the entity type. In the following, we define an *example* entity type *VeEntityTypeNode* like so:
 
     using VeEntityTypeNode = vtll::type_list< VeComponentName, VeComponentPosition, VeComponentOrientation >;
 
-with any of these two methods:
+We assume that is has been registered as described in the previous section. Of course, any other similarly defined type can be used for the following examples as well. You can create an entity of type *VeEntityTypeNode* with any of these two methods:
 
     VecsHandle handle1 = VecsRegistry{}.insert<VeEntityTypeNode>("Node1", VeComponentPosition{}, VeComponentOrientation{});
     auto       handle2 = VecsRegistry<VeEntityTypeNode>{}.insert("Node2", {}, {}); //if handle of type VeEntityTypeNode
 
 In fact, the first call simply calls the second call internally. Obviously, the parameters for this call must match the list of components that the entity is composed of.
 
-The result of creating an entity is a *handle*. A handle is an 8-bytes structure that uniquely identifies the new entity and you can use it later to access the entity again. For instance, reading a component from a given entity can be done by any of these methods:
+The result of creating an entity is a *handle*. A handle is an 8-bytes structure that uniquely identifies the new entity and you can use it later to access the entity again. A handle can be invalid, meaning that it does not point to any entity. You can test whether a handle is valid or not by calling
+
+    handle.is_valid();
+
+If the handle is valid, then it IDs an entity in VECS. However, the entity might have been erased from VECS. You can test whether the entity that the handle represents is still in VECS by calculating either
+
+    handle.has_value();
+    VecsRegistry{}.contains(handle); //any type
+    VecsRegistry<VeEntityTypeNode>{}.contains(handle); //if certain that entity is of type VeEntityTypeNode
+
+A part of a handle contains an ID for the entity type. You can get the type index by calculating
+
+    handle.type();
+
+Reading a component from a given entity can be done by any of these methods:
 
     VeComponentPosition pos1 = handle.component<VeComponentPosition>(handle);
     auto pos2 = VecsRegistry{}.component<VeComponentPosition>(handle);
     auto pos3 = VecsRegistry<VeEntityTypeNode>{}.component<VeComponentPosition>(handle); //if handle of type VeEntityTypeNode
+
+Since entities are composed of a list of components, and components have a unique index in them, you can also retrieve a component by specifying its index like so:
+
+    auto pos3 = VecsRegistry<VeEntityTypeNode>{}.component<1>(handle); //if handle of type VeEntityTypeNode
 
 Again, all calls are finally handed to the last version, which then resolves the data. Only the last version is actually checked by the compiler at compile time, and the first two version thus could result in an empty component being returned. You can call *has_component<C()* to check whether an entity pointed represented by a handle does contain a specific component of type *C* using any of these methods:
 
@@ -269,10 +287,15 @@ Finally, you can erase entities from VECS using any of these calls:
     VecsRegistry{}.erase(handle);
     VecsRegistry<VeEntityTypeNode>{}.erase(handle); //if handle of type VeEntityTypeNode
 
-When an entity is erased, for any component its *destructor* is called, if it has one and it is not trivially destructible. However, the space in the component table is *not* removed. Thus, erasing entities produces gaps in the data and iterating through all entities gets increasingly less efficient. In order to compress the component table, you have to
+When an entity is erased, for any of its components, the component *destructor* is called, if it has one and it is not trivially destructible. You can erase all entities by calling *clear()*:
 
-* stop multithreaded access to VECS, and
-* call *VecsRegistry::compress()* (all tables) or *VecsRegistry<E>::compress()* (only table for entity type *E*).
+    VecsRegistry{}.clear(); //erase all entities in VECS
+    VecsRegistry<VeEntityTypeNode>{}.clear(); //erase all entities of type VeEntityTypeNode
+
+If an entity is erased, the space in the component table is *not* removed, just invalidated. Thus, erasing entities produces gaps in the data and iterating through all entities gets increasingly less efficient. In order to compress the component table, you have to stop multithreaded access to VECS, and call either
+
+    VecsRegistry{}.compress(); //compress all tables
+    VecsRegistry<VeEntityTypeNode>{}.compress();  // compress only table for entity type VeEntityTypeNode
 
 This will remove any gap in the component table(s) to speed up iterating through the entities in VECS. In a game, this can be done typically once per game loop iteration. Compressing may reshuffle rows, and if the ordering of entities is important, you may want to go through the entities once more and make sure that the ordering is ensured. An example for this is a scene graph, where nodes in a scene can have siblings and children, thus spanning up a tree that is stored in a flat table. When calculating the world matrices of the nodes, it is important to compute in the order from the tree root down to the leaves. Thus, when looping through the node entities, parent nodes must occur before child nodes. You can compare the positions in the component table using the function *index()*, use either of these:
 
@@ -281,21 +304,57 @@ This will remove any gap in the component table(s) to speed up iterating through
 
 If a child comes before a parent then you can swap the places of two entities using either
 
-    VecsRegistry{}.swap(handle1, handle2);
-    VecsRegistry<VeEntityTypeNode>{}.swap(handle1, handle2); //if both handles of type VeEntityTypeNode
+    VecsRegistry{}.swap(handle1, handle2); //if both handles of same type
+    VecsRegistry<VeEntityTypeNode>{}.swap(handle1, handle2);  //if both handles of type VeEntityTypeNode
 
-The entities are swapped only if they are of the same type.
+The entities are swapped only if they are of the same type. You can ask for the number of valid entities currently in VECS using
 
+    VecsRegistry{}.size(); //return total number of entities in VECS
+    VecsRegistry<VeEntityTypeNode>{}.size(); //return number of entities of type VeEntityTypeNode in VECS
 
 
 ### Entity Proxy
 
+You can make a local copy of an entity by creating a *proxy*, like so:
+
+    VecsEntityProxy<VeEntityTypeNode> proxy1 = handle.proxy(false); //if handle is for entity type VeEntityTypeNode
+    auto proxy2 = VecsRegistry<VeEntityTypeNode>{}.proxy(handle, true); //if handle is for entity type VeEntityTypeNode
+    VecsEntityProxy<VeEntityTypeNode> proxy3{true, {}, {}, {}  }; //also creates new entity in VECS
+
+Working on the local proxy can be faster, and you can copy the proxy state back to VECS by calling
+
+    proxy1.update();
+
+The boolean parameter determines whether the proxy automatically calls *update()* in its destructor, so that any changes are copied back to VECS in a RAII manner. For the first two versions, if the boolean is not specified, then the default value is *false*.
+
+You can also use the *update()* function to update components locally in the proxy:
+
+    proxy1.update<VeSystemComponentName>("New name");
+
+However, this does *not* update the component in VECS, only the local copy in the proxy. You can get the handle of the VECS entity by calling
+
+    proxy1.handle();
+
+Likewise, you can check whether the proxy still represents an entity in VECS, i.e., the entity has not been erased yet, by calling
+
+    proxy1.has_value();
+
+You can check whether the proxy holds a component of type *C* by calling e.g.
+
+    proxy1.has_component<VeSystemComponentName>();
+
+and you can retrieve the local component data by calling
+
+    VeSystemComponentName name{ proxy1.component<VeSystemComponentName>() };
+
+You can also retrieve a component by specifying its index:
+
+    VeSystemComponentName name{ proxy1.component<0>() }; //VeSystemComponentName is the first component
 
 
 ### Iterators
 
 
-## Parallel Operations
 
 
 
@@ -313,6 +372,8 @@ The entities are swapped only if they are of the same type.
 
 ## Performance
 
+
+## Parallel Operations
 
 
 
