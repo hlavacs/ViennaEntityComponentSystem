@@ -11,6 +11,7 @@
 #include <optional>
 #include <functional>
 #include <chrono>
+#include <ranges>
 #include "VTLL.h"
 #include "VECSTable.h"
 
@@ -662,6 +663,10 @@ namespace vecs {
 	template<typename... Cs>
 	class VecsIterator;
 
+	template<typename... Cs>
+	class VecsRange;
+
+
 	/**
 	* \brief This class stores all generalized handles of all entities, and can be used
 	* to insert, update, read and delete all entity types. 
@@ -763,15 +768,9 @@ namespace vecs {
 			return m_size.load(); 
 		};
 
-		template<typename... Cs>
-		auto begin() noexcept		-> VecsIterator<Cs...>;		///< Get iterator pointing to first entity with all components
-
-		template<typename... Cs>
-		auto end() noexcept			-> VecsIterator<Cs...>;		///< Get an end iterator for entities with all components
-
-		template<typename... Cs>
+		template<template<typename...> typename R, typename... Cs>
 		requires are_component_types<Cs...>
-		auto for_each(VecsIterator<Cs...>& b, VecsIterator<Cs...>& e, std::function<Functor<Cs...>> f) -> void;
+		auto for_each(R<Cs...>&& r, std::function<Functor<Cs...>> f) -> void;
 
 		template<typename... Cs>
 		requires are_component_types<Cs...>
@@ -1263,13 +1262,10 @@ namespace vecs {
 
 	public:
 		using value_type = std::tuple<VecsHandle, Cs...>; ///< Tuple containing all component values
-		using ref_type = std::tuple<VecsHandle, Cs&...>; ///< Tuple containing all component values
+		using ref_type = std::tuple<VecsHandle, Cs&...>;  ///< Tuple containing component references
 
 		VecsIterator( bool is_end = false ) noexcept ;		///< Constructor that should be called always from outside
 		VecsIterator(const VecsIterator& v) noexcept;		///< Copy constructor
-
-		auto begin() { return *this; };									///< Return this iterator as iterator
-		auto end() { return VecsRegistryBaseClass().end<Cs...>(); };	///> Return an end iterator
 
 		auto operator=(const VecsIterator& v) noexcept			-> VecsIterator<Cs...>;	///< Copy
 		auto operator+=(size_t N) noexcept						-> VecsIterator<Cs...>;	///< Increase and set
@@ -1612,6 +1608,61 @@ namespace vecs {
 	};
 
 
+	//-------------------------------------------------------------------------
+	//VecsRange
+
+	/**
+	* \brief Range for iterating over all entities that contain the given component types.
+	*/
+	template<typename... Cs>
+	class VecsRange {
+		VecsIterator<Cs...> m_begin;
+		VecsIterator<Cs...> m_end;
+
+	public:
+		VecsRange() noexcept : m_begin{ VecsIterator<Cs...>(false) }, m_end{ VecsIterator<Cs...>(true) } {};
+		VecsRange(VecsIterator<Cs...>& begin, VecsIterator<Cs...>& end) noexcept : m_begin{begin}, m_end{end} {};
+		VecsRange( const VecsRange<Cs...>& rhs) noexcept : m_begin{ rhs.m_begin }, m_end{ rhs.m_end } {};
+
+		auto operator=(const VecsRange<Cs...>& rhs) noexcept -> VecsIterator<Cs...> {
+			m_begin = rhs.m_begin;
+			m_end = rhs.m_end;
+			return *this;
+		}
+
+		auto split(size_t N) noexcept {
+			std::pmr::vector<VecsRange<Cs...>> result;
+			result.reserve(N);
+			size_t remain = m_begin.size();
+			size_t num = remain / N;
+			if (num * N < remain) ++num;
+			auto b = m_begin;
+			while (remain > 0 && b != m_end) {
+				if (remain > num) {
+					size_t delta = (remain > num ? num : remain) - 1;
+					VecsIterator<Cs...> e = b + delta;
+					result.emplace_back(VecsRange(b, e));
+					remain -= (delta + 1);
+					b = e + 1;
+				}
+				else {
+					result.emplace_back(VecsRange(b, m_end));
+					remain = 0;
+				}
+			};
+			return result;
+		}
+
+		auto begin() noexcept	->	VecsIterator<Cs...> {
+			return m_begin;
+		}
+
+		auto end() noexcept		->	VecsIterator<Cs...> {
+			return m_end;
+		}
+	};
+
+
 
 	//-------------------------------------------------------------------------
 	//left over implementations that depend on definition of classes
@@ -1790,34 +1841,17 @@ namespace vecs {
 	}
 
 	/**
-	* \brief Return an iterator that points to the first entity in the ECS that contains all given components Cs.
-	* \returns an iterator that points to the first entity in the ECS that contains all given components Cs.
+	* \brief takes two iterators and loops from begin to end, and for each entity calls the provided function.
+	*
+	* \param[in] b Begin iterator.
+	* \param[in] e End iterator.
+	* \param[in] f Functor to be called for every entity the iterator visits.
 	*/
-	template<typename... Cs>
-	inline auto VecsRegistryBaseClass::begin() noexcept			-> VecsIterator<Cs...> {
-		return VecsIterator<Cs...>(false);
-	}
-
-	/**
-	* \brief Returns an end iterator.
-	* \returns an end iterator.
-	*/
-	template<typename... Cs>
-	inline auto VecsRegistryBaseClass::end() noexcept			-> VecsIterator<Cs...> {
-		return VecsIterator<Cs...>(true);
-	}
-
-
-	/**
-* \brief takes two iterators and loops from begin to end, and for each entity calls the provided function.
-*
-* \param[in] b Begin iterator.
-* \param[in] e End iterator.
-* \param[in] f Functor to be called for every entity the iterator visits.
-*/
-	template<typename... Cs>
+	template<template<typename...> typename R, typename... Cs>
 	requires are_component_types<Cs...>
-	inline auto VecsRegistryBaseClass::for_each(VecsIterator<Cs...>& b, VecsIterator<Cs...>& e, std::function<Functor<Cs...>> f) -> void {
+	inline auto VecsRegistryBaseClass::for_each( R<Cs...>&& range, std::function<Functor<Cs...>> f) -> void {
+		auto b = range.begin();
+		auto e = range.end();
 		for (; b != e; ++b) {
 			typename VecsIterator<Cs...>::value_type tup;
 			{
@@ -1840,9 +1874,7 @@ namespace vecs {
 	template<typename... Cs>
 	requires are_component_types<Cs...>
 	inline auto VecsRegistryBaseClass::for_each(std::function<Functor<Cs...>> f) -> void {
-		auto b = begin<Cs...>();
-		auto e = end<Cs...>();
-		for_each(b, e, f);
+		for_each(VecsRange<Cs...>{}, f);
 	}
 
 

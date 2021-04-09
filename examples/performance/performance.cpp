@@ -16,7 +16,6 @@ using namespace std::chrono;
 
 void recursive() {
 
-
 	bool test = true;
 
 	auto f = [&]<typename B, typename E>(B && b, E && e, auto & self, int& i) {
@@ -35,8 +34,9 @@ void recursive() {
 		return false;
 	};
 
-	auto b = VecsRegistry().begin<VeComponentPosition>();
-	auto e = VecsRegistry().end<VeComponentPosition>();
+	VecsRange<VeComponentPosition> range;
+	auto b = range.begin();
+	auto e = range.end();
 	int i = 1;
 	while (f(b, e, f, i)) { b++; };
 
@@ -55,7 +55,7 @@ void linear(std::vector<VeComponentPosition>& vec) {
 	}*/
 
 	i = 0;
-	for (auto&& [handle, pos] : VecsRegistry().begin<VeComponentPosition>()) {
+	for (auto&& [handle, pos] : VecsRange<VeComponentPosition>{}) {
 		if (!handle.is_valid()) continue;
 		++i;
 		pos.m_position = glm::vec3{ 7.0f + i, 8.0f + i, 9.0f + i };

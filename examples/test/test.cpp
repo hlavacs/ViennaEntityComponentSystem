@@ -123,13 +123,10 @@ int main() {
 
 		TESTRESULT(++number, "clear", VecsRegistry{}.clear(), (!h1_2.has_value() && VecsRegistry().size() == 0 && VecsRegistry<VeEntityTypeNode>().size() == 0 && VecsRegistry<VeEntityTypeDraw>().size() == 0), );
 
-		auto b = VecsRegistry().begin<VeComponentName>();
-		auto e = VecsRegistry().end<VeComponentName>();
-
 		int i = 0;
 		bool test = true;
 
-		for (auto&& [handle, name] : VecsRegistry().begin<VeComponentName>()) {
+		for (auto&& [handle, name] : VecsRange<VeComponentName>{}) {
 			if (!handle.is_valid()) continue;
 			++i;
 			if (name.m_name != "Node" && name.m_name != "Draw") { test = false; }
@@ -171,7 +168,7 @@ int main() {
 
 		i = 0;
 		test = true;
-		for (auto&& [handle, name] : VecsRegistry().begin<VeComponentName>()) {
+		for (auto&& [handle, name] : VecsRange<VeComponentName>{}) {
 			VecsReadLock lock(handle.mutex());
 			if (!handle.is_valid()) continue;
 			++i;
@@ -207,8 +204,9 @@ int main() {
 			return false;
 		};
 
-		auto b = VecsRegistry().begin<VeComponentName>();
-		auto e = VecsRegistry().end<VeComponentName>();
+		VecsRange<VeComponentName> range;
+		auto b = range.begin();
+		auto e = range.end();
 		i = 1;
 		while (f(b, e, f, i)) { b++; };
 

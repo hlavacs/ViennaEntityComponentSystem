@@ -37,9 +37,11 @@ void work( size_t num ) {
 }
 
 
-template<typename it> 
-void linear( it b, it e, size_t num ) {
+template<template<typename...> typename R, typename... Cs>
+void linear(R<Cs...> range, size_t num ) {
 	size_t i = 0;
+	auto b = range.begin();
+	auto e = range.end();
 	while ( b != e ) {
 		auto&& [handle, pos] = *b;
 		if (!handle.is_valid()) continue;
@@ -83,31 +85,15 @@ vgjs::Coro<> start( size_t num ) {
 
 	int thr = 12;
 	std::pmr::vector<vgjs::Function> vec;
-	auto bi = VecsRegistry().begin<VeComponentPosition>();
-	auto ei = VecsRegistry().end<VeComponentPosition>();
 
-	auto b = VecsRegistry().begin<VeComponentPosition>();
-	auto e = VecsRegistry().begin<VeComponentPosition>();
-
-	for (int i = 0; i < thr; ++i) {
-		b = bi + i * bi.size() / thr;
-		size_t sizeit = bi.size();
-		if (i < thr - 1) {
-			e = bi + (i + 1) * bi.size() / thr;
-			vec.push_back(vgjs::Function([=]() {
-					linear( b, e, 2 * num / thr);
-				}, vgjs::thread_index_t{}, vgjs::thread_type_t{ 1 }, vgjs::thread_id_t{ i }));
-		}
-		else {
-			vec.push_back(vgjs::Function([=]() {
-					linear( b, ei, 2 * num / thr);
-				}, vgjs::thread_index_t{}, vgjs::thread_type_t{ 2 }, vgjs::thread_id_t{ i }));
-		}
+	auto ranges = VecsRange<VeComponentPosition>{}.split(thr);
+	for (int i = 0; i < ranges.size(); ++i) {
+		vec.push_back(vgjs::Function([=]() { linear( ranges[i], 2 * num / thr); }, vgjs::thread_index_t{}, vgjs::thread_type_t{ 1 }, vgjs::thread_id_t{ i }));
 	}
 
 	auto lin =
 		vgjs::Function([&]() {
-				linear( VecsRegistry().begin<VeComponentPosition>(), VecsRegistry().end<VeComponentPosition>(), 2 * num);
+				linear(VecsRange<VeComponentPosition>{}, 2 * num);
 			}, vgjs::thread_index_t{}, vgjs::thread_type_t{1}, vgjs::thread_id_t{100});
 
 	auto t0 = high_resolution_clock::now();
@@ -117,7 +103,7 @@ vgjs::Coro<> start( size_t num ) {
 	auto t1 = high_resolution_clock::now();
 
 	//for (auto& func : vec) {
-		//co_await func.m_function;
+		//func.m_function();
 	//}
 	
 	co_await vec;
@@ -165,7 +151,7 @@ void func1(size_t num) {
 void func2(size_t num) {
 	auto lin =
 		vgjs::Function([&]() {
-		linear(VecsRegistry().begin<VeComponentPosition>(), VecsRegistry().end<VeComponentPosition>(), 2 * num);
+		linear(VecsRange<VeComponentPosition>{}, 2 * num);
 			}, vgjs::thread_index_t{}, vgjs::thread_type_t{ 1 }, vgjs::thread_id_t{ 100 });
 
 	t0 = high_resolution_clock::now();
@@ -183,26 +169,10 @@ void func3(size_t num) {
 	int thr = 12;
 
 	std::pmr::vector<vgjs::Function> vec;
-	auto bi = VecsRegistry().begin<VeComponentPosition>();
-	auto ei = VecsRegistry().end<VeComponentPosition>();
 
-	auto b = VecsRegistry().begin<VeComponentPosition>();
-	auto e = VecsRegistry().begin<VeComponentPosition>();
-
-	for (int i = 0; i < thr; ++i) {
-		b = bi + i * bi.size() / thr;
-		size_t sizeit = bi.size();
-		if (i < thr - 1) {
-			e = bi + (i + 1) * bi.size() / thr;
-			vec.push_back(vgjs::Function([=]() {
-				linear(b, e, 2 * num / thr);
-				}, vgjs::thread_index_t{}, vgjs::thread_type_t{ 1 }, vgjs::thread_id_t{ i }));
-		}
-		else {
-			vec.push_back(vgjs::Function([=]() {
-				linear(b, ei, 2 * num / thr);
-				}, vgjs::thread_index_t{}, vgjs::thread_type_t{ 2 }, vgjs::thread_id_t{ i }));
-		}
+	auto ranges = VecsRange<VeComponentPosition>{}.split(thr);
+	for (int i = 0; i < ranges.size(); ++i) {
+		vec.push_back(vgjs::Function([=]() { linear(ranges[i], 2 * num / thr); }, vgjs::thread_index_t{}, vgjs::thread_type_t{ 1 }, vgjs::thread_id_t{ i }));
 	}
 
 	t2 = high_resolution_clock::now();
