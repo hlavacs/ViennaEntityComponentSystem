@@ -529,7 +529,6 @@ namespace vecs {
 		return m_data.update(index, std::forward<C>(comp));
 	}
 
-
 	/**
 	* \brief Erase the component data for an entity.
 	* 
@@ -942,7 +941,7 @@ namespace vecs {
 		//insert data
 
 		template<typename... CCs>
-		//requires is_composed_of<E<Cs...>, CCs...> [[nodiscard]] 
+		requires is_composed_of<E<Cs...>, CCs...> [[nodiscard]] 
 		auto insert(CCs&&... args) noexcept					-> VecsHandle;
 
 		//-------------------------------------------------------------------------
@@ -1055,7 +1054,7 @@ namespace vecs {
 	*/
 	template<template<typename...> typename E, typename... Cs> 
 	template<typename... CCs> 
-	//requires is_composed_of<E<Cs...>, CCs...> [[nodiscard]]
+	requires is_composed_of<E<Cs...>, CCs...> [[nodiscard]]
 	inline auto VecsRegistry<E<Cs...>>::insert(CCs&&... args) noexcept	-> VecsHandle {
 		index_t idx{};
 

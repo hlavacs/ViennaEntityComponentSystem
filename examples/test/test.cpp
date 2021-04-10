@@ -148,10 +148,11 @@ int main() {
 
 		int i = 0;
 		bool test = true;
-
 		for (auto&& [handle, name, pos, orient, trans] : VecsRegistry<VeEntityTypeNode>{}) {
+			if (name.m_name != "Node" && name.m_name != "Draw") { test = false; }
 		}
 
+		i = 0;
 		VecsRegistry().for_each<VeComponentName>([&](auto handle, auto& name) {
 			++i;
 			if (name.m_name != "Node" && name.m_name != "Draw") { test = false; }
