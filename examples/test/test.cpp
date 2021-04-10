@@ -40,7 +40,7 @@ int main() {
 		TESTRESULT(++number, "size", , (VecsRegistry().size() == 0 && VecsRegistry<VeEntityTypeNode>().size() == 0 && VecsRegistry<VeEntityTypeDraw>().size() == 0), );
 
 		TESTRESULT(++number, "insert",
-			auto h1 = VecsRegistry{}.insert<VeEntityTypeNode>(VeComponentName{ "Node" }, pos, orient, trans),
+			auto h1 = VecsRegistry<VeEntityTypeNode>{}.insert(VeComponentName{ "Node" }, pos, orient, trans),
 			h1.has_value() && VecsRegistry().size() == 1, );
 
 		TESTRESULT(++number, "insert",
@@ -148,6 +148,9 @@ int main() {
 
 		int i = 0;
 		bool test = true;
+
+		for (auto&& [handle, name, pos, orient, trans] : VecsRegistry<VeEntityTypeNode>{}) {
+		}
 
 		VecsRegistry().for_each<VeComponentName>([&](auto handle, auto& name) {
 			++i;
