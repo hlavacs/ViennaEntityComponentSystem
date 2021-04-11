@@ -455,6 +455,27 @@ namespace vtll {
 	static_assert(!has_type<type_list<double, int, char, double>, float>::value, "The implementation of has_type is bad");
 
 	//-------------------------------------------------------------------------
+	//have_type: check whether all elements of a list of lists contain an element
+
+	namespace detail {
+		template<typename Seq, typename T>
+		struct have_type_impl;
+
+		template<template <typename...> typename Seq, typename... Ts, typename T>
+		struct have_type_impl<Seq<Ts...>, T> {
+			static const bool value = (has_type<Ts, T>::value && ...);
+		};
+	}
+	template <typename Seq, typename T>
+	struct have_type {
+		static const bool value = detail::have_type_impl<Seq, T>::value;
+	};
+
+	static_assert(have_type<  type_list< type_list<char, double>, type_list<float, char, int> >, char>::value, "The implementation of have_type is bad");
+
+	static_assert(!have_type< type_list< type_list<double, int>, type_list<int> >, float>::value, "The implementation of have_type is bad");
+
+	//-------------------------------------------------------------------------
 	//is_pow2: test whether a std::integral_constant<size_t, I> is a power of 2
 
 	/*namespace detail {
@@ -868,7 +889,6 @@ namespace vtll {
 	static_assert(std::is_same_v< map<detail::test_map, int, float >, char >, "The implementation of map is bad");
 	static_assert(std::is_same_v< map<detail::test_map, char, float >, float >, "The implementation of map is bad");
 
-
 	//-------------------------------------------------------------------------
 	//apply_map: apply a list of keys to a map, get the list of their values, of defaults if the keys are not found
 	namespace detail {
@@ -887,6 +907,96 @@ namespace vtll {
 	static_assert(
 		std::is_same_v< apply_map<detail::test_map, type_list<int, float, char>, char >, type_list<char, double, char> >, 
 		"The implementation of apply_map is bad");
+
+	//-------------------------------------------------------------------------
+	//remove_duplicates: remove duplicates from a list
+
+	namespace detail {
+		template<typename Seq>
+		struct remove_duplicates_impl;
+
+		template<typename T, template<typename...> typename Seq>
+		struct remove_duplicates_impl<Seq<T>> {
+			using type = Seq<T>;
+		};
+
+		template<typename T, template<typename...> typename Seq, typename... Ts>
+		struct remove_duplicates_impl<Seq<T, Ts...>> {
+			using type = typename std::conditional_t<	has_type<Seq<Ts...>, T>::value
+														, typename remove_duplicates_impl<Seq<Ts...>>::type
+														, cat< type_list<T>, typename remove_duplicates_impl<Seq<Ts...>>::type >
+													>;
+		};
+	}
+
+	template<typename Seq>
+	using remove_duplicates = typename detail::remove_duplicates_impl<Seq>::type;
+
+	static_assert(
+		std::is_same_v< remove_duplicates<type_list<char, char>>, type_list<char> >,
+		"The implementation of remove_duplicates is bad");
+
+	static_assert(
+		std::is_same_v< remove_duplicates<type_list<int, float, int, char, char >>, type_list<float, int, char> >,
+		"The implementation of remove_duplicates is bad");
+
+	//-------------------------------------------------------------------------
+	//flatten: turn a list LL of lists into one list that holds all elements from LL
+
+	namespace detail {
+		template<typename Seq>
+		struct flatten_impl;
+
+		template<typename T, template<typename...> typename Seq>
+		struct flatten_impl<Seq<T>> {
+			using type = T;
+		};
+
+		template<typename T, template<typename...> typename Seq, typename... Ts>
+		struct flatten_impl<Seq<T, Ts...>> {
+			using type = cat< T, typename flatten_impl<Seq<Ts...>>::type >;
+		};
+	}
+
+	template<typename Seq>
+	using flatten = typename detail::flatten_impl<Seq>::type;
+
+	static_assert(
+		std::is_same_v< flatten< type_list<type_list<int, float>, type_list<int, char>, type_list<double>> >
+						, type_list<int, float, int, char, double> >,
+		"The implementation of flatten is bad");
+
+	//-------------------------------------------------------------------------
+	//intersection: return a list of those elements that are in all given lists
+
+	namespace detail {
+		template<typename Seq, typename E>
+		struct intersection_impl;
+
+		template<template<typename...> typename Seq, typename... Ts, typename E>
+		struct intersection_impl<Seq<Ts...>, Seq<E>> {
+			using type = typename std::conditional_t<	have_type<Seq<Ts...>, E>::value
+														, type_list<E>
+														, type_list<>
+													>;
+		};
+
+		template<template<typename...> typename Seq, typename... Ts, typename E, typename... Es>
+		struct intersection_impl<Seq<Ts...>, Seq<E, Es...>> {
+			using type = typename std::conditional_t<	have_type<Seq<Ts...>, E>::value
+														, cat< type_list<E>, typename intersection_impl<Seq<Ts...>, Seq<Es...>>::type >
+														, typename intersection_impl<Seq<Ts...>, Seq<Es...>>::type
+													>;
+		};
+	}
+
+	template<typename Seq>
+	using intersection = typename detail::intersection_impl<Seq, remove_duplicates<flatten<Seq>>>::type;
+
+	static_assert(
+		std::is_same_v< intersection< type_list<type_list<int, float, char>, type_list<int, char>, type_list<double, char, int>> >
+						, type_list<char, int> >,  
+		"The implementation of intersection is bad");
 
 	//-------------------------------------------------------------------------
 	//static for: with this compile time for loop you can loop over any tuple, type list, or variadic argument list

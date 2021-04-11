@@ -955,7 +955,7 @@ namespace vecs {
 			return is_component_of<E<Cs...>,C>;
 		}
 
-		template<size_t I, typename C = vtll::Nth_type<E, I>>
+		template<size_t I, typename C = vtll::Nth_type<E<Cs...>, I>>
 		requires is_component_of<E<Cs...>, C>
 		auto component(VecsHandle handle) noexcept							-> C;
 
