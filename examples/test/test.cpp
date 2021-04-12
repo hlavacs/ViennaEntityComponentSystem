@@ -75,8 +75,12 @@ int main() {
 		TESTRESULT(++number, "update", h1.update(VeComponentPosition{ glm::vec3{-99.0f, -22.0f, -33.0f} }),
 			(h1.component<VeComponentPosition>().m_position == glm::vec3{ -99.0f, -22.0f, -33.0f }), );
 
-		TESTRESULT(++number, "update", h1.update<VeComponentPosition>(VeComponentPosition{ glm::vec3{-9.0f, -2.0f, -3.0f} }),
-			(h1.component<VeComponentPosition>().m_position == glm::vec3{ -9.0f, -2.0f, -3.0f }), );
+		std::get<VeComponentPosition>(tup1).m_position = glm::vec3{ -9.0f, -255.0f, -3.0f };
+		TESTRESULT(++number, "update tuple", VecsRegistry<VeEntityTypeNode>{}.update(h1, tup1),
+			(h1.component<VeComponentPosition>().m_position == glm::vec3{ -9.0f, -255.0f, -3.0f }), );
+
+		std::get<VeComponentPosition*>(tup2)->m_position = glm::vec3{ -9.0f, -255.0f, -355.0f };
+		TESTRESULT(++number, "update tuple ref", , (h1_2.component<VeComponentPosition>().m_position == glm::vec3{ -9.0f, -255.0f, -355.0f }), );
 
 		TESTRESULT(++number, "update handle", h1.update(VeComponentPosition{ glm::vec3{99.0f, 22.0f, 33.0f} }),
 			(h1.component<VeComponentPosition>().m_position == glm::vec3{ 99.0f, 22.0f, 33.0f }), );
@@ -98,9 +102,11 @@ int main() {
 
 		//--------------------------------------------------------------------------------------------------------------------------
 
+		auto position1 = h1.component<VeComponentPosition>().m_position;
+		auto position1_2 = h1_2.component<VeComponentPosition>().m_position;
 		TESTRESULT(++number, "swap", auto swap1 = VecsRegistry{}.swap(h1, h1_2),
-			(swap1 && h1.component<VeComponentPosition>().m_position == glm::vec3{ -97.0f, -22.0f, -30.0f }
-		&& h1_2.component<VeComponentPosition>().m_position == glm::vec3{ 22.0f, 2.0f, 3.0f }), );
+			(swap1	&& h1.component<VeComponentPosition>().m_position == position1
+					&& h1_2.component<VeComponentPosition>().m_position == position1_2), );
 
 		//--------------------------------------------------------------------------------------------------------------------------
 
