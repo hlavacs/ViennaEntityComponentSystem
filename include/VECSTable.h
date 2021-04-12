@@ -37,6 +37,7 @@ namespace vecs {
 
 		using tuple_value_t = vtll::to_tuple<DATA>;		///< Tuple holding the entries as value
 		using tuple_ref_t = vtll::to_ref_tuple<DATA>;	///< Tuple holding references to the entries
+		using tuple_ptr_t = vtll::to_ptr_tuple<DATA>;	///< Tuple holding references to the entries
 
 		using array_tuple_t1 = std::array<tuple_value_t, N>;								///< ROW: an array of tuples
 		using array_tuple_t2 = vtll::to_tuple<vtll::transform_size_t<DATA,std::array,N>>;	///< COLUMN: a tuple of arrays
@@ -122,6 +123,24 @@ namespace vecs {
 			};
 			return f(std::make_index_sequence<vtll::size<DATA>::value>{});
 		};
+
+		/**
+		* \brief Get a tuple with references to all components of an entry.
+		* \param[in] n Index to the entry.
+		* \returns a tuple with references to all components of entry n.
+		*/
+		inline auto tuple_ptr(index_t n) noexcept -> tuple_ptr_t {
+			auto f = [&]<size_t... Is>(std::index_sequence<Is...>) {
+				if constexpr (ROW) {
+					return std::make_tuple(&std::get<Is>((*m_segment[n >> L])[n & BIT_MASK])...);
+				}
+				else {
+					return std::make_tuple(&std::get<Is>(*m_segment[n >> L])[n & BIT_MASK]...);
+				}
+			};
+			return f(std::make_index_sequence<vtll::size<DATA>::value>{});
+		};
+
 
 		/**
 		* \brief Create a new entry at the end of the table.

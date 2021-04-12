@@ -102,7 +102,6 @@ namespace vecs {
 	class VecsReadLock;
 	class VecsWriteLock;
 	class VecsHandle;
-	template <typename E> class VecsEntityProxy;
 	template<typename E> class VecsComponentAccessor;
 	template<typename E, size_t I> class VecsComponentAccessorDerived;
 	template<typename E> class VecsComponentTable;
@@ -137,7 +136,7 @@ namespace vecs {
 	concept is_composed_of = (vtll::is_same<E, std::decay_t<Cs>...>::value);	///< E is composed of Cs
 
 	template<typename ET, typename E = vtll::front<ET>>
-	concept is_entity = (is_entity_type<E> && std::is_same_v<std::decay_t<ET>, VecsEntityProxy<E>>); ///< ET is a VecsEntityProxy
+	concept is_tuple = (is_entity_type<E> && std::is_same_v<std::decay_t<ET>, vtll::to_tuple<E>>); ///< ET is a std::tuple
 
 	template<typename E, typename... Cs>
 	concept is_iterator = (std::is_same_v<std::decay_t<E>, VecsIterator<Cs...>>);	///< E is composed of Cs
@@ -198,8 +197,8 @@ namespace vecs {
 		auto component() noexcept -> C;		///< Get a component of type C of the entity (first found is copied)
 
 		template<typename ET>
-		requires is_entity<ET>
-		auto update(ET&& ent) noexcept -> bool;				///< Update this entity using a VecsEntityProxy of the same type
+		requires is_tuple<ET>
+		auto update(ET&& ent) noexcept -> bool;				///< Update this entity using a std::tuple of the same type
 
 		template<typename C>
 		requires is_component_type<C>
@@ -245,7 +244,9 @@ namespace vecs {
 		template<typename E, typename... Cs> friend class VecsIteratorEntity;
 
 	protected:
-		using value_type = vtll::to_tuple<E>;		///< A tuple storing all components of entity of type E
+		using value_type = vtll::to_tuple<E>;			///< A tuple storing all components of entity of type E
+		using ref_type   = vtll::to_ref_tuple<E>;		///< A tuple storing references to all components of entity of type E
+		using ptr_type	 = vtll::to_ptr_tuple<E>;		///< A tuple storing references to all components of entity of type E
 		using layout_type = vtll::map<VecsTableLayoutMap, E, VECS_LAYOUT_DEFAULT>;
 
 		using info = vtll::type_list<VecsHandle, std::atomic<uint32_t>*>;	///< List of management data per entity (handle and mutex)
@@ -279,6 +280,7 @@ namespace vecs {
 		requires is_composed_of<E, Cs...> [[nodiscard]]
 		auto insert(VecsHandle handle, std::atomic<uint32_t>* mutex, Cs&&... args) noexcept	-> index_t;
 
+		auto pointers(const index_t index) noexcept				-> ptr_type;
 		auto values(const index_t index) noexcept				-> value_type;
 		auto handle(const index_t index) noexcept				-> VecsHandle;
 		auto mutex(const index_t index) noexcept				-> std::atomic<uint32_t>*;
@@ -294,7 +296,7 @@ namespace vecs {
 		auto component(const index_t index) noexcept			-> C&;
 
 		template<typename ET>
-		requires is_entity<ET, E>
+		requires is_tuple<ET, E>
 		auto update(const index_t index, ET&& ent) noexcept		-> bool;
 
 		template<typename C>
@@ -380,6 +382,18 @@ namespace vecs {
 	* \returns a tuple holding the components of an entity.
 	*/
 	template<typename E>
+	inline auto VecsComponentTable<E>::pointers(const index_t index) noexcept -> typename VecsComponentTable<E>::ptr_type {
+		assert(index < m_data.size());
+		auto tup = m_data.tuple_ptr(index);												///< Get the whole data from the data
+		return vtll::sub_tuple< c_info_size, std::tuple_size_v<decltype(tup)> >(tup);	///< Return only entity components in a subtuple
+	}
+
+
+	/**
+	* \param[in] index The index of the data in the component table.
+	* \returns a tuple holding the components of an entity.
+	*/
+	template<typename E>
 	inline auto VecsComponentTable<E>::values(const index_t index) noexcept -> typename VecsComponentTable<E>::value_type {
 		assert(index < m_data.size());
 		auto tup = m_data.tuple_value(index);											///< Get the whole data from the data
@@ -419,19 +433,19 @@ namespace vecs {
 	}
 
 	/**
-	* \brief Update all components using a reference to a VecsEntityProxy instance.
+	* \brief Update all components using a reference to a std::tuple instance.
 	* \param[in] index Index of the entity to be updated in the component table.
 	* \param[in] ent Universal reference to the new entity data.
 	* \returns true if the update was successful.
 	*/
 	template<typename E>
 	template<typename ET>
-	requires is_entity<ET, E>
+	requires is_tuple<ET, E>
 	inline auto VecsComponentTable<E>::update(const index_t index, ET&& ent) noexcept -> bool {
 		vtll::static_for<size_t, 0, vtll::size<E>::value >(							///< Loop over all components
 			[&](auto i) {
 				using type = vtll::Nth_type<E,i>;
-				m_data.update<c_info_size + i>(index, std::forward<type>(ent.component<i>()));	///< Update each component
+				m_data.update<c_info_size + i>(index, std::forward<type>(get<i>(ent)));	///< Update each component
 			}
 		);
 		return true;
@@ -649,8 +663,8 @@ namespace vecs {
 		//update data
 
 		template<typename ET>
-		requires is_entity<ET>
-		auto update(VecsHandle handle, ET&& ent) noexcept -> bool;		///< Update an entity 
+		requires is_tuple<ET>
+		auto update(VecsHandle handle, ET&& ent) noexcept -> bool;		///< Update a tuple 
 
 		template<typename C>
 		requires is_component_type<C>
@@ -870,6 +884,9 @@ namespace vecs {
 		//-------------------------------------------------------------------------
 		//get data
 
+		auto pointers(VecsHandle handle) noexcept -> std::tuple<Cs*...>;		///< Return a tuple with pointers to the components
+		auto values(VecsHandle handle) noexcept -> std::tuple<Cs...>;		///< Return a tuple with copies of the components
+
 		template<typename C>
 		requires is_component_type<C>
 		auto has_component() noexcept	-> bool {	///< Return true if the entity type has a component C
@@ -888,7 +905,7 @@ namespace vecs {
 		//update data
 
 		template<typename ET>
-		requires is_entity<ET, E<Cs...>>
+		requires is_tuple<ET, E<Cs...>>
 		auto update(VecsHandle handle, ET&& ent) noexcept	-> bool;
 
 		template<typename C> 
@@ -1003,6 +1020,35 @@ namespace vecs {
 		return handle;
 	};
 
+	
+	/**
+	* \brief Return a tuple with pointers to the components.
+	*
+	* \param[in] handle Entity handle.
+	* \returns tuple with pointers to the components.
+	*/
+	template<template<typename...> typename E, typename... Cs>
+	inline auto VecsRegistry<E<Cs...>>::pointers(VecsHandle handle) noexcept -> std::tuple<Cs*...>  {
+		VecsReadLock lock(handle.mutex());
+		if (!contains(handle)) return {};	///< Return the empty component
+		auto& comp_table_idx = m_entity_table.comp_ref_idx<c_index>(handle.m_entity_index); ///< Get reference to component
+		return VecsComponentTable<E<Cs...>>{}.pointers( comp_table_idx );
+	}
+
+	/**
+	* \brief Return a tuple with copies of the components.
+	*
+	* \param[in] handle Entity handle.
+	* \returns tuple with copies of the components.
+	*/
+	template<template<typename...> typename E, typename... Cs>
+	inline auto VecsRegistry<E<Cs...>>::values(VecsHandle handle) noexcept -> std::tuple<Cs...> {
+		VecsReadLock lock(handle.mutex());
+		if (!contains(handle)) return {};	///< Return the empty component
+		auto& comp_table_idx = m_entity_table.comp_ref_idx<c_index>(handle.m_entity_index); ///< Get component copies
+		return VecsComponentTable<E<Cs...>>{}.values(comp_table_idx);
+	}
+
 	/**
 	* \brief Swap the rows of two entities of the same type.
 	* The call is dispatched to the correct subclass for entity type E.
@@ -1084,16 +1130,16 @@ namespace vecs {
 	}
 
 	/**
-	* \brief Update all components of an entity of type E from a VecsEntityProxy<E>
+	* \brief Update all components of an entity of type E from a std::tuple<Cs...>
 	*
 	* \param[in] handle The Enity handle. 
-	* \param[in] ent A universal reference to the VecsEntityProxy<E> that contains the data.
+	* \param[in] ent A universal reference to the std::tuple<Cs...> that contains the data.
 	* \returns true if the operation was successful.
 	*/
 	template<template<typename...> typename E, typename... Cs>
 	template<typename ET>
-	requires is_entity<ET, E<Cs...>>
-	inline auto VecsRegistry<E<Cs...>>::update( VecsHandle handle, ET&& ent) noexcept -> bool {
+	requires is_tuple<ET, E<Cs...>>
+	inline auto VecsRegistry<E<Cs...>>::update(VecsHandle handle, ET&& ent) noexcept -> bool {
 		VecsWriteLock lock(handle.mutex());
 		if (!contains(handle)) return false;
 		VecsComponentTable<E<Cs...>>().update(handle.m_entity_index, std::forward<ET>(ent));
@@ -1306,7 +1352,7 @@ namespace vecs {
 	* \returns true if the operation was successful.
 	*/
 	template<typename ET>
-	requires is_entity<ET>
+	requires is_tuple<ET>
 	inline auto VecsRegistryBaseClass::update( VecsHandle handle, ET&& ent) noexcept	-> bool {
 		return VecsRegistry<vtll::front<ET>>().update({ handle }, std::forward<ET>(ent));
 	}
@@ -1403,7 +1449,7 @@ namespace vecs {
 	* \returns true if the operation was successful.
 	*/
 	template<typename ET>
-	requires is_entity<ET>
+	requires is_tuple<ET>
 	inline auto VecsHandle::update(ET&& ent) noexcept			-> bool {
 		using type = vtll::front<std::decay_t<ET>>;
 		return VecsRegistry<type>().update(*this, std::forward<ET>(ent));
@@ -1448,23 +1494,6 @@ namespace vecs {
 		if (!is_valid()) return nullptr;
 		return &VecsRegistryBaseClass::m_entity_table.comp_ref_idx<VecsRegistryBaseClass::c_mutex>(m_entity_index);
 	}
-
-
-	//-------------------------------------------------------------------------
-	//system
-
-
-	/**
-	* \brief Systems can access all components in sequence
-	*/
-
-	template<typename T, typename... Cs>
-	class VecsSystem : public VecsMonostate<VecsSystem<T>> {
-	protected:
-	public:
-		VecsSystem() = default;
-	};
-
 
 }
 

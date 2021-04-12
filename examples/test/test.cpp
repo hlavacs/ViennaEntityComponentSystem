@@ -64,12 +64,18 @@ int main() {
 
 		TESTRESULT(++number, "component handle", auto comp3 = h2.component<VeComponentMaterial>(), (comp3.i == 99), );
 
+		TESTRESULT(++number, "value tuple", auto tup1 = VecsRegistry<VeEntityTypeNode>{}.values(h1),
+			(get<VeComponentPosition>(tup1).m_position == glm::vec3{ 9.0f, 2.0f, 3.0f }), );
+
+		TESTRESULT(++number, "ptr tuple", auto tup2 = VecsRegistry<VeEntityTypeNode>{}.pointers(h1_2),
+			(get<VeComponentPosition*>(tup2)->m_position == glm::vec3{ 22.0f, 2.0f, 3.0f }), );
+
 		//--------------------------------------------------------------------------------------------------------------------------
 
-		TESTRESULT(++number, "local_update", h1.update(VeComponentPosition{ glm::vec3{-99.0f, -22.0f, -33.0f} }),
+		TESTRESULT(++number, "update", h1.update(VeComponentPosition{ glm::vec3{-99.0f, -22.0f, -33.0f} }),
 			(h1.component<VeComponentPosition>().m_position == glm::vec3{ -99.0f, -22.0f, -33.0f }), );
 
-		TESTRESULT(++number, "local_update", h1.update<VeComponentPosition>(VeComponentPosition{ glm::vec3{-9.0f, -2.0f, -3.0f} }),
+		TESTRESULT(++number, "update", h1.update<VeComponentPosition>(VeComponentPosition{ glm::vec3{-9.0f, -2.0f, -3.0f} }),
 			(h1.component<VeComponentPosition>().m_position == glm::vec3{ -9.0f, -2.0f, -3.0f }), );
 
 		TESTRESULT(++number, "update handle", h1.update(VeComponentPosition{ glm::vec3{99.0f, 22.0f, 33.0f} }),
