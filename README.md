@@ -22,6 +22,7 @@ VECS is a header only library, consisting of the following header files:
 * *IntType.h*: Template for strong integral types like *index_t* or *counter16_t*. Such types enforce to use them explicitly as function parameters and prevent users from mixing them up with *size_t, int* or *unsigned long*. Also such a type can store a NULL value, and can be tested with *is_valid()*.
 * *VECSUtil.h*: Contains utility classes such as a class for implementing CRTP, mono state, and simple low-overhead read and write locks.
 * *VECS.h*: The main include file containing most of VECS functionality.
+* *VECSIterator.h*: Functionality for iterating over entities in VECS.
 * *VECSCompSystem.h*: Examples for component types and entity types used in a game engine itself.
 * *VECSCompUser.h*: Examples for components and entities that could be defined by the engine users to store their own entities.
 * *VTLL.h*: The Vienna Type List Library is a collection of meta-algorithms for treating type lists and value lists.

@@ -12,6 +12,7 @@ set(HEADERS
   ${INCLUDE}/VECSCompSystem.h
   ${INCLUDE}/VECSCompUser.h
   ${INCLUDE}/VECS.h
+  ${INCLUDE}/VECSIterator.h
 )
 
 add_executable(${TARGET} ${SOURCE} ${HEADERS})
