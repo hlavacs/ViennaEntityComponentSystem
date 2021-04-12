@@ -1104,7 +1104,7 @@ namespace vecs {
 		index_t& i2 = m_entity_table.comp_ref_idx<c_index>(h2.m_entity_index);
 		std::swap(i1, i2);											///< Swap in map
 
-		auto res = VecsComponentTable<E<Cs...>>().swap(i1, i2);		///< SWap in component table
+		auto res = VecsComponentTable<E<Cs...>>().swap(i1, i2);		///< Swap in component table
 
 		VecsWriteLock::unlock(h1.mutex());
 		VecsWriteLock::unlock(h2.mutex());

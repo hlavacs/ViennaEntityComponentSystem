@@ -127,13 +127,13 @@ int main() {
 		bool test = true;
 
 		for (auto&& [handle, name] : VecsRange<VeComponentName>{}) {
-			if (!handle.is_valid()) continue;
+			VecsReadLock lock( handle.mutex() );
+			if (!handle.has_value()) continue;
 			++i;
 			if (name.m_name != "Node" && name.m_name != "Draw") { test = false; }
 			//std::cout << "Entity " << name << "\n";
 		}
 		TESTRESULT(++number, "system create", , (test && i == 0), );
-
 	}
 
 
@@ -149,6 +149,9 @@ int main() {
 		int i = 0;
 		bool test = true;
 		for (auto&& [handle, name, pos, orient, trans] : VecsRegistry<VeEntityTypeNode>{}) {
+			VecsReadLock lock(handle.mutex());
+			if (!handle.has_value()) continue;
+			++i;
 			if (name.m_name != "Node" && name.m_name != "Draw") { test = false; }
 		}
 
@@ -174,7 +177,7 @@ int main() {
 		test = true;
 		for (auto&& [handle, name] : VecsRange<VeComponentName>{}) {
 			VecsReadLock lock(handle.mutex());
-			if (!handle.is_valid()) continue;
+			if (!handle.has_value()) continue;
 			++i;
 			name.m_name = "Name Holder 2 " + std::to_string(i);
 			//std::cout << "Entity " << name.m_name << " " << i << "\n";
