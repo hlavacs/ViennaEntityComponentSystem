@@ -112,6 +112,7 @@ namespace vecs {
 	template<typename... Cs> class VecsIterator;
 	template<typename... Cs> class VecsIteratorEntityBaseClass;
 	template<typename E, typename... Cs> class VecsIteratorEntity;
+	template<typename... Cs> class VecsRange;
 
 
 	/** basic concepts */
@@ -659,13 +660,6 @@ namespace vecs {
 	//-------------------------------------------------------------------------
 	//entity registry base class
 
-	template<typename... Cs>
-	class VecsIterator;
-
-	template<typename... Cs>
-	class VecsRange;
-
-
 	/**
 	* \brief This class stores all generalized handles of all entities, and can be used
 	* to insert, update, read and delete all entity types. 
@@ -1096,16 +1090,26 @@ namespace vecs {
 		if (!h1.is_valid() || !h1.is_valid() || h1.type() != h2.type()) return false;
 		if (h1.m_type_index != vtll::index_of<VecsEntityTypeList, E<Cs...>>::value) return false;
 		if (h2.m_type_index != vtll::index_of<VecsEntityTypeList, E<Cs...>>::value) return false;
-
-		VecsReadLock lock1(h1.mutex());
-		VecsReadLock lock2(h2.mutex());
+		
+		if (h1.m_entity_index.value < h2.m_entity_index.value) {	//avoid deadlock by ordering 
+			VecsWriteLock::lock(h1.mutex());
+			VecsWriteLock::lock(h2.mutex());
+		}
+		else {
+			VecsWriteLock::lock(h2.mutex());
+			VecsWriteLock::lock(h1.mutex());
+		}
 
 		index_t& i1 = m_entity_table.comp_ref_idx<c_index>(h1.m_entity_index);
 		index_t& i2 = m_entity_table.comp_ref_idx<c_index>(h2.m_entity_index);
+		std::swap(i1, i2);											///< Swap in map
 
-		std::swap(i1, i2);
-		
-		return VecsComponentTable<E<Cs...>>().swap(i1, i2);
+		auto res = VecsComponentTable<E<Cs...>>().swap(i1, i2);		///< SWap in component table
+
+		VecsWriteLock::unlock(h1.mutex());
+		VecsWriteLock::unlock(h2.mutex());
+
+		return res;
 	}
 
 	/**
@@ -1864,17 +1868,18 @@ namespace vecs {
 		auto b = range.begin();
 		auto e = range.end();
 		for (; b != e; ++b) {
-			typename VecsIterator<Cs...>::value_type tup;
-			{
-				VecsReadLock lock{ b.mutex() };		///< Make a local copy
-				if (!b.has_value()) continue;
-				tup = *b;
+			VecsReadLock::lock( b.mutex() );		///< Read lock
+			if (!b.has_value()) {
+				VecsReadLock::unlock( b.mutex() );	
+				continue;
 			}
+			auto tup = *b;							///< Make a local copy
+			VecsReadLock::unlock( b.mutex() );
 			std::apply(f, tup);						///< Run the function on the copy
 
-			VecsWriteLock lock{ b.mutex() };		///< Copy back to ECS
+			VecsWriteLock lock{ b.mutex() };		///< Write lock
 			if (!b.has_value()) continue;
-			*b = tup;
+			*b = tup;								///< Copy back to ECS
 		}
 	}
 
@@ -1897,8 +1902,10 @@ namespace vecs {
 	* \returns true if the data in the handle is not null
 	*/
 	inline auto VecsHandle::is_valid() noexcept				-> bool {
-		return m_entity_index.has_value() && m_generation_counter.has_value() 
-			&& m_type_index.has_value() && m_type_index.value < vtll::size<VecsEntityTypeList>::value;
+		return	m_entity_index.has_value() 
+				&& m_generation_counter.has_value() 
+				&& m_type_index.has_value() 
+				&& m_type_index.value < vtll::size<VecsEntityTypeList>::value;
 	}
 
 	/**
@@ -1906,7 +1913,7 @@ namespace vecs {
 	* \returns true if the entity this handle belongs to is still in the ECS.
 	*/
 	inline auto VecsHandle::has_value() noexcept				-> bool {
-		return is_valid() && VecsRegistryBaseClass().contains(*this);
+		return VecsRegistryBaseClass().contains(*this);
 	}
 
 	/**
