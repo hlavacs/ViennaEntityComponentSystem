@@ -763,11 +763,19 @@ namespace vecs {
 
 		template<template<typename...> typename R, typename... Cs>
 		requires are_component_types<Cs...>
-		auto for_each(R<Cs...>&& r, std::function<Functor<Cs...>> f) -> void;
+		auto for_each_copy(R<Cs...>&& r, std::function<Functor<Cs...>> f) -> void;
 
 		template<typename... Cs>
 		requires are_component_types<Cs...>
-		auto for_each(std::function<Functor<Cs...>> f) -> void;
+		auto for_each_copy(std::function<Functor<Cs...>> f) -> void;
+
+		template<template<typename...> typename R, typename... Cs>
+		requires are_component_types<Cs...>
+		auto for_each_ref(R<Cs...>&& r, std::function<Functor<Cs...>> f) -> void;
+
+		template<typename... Cs>
+		requires are_component_types<Cs...>
+		auto for_each_ref(std::function<Functor<Cs...>> f) -> void;
 
 		auto index(VecsHandle h) noexcept -> index_t;
 
@@ -1855,6 +1863,9 @@ namespace vecs {
 		return VecsRegistry<vtll::front<ET>>().update({ handle }, std::forward<ET>(ent));
 	}
 
+	//-------------------------------------------------------------------------
+	//for_each
+
 	/**
 	* \brief takes two iterators and loops from begin to end, and for each entity calls the provided function.
 	*
@@ -1864,17 +1875,47 @@ namespace vecs {
 	*/
 	template<template<typename...> typename R, typename... Cs>
 	requires are_component_types<Cs...>
-	inline auto VecsRegistryBaseClass::for_each( R<Cs...>&& range, std::function<Functor<Cs...>> f) -> void {
+	inline auto VecsRegistryBaseClass::for_each_ref( R<Cs...>&& range, std::function<Functor<Cs...>> f) -> void {
 		auto b = range.begin();
 		auto e = range.end();
 		for (; b != e; ++b) {
-			VecsReadLock::lock( b.mutex() );		///< Read lock
+			VecsWriteLock lock( b.mutex() );		///< Write lock
+			if (!b.has_value()) continue;
+			std::apply(f, *b);						///< Run the function on the copy
+		}
+	}
+
+	/**
+	* \brief Visits all entities in the ECS that have the given components CS...
+	* \param[in] f Functor to be called for every visited entity.
+	*/
+	template<typename... Cs>
+	requires are_component_types<Cs...>
+	inline auto VecsRegistryBaseClass::for_each_ref(std::function<Functor<Cs...>> f) -> void {
+		for_each_ref(VecsRange<Cs...>{}, f);
+	}
+
+
+	/**
+	* \brief takes two iterators and loops from begin to end, and for each entity calls the provided function.
+	*
+	* \param[in] b Begin iterator.
+	* \param[in] e End iterator.
+	* \param[in] f Functor to be called for every entity the iterator visits.
+	*/
+	template<template<typename...> typename R, typename... Cs>
+	requires are_component_types<Cs...>
+		inline auto VecsRegistryBaseClass::for_each_copy(R<Cs...>&& range, std::function<Functor<Cs...>> f) -> void {
+		auto b = range.begin();
+		auto e = range.end();
+		for (; b != e; ++b) {
+			VecsReadLock::lock(b.mutex());		///< Read lock
 			if (!b.has_value()) {
-				VecsReadLock::unlock( b.mutex() );	
+				VecsReadLock::unlock(b.mutex());
 				continue;
 			}
-			auto tup = *b;							///< Make a local copy
-			VecsReadLock::unlock( b.mutex() );
+			typename VecsIterator<Cs...>::value_type tup = *b;	///< Make a local copy
+			VecsReadLock::unlock(b.mutex());
 			std::apply(f, tup);						///< Run the function on the copy
 
 			VecsWriteLock lock{ b.mutex() };		///< Write lock
@@ -1889,9 +1930,10 @@ namespace vecs {
 	*/
 	template<typename... Cs>
 	requires are_component_types<Cs...>
-	inline auto VecsRegistryBaseClass::for_each(std::function<Functor<Cs...>> f) -> void {
-		for_each(VecsRange<Cs...>{}, f);
+		inline auto VecsRegistryBaseClass::for_each_copy(std::function<Functor<Cs...>> f) -> void {
+		for_each_copy(VecsRange<Cs...>{}, f);
 	}
+
 
 
 	//-------------------------------------------------------------------------

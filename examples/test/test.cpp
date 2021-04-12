@@ -156,7 +156,7 @@ int main() {
 		}
 
 		i = 0;
-		VecsRegistry().for_each<VeComponentName>([&](auto handle, auto& name) {
+		VecsRegistry().for_each_copy<VeComponentName>([&](auto handle, auto& name) {
 			++i;
 			if (name.m_name != "Node" && name.m_name != "Draw") { test = false; }
 			name.m_name = "Name Holder " + std::to_string(i);
@@ -164,7 +164,7 @@ int main() {
 			});
 
 		i = 0;
-		VecsRegistry().for_each<VeComponentName>([&](auto handle, auto& name) {
+		VecsRegistry().for_each_ref<VeComponentName>([&](auto handle, auto& name) {
 			++i;
 			if (name.m_name != "Name Holder " + std::to_string(i)) { test = false; }
 			//std::cout << "Entity " << name.m_name << " " << i << "\n";
@@ -184,7 +184,7 @@ int main() {
 		}
 
 		i = 0;
-		VecsRegistry().for_each<VeComponentName>([&](auto handle, auto& name) {
+		VecsRegistry().for_each_ref<VeComponentName>([&](auto handle, auto& name) {
 			++i;
 			if (name.m_name != ("Name Holder 2 " + std::to_string(i))) { test = false; }
 			//std::cout << "Entity " << name.m_name << " " << i << "\n";
@@ -217,13 +217,22 @@ int main() {
 		i = 1;
 		while (f(b, e, f, i)) { b++; };
 
-		TESTRESULT(++number, "system run 3", , test, );
-
 		i = 0;
 		test = true;
-		VecsRegistry().for_each<VeComponentName>([&](auto handle, auto& name) {
+		VecsRegistry().for_each_ref<VeComponentName>([&](auto handle, auto& name) {
 			++i;
 			if (name.m_name != ("Name Holder 3 " + std::to_string(i))) { test = false; }
+			name.m_name = "Name Holder 4 " + std::to_string(i);
+			//std::cout << "Entity " << name.m_name << " " << i << "\n";
+			});
+
+		TESTRESULT(++number, "system run 3", , test, );
+
+
+		i = 0;
+		VecsRegistry().for_each_ref<VeComponentName>([&](auto handle, auto& name) {
+			++i;
+			if (name.m_name != ("Name Holder 4 " + std::to_string(i))) { test = false; }
 			//std::cout << "Entity " << name.m_name << " " << i << "\n";
 			});
 
