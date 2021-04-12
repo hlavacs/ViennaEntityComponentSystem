@@ -267,6 +267,23 @@ int main() {
 
 	}
 
+
+	{
+		int i = 0;
+		bool test = true;
+		VecsRegistry().for_each<VeEntityTypeNode>([&](auto handle) {
+			++i;
+			auto name = handle.component<VeComponentName>();
+			if (name.m_name != ("Name Holder 4 " + std::to_string(i))) { test = false; }
+			//std::cout << "Entity " << name.m_name << " " << i << "\n";
+			});
+
+		TESTRESULT(++number, "system run 6", , test, );
+
+
+
+	}
+
     return 0;
 }
 
