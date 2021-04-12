@@ -108,7 +108,7 @@ namespace vecs {
 	template<typename E> class VecsComponentTable;
 	class VecsRegistryBaseClass;
 	template<typename E> class VecsRegistry;
-	template<typename... Cs> class VecsIterator;
+	template<typename... Ts> requires (are_component_types<Ts...> || are_entity_types<Ts...>) class VecsIterator;
 	template<typename... Cs> class VecsIteratorEntityBaseClass;
 	template<typename E, typename... Cs> class VecsIteratorEntity;
 	template<typename... Cs> requires (are_component_types<Cs...> || are_entity_types<Cs...>) class VecsRange;
@@ -322,7 +322,7 @@ namespace vecs {
 		template<typename E, size_t I> friend class VecsComponentAccessorDerived;
 		friend class VecsRegistryBaseClass;
 		template<typename E> friend class VecsRegistry;
-		template<typename... Cs> friend class VecsIterator;
+		template<typename... Ts> requires (are_component_types<Ts...> || are_entity_types<Ts...>) friend class VecsIterator;
 		template<typename E, typename... Cs> friend class VecsIteratorEntity;
 
 	protected:
@@ -1267,17 +1267,17 @@ namespace vecs {
 	* entities are included that contain ALL component types.
 	*/
 
-	template<typename... Cs>
+	template<typename... Ts>
+	requires (are_component_types<Ts...> || are_entity_types<Ts...>)
 	class VecsIterator {
 		
-		template<typename E, typename... Cs>
-		friend class VecsIteratorDerived;
-
 	protected:
-		using entity_types = vtll::filter_have_all_types< VecsEntityTypeList, vtll::type_list<Cs...> >; ///< List with entity types
+		using entity_types = vtll::filter_have_all_types< VecsEntityTypeList, vtll::type_list<Ts...> >; ///< List with entity types
+
+
 		using last_type = vtll::back<entity_types>;	///< last type for end iterator
 
-		std::array<std::unique_ptr<VecsIteratorEntityBaseClass<Cs...>>, vtll::size<entity_types>::value> m_dispatch; ///< Subiterators for each entity type E
+		std::array<std::unique_ptr<VecsIteratorEntityBaseClass<Ts...>>, vtll::size<entity_types>::value> m_dispatch; ///< Subiterators for each entity type E
 		index_t m_current_iterator{ 0 };	///< Current iterator of type E that is used
 		index_t m_current_index{ 0 };		///< Current index in the VecsComponentTable<E>
 		bool	m_is_end{ false };			///< True if this is an end iterator (for stopping the loop)
@@ -1286,24 +1286,24 @@ namespace vecs {
 		VecsIterator(std::nullopt_t n) noexcept {};			///< Needed for derived iterator to call
 
 	public:
-		using value_type = std::tuple<VecsHandle, Cs...>; ///< Tuple containing all component values
-		using ref_type = std::tuple<VecsHandle, Cs&...>;  ///< Tuple containing component references
+		using value_type = std::tuple<VecsHandle, Ts...>; ///< Tuple containing all component values
+		using ref_type = std::tuple<VecsHandle, Ts&...>;  ///< Tuple containing component references
 
 		VecsIterator( bool is_end = false ) noexcept ;		///< Constructor that should be called always from outside
 		VecsIterator(const VecsIterator& v) noexcept;		///< Copy constructor
 
-		auto operator=(const VecsIterator& v) noexcept			-> VecsIterator<Cs...>;	///< Copy
-		auto operator+=(size_t N) noexcept						-> VecsIterator<Cs...>;	///< Increase and set
-		auto operator+(size_t N) noexcept						-> VecsIterator<Cs...>;	///< Increase
-		auto operator!=(const VecsIterator<Cs...>& v) noexcept	-> bool;	///< Unqequal
-		auto operator==(const VecsIterator<Cs...>& v) noexcept	-> bool;	///< Equal
+		auto operator=(const VecsIterator& v) noexcept			-> VecsIterator<Ts...>;	///< Copy
+		auto operator+=(size_t N) noexcept						-> VecsIterator<Ts...>;	///< Increase and set
+		auto operator+(size_t N) noexcept						-> VecsIterator<Ts...>;	///< Increase
+		auto operator!=(const VecsIterator<Ts...>& v) noexcept	-> bool;	///< Unqequal
+		auto operator==(const VecsIterator<Ts...>& v) noexcept	-> bool;	///< Equal
 
 		virtual auto handle() noexcept			-> VecsHandle;				///< Return handle of the current entity
 		virtual auto mutex() noexcept			-> std::atomic<uint32_t>*;	///< Return poiter to the mutex of this entity
 		virtual auto has_value() noexcept		-> bool;					///< Is currently pointint to a valid entity
 		virtual	auto operator*() noexcept		-> ref_type;				///< Access the data
-		virtual auto operator++() noexcept		-> VecsIterator<Cs...>&;	///< Increase by 1
-		virtual auto operator++(int) noexcept	-> VecsIterator<Cs...>&;	///< Increase by 1
+		virtual auto operator++() noexcept		-> VecsIterator<Ts...>&;	///< Increase by 1
+		virtual auto operator++(int) noexcept	-> VecsIterator<Ts...>&;	///< Increase by 1
 		virtual auto is_vector_end() noexcept	-> bool;					///< Is currently at the end of any sub iterator
 		virtual auto size() noexcept			-> size_t;					///< Number of valid entities
 	};
@@ -1317,7 +1317,7 @@ namespace vecs {
 	*/
 	template<typename... Cs>
 	class VecsIteratorEntityBaseClass {
-		template<typename... Cs> friend class VecsIterator;
+		template<typename... Ts> requires (are_component_types<Ts...> || are_entity_types<Ts...>) friend class VecsIterator;
 
 	protected:
 		index_t m_current_index{ 0 };		///< Current index in the VecsComponentTable<E>
@@ -1346,8 +1346,9 @@ namespace vecs {
 	*
 	* \param[in] v Other Iterator that should be copied
 	*/
-	template<typename... Cs>
-	inline VecsIterator<Cs...>::VecsIterator(const VecsIterator& v) noexcept : VecsIterator(v.m_is_end) {
+	template<typename... Ts>
+	requires (are_component_types<Ts...> || are_entity_types<Ts...>)
+	inline VecsIterator<Ts...>::VecsIterator(const VecsIterator& v) noexcept : VecsIterator(v.m_is_end) {
 		m_current_iterator = v.m_current_iterator;
 		m_current_index = v.m_current_index;
 		m_size = v.m_size;
@@ -1363,8 +1364,9 @@ namespace vecs {
 	*
 	* \returns true if the iterator points to a valid entity.
 	*/
-	template<typename... Cs>
-	inline auto VecsIterator<Cs...>::has_value() noexcept	-> bool {
+	template<typename... Ts>
+	requires (are_component_types<Ts...> || are_entity_types<Ts...>)
+	inline auto VecsIterator<Ts...>::has_value() noexcept	-> bool {
 		if (m_is_end || is_vector_end()) return false;
 		return m_dispatch[m_current_iterator]->has_value();
 	}
@@ -1373,8 +1375,9 @@ namespace vecs {
 	* \brief Retrieve the handle of the current entity.
 	* \returns the handle of the current entity.
 	*/
-	template<typename... Cs>
-	inline auto VecsIterator<Cs...>::handle() noexcept	-> VecsHandle {
+	template<typename... Ts>
+	requires (are_component_types<Ts...> || are_entity_types<Ts...>)
+	inline auto VecsIterator<Ts...>::handle() noexcept	-> VecsHandle {
 		return m_dispatch[m_current_iterator]->handle();
 	}
 
@@ -1382,8 +1385,9 @@ namespace vecs {
 	* \brief Retrieve the handle of the current entity.
 	* \returns the handle of the current entity.
 	*/
-	template<typename... Cs>
-	inline auto VecsIterator<Cs...>::mutex() noexcept	-> std::atomic<uint32_t>* {
+	template<typename... Ts>
+	requires (are_component_types<Ts...> || are_entity_types<Ts...>)
+	inline auto VecsIterator<Ts...>::mutex() noexcept	-> std::atomic<uint32_t>* {
 		return m_dispatch[m_current_iterator]->mutex();
 	}
 
@@ -1393,8 +1397,9 @@ namespace vecs {
 	* \param[in] v The source iterator for the assignment.
 	* \returns *this.
 	*/
-	template<typename... Cs>
-	inline auto VecsIterator<Cs...>::operator=(const VecsIterator& v) noexcept	-> VecsIterator<Cs...> {
+	template<typename... Ts>
+	requires (are_component_types<Ts...> || are_entity_types<Ts...>)
+	inline auto VecsIterator<Ts...>::operator=(const VecsIterator& v) noexcept	-> VecsIterator<Ts...> {
 		m_current_iterator = v.m_current_iterator;
 		m_current_index = v.m_current_index;
 		m_size = v.m_size;
@@ -1409,8 +1414,9 @@ namespace vecs {
 	*
 	* \returns a tuple holding the components Cs of the entity the iterator is currently pointing to.
 	*/
-	template<typename... Cs>
-	inline auto VecsIterator<Cs...>::operator*() noexcept	-> ref_type {
+	template<typename... Ts>
+	requires (are_component_types<Ts...> || are_entity_types<Ts...>)
+	inline auto VecsIterator<Ts...>::operator*() noexcept	-> ref_type {
 		return *(*m_dispatch[m_current_iterator]);
 	};
 
@@ -1419,8 +1425,9 @@ namespace vecs {
 	*
 	* \returns *this.
 	*/
-	template<typename... Cs>
-	inline auto VecsIterator<Cs...>::operator++() noexcept		-> VecsIterator<Cs...>& {
+	template<typename... Ts>
+	requires (are_component_types<Ts...> || are_entity_types<Ts...>)
+	inline auto VecsIterator<Ts...>::operator++() noexcept		-> VecsIterator<Ts...>& {
 		if (m_is_end) return *this;
 		(*m_dispatch[m_current_iterator])++;
 
@@ -1436,8 +1443,9 @@ namespace vecs {
 	*
 	* \returns *this.
 	*/
-	template<typename... Cs>
-	inline auto VecsIterator<Cs...>::operator++(int) noexcept	-> VecsIterator<Cs...>& {
+	template<typename... Ts>
+	requires (are_component_types<Ts...> || are_entity_types<Ts...>)
+	inline auto VecsIterator<Ts...>::operator++(int) noexcept	-> VecsIterator<Ts...>& {
 		return operator++();
 	};
 
@@ -1449,8 +1457,9 @@ namespace vecs {
 	* \param[in] N The number of positions to jump forward.
 	* \returns *this.
 	*/
-	template<typename... Cs>
-	inline auto VecsIterator<Cs...>::operator+=(size_t N) noexcept -> VecsIterator<Cs...> {
+	template<typename... Ts>
+	requires (are_component_types<Ts...> || are_entity_types<Ts...>)
+	inline auto VecsIterator<Ts...>::operator+=(size_t N) noexcept -> VecsIterator<Ts...> {
 		if (m_is_end) return *this;
 		size_t left = N;
 		while (left > 0) {
@@ -1478,9 +1487,10 @@ namespace vecs {
 	* \param[in] N Number of positions to jump.
 	* \returns The new iterator.
 	*/
-	template<typename... Cs>
-	inline auto VecsIterator<Cs...>::operator+(size_t N) noexcept	-> VecsIterator<Cs...> {
-		VecsIterator<Cs...> temp{ *this };
+	template<typename... Ts>
+	requires (are_component_types<Ts...> || are_entity_types<Ts...>)
+	inline auto VecsIterator<Ts...>::operator+(size_t N) noexcept	-> VecsIterator<Ts...> {
+		VecsIterator<Ts...> temp{ *this };
 		temp += N;
 		return temp;
 	}
@@ -1490,8 +1500,9 @@ namespace vecs {
 	*
 	* \returns true if the iterators are not equal.
 	*/
-	template<typename... Cs>
-	inline auto VecsIterator<Cs...>::operator!=(const VecsIterator<Cs...>& v) noexcept	-> bool {
+	template<typename... Ts>
+	requires (are_component_types<Ts...> || are_entity_types<Ts...>)
+	inline auto VecsIterator<Ts...>::operator!=(const VecsIterator<Ts...>& v) noexcept	-> bool {
 		return !(*this == v);
 	}
 
@@ -1500,8 +1511,9 @@ namespace vecs {
 	*
 	* \returns true if the iterators are equal.
 	*/
-	template<typename... Cs>
-	inline auto VecsIterator<Cs...>::operator==(const VecsIterator<Cs...>& v) noexcept	-> bool {
+	template<typename... Ts>
+	requires (are_component_types<Ts...> || are_entity_types<Ts...>)
+	inline auto VecsIterator<Ts...>::operator==(const VecsIterator<Ts...>& v) noexcept	-> bool {
 		return	v.m_current_iterator == m_current_iterator && v.m_current_index == m_current_index;
 	}
 
@@ -1511,8 +1523,9 @@ namespace vecs {
 	*
 	* \returns true if the current subiterator is at its end.
 	*/
-	template<typename... Cs>
-	inline auto VecsIterator<Cs...>::is_vector_end() noexcept		-> bool {
+	template<typename... Ts>
+	requires (are_component_types<Ts...> || are_entity_types<Ts...>)
+	inline auto VecsIterator<Ts...>::is_vector_end() noexcept		-> bool {
 		return m_dispatch[m_current_iterator]->is_vector_end();
 	}
 
@@ -1523,8 +1536,9 @@ namespace vecs {
 	*
 	* \returns the total number of entities that have all components Cs.
 	*/
-	template<typename... Cs>
-	inline auto VecsIterator<Cs...>::size() noexcept	-> size_t {
+	template<typename... Ts>
+	requires (are_component_types<Ts...> || are_entity_types<Ts...>)
+	inline auto VecsIterator<Ts...>::size() noexcept	-> size_t {
 		return m_size;
 	}
 
@@ -1586,7 +1600,7 @@ namespace vecs {
 
 
 	/**
-	* \brief Constructor of class VecsIteratorDerived<E, Cs...>. Calls empty constructor of base class.
+	* \brief Constructor of class VecsIteratorEntity<E, Cs...>. Calls empty constructor of base class.
 	*
 	* \param[in] is_end If true, then the iterator belongs to an end-iterator.
 	*/
@@ -1701,8 +1715,9 @@ namespace vecs {
 	* creates subiterators for all entity types that have all component types.
 	* \param[in] is_end If true then this iterator is an end iterator.
 	*/
-	template<typename... Cs>
-	inline VecsIterator<Cs...>::VecsIterator(bool is_end) noexcept : m_is_end{ is_end } {
+	template<typename... Ts>
+	requires (are_component_types<Ts...> || are_entity_types<Ts...>)
+	inline VecsIterator<Ts...>::VecsIterator(bool is_end) noexcept : m_is_end{ is_end } {
 		if (is_end) {
 			m_current_iterator = static_cast<decltype(m_current_iterator)>(m_dispatch.size() - 1);
 			m_current_index = static_cast<decltype(m_current_index)>(VecsRegistry<last_type>().size());
@@ -1711,7 +1726,7 @@ namespace vecs {
 		vtll::static_for<size_t, 0, vtll::size<entity_types>::value >(
 			[&](auto i) {
 				using type = vtll::Nth_type<entity_types, i>;
-				m_dispatch[i] = std::make_unique<VecsIteratorEntity<type, Cs...>>(is_end);
+				m_dispatch[i] = std::make_unique<VecsIteratorEntity<type, Ts...>>(is_end);
 				auto size = m_dispatch[i]->size();
 				m_size += size;
 				if (size == 0 && i + 1 < vtll::size<entity_types>::value) m_current_iterator++;
