@@ -27,10 +27,7 @@ namespace vecs {
 
 			using last_type = vtll::back<entity_types>;	///< last type for end iterator
 
-			using array_type = typename std::conditional_t<are_component_types<Ts...>
-				, std::array<std::unique_ptr<VecsIteratorEntityBaseClass<Ts...>>, vtll::size<entity_types>::value>
-				, std::array<std::unique_ptr<VecsIteratorEntityBaseClass<Ts...>>, vtll::size<entity_types>::value>
-			>;
+			using array_type = std::array<std::unique_ptr<VecsIteratorEntityBaseClass<Ts...>>, vtll::size<entity_types>::value>;
 
 			array_type m_dispatch;				///< Subiterators for each entity type E
 
