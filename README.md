@@ -314,43 +314,8 @@ The entities are swapped only if they are of the same type. You can ask for the 
     VecsRegistry<VeEntityTypeNode>{}.size(); //return number of entities of type VeEntityTypeNode in VECS
 
 
-### Entity Proxy
+### Entity Reference Tuple
 
-You can make a local copy of an entity by creating a *proxy*, like so:
-
-    VecsEntityProxy<VeEntityTypeNode> proxy1 = handle.proxy(false); //if handle is for entity type VeEntityTypeNode
-    auto proxy2 = VecsRegistry<VeEntityTypeNode>{}.proxy(handle, true); //if handle is for entity type VeEntityTypeNode
-    VecsEntityProxy<VeEntityTypeNode> proxy3{true, {}, {}, {}  }; //also creates new entity in VECS
-
-Working on the local proxy can be faster, and you can copy the proxy state back to VECS by calling
-
-    proxy1.update();
-
-The boolean parameter determines whether the proxy automatically calls *update()* in its destructor, so that any changes are copied back to VECS in a RAII manner. For the first two versions, if the boolean is not specified, then the default value is *false*.
-
-You can also use the *update()* function to update components locally in the proxy:
-
-    proxy1.update<VeSystemComponentName>("New name");
-
-However, this does *not* update the component in VECS, only the local copy in the proxy. You can get the handle of the VECS entity by calling
-
-    proxy1.handle();
-
-Likewise, you can check whether the proxy still represents an entity in VECS, i.e., the entity has not been erased yet, by calling
-
-    proxy1.has_value();
-
-You can check whether the proxy holds a component of type *C* by calling e.g.
-
-    proxy1.has_component<VeSystemComponentName>();
-
-and you can retrieve the local component data by calling
-
-    VeSystemComponentName name{ proxy1.component<VeSystemComponentName>() };
-
-You can also retrieve a component by specifying its index:
-
-    VeSystemComponentName name{ proxy1.component<0>() }; //VeSystemComponentName is the first component
 
 
 ### Iterators
