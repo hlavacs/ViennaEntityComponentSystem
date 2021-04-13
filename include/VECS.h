@@ -96,23 +96,6 @@ namespace vecs {
 
 	using VecsTableLayoutMap = vtll::cat< VeSystemTableLayoutMap, VeUserTableLayoutMap >;
 
-	/**
-	* Declarations of the main VECS classes
-	*/
-	class VecsReadLock;
-	class VecsWriteLock;
-	class VecsHandle;
-	template<typename E> class VecsComponentAccessor;
-	template<typename E, size_t I> class VecsComponentAccessorDerived;
-	template<typename E> class VecsComponentTable;
-	class VecsRegistryBaseClass;
-	template<typename E> class VecsRegistry;
-	template<typename... Ts> requires (are_component_types<Ts...> || are_entity_types<Ts...>) class VecsIterator;
-	template<typename... Cs> class VecsIteratorEntityBaseClass;
-	template<typename E, typename... Cs> class VecsIteratorEntity;
-	template<typename... Cs> requires (are_component_types<Cs...> || are_entity_types<Cs...>) class VecsRange;
-
-
 	/** basic concepts */
 	template<typename C>
 	concept is_component_type = (vtll::has_type<VecsComponentTypeList, std::decay_t<C>>::value); ///< C is a component
@@ -140,6 +123,23 @@ namespace vecs {
 
 	template<typename E, typename... Cs>
 	concept is_iterator = (std::is_same_v<std::decay_t<E>, VecsIterator<Cs...>>);	///< E is composed of Cs
+
+	/**
+	* Declarations of the main VECS classes
+	*/
+	class VecsReadLock;
+	class VecsWriteLock;
+	class VecsHandle;
+	template<typename E> class VecsComponentAccessor;
+	template<typename E, size_t I> class VecsComponentAccessorDerived;
+	template<typename E> class VecsComponentTable;
+	class VecsRegistryBaseClass;
+	template<typename E> class VecsRegistry;
+	template<typename... Ts> requires (are_component_types<Ts...> || are_entity_types<Ts...>) class VecsIterator;
+	template<typename... Cs> class VecsIteratorEntityBaseClass;
+	template<typename E, typename... Cs> class VecsIteratorEntity;
+	template<typename... Cs> requires (are_component_types<Cs...> || are_entity_types<Cs...>) class VecsRange;
+
 
 	/** 
 	* \brief General functor type that can hold any function, and depends in a number of component types.
