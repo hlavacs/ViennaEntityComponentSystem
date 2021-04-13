@@ -204,7 +204,7 @@ In your CPP file, make sure to include first your own include file, then afterwa
 
     #include "basic_test.h" //your own definitions, including VECS_USER_DATA
 
-    #include "VECS.h"       //VECS
+    #include "VECS.h"       //VECS does not load VECSCompUser.h since you defined VECS_USER_DATA
 
     using namespace vecs;
 
@@ -303,7 +303,7 @@ This will remove any gap in the component table(s) to speed up iterating through
     index_t first = handle.index();
     index_t second = VecsRegistry{}.index(handle);
 
-If a child comes before a parent then you can swap the places of two entities using either
+If a child comes before a parent then you can swap the places of two entities in the component table using either
 
     VecsRegistry{}.swap(handle1, handle2); //if both handles of same type
     VecsRegistry<VeEntityTypeNode>{}.swap(handle1, handle2);  //if both handles of type VeEntityTypeNode
@@ -314,18 +314,49 @@ The entities are swapped only if they are of the same type. You can ask for the 
     VecsRegistry<VeEntityTypeNode>{}.size(); //return number of entities of type VeEntityTypeNode in VECS
 
 
-### Entity Reference Tuple
+### Entity Tuples
 
+You can make a local copy of an entity by calling
 
+    auto tuple_val = VecsRegistry<VeEntityTypeNode>{}.values(handle);
 
-### Iterators
+The result is a *std::tuple* holding a copy of all components of the entity. Of course this is only possible if all components are copyable. You can access the components by using the *std::get* function on the tuple, by either using the index of the component or its type (which should be unique):
 
+    auto& comp1 = std::get<0>(tuple_val); //use index, or
+    auto& comp2 = std::get<VeComponentPosition>(tuple_val); //use type as an index
 
+The outcome is a reference that can be used for reading and writing the value in the tuple. Of course, writing a new value does not affect the entity in VECS. You can write the tuple back to VECS using
 
+    VecsRegistry<VeEntityTypeNode>{}.update(handle, tuple_val);
 
+On the other hand, if you want quick access without the need for updates, you can calls
+
+    auto tuple_ptr = VecsRegistry<VeEntityTypeNode>{}.pointer(handle);
+
+The result is a *std::tuple* that contains pointers to the components of the entity. Accessing them results in a direct read or writing of the original entity. In single thread operations, this is not a problem. However, in multithreaded operations, you should lock the entity first using either a read or write lock (see Parallel Operations).
+
+  auto pos = std::get<VeComponentPosition*>(tuple_ptr)->m_position; //use * since it is a pointer!
 
 ## Looping
 
+The basic use case of any ECS is to loop over all or some of the entities. VECS allows this in various ways. The basic mechanism is given by iterators and ranges. These can then be used to compose loops.
+
+### Iterators and Ranges
+
+Iterators are generalized pointers, and are the main mechanism for looping over entities in VECS. Iterators are implemented in class *VecsIterator* and come in two basic forms, and can be used for two basic use cases.
+
+The first form is a general iterator that can point to any entity and can be increased to jump ahead. The second one is an end-iterator, it is created by calling it with the boolean parameter *true*:
+
+    VecsIterator<VeComponentName> it;         //normal iterator
+    VecsIterator<VeComponentName> end(true);  //end iterator used as looping end point
+
+Iterators have template parameters, which define their starting position and the entity categories they cover. If the template parameter is a list of component types, then the covered entities are all entity types that contain *all* specified component types. In the previous example, these are all entity types that contain the component *VeComponentName*. Since the components are given explicitly, accessing the value with * yields a *std::tuple* that starts with a handle, and as rest contains direct references to the components in VECS.
+
+    auto [handle, name] = *it; //name is a reference to the component in VECS
+
+If on the other hand the template parameters are entity types, then these are the entity types the iterator covers, accessing an entity with the * operator yields only the handle of the current entity the iterator points to:
+
+    auto [handle] = 
 
 ### Range Based For loop
 
@@ -337,6 +368,7 @@ The entities are swapped only if they are of the same type. You can ask for the 
 
 
 ## Performance
+
 
 
 ## Parallel Operations

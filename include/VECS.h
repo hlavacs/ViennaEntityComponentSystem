@@ -884,8 +884,8 @@ namespace vecs {
 		//-------------------------------------------------------------------------
 		//get data
 
-		auto pointers(VecsHandle handle) noexcept -> std::tuple<Cs*...>;		///< Return a tuple with pointers to the components
 		auto values(VecsHandle handle) noexcept -> std::tuple<Cs...>;		///< Return a tuple with copies of the components
+		auto pointers(VecsHandle handle) noexcept -> std::tuple<Cs*...>;	///< Return a tuple with pointers to the components
 
 		template<typename C>
 		requires is_component_type<C>

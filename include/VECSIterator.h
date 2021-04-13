@@ -17,7 +17,7 @@ namespace vecs {
 
 	template<typename... Ts>
 	requires (are_component_types<Ts...> || are_entity_types<Ts...>)
-		class VecsIterator {
+	class VecsIterator {
 
 		protected:
 			using entity_types = typename std::conditional_t<are_component_types<Ts...>
@@ -44,13 +44,22 @@ namespace vecs {
 		public:
 			using value_type = typename std::conditional_t < are_component_types<Ts...>
 									, std::tuple<VecsHandle, Ts...>		///< Tuple containing all component values
-									, std::tuple<VecsHandle>			///< Tuple containing all component values
-			> ;
+									, std::tuple<VecsHandle>			///< Tuple contains only handle
+			>;
 
-			using ref_type = typename std::conditional_t < are_component_types<Ts...>
+			using reference = typename std::conditional_t < are_component_types<Ts...>
 									, std::tuple<VecsHandle, Ts&...>	///< Tuple containing all component refs
-									, std::tuple<VecsHandle>			///< Tuple containing all component refs
-			> ;
+									, std::tuple<VecsHandle>			///< Tuple contains only handle
+			>;
+
+			using pointer = typename std::conditional_t < are_component_types<Ts...>
+									, std::tuple<VecsHandle, Ts*...>	///< Tuple containing all component ptr
+									, std::tuple<VecsHandle>			///< Tuple contains only handle
+			>;
+
+			using iterator_category = std::forward_iterator_tag;
+
+			using difference_type = size_t;
 
 			VecsIterator(bool is_end = false) noexcept;		///< Constructor that should be called always from outside
 			VecsIterator(const VecsIterator& v) noexcept;		///< Copy constructor
@@ -64,12 +73,14 @@ namespace vecs {
 			virtual auto handle() noexcept			-> VecsHandle;				///< Return handle of the current entity
 			virtual auto mutex() noexcept			-> std::atomic<uint32_t>*;	///< Return poiter to the mutex of this entity
 			virtual auto has_value() noexcept		-> bool;					///< Is currently pointint to a valid entity
-			virtual	auto operator*() noexcept		-> ref_type;				///< Access the data
+			virtual	auto operator*() noexcept		-> reference;				///< Access the data
 			virtual auto operator++() noexcept		-> VecsIterator<Ts...>&;	///< Increase by 1
 			virtual auto operator++(int) noexcept	-> VecsIterator<Ts...>&;	///< Increase by 1
 			virtual auto is_vector_end() noexcept	-> bool;					///< Is currently at the end of any sub iterator
 			virtual auto size() noexcept			-> size_t;					///< Number of valid entities
 	};
+
+
 
 
 	//----------------------------------------------------------------------------------------------
@@ -92,7 +103,7 @@ namespace vecs {
 		virtual auto handle() noexcept		-> VecsHandle = 0;
 		virtual auto mutex() noexcept		-> std::atomic<uint32_t>* = 0;
 		virtual auto has_value() noexcept	-> bool = 0;
-		virtual auto operator*() noexcept	-> typename VecsIterator<Cs...>::ref_type = 0;
+		virtual auto operator*() noexcept	-> typename VecsIterator<Cs...>::reference = 0;
 
 		auto operator++() noexcept			-> void;
 		auto operator++(int) noexcept		-> void;
@@ -179,7 +190,7 @@ namespace vecs {
 	*/
 	template<typename... Ts>
 	requires (are_component_types<Ts...> || are_entity_types<Ts...>)
-	inline auto VecsIterator<Ts...>::operator*() noexcept	-> ref_type {
+	inline auto VecsIterator<Ts...>::operator*() noexcept	-> reference {
 		return *(*m_dispatch[m_current_iterator]);
 	};
 
@@ -358,7 +369,7 @@ namespace vecs {
 		auto handle() noexcept			-> VecsHandle;
 		auto mutex() noexcept			-> std::atomic<uint32_t>*;
 		auto has_value() noexcept		-> bool;
-		auto operator*() noexcept		-> typename VecsIterator<Cs...>::ref_type;
+		auto operator*() noexcept		-> typename VecsIterator<Cs...>::reference;
 	};
 
 
@@ -405,7 +416,7 @@ namespace vecs {
 	* \returns all components Cs from the entity the iterator points to.
 	*/
 	template<typename E, typename... Cs>
-	inline auto VecsIteratorEntity<E, Cs...>::operator*() noexcept		-> typename VecsIterator<Cs...>::ref_type {
+	inline auto VecsIteratorEntity<E, Cs...>::operator*() noexcept		-> typename VecsIterator<Cs...>::reference {
 		return std::forward_as_tuple(VecsComponentTable<E>().handle(this->m_current_index), VecsComponentTable<E>().component<Cs>(this->m_current_index)...);
 	};
 
