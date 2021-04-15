@@ -27,8 +27,6 @@ namespace vecs {
 
 			using last_type = vtll::back<entity_types>;	///< last type for end iterator
 
-			//static_assert(are_component_types < Ts...>, "FF");
-
 			using ctype = typename std::conditional_t < are_component_types<Ts...>
 				, vtll::type_list< vtll::type_list<Ts>...>
 				, vtll::type_list<Ts...>
@@ -55,19 +53,16 @@ namespace vecs {
 			using value_type = typename std::conditional_t < are_component_types<Ts...>
 				, std::tuple<VecsHandle, Ts...>							///< Tuple containing all component values
 				, vtll::to_tuple< vtll::cat< vtll::type_list<VecsHandle>, component_types  >>      
-				//, std::tuple<VecsHandle>			///< Tuple contains only handle
 			>;
 
 			using reference = typename std::conditional_t < are_component_types<Ts...>
 				, std::tuple<VecsHandle, Ts&...>	///< Tuple containing all component refs
 				, vtll::to_tuple< vtll::cat< vtll::type_list<VecsHandle>, vtll::to_ref< component_types >>>     
-				//, std::tuple<VecsHandle>			///< Tuple contains only handle
 			>;
 
 			using pointer = typename std::conditional_t < are_component_types<Ts...>
 				, std::tuple<VecsHandle, Ts*...>	///< Tuple containing all component ptr
 				, vtll::to_tuple< vtll::cat< vtll::type_list<VecsHandle>, vtll::to_ptr<component_types> >>	
-				//, std::tuple<VecsHandle>			///< Tuple contains only handle
 			>;
 
 			using iterator_category = std::forward_iterator_tag;
@@ -382,10 +377,10 @@ namespace vecs {
 		using reference = VecsIterator<Ts...>::reference;
 
 		template<typename T>
-		struct f;
+		struct component_access;
 
 		template< template<typename...> typename Seq, typename... Cs >
-		struct f<Seq<Cs...>> {
+		struct component_access<Seq<Cs...>> {
 			reference operator()(index_t index) {
 				return std::forward_as_tuple(VecsComponentTable<E>().handle(index), VecsComponentTable<E>().component<Cs>(index)...);
 			}
@@ -442,16 +437,9 @@ namespace vecs {
 	* \brief Access operator retrieves all relevant components Ts from the entity it points to.
 	* \returns all components Ts from the entity the iterator points to.
 	*/
-
-
 	template<typename E, typename... Ts>
-	inline auto VecsIteratorEntity<E, Ts...>::operator*() noexcept		-> typename VecsIterator<Ts...>::reference {
-		if constexpr ( are_component_types<Ts...> ) {
-			return std::forward_as_tuple(VecsComponentTable<E>().handle(this->m_current_index), VecsComponentTable<E>().component<Ts>(this->m_current_index)...);
-		}
-		else {
-			return f<component_types>{}(this->m_current_index);
-		}
+	inline auto VecsIteratorEntity<E, Ts...>::operator*() noexcept	-> reference {
+		return component_access<component_types>{}(this->m_current_index);
 	};
 
 
@@ -530,7 +518,9 @@ namespace vecs {
 				m_dispatch[i] = std::make_unique<VecsIteratorEntity<type, Ts...>>(is_end);
 				auto size = m_dispatch[i]->size();
 				m_size += size;
-				if (size == 0 && i + 1 < vtll::size<entity_types>::value) m_current_iterator++;
+				if (!is_end && size == 0 && i + 1 < vtll::size<entity_types>::value) {
+					m_current_iterator++;
+				}
 			}
 		);
 	};
