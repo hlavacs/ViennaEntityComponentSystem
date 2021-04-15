@@ -273,6 +273,26 @@ namespace vtll {
 		"The implementation of cat is bad");
 
 	//-------------------------------------------------------------------------
+	//to_ref: turn list elements into references
+
+	namespace detail {
+		template <typename Seq>
+		struct to_ref_impl;
+
+		template <template <typename...> typename Seq, typename... Ts>
+		struct to_ref_impl<Seq<Ts...>> {
+			using type = Seq<Ts&...>;
+		};
+	}
+
+	template <typename Seq>
+	using to_ref = typename detail::to_ref_impl<Seq>::type;
+
+	static_assert(
+		std::is_same_v< to_ref< type_list<double, int> >, type_list<double&, int&> >,
+		"The implementation of to_ref is bad");
+
+	//-------------------------------------------------------------------------
 	//to_ptr: turn list elements into pointers
 
 	namespace detail {
@@ -931,6 +951,10 @@ namespace vtll {
 
 	template<typename Seq>
 	using remove_duplicates = typename detail::remove_duplicates_impl<Seq>::type;
+
+	static_assert(
+		std::is_same_v< remove_duplicates<type_list<char>>, type_list<char> >,
+		"The implementation of remove_duplicates is bad");
 
 	static_assert(
 		std::is_same_v< remove_duplicates<type_list<char, char>>, type_list<char> >,

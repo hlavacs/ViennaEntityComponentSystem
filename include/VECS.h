@@ -146,10 +146,13 @@ namespace vecs {
 	* 
 	* Used in for_each to iterate over entities and call the functor for each entity.
 	*/
-	template<typename... Cs>
-	requires are_component_types<Cs...>
-	using Functor = void(VecsHandle, Cs&...);
+	template<typename C>
+	struct Functor;
 
+	template<template<typename...> typename Seq, typename... Cs>
+	struct Functor<Seq<Cs...>> {
+		using type = void(VecsHandle, Cs&...);
+	};
 
 	//-------------------------------------------------------------------------
 	//entity handle
@@ -697,20 +700,20 @@ namespace vecs {
 		};
 
 		template<template<typename...> typename R, typename... Cs>
-		requires are_component_types<Cs...>
-		auto for_each(R<Cs...>&& r, std::function<Functor<Cs...>> f) -> void;
+		requires (std::is_same_v<R<Cs...>, VecsRange<Cs...>> && are_component_types<Cs...>)
+		auto for_each(R<Cs...>&& r, std::function<typename Functor<vtll::type_list<Cs...>>::type> f) -> void;
 
 		template<typename... Cs>
 		requires are_component_types<Cs...>
-		auto for_each(std::function<Functor<Cs...>> f) -> void { for_each(VecsRange<Cs...>{}, f); }
+		auto for_each(std::function<typename Functor<vtll::type_list<Cs...>>::type> f) -> void { for_each(VecsRange<Cs...>{}, f); }
 
 		template<template<typename...> typename R, typename... Es>
-		requires are_entity_types<Es...>
-		auto for_each(R<Es...>&& r, std::function<Functor<>> f) -> void;
+		requires (std::is_same_v<R<Es...>, VecsRange<Es...>> && are_entity_types<Es...>)
+		auto for_each( R<Es...>&& r, std::function<typename Functor<typename VecsIterator<Es...>::component_types>::type> f) -> void;
 
 		template<typename... Es>
 		requires are_entity_types<Es...>
-		auto for_each(std::function<Functor<>> f) -> void { for_each(VecsRange<Es...>{}, f); }
+		auto for_each(std::function<typename Functor<typename VecsIterator<Es...>::component_types>::type> f) -> void { for_each(VecsRange<Es...>{}, f); }
 
 		auto index(VecsHandle h) noexcept -> index_t;
 
@@ -1368,8 +1371,8 @@ namespace vecs {
 	* \param[in] f Functor to be called for every entity the iterator visits.
 	*/
 	template<template<typename...> typename R, typename... Cs>
-	requires are_component_types<Cs...>
-	inline auto VecsRegistryBaseClass::for_each( R<Cs...>&& range, std::function<Functor<Cs...>> f) -> void {
+	requires (std::is_same_v<R<Cs...>, VecsRange<Cs...>> && are_component_types<Cs...>)
+	inline auto VecsRegistryBaseClass::for_each( R<Cs...>&& range, std::function<typename Functor<vtll::type_list<Cs...>>::type> f) -> void {
 		auto b = range.begin();
 		auto e = range.end();
 		for (; b != e; ++b) {
@@ -1388,8 +1391,8 @@ namespace vecs {
 	* \param[in] f Functor to be called for every entity the iterator visits.
 	*/
 	template<template<typename...> typename R, typename... Es>
-	requires are_entity_types<Es...>
-	inline auto VecsRegistryBaseClass::for_each(R<Es...>&& range, std::function<Functor<>> f) -> void {
+	requires (std::is_same_v<R<Es...>, VecsRange<Es...>> && are_entity_types<Es...>)
+	inline auto VecsRegistryBaseClass::for_each(R<Es...>&& range, std::function<typename Functor<typename VecsIterator<Es...>::component_types>::type> f) -> void {
 		auto b = range.begin();
 		auto e = range.end();
 		for (; b != e; ++b) {

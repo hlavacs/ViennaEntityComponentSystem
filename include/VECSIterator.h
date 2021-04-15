@@ -19,7 +19,7 @@ namespace vecs {
 	requires (are_component_types<Ts...> || are_entity_types<Ts...>)
 		class VecsIterator {
 
-		protected:
+		public:
 			using entity_types = typename std::conditional_t<are_component_types<Ts...>
 				, vtll::filter_have_all_types< VecsEntityTypeList, vtll::type_list<Ts...> >
 				, vtll::type_list<Ts...>
@@ -27,6 +27,19 @@ namespace vecs {
 
 			using last_type = vtll::back<entity_types>;	///< last type for end iterator
 
+			//static_assert(are_component_types < Ts...>, "FF");
+
+			using ctype = typename std::conditional_t < are_component_types<Ts...>
+				, vtll::type_list< vtll::type_list<Ts>...>
+				, vtll::type_list<Ts...>
+			>;
+
+			using component_types = typename std::conditional_t< are_component_types<Ts...>
+				, vtll::type_list<Ts...>
+				, vtll::intersection< ctype > ///< this is evaluated even for both conditions!! So I need them in a type_list anyway
+			>;
+
+		protected:
 			using array_type = std::array<std::unique_ptr<VecsIteratorEntityBaseClass<Ts...>>, vtll::size<entity_types>::value>;
 
 			array_type m_dispatch;				///< Subiterators for each entity type E
@@ -40,18 +53,21 @@ namespace vecs {
 
 		public:
 			using value_type = typename std::conditional_t < are_component_types<Ts...>
-				, std::tuple<VecsHandle, Ts...>		///< Tuple containing all component values
-				, std::tuple<VecsHandle>			///< Tuple contains only handle
+				, std::tuple<VecsHandle, Ts...>							///< Tuple containing all component values
+				, vtll::to_tuple< vtll::cat< vtll::type_list<VecsHandle>, component_types  >>      
+				//, std::tuple<VecsHandle>			///< Tuple contains only handle
 			>;
 
 			using reference = typename std::conditional_t < are_component_types<Ts...>
 				, std::tuple<VecsHandle, Ts&...>	///< Tuple containing all component refs
-				, std::tuple<VecsHandle>			///< Tuple contains only handle
+				, vtll::to_tuple< vtll::cat< vtll::type_list<VecsHandle>, vtll::to_ref< component_types >>>     
+				//, std::tuple<VecsHandle>			///< Tuple contains only handle
 			>;
 
 			using pointer = typename std::conditional_t < are_component_types<Ts...>
 				, std::tuple<VecsHandle, Ts*...>	///< Tuple containing all component ptr
-				, std::tuple<VecsHandle>			///< Tuple contains only handle
+				, vtll::to_tuple< vtll::cat< vtll::type_list<VecsHandle>, vtll::to_ptr<component_types> >>	
+				//, std::tuple<VecsHandle>			///< Tuple contains only handle
 			>;
 
 			using iterator_category = std::forward_iterator_tag;
@@ -361,6 +377,20 @@ namespace vecs {
 	*/
 	template<typename E, typename... Ts>
 	class VecsIteratorEntity : public VecsIteratorEntityBaseClass<Ts...> {
+
+		using component_types = VecsIterator<Ts...>::component_types;
+		using reference = VecsIterator<Ts...>::reference;
+
+		template<typename T>
+		struct f;
+
+		template< template<typename...> typename Seq, typename... Cs >
+		struct f<Seq<Cs...>> {
+			reference operator()(index_t index) {
+				return std::forward_as_tuple(VecsComponentTable<E>().handle(index), VecsComponentTable<E>().component<Cs>(index)...);
+			}
+		};
+
 	public:
 		VecsIteratorEntity(bool is_end = false) noexcept;
 		auto handle() noexcept			-> VecsHandle;
@@ -412,13 +442,15 @@ namespace vecs {
 	* \brief Access operator retrieves all relevant components Ts from the entity it points to.
 	* \returns all components Ts from the entity the iterator points to.
 	*/
+
+
 	template<typename E, typename... Ts>
 	inline auto VecsIteratorEntity<E, Ts...>::operator*() noexcept		-> typename VecsIterator<Ts...>::reference {
 		if constexpr ( are_component_types<Ts...> ) {
 			return std::forward_as_tuple(VecsComponentTable<E>().handle(this->m_current_index), VecsComponentTable<E>().component<Ts>(this->m_current_index)...);
 		}
 		else {
-			return std::forward_as_tuple(VecsComponentTable<E>().handle(this->m_current_index));
+			return f<component_types>{}(this->m_current_index);
 		}
 	};
 
