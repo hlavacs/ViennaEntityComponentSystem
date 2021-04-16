@@ -229,6 +229,8 @@ If you just want to initialize the registry you can do it like this:
 Using *VecsRegistry* is not bound to a specific entity type, but commands evenmtually need this information. However, all calls are eventually passed on to *VecsRegistry<E>*, where *E* is an entity type. This is a specialized version of the registry made only for entity type *E*. It is recommended to always use this specialized version, if possible. For instance, if you want to create an entity of type *E*, you have at some point to specify the entity type. In the following, we define an *example* entity type *VeEntityTypeNode* like so:
 
     using VeEntityTypeNode = vtll::type_list< VeComponentName, VeComponentPosition, VeComponentOrientation >;
+    using VeEntityTypeDraw = vtll::type_list< VeComponentName, VeComponentPosition, VeComponentMaterial, VeComponentGeometry>;
+
 
 We assume that is has been registered as described in the previous section. Of course, any other similarly defined type can be used for the following examples as well. You can create an entity of type *VeEntityTypeNode* with any of these two methods:
 
@@ -241,7 +243,7 @@ The result of creating an entity is a *handle*. A handle is an 8-bytes structure
 
     handle.is_valid();
 
-If the handle is valid, then it IDs an entity in VECS. However, the entity might have been erased from VECS. You can test whether the entity that the handle represents is still in VECS by calculating either
+If the handle is valid, then it IDs an entity in VECS. However, the entity might have been erased from VECS previously. You can test whether the entity that the handle represents is still in VECS by calling either of these:
 
     handle.has_value();
     VecsRegistry{}.contains(handle); //any type
@@ -347,28 +349,80 @@ Iterators are generalized pointers, and are the main mechanism for looping over 
 
 The first form is a general iterator that can point to any entity and can be increased to jump ahead. The second one is an end-iterator, it is created by calling it with the boolean parameter *true*:
 
-    VecsIterator<VeComponentName> it;         //normal iterator
-    VecsIterator<VeComponentName> end(true);  //end iterator used as looping end point
+    VecsIterator<VeComponentName, VeUserComponentPosition> it;         //normal iterator
+    VecsIterator<VeComponentName, VeUserComponentPosition> end(true);  //end iterator used as looping end point
 
-Iterators have template parameters, which define their starting position and the entity categories they cover. If the template parameter is a list of component types, then the covered entities are all entity types that contain *all* specified component types. In the previous example, these are all entity types that contain the component *VeComponentName*. Since the components are given explicitly, accessing the value with * yields a *std::tuple* that starts with a handle, and as rest contains direct references to the components in VECS.
+Iterators have template parameters, which define their starting position and the entity categories they cover. If the template parameter is a list of component types, then the covered entities are all entity types that contain *all* specified component types. In the previous example, these are all entity types that contain the components *VeComponentName* and *VeUserComponentPosition*. Since the components are given explicitly, accessing the value with * yields a *std::tuple* that starts with a handle, and as rest contains direct references to the components in VECS.
 
-    auto [handle, name] = *it; //name is a reference to the component in VECS
+    auto [handle, name, pos] = *it; //name and pos are references to the components in VECS
 
-If on the other hand the template parameters are entity types, then these are the entity types the iterator covers, accessing an entity with the * operator yields only the handle of the current entity the iterator points to:
+If on the other hand the template parameters are entity types, then these are the entity types the iterator covers, accessing an entity with the * operator yields the components that are found in *both* entities.
 
-    auto [handle] = 
+    VecsIterator<VeEntityTypeNode, VeEntityTypeDraw> it2;   //normal iterator
+    auto [handle, name, pos] = *it2;                        //name and pos are references to the components
 
-### Range Based For loop
+In this example, *it2* of course points to only one entity, but it can be of either type *VeEntityTypeNode* or *VeEntityTypeDraw*. Components *VeComponentName* and *VeComponentPosition* are found in both types, thus references to them are returned by the iterator. Iterators can exclusively either use lists of components or entities, but mixing is not allowed and results in a compilation error.
+
+Starting with a begin entity, a *VecsIterator* can be increased to point to the next entity in the component table, by calling the operator ++, either as pre-increment (preferred!) or post-increment (expensive, results in a copy!) Furthermore, you can add a positive integer number to skip ahead more than one entity. Finally, you can compare two iterators for equality or inequality. Combining these operators, you can already implement a simple loop over a set of entities:
+
+    VecsIterator<VeComponentName, VeUserComponentPosition> b;        //normal iterator
+    VecsIterator<VeComponentName, VeUserComponentPosition> e(true);  //end iterator used as looping end point
+    for (; b != e; ++b) {
+        if (!b.has_value()) continue;   ///< Could be an invalidated entity, so test for it!
+        auto [handle, name, pos] = *b;
+        //...
+    }
+
+Note that this way of looping does not synchronize accesses in case or multithreaded operations. By changing to
+
+    VecsIterator<VeComponentName, VeUserComponentPosition> b;        //normal iterator
+    VecsIterator<VeComponentName, VeUserComponentPosition> e(true);  //end iterator used as looping end point
+    for (; b != e; ++b) {
+        VecsWriteLock lock( b.mutex() );	///< Write lock
+			  if (!b.has_value()) continue;     ///< Could be an invalidated entity, so test for it!
+        auto [handle, name, pos] = *b;
+        //...
+    }
+
+you add synchronization and can safely read and write. If you only read, then you can change the lock to a read lock (see below for more on parallel operations). Also you should always check whether the entity does hold a value, since entities that are erased are not automatically removed from VECS, only after calling *compress()*!
+
+A *VecsRange* is now a combination of two iterators, one points to a starting entity, one points to an end position. The end position can be an end iterator, or any entity following the starting entity, which is no more included into the range.
+
+    VecsRange<VeEntityTypeNode, VeEntityTypeDraw> range_entities;
+    VecsRange<VeComponentName, VeComponentPosition> range_components;
+
+    VecsIterator<VeEntityTypeNode, VeEntityTypeDraw> b = range_entities.begin();  ///< Get begin iterator
+    VecsIterator<VeEntityTypeNode, VeEntityTypeDraw> e = range_entities.end();    ///< Get end iterator
+
+Again, ranges can use exclusively either lists of components or entities, but not both. For parallelization a range can be split into *N* non-overlapping subranges, yielding a *std::pmr::vector* holding the subranges:
+
+    std::pmr::vector<VecsRange<VeEntityTypeNode, VeEntityTypeDraw>> subranges = range_entities.split(16);
 
 
+### Looping
 
-### for_each
+The sole purpose of an ECS is to quickly loop over a subset of entities in a cache-optimal way. VECS allows for various modes of looping. An example for a simple manual loop has been already described in the previous section. Another way is to use *VecsRange* in a *range based for loop*:
 
+    for (auto&& [handle, name, pos, orient] : VecsRange<VeEntityTypeNode, VeEntityTypeDraw>{}) {
+        VecsWriteLock lock(handle.mutex()); ///< Write lock
+        if (!handle.has_value()) continue;  ///< Could be an invalidated entity, so test for it!
 
+        //....
+    }
 
+This is just a nicer way of writing a loop, and is essentially the same as in the previous example. As can be seen the range based loop does not provide synchronization, and thus you can decide yourself whether to lock the entity or not. However you should always check whether the entity is still in VECS by calling *has_value()*! As range you can specify any range, also a subrange that was derived by calling *split()*.
 
-## Performance
+Finally, the safest way for looping is to use the *for_each* member function of *VecsRegistry*:
 
+    VecsRegistry{}.for_each( VecsRange<VeEntityTypeNode, VeEntityTypeDraw>{}, [&](auto handle, auto& name) {
+        //...
+    });
+
+    VecsRegistry{}.for_each<VeComponentName, VeComponentPosition>([&](auto handle, auto& name) {
+        //...
+    });
+
+Both loop over all entities that have the components *VeComponentName* and *VeComponentPosition* and internally does all the synchronization and checking for you. In the first version you can provide any range or subrange, the second version loops over all suitable entities.
 
 
 ## Parallel Operations

@@ -701,24 +701,24 @@ namespace vecs {
 
 		template<template<typename...> typename R, typename... Cs>
 		requires (std::is_same_v<R<Cs...>, VecsRange<Cs...>> && are_component_types<Cs...>)
-		auto for_each(R<Cs...>&& r, std::function<typename Functor<vtll::type_list<Cs...>>::type> f) -> void;
+		auto for_each(R<Cs...>&& r, std::function<typename Functor<vtll::type_list<Cs...>>::type> f) -> void;	///< Loop over components
 
 		template<typename... Cs>
 		requires are_component_types<Cs...>
-		auto for_each(std::function<typename Functor<vtll::type_list<Cs...>>::type> f) -> void { for_each(VecsRange<Cs...>{}, f); }
+		auto for_each(std::function<typename Functor<vtll::type_list<Cs...>>::type> f) -> void { for_each(VecsRange<Cs...>{}, f); }	///< Loop over components
 
 		template<template<typename...> typename R, typename... Es>
 		requires (std::is_same_v<R<Es...>, VecsRange<Es...>> && are_entity_types<Es...>)
-		auto for_each( R<Es...>&& r, std::function<typename Functor<typename VecsIterator<Es...>::component_types>::type> f) -> void;
+		auto for_each( R<Es...>&& r, std::function<typename Functor<typename VecsIterator<Es...>::component_types>::type> f) -> void;	///< Loop over entities
 
 		template<typename... Es>
 		requires are_entity_types<Es...>
-		auto for_each(std::function<typename Functor<typename VecsIterator<Es...>::component_types>::type> f) -> void { for_each(VecsRange<Es...>{}, f); }
+		auto for_each(std::function<typename Functor<typename VecsIterator<Es...>::component_types>::type> f) -> void { for_each(VecsRange<Es...>{}, f); }	///< Loop over entities
 
 		auto index(VecsHandle h) noexcept -> index_t;
 
 		virtual
-		auto swap( VecsHandle h1, VecsHandle h2 ) noexcept -> bool;
+		auto swap( VecsHandle h1, VecsHandle h2 ) noexcept -> bool;		///< Swap places of two entities in the component table
 
 		virtual
 		auto contains(VecsHandle handle) noexcept	-> bool;	///< \returns true if the ECS still holds this entity (externally synced)
@@ -922,10 +922,6 @@ namespace vecs {
 
 		//-------------------------------------------------------------------------
 		//utility
-
-		auto begin() -> VecsIterator<Cs...> { return VecsIterator<Cs...>{false}; } 
-
-		auto end() -> VecsIterator<Cs...> { return VecsIterator<Cs...>{true}; }
 
 		auto size() noexcept								-> size_t {		///< \returns the number of valid entities of type E
 			return VecsRegistry<E<Cs...>>::m_sizeE.load();

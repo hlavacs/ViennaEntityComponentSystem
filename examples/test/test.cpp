@@ -48,11 +48,11 @@ int main() {
 			h1_2.has_value() && VecsRegistry().size() == 2, );
 
 		TESTRESULT(++number, "insert<type>",
-			auto h2 = VecsRegistry<VeEntityTypeDraw>{}.insert(VeComponentName{ "Draw" }, pos, orient, trans, mat, geo),
+			auto h2 = VecsRegistry<VeEntityTypeDraw>{}.insert(VeComponentName{ "Draw" }, pos, orient, mat, geo),
 			h2.has_value() && VecsRegistry().size() == 3, );
 
 		TESTRESULT(++number, "insert<type>",
-			auto h3 = VecsRegistry<VeEntityTypeDraw>{}.insert(VeComponentName{ "Draw" }, pos, orient, trans, mat, geo),
+			auto h3 = VecsRegistry<VeEntityTypeDraw>{}.insert(VeComponentName{ "Draw" }, pos, orient, mat, geo),
 			h3.has_value() && VecsRegistry().size() == 4, );
 
 		//--------------------------------------------------------------------------------------------------------------------------
@@ -140,13 +140,13 @@ int main() {
 
 		for (int i = 0; i < num; i++) {
 			auto h1 = VecsRegistry<VeEntityTypeNode>{}.insert(VeComponentName{ "Node" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentTransform{});
-			auto h2 = VecsRegistry<VeEntityTypeDraw>{}.insert(VeComponentName{ "Draw" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentTransform{}, VeComponentMaterial{ 1 }, VeComponentGeometry{ 1 });
+			auto h2 = VecsRegistry<VeEntityTypeDraw>{}.insert(VeComponentName{ "Draw" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentMaterial{ 1 }, VeComponentGeometry{ 1 });
 		}
 		TESTRESULT(++number, "system create", , (VecsRegistry().size() == 2 * num), );
 
 		int i = 0;
 		bool test = true;
-		for (auto&& [handle, name, pos, orient, trans] : VecsRegistry<VeEntityTypeNode>{}) {
+		for (auto&& [handle, name, pos, orient, trans] : VecsRange<VeEntityTypeNode>{}) {
 			VecsReadLock lock(handle.mutex());
 			if (!handle.has_value()) continue;
 			++i;
@@ -255,7 +255,7 @@ int main() {
 				auto h1 = VecsRegistry<VeEntityTypeNode>{}.insert(VeComponentName{ "Node" }, pos, orient, trans);
 				test = test && VecsRegistry<VeEntityTypeNode>{}.size() == i + 1;
 
-				auto h2 = VecsRegistry<VeEntityTypeDraw>{}.insert(VeComponentName{ "Draw" }, pos, orient, trans, VeComponentMaterial{ 1 }, VeComponentGeometry{ 1 });
+				auto h2 = VecsRegistry<VeEntityTypeDraw>{}.insert(VeComponentName{ "Draw" }, pos, orient, VeComponentMaterial{ 1 }, VeComponentGeometry{ 1 });
 				test = test && VecsRegistry<VeEntityTypeDraw>{}.size() == i + 1;
 			}
 			VecsRegistry{}.clear();
@@ -271,7 +271,7 @@ int main() {
 	{
 		int i = 0;
 		bool test = true;
-		VecsRegistry().for_each<VeEntityTypeNode, VeEntityTypeDraw>( [&](auto handle, auto name, auto pos, auto orient, auto trans) {
+		VecsRegistry().for_each<VeEntityTypeNode, VeEntityTypeDraw>( [&](auto handle, auto name, auto pos, auto orient) {
 			++i;
 			if (name.m_name != ("Name Holder 4 " + std::to_string(i))) { test = false; }
 			//std::cout << "Entity " << name.m_name << " " << i << "\n";
