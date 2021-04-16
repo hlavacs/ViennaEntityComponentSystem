@@ -38,17 +38,20 @@ void work( size_t num ) {
 
 
 template<template<typename...> typename R, typename... Cs>
-void linear(R<Cs...> range, size_t num ) {
+void do_work(R<Cs...> range ) {
 	size_t i = 0;
-	auto b = range.begin();
-	auto e = range.end();
-	while ( b != e ) {
-		auto&& [handle, pos] = *b;
+
+	for (auto [handle, pos] : range) {
 		if (!handle.is_valid()) continue;
 		pos.m_position = glm::vec3{ 7.0f + i, 8.0f + i, 9.0f + i };
-		++b;
 		++i;
 	}
+
+	/*VecsRegistry{}.for_each( std::move(range), [&](auto handle, auto& pos) {
+		pos.m_position = glm::vec3{ 7.0f + i, 8.0f + i, 9.0f + i };
+		++i;
+	});*/
+
 }
 
 
@@ -88,13 +91,14 @@ vgjs::Coro<> start( size_t num ) {
 
 	auto ranges = VecsRange<VeComponentPosition>{}.split(thr);
 	for (int i = 0; i < ranges.size(); ++i) {
-		vec.push_back(vgjs::Function([=]() { linear( ranges[i], 2 * num / thr); }, vgjs::thread_index_t{}, vgjs::thread_type_t{ 1 }, vgjs::thread_id_t{ i }));
+		vec.push_back(vgjs::Function([=]() { do_work( ranges[i]); }, vgjs::thread_index_t{}, vgjs::thread_type_t{ 1 }, vgjs::thread_id_t{ i }));
 	}
 
 	auto lin =
 		vgjs::Function([&]() {
-				linear(VecsRange<VeComponentPosition>{}, 2 * num);
-			}, vgjs::thread_index_t{}, vgjs::thread_type_t{1}, vgjs::thread_id_t{100});
+				do_work(VecsRange<VeComponentPosition>{});
+			}
+			, vgjs::thread_index_t{}, vgjs::thread_type_t{1}, vgjs::thread_id_t{100});
 
 	auto t0 = high_resolution_clock::now();
 
@@ -151,7 +155,7 @@ void func1(size_t num) {
 void func2(size_t num) {
 	auto lin =
 		vgjs::Function([&]() {
-		linear(VecsRange<VeComponentPosition>{}, 2 * num);
+		do_work(VecsRange<VeComponentPosition>{});
 			}, vgjs::thread_index_t{}, vgjs::thread_type_t{ 1 }, vgjs::thread_id_t{ 100 });
 
 	t0 = high_resolution_clock::now();
@@ -172,7 +176,7 @@ void func3(size_t num) {
 
 	auto ranges = VecsRange<VeComponentPosition>{}.split(thr);
 	for (int i = 0; i < ranges.size(); ++i) {
-		vec.push_back(vgjs::Function([=]() { linear(ranges[i], 2 * num / thr); }, vgjs::thread_index_t{}, vgjs::thread_type_t{ 1 }, vgjs::thread_id_t{ i }));
+		vec.push_back(vgjs::Function([=]() { do_work(ranges[i]); }, vgjs::thread_index_t{}, vgjs::thread_type_t{ 1 }, vgjs::thread_id_t{ i }));
 	}
 
 	t2 = high_resolution_clock::now();

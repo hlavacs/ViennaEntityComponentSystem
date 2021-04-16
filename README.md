@@ -492,15 +492,31 @@ The following list shows the calls that are internally or externally synchronize
 
 Note that *VecsRegistry<E>{}.pointer(...)* is actually externally synchronized. That means before calling this function with multiple threads you should first create a read or write lock, and keep it until you no longer need the tuple.
 
-An example for looping over entities in parallel on several threads is given in example program parallel.cpp. For parallelization, the example uses the Vienna Game Job System (VGJS), a sibling project of VECS. VGJS is a header-only C++20 library enabling using function pointers, std::function, lambdas, or coroutines to be run in the job system.
+An example for looping over entities in parallel on several threads is given in example program parallel.cpp. For parallelization, the example uses the Vienna Game Job System (VGJS, https://github.com/hlavacs/ViennaGameJobSystem), a sibling project of VECS. VGJS is a header-only C++20 library enabling using function pointers, std::function, lambdas, or coroutines to be run in the job system.
+
+    template<template<typename...> typename R, typename... Cs>
+    void do_work(R<Cs...> range) {
+        size_t i = 0;
+
+        for (auto [handle, pos] : range) {
+            if (!handle.is_valid()) continue;
+            pos.m_position = glm::vec3{ 7.0f + i, 8.0f + i, 9.0f + i };
+            ++i;
+        }
+
+    	  /*VecsRegistry{}.for_each( std::move(range), [&](auto handle, auto& pos) {
+    		    pos.m_position = glm::vec3{ 7.0f + i, 8.0f + i, 9.0f + i };
+    		    ++i;
+    	  });*/
+    }
 
     auto ranges = VecsRange<VeComponentPosition>{}.split(16); // split set of entities holding VeComponentPosition into 12 subranges
 
-    std::pmr::vector<vgjs::Function> vec;
+    std::pmr::vector<vgjs::Function> vec; //store functions that should be run in parallel
 
     for (int i = 0; i < ranges.size(); ++i) { //create an vector of functions, one function for each subrange
         vec.push_back(
-            vgjs::Function([=]() { linear( ranges[i], 2 * num / thr); } //Function class can store meta information
+            vgjs::Function([=]() { do_work( ranges[i] ); } //Function class can store meta information
             , vgjs::thread_index_t{}    //use any thread that is available
             , vgjs::thread_type_t{ 1 }  //log with type 1
             , vgjs::thread_id_t{ i })); //log with ID i
@@ -509,3 +525,6 @@ An example for looping over entities in parallel on several threads is given in 
     co_await vec;   //run the functions in parallel and wait for completion
 
     //...
+
+Note that since the ranges do not overlap, there is actually no need for synchronization of no other thread accesses the entities. Thus there is no lock in the range based for loop.
+If there are other threads accessing the entities, then you can either introduce locks, or switch to the *for_each* version. Not that this version will take longer time on average, due to locking every entity before accessing it.
