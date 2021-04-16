@@ -422,12 +422,132 @@ Finally, the safest way for looping is to use the *for_each* member function of 
         //...
     });
 
-Both loop over all entities that have the components *VeComponentName* and *VeComponentPosition* and internally does all the synchronization and checking for you. In the first version you can provide any range or subrange, the second version loops over all suitable entities.
+Both loop over all entities that have the components *VeComponentName* and *VeComponentPosition* and internally do all the synchronization and checking for you. In the first version you can provide any range or subrange, the second version loops over all suitable entities.
 
 
-## Parallel Operations
+## Parallel Operations and Performance
+
+In principle, VECS allows parallel operations if certain principles are upheld. First, only member functions of the class VecsRegistry\<\> or VecsRegistry\<E\> are internally synchronized. These synchronizations use *VecsWriteLock* or *VecsReadLock* on a per entity basis, and synchronization lasts only for the duration of the call. Such locks need the address a *std::atomic\<uint32_t\>*  (a VECS mutex) as input parameter, and every entity has its own such VECS mutex. You can get the VECS mutex of an entity by calling *mutex()* on a *handle* or an *iterator*. The call always returns a valid mutex, even if the entity has been erased and is no longer valid.
+
+The following list shows the calls that are internally or externally synchronized in class *VecsRegistry\<\>*:
+
+    class VecsRegistryBaseClass : public VecsMonostate<VecsRegistryBaseClass> {
+
+    ...
+
+    public:
+      VecsRegistryBaseClass( size_t r = VecsTableMaxSize::value ) noexcept;
+
+      template<typename E, typename... Cs>
+      requires is_composed_of<E, Cs...> [[nodiscard]]
+      auto insert(Cs&&... args) noexcept	-> VecsHandle;	///< Insert a new entity into the ECS (internally synchronized)
+
+      template<typename C>
+      requires is_component_type<C>
+      auto has_component(VecsHandle handle) noexcept	-> bool;	///< \returns true if the entity of type E has a component of type C (internally synchronized)
+
+      template<typename C>
+      requires is_component_type<C>
+      auto component(VecsHandle handle) noexcept -> C;			///< Get a component of type C (internally synchronized)
+
+      template<typename ET>
+      requires is_tuple<ET>
+      auto update(VecsHandle handle, ET&& ent) noexcept -> bool;		///< Update a whole entity with a tuple (internally synchronized)
+
+      template<typename C>
+      requires is_component_type<C>
+      auto update(VecsHandle handle, C&& comp) noexcept -> bool;		///< Update component of type C of an entity (internally synchronized)
+
+      virtual auto erase(VecsHandle handle) noexcept -> bool;		///< Erase a specific entity (internally synchronized)
+      auto clear() noexcept -> size_t;					///< Clear the whole ECS (internally synchronized)
+      auto compress() noexcept -> void;				  ///< Compress all component tables (externally synchronized)
+
+      template<template<typename...> typename R, typename... Cs>
+      requires (std::is_same_v<R<Cs...>, VecsRange<Cs...>> && are_component_types<Cs...>)
+      auto for_each(R<Cs...>&& r, std::function<typename Functor<vtll::type_list<Cs...>>::type> f) -> void;	///< Loop over components (internally synchronized)
+
+      template<typename... Cs>
+      requires are_component_types<Cs...>
+      auto for_each(std::function<typename Functor<vtll::type_list<Cs...>>::type> f) -> void { for_each(VecsRange<Cs...>{}, f); }		///< Loop over components (internally synchronized)
+
+      template<template<typename...> typename R, typename... Es>
+      requires (std::is_same_v<R<Es...>, VecsRange<Es...>> && are_entity_types<Es...>)
+      auto for_each( R<Es...>&& r, std::function<typename Functor<typename VecsIterator<Es...>::component_types>::type> f) -> void;	///< Loop over entities (internally synchronized)
+
+      template<typename... Es>
+      requires are_entity_types<Es...>
+      auto for_each(std::function<typename Functor<typename VecsIterator<Es...>::component_types>::type> f) -> void { for_each(VecsRange<Es...>{}, f); }	///< Loop over entities (internally synchronized)
+
+      auto index(VecsHandle h) noexcept -> index_t;				///< \returns row index in component table (internally synchronized)
+      virtual auto size() noexcept -> size_t { return m_size.load(); };	///< \returns the total number of valid entities (internally synchronized)
+      virtual auto swap( VecsHandle h1, VecsHandle h2 ) noexcept -> bool;	///< Swap places of two entities in the component table (internally synchronized)
+      virtual auto contains(VecsHandle handle) noexcept	-> bool;		///< \returns true if the ECS still holds this entity  (externally synchronized)
+    };
 
 
+The following list shows the calls that are internally or externally synchronized in class *VecsRegistry\<E\>*:
+
+    template<template<typename...> typename E, typename... Cs>
+    class VecsRegistry<E<Cs...>> : public VecsRegistryBaseClass {
+
+      ...
+
+      auto updateC(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept	-> bool; ///< dispatch from base class (internally synchronized)
+      auto componentE(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept	-> bool; ///< dispatch from base class (internally synchronized)
+      auto has_componentE(VecsHandle handle, size_t compidx) noexcept						-> bool; ///< dispatch from base class (internally synchronized)
+      auto compressE() noexcept	-> void { return VecsComponentTable<E<Cs...>>().compress(); };	 ///< Forward to component table of type E (externally synchronized)
+
+      auto clearE() noexcept		-> size_t { 			///< Forward to component table of type E
+        return VecsComponentTable<E<Cs...>>().clear();	///< Call clear() in the correct component table
+      };
+
+    public:
+      VecsRegistry(size_t r = 1 << c_max_size) noexcept : VecsRegistryBaseClass() { 	///< Constructor of class VecsRegistry<E>
+        VecsComponentTable<E<Cs...>>{r};
+      };
+      VecsRegistry(std::nullopt_t u) noexcept : VecsRegistryBaseClass() { 			///< Constructor of class VecsRegistry<E>
+        m_sizeE = 0;
+      };
+
+      template<typename... CCs>
+      requires is_composed_of<E<Cs...>, CCs...> [[nodiscard]]
+      auto insert(CCs&&... args) noexcept			-> VecsHandle;			///< Insert new entity of type E into VECS (internally synchronized)
+
+      auto values(VecsHandle handle) noexcept		-> std::tuple<Cs...>;	///< Return a tuple with copies of the components (internally synchronized)
+
+      auto pointers(VecsHandle handle) noexcept	-> std::tuple<Cs*...>;	///< Return a tuple with pointers to the components (externally synchronized)
+
+      template<typename C>
+      requires is_component_type<C>
+      auto has_component() noexcept				-> bool {	///< Return true if the entity type has a component C (internally synchronized)
+        return is_component_of<E<Cs...>,C>;
+      }
+
+      template<size_t I, typename C = vtll::Nth_type<E<Cs...>, I>>
+      requires is_component_of<E<Cs...>, C>
+      auto component(VecsHandle handle) noexcept	-> C;		///< Get copy of a component given index of component (internally synchronized)
+
+      template<typename C>
+      requires is_component_of<E<Cs...>, C>
+      auto component(VecsHandle handle) noexcept	-> C;		///< Get copy of a component given type of component (internally synchronized)
+
+      template<typename ET>
+      requires is_tuple<ET, E<Cs...>>
+      auto update(VecsHandle handle, ET&& ent) noexcept	-> bool;		///< Update a whole entity with the given tuple (internally synchronized)
+
+      template<typename C>
+      requires is_component_of<E<Cs...>, C>
+      auto update(VecsHandle handle, C&& comp) noexcept	-> bool;		///< Update one component of an entity (internally synchronized)
+
+      auto erase(VecsHandle handle) noexcept				-> bool;		///< Erase an entity from VECS (internally synchronized)
+      auto clear() noexcept -> size_t { return clearE(); };				///< Clear entities of type E (externally synchronized)
+      auto compress() noexcept -> void { compressE(); }					///< Remove erased rows from the component table (externally synchronized)
+      auto size() noexcept -> size_t { return m_sizeE.load(); };			///< \returns the number of valid entities of type E (internally synchronized)
+      auto swap(VecsHandle h1, VecsHandle h2) noexcept	-> bool;		///< Swap rows in component table (internally synchronized)
+      auto contains(VecsHandle handle) noexcept			-> bool;		///< Test if an entity is still in VECS (externally synchronized)
+    };
+
+Note that *VecsRegistry<E>{}.pointer(...)* is actually externally synchronized. That means before calling this function with multiple threads you should first create a read or write lock, and keep it until you no longer need the tuple.
 
 ## Examples
 
