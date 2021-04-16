@@ -339,11 +339,10 @@ The result is a *std::tuple* that contains pointers to the components of the ent
 
   auto pos = std::get<VeComponentPosition*>(tuple_ptr)->m_position; //use * since it is a pointer!
 
-## Looping
+
+## Iterators, Ranges and Loops
 
 The basic use case of any ECS is to loop over all or some of the entities. VECS allows this in various ways. The basic mechanism is given by iterators and ranges. These can then be used to compose loops.
-
-### Iterators and Ranges
 
 Iterators are generalized pointers, and are the main mechanism for looping over entities in VECS. Iterators are implemented in class *VecsIterator* and come in two basic forms, and can be used for two basic use cases.
 
@@ -399,8 +398,6 @@ Again, ranges can use exclusively either lists of components or entities, but no
     std::pmr::vector<VecsRange<VeEntityTypeNode, VeEntityTypeDraw>> subranges = range_entities.split(16);
 
 
-### Looping
-
 The sole purpose of an ECS is to quickly loop over a subset of entities in a cache-optimal way. VECS allows for various modes of looping. An example for a simple manual loop has been already described in the previous section. Another way is to use *VecsRange* in a *range based for loop*:
 
     for (auto&& [handle, name, pos, orient] : VecsRange<VeEntityTypeNode, VeEntityTypeDraw>{}) {
@@ -427,63 +424,9 @@ Both loop over all entities that have the components *VeComponentName* and *VeCo
 
 ## Parallel Operations and Performance
 
-In principle, VECS allows parallel operations if certain principles are upheld. First, only member functions of the class VecsRegistry\<\> or VecsRegistry\<E\> are internally synchronized. These synchronizations use *VecsWriteLock* or *VecsReadLock* on a per entity basis, and synchronization lasts only for the duration of the call. Such locks need the address a *std::atomic\<uint32_t\>*  (a VECS mutex) as input parameter, and every entity has its own such VECS mutex. You can get the VECS mutex of an entity by calling *mutex()* on a *handle* or an *iterator*. The call always returns a valid mutex, even if the entity has been erased and is no longer valid.
+In principle, VECS allows parallel operations if certain principles are upheld. First, only member functions of the class *VecsRegistry\<E\>* are actually internally synchronized. These synchronizations use *VecsWriteLock* or *VecsReadLock* on a per entity basis, and synchronization lasts only for the duration of the call. Such locks need the address a *std::atomic\<uint32_t\>*  (a VECS mutex) as input parameter, and every entity has its own such VECS mutex. You can get the VECS mutex of an entity by calling *mutex()* on a *handle* or an *iterator*. The call always returns a valid mutex, even if the entity has been erased and is no longer valid.
 
-The following list shows the calls that are internally or externally synchronized in class *VecsRegistry\<\>*:
-
-    class VecsRegistryBaseClass : public VecsMonostate<VecsRegistryBaseClass> {
-
-    ...
-
-    public:
-      VecsRegistryBaseClass( size_t r = VecsTableMaxSize::value ) noexcept;
-
-      template<typename E, typename... Cs>
-      requires is_composed_of<E, Cs...> [[nodiscard]]
-      auto insert(Cs&&... args) noexcept	-> VecsHandle;	///< Insert a new entity into the ECS (internally synchronized)
-
-      template<typename C>
-      requires is_component_type<C>
-      auto has_component(VecsHandle handle) noexcept	-> bool;	///< \returns true if the entity of type E has a component of type C (internally synchronized)
-
-      template<typename C>
-      requires is_component_type<C>
-      auto component(VecsHandle handle) noexcept -> C;			///< Get a component of type C (internally synchronized)
-
-      template<typename ET>
-      requires is_tuple<ET>
-      auto update(VecsHandle handle, ET&& ent) noexcept -> bool;		///< Update a whole entity with a tuple (internally synchronized)
-
-      template<typename C>
-      requires is_component_type<C>
-      auto update(VecsHandle handle, C&& comp) noexcept -> bool;		///< Update component of type C of an entity (internally synchronized)
-
-      virtual auto erase(VecsHandle handle) noexcept -> bool;		///< Erase a specific entity (internally synchronized)
-      auto clear() noexcept -> size_t;					///< Clear the whole ECS (internally synchronized)
-      auto compress() noexcept -> void;				  ///< Compress all component tables (externally synchronized)
-
-      template<template<typename...> typename R, typename... Cs>
-      requires (std::is_same_v<R<Cs...>, VecsRange<Cs...>> && are_component_types<Cs...>)
-      auto for_each(R<Cs...>&& r, std::function<typename Functor<vtll::type_list<Cs...>>::type> f) -> void;	///< Loop over components (internally synchronized)
-
-      template<typename... Cs>
-      requires are_component_types<Cs...>
-      auto for_each(std::function<typename Functor<vtll::type_list<Cs...>>::type> f) -> void { for_each(VecsRange<Cs...>{}, f); }		///< Loop over components (internally synchronized)
-
-      template<template<typename...> typename R, typename... Es>
-      requires (std::is_same_v<R<Es...>, VecsRange<Es...>> && are_entity_types<Es...>)
-      auto for_each( R<Es...>&& r, std::function<typename Functor<typename VecsIterator<Es...>::component_types>::type> f) -> void;	///< Loop over entities (internally synchronized)
-
-      template<typename... Es>
-      requires are_entity_types<Es...>
-      auto for_each(std::function<typename Functor<typename VecsIterator<Es...>::component_types>::type> f) -> void { for_each(VecsRange<Es...>{}, f); }	///< Loop over entities (internally synchronized)
-
-      auto index(VecsHandle h) noexcept -> index_t;				///< \returns row index in component table (internally synchronized)
-      virtual auto size() noexcept -> size_t { return m_size.load(); };	///< \returns the total number of valid entities (internally synchronized)
-      virtual auto swap( VecsHandle h1, VecsHandle h2 ) noexcept -> bool;	///< Swap places of two entities in the component table (internally synchronized)
-      virtual auto contains(VecsHandle handle) noexcept	-> bool;		///< \returns true if the ECS still holds this entity  (externally synchronized)
-    };
-
+Note that calls to *VecsRegistry\<\>* and *VecsHandle* are eventually forwarded to their counterparts in class *VecsRegistry\<E\>* with the same name. Thus, these member functions are also implicitly internally synchronized.
 
 The following list shows the calls that are internally or externally synchronized in class *VecsRegistry\<E\>*:
 
@@ -549,9 +492,20 @@ The following list shows the calls that are internally or externally synchronize
 
 Note that *VecsRegistry<E>{}.pointer(...)* is actually externally synchronized. That means before calling this function with multiple threads you should first create a read or write lock, and keep it until you no longer need the tuple.
 
-## Examples
+An example for looping over entities in parallel on several threads is given in example program parallel.cpp. For parallelization, the example uses the Vienna Game Job System (VGJS), a sibling project of VECS. VGJS is a header-only C++20 library enabling using function pointers, std::function, lambdas, or coroutines to be run in the job system.
 
+    auto ranges = VecsRange<VeComponentPosition>{}.split(16); // split set of entities holding VeComponentPosition into 12 subranges
 
+    std::pmr::vector<vgjs::Function> vec;
 
+    for (int i = 0; i < ranges.size(); ++i) { //create an vector of functions, one function for each subrange
+        vec.push_back(
+            vgjs::Function([=]() { linear( ranges[i], 2 * num / thr); } //Function class can store meta information
+            , vgjs::thread_index_t{}    //use any thread that is available
+            , vgjs::thread_type_t{ 1 }  //log with type 1
+            , vgjs::thread_id_t{ i })); //log with ID i
+    }
 
-## Implementation Details
+    co_await vec;   //run the functions in parallel and wait for completion
+
+    //...

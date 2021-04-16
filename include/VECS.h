@@ -188,32 +188,32 @@ namespace vecs {
 
 		/** \returns the type index of the handle. */
 		auto type() const noexcept	-> uint32_t { return static_cast<uint32_t>(m_type_index); };
-		inline auto is_valid() noexcept	-> bool;	///< The data in the handle is non null
-		auto has_value() noexcept		-> bool;	///< The entity that is pointed to exists in the ECS
+		inline auto is_valid() noexcept	-> bool;	///< The data in the handle is non null (internally synchronized)
+		auto has_value() noexcept		-> bool;	///< The entity that is pointed to exists in the ECS (externally synchronized)
 
 		template<typename C>
 		requires is_component_type<C>
-		auto has_component() noexcept	-> bool;	///< Return true if the entity type has a component C
+		auto has_component() noexcept	-> bool;	///< Return true if the entity type has a component C (internally synchronized)
 
 		template<typename C>
 		requires is_component_type<C> 
-		auto component() noexcept -> C;		///< Get a component of type C of the entity (first found is copied)
+		auto component() noexcept -> C;				///< Get a component of type C of the entity (first found is copied)  (internally synchronized)
 
 		template<typename ET>
 		requires is_tuple<ET>
-		auto update(ET&& ent) noexcept -> bool;				///< Update this entity using a std::tuple of the same type
+		auto update(ET&& ent) noexcept -> bool;		///< Update this entity using a std::tuple of the same type (internally synchronized)
 
 		template<typename C>
 		requires is_component_type<C>
-		auto update(C&& comp) noexcept -> bool;				///< Update a component of type C
+		auto update(C&& comp) noexcept -> bool;		///< Update a component of type C (internally synchroinized)
 
-		auto erase() noexcept -> bool;						///< Erase the entity
+		auto erase() noexcept -> bool;				///< Erase the entity (internally synchroinized)
 
-		auto index() noexcept -> index_t;					///< Get index of this entity in the component table
+		auto index() noexcept -> index_t;			///< Get index of this entity in the component table (externally synchronized)
 
-		std::atomic<uint32_t>* mutex();
+		std::atomic<uint32_t>* mutex();				///< \returns address of the VECS mutex for this entity (internally synchronized)
 
-		bool operator==(const VecsHandle& rhs) {
+		bool operator==(const VecsHandle& rhs) {	///< Equality operator (externally synchronized)
 			return m_entity_index == rhs.m_entity_index && m_generation_counter == rhs.m_generation_counter && m_type_index == rhs.m_type_index;
 		}
 	};
