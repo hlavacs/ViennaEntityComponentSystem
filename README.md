@@ -485,7 +485,8 @@ The following list shows the calls that are internally or externally synchronize
       auto erase(VecsHandle handle) noexcept				-> bool;		///< Erase an entity from VECS (internally synchronized)
       auto clear() noexcept -> size_t { return clearE(); };				///< Clear entities of type E (externally synchronized)
       auto compress() noexcept -> void { compressE(); }					///< Remove erased rows from the component table (externally synchronized)
-      auto size() noexcept -> size_t { return m_sizeE.load(); };			///< \returns the number of valid entities of type E (internally synchronized)
+      auto max_capacity(size_t) noexcept					-> size_t;		///< Set max number of entities of this type (externally synchronized)
+      auto size() noexcept -> size_t { return m_sizeE.load(); };	///< \returns the number of valid entities of type E (internally synchronized)
       auto swap(VecsHandle h1, VecsHandle h2) noexcept	-> bool;		///< Swap rows in component table (internally synchronized)
       auto contains(VecsHandle handle) noexcept			-> bool;		///< Test if an entity is still in VECS (externally synchronized)
     };

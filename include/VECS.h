@@ -929,7 +929,7 @@ namespace vecs {
 
 		auto compress() noexcept -> void { compressE(); }					///< Remove erased rows from the component table (externally synchronized)
 
-		auto max_capacity(size_t) noexcept					-> size_t;
+		auto max_capacity(size_t) noexcept					-> size_t;		///< Set max number of entities of this type (externally synchronized)
 
 		auto size() noexcept -> size_t { return m_sizeE.load(); };			///< \returns the number of valid entities of type E (internally synchronized)
 
@@ -1203,7 +1203,20 @@ namespace vecs {
 	*/
 	template<template<typename...> typename E, typename... Cs>
 	inline auto VecsRegistry<E<Cs...>>::max_capacity(size_t r) noexcept -> size_t {
-		return m_component_table.max_capacity(r);
+		auto maxE = m_component_table.max_capacity(r);
+
+		size_t sum_max = 0;
+
+		vtll::static_for<size_t, 0, vtll::size<VecsEntityTypeList>::value >(
+			[&](auto i) {
+				using type = vtll::Nth_type<VecsEntityTypeList, i>;
+				sum_max += VecsRegistry<type>.max_capacity(0);
+			}
+		);
+
+		m_entity_table.max_capacity(sum_max);
+
+		return maxE;
 	}
 
 
