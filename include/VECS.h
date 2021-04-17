@@ -293,6 +293,7 @@ namespace vecs {
 		auto erase(const index_t idx) noexcept					-> bool;
 		auto compress() noexcept								-> void;
 		auto clear() noexcept									-> size_t;
+		auto max_capacity(size_t) noexcept						-> size_t;
 
 		template<typename C>
 		requires is_component_of<E, C>
@@ -491,6 +492,20 @@ namespace vecs {
 		);
 
 		return true;
+	}
+
+	/**
+	* \brief Set the max number of entries that can be stored in the component table.
+	* 
+	* If the new max is smaller than the previous one it will be ignored. Tables cannot shrink.
+	*
+	* \param[in] r New max number or entities that can be stored.
+	* \returns the current max number, or the new one.
+	*/
+	template<typename E>
+	inline auto VecsComponentTable<E>::max_capacity(size_t r) noexcept -> size_t {
+		m_data.max_capacity(r);
+		return m_deleted.max_capacity(r);
 	}
 
 
@@ -838,7 +853,8 @@ namespace vecs {
 		friend class VecsRegistryBaseClass;
 
 	protected:
-		static inline std::atomic<uint32_t> m_sizeE{0};	///< Store the number of valid entities of type E currently in the ECS
+		static inline std::atomic<uint32_t>				m_sizeE{0};	///< Store the number of valid entities of type E currently in the ECS
+		static inline VecsComponentTable<E<Cs...>>		m_component_table;
 
 		/** Maximum number of entites of type E that can be stored. */
 		static const size_t c_max_size = vtll::back_value<vtll::map< VecsTableSizeMap, E<Cs...>, VeTableSizeDefault > >::value;
@@ -847,17 +863,17 @@ namespace vecs {
 		auto updateC(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept	-> bool; ///< Dispatch from base class (internally synchronized)
 		auto componentE(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept	-> bool; ///< Dispatch from base class (internally synchronized)
 		auto has_componentE(VecsHandle handle, size_t compidx) noexcept						-> bool; ///< Dispatch from base class (internally synchronized)
-		auto compressE() noexcept	-> void { return VecsComponentTable<E<Cs...>>().compress(); };	 ///< Compress component table of type E (externally synchronized)
+		auto compressE() noexcept	-> void { return m_component_table.compress(); };	 ///< Compress component table of type E (externally synchronized)
 
 		/** \brief Erase all entites of type E */
 		auto clearE() noexcept		-> size_t { 			///< Forward to component table of type E
-			return VecsComponentTable<E<Cs...>>().clear();	///< Call clear() in the correct component table
+			return m_component_table.clear();	///< Call clear() in the correct component table
 		};
 
 	public:
 		/** Constructors for class VecsRegistry<E>. */
 		VecsRegistry(size_t r = 1 << c_max_size) noexcept : VecsRegistryBaseClass() { 	///< Constructor of class VecsRegistry<E>
-			VecsComponentTable<E<Cs...>>{r}; 
+			VecsComponentTable<E<Cs...>>{r}.max_capacity(r);
 		};
 		VecsRegistry(std::nullopt_t u) noexcept : VecsRegistryBaseClass() { 			///< Constructor of class VecsRegistry<E>
 			m_sizeE = 0; 
@@ -913,6 +929,8 @@ namespace vecs {
 
 		auto compress() noexcept -> void { compressE(); }					///< Remove erased rows from the component table (externally synchronized)
 
+		auto max_capacity(size_t) noexcept					-> size_t;
+
 		auto size() noexcept -> size_t { return m_sizeE.load(); };			///< \returns the number of valid entities of type E (internally synchronized)
 
 		auto swap(VecsHandle h1, VecsHandle h2) noexcept	-> bool;		///< Swap rows in component table (internally synchronized)
@@ -935,7 +953,7 @@ namespace vecs {
 	inline auto VecsRegistry<E<Cs...>>::updateC(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept -> bool {
 		VecsWriteLock lock(handle.mutex());
 		if (!contains(handle)) return {};
-		return VecsComponentTable<E<Cs...>>().updateC(m_entity_table.comp_ref_idx<c_index>(handle.m_entity_index), compidx, ptr, size);
+		return m_component_table.updateC(m_entity_table.comp_ref_idx<c_index>(handle.m_entity_index), compidx, ptr, size);
 	}
 
 	/**
@@ -950,7 +968,7 @@ namespace vecs {
 	inline auto VecsRegistry<E<Cs...>>::has_componentE(VecsHandle handle, size_t compidx) noexcept -> bool {
 		VecsReadLock lock(handle.mutex());
 		if (!contains(handle)) return false;
-		return VecsComponentTable<E<Cs...>>().has_componentE(compidx);
+		return m_component_table.has_componentE(compidx);
 	}
 
 	/**
@@ -967,7 +985,7 @@ namespace vecs {
 	inline auto VecsRegistry<E<Cs...>>::componentE(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept -> bool {
 		VecsReadLock lock(handle.mutex());
 		if (!contains(handle)) return {};
-		return VecsComponentTable<E<Cs...>>().componentE(m_entity_table.comp_ref_idx<c_index>(handle.m_entity_index), compidx, ptr, size);
+		return m_component_table.componentE(m_entity_table.comp_ref_idx<c_index>(handle.m_entity_index), compidx, ptr, size);
 	}
 
 	/**
@@ -1000,7 +1018,7 @@ namespace vecs {
 		VecsHandle handle{ idx, m_entity_table.comp_ref_idx<c_counter>(idx), m_entity_table.comp_ref_idx<c_type>(idx) }; ///< The handle
 		
 		m_entity_table.comp_ref_idx<c_index>(idx) 
-			= VecsComponentTable<E<Cs...>>().insert(handle, &m_entity_table.comp_ref_idx<c_mutex>(idx), std::forward<Cs>(args)...);	///< add data into component table
+			= m_component_table.insert(handle, &m_entity_table.comp_ref_idx<c_mutex>(idx), std::forward<Cs>(args)...);	///< add data into component table
 
 		m_size++;
 		m_sizeE++;
@@ -1018,7 +1036,7 @@ namespace vecs {
 	inline auto VecsRegistry<E<Cs...>>::pointers(VecsHandle handle) noexcept -> std::tuple<Cs*...>  {
 		if (!contains(handle)) return {};	///< Return the empty component
 		auto& comp_table_idx = m_entity_table.comp_ref_idx<c_index>(handle.m_entity_index); ///< Get reference to component
-		return VecsComponentTable<E<Cs...>>{}.pointers( comp_table_idx );
+		return m_component_table.pointers( comp_table_idx );
 	}
 
 	/**
@@ -1032,7 +1050,7 @@ namespace vecs {
 		VecsReadLock lock(handle.mutex());
 		if (!contains(handle)) return {};	///< Return the empty component
 		auto& comp_table_idx = m_entity_table.comp_ref_idx<c_index>(handle.m_entity_index); ///< Get component copies
-		return VecsComponentTable<E<Cs...>>{}.values(comp_table_idx);
+		return m_component_table.values(comp_table_idx);
 	}
 
 	/**
@@ -1063,7 +1081,7 @@ namespace vecs {
 		index_t& i2 = m_entity_table.comp_ref_idx<c_index>(h2.m_entity_index);
 		std::swap(i1, i2);											///< Swap in map
 
-		auto res = VecsComponentTable<E<Cs...>>().swap(i1, i2);		///< Swap in component table
+		auto res = m_component_table.swap(i1, i2);		///< Swap in component table
 
 		VecsWriteLock::unlock(h1.mutex());
 		VecsWriteLock::unlock(h2.mutex());
@@ -1099,7 +1117,7 @@ namespace vecs {
 		VecsReadLock lock(handle.mutex());
 		if (!contains(handle)) return {};	///< Return the empty component
 		auto& comp_table_idx = m_entity_table.comp_ref_idx<c_index>(handle.m_entity_index); ///< Get reference to component
-		return VecsComponentTable<E<Cs...>>().component<C>(comp_table_idx);	///< Return the component
+		return m_component_table.component<C>(comp_table_idx);	///< Return the component
 	}
 
 	/**
@@ -1128,7 +1146,7 @@ namespace vecs {
 	inline auto VecsRegistry<E<Cs...>>::update(VecsHandle handle, ET&& ent) noexcept -> bool {
 		VecsWriteLock lock(handle.mutex());
 		if (!contains(handle)) return false;
-		VecsComponentTable<E<Cs...>>().update(handle.m_entity_index, std::forward<ET>(ent));
+		m_component_table.update(handle.m_entity_index, std::forward<ET>(ent));
 		return true;
 	}
 
@@ -1146,7 +1164,7 @@ namespace vecs {
 		VecsWriteLock lock(handle.mutex());
 		if constexpr (!vtll::has_type<E<Cs...>, std::decay_t<C>>::value) { return false; }
 		if (!contains(handle)) return false;
-		VecsComponentTable<E<Cs...>>{}.update<C>(handle.m_entity_index, std::forward<C>(comp));
+		m_component_table.update<C>(handle.m_entity_index, std::forward<C>(comp));
 		return true;
 	}
 
@@ -1161,7 +1179,7 @@ namespace vecs {
 		{
 			VecsWriteLock lock(handle.mutex());
 			if (!contains(handle)) return false;
-			VecsComponentTable<E<Cs...>>().erase(m_entity_table.comp_ref_idx <c_index>(handle.m_entity_index)); ///< Erase from comp table
+			m_component_table.erase(m_entity_table.comp_ref_idx <c_index>(handle.m_entity_index)); ///< Erase from comp table
 			m_entity_table.comp_ref_idx<c_counter>(handle.m_entity_index)++;			///< Invalidate the entity handle
 		}
 
@@ -1173,6 +1191,19 @@ namespace vecs {
 		m_first_free = handle.m_entity_index;
 
 		return true; 
+	}
+
+	/**
+	* \brief Set the max number of entries that can be stored in the component table.
+	*
+	* If the new max is smaller than the previous one it will be ignored. Tables cannot shrink.
+	*
+	* \param[in] r New max number or entities that can be stored.
+	* \returns the current max number, or the new one.
+	*/
+	template<template<typename...> typename E, typename... Cs>
+	inline auto VecsRegistry<E<Cs...>>::max_capacity(size_t r) noexcept -> size_t {
+		return m_component_table.max_capacity(r);
 	}
 
 

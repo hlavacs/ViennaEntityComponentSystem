@@ -279,13 +279,14 @@ namespace vecs {
 		* No parallel processing is allowed when calling this function!
 		* \param[in] r Max number of entities to be allowed in the table.
 		*/
-		auto max_capacity(size_t r) noexcept -> void {
-			if (r == 0) return;
+		auto max_capacity(size_t r) noexcept -> size_t {
+			if (r == 0) return m_seg_max * N;
 			auto segs = (r-1) / N + 1;				///< Number of segments necessary
 			if (segs > m_segment.capacity()) {		///< Is it larger than the one we have?
 				m_segment.reserve(segs);			///< If yes, reallocate the vector.
 			}
 			m_seg_max = m_segment.capacity();		///< Publish the new capacity.
+			return m_seg_max * N;
 		}
 
 		/**
@@ -298,6 +299,7 @@ namespace vecs {
 			}
 			m_seg_allocated = m_segment.size();
 		}
+
 	};
 
 }
