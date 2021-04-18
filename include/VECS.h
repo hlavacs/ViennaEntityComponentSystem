@@ -368,17 +368,7 @@ namespace vecs {
 		m_data.update<c_handle>(idx, handle);	///< Update the handle data
 		m_data.update<c_mutex>(idx, mutex);		///< Update the mutex pointer
 
-		auto f = [&]<typename T>(T&& tup) {
-			vtll::static_for<size_t, 0, std::tuple_size<T>::value >(							///< Loop over all components
-				[&](auto i) {
-					using type = std::tuple_element_t<i, T>;
-					m_data.update<c_info_size + i>(idx, std::forward<type>(std::get<i>(tup))); ///< Update the entity components
-				}
-			);
-		};
-		f(std::forward_as_tuple(args...));
-
-		//(m_data.update<c_info_size + vtll::index_of<E,std::decay_t<Cs>>::value> (idx, std::forward<Cs>(args)), ...); ///< Update the entity components
+		(m_data.update<c_info_size + vtll::index_of<E,std::decay_t<Cs>>::value> (idx, std::forward<Cs>(args)), ...); ///< Update the entity components
 		return idx;								///< Return the index of the new data
 	};
 
