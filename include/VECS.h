@@ -171,7 +171,7 @@ namespace vecs {
 
 	protected:
 		index_t		m_entity_index{};			///< The slot of the entity in the entity list
-		counter16_t	m_generation_counter{};		///< Generation counter
+		counter_t	m_generation_counter{};		///< Generation counter
 
 	public:
 		VecsHandle() noexcept {}; ///< Empty constructor of class VecsHandle
@@ -182,8 +182,7 @@ namespace vecs {
 		* \param[in] cnt Current generation counter identifying this entity on in the slot.
 		* \param[in] type Type index for the entity type E.
 		*/
-		VecsHandle(index_t idx, counter16_t cnt, index16_t type) noexcept
-			: m_entity_index{ idx }, m_generation_counter{ cnt } {};
+		VecsHandle(index_t idx, counter_t cnt) noexcept : m_entity_index{ idx }, m_generation_counter{ cnt } {};
 
 		inline auto is_valid() noexcept	-> bool;	///< The data in the handle is non null (internally synchronized)
 		auto has_value() noexcept		-> bool;	///< The entity that is pointed to exists in the ECS (externally synchronized)
@@ -207,7 +206,7 @@ namespace vecs {
 		auto erase() noexcept -> bool;				///< Erase the entity (internally synchroinized)
 
 		auto index() noexcept -> index_t;			///< Get index of this entity in the component table (externally synchronized)
-		auto type() noexcept  -> index16_t;			///< Get index of this entity in the component table (externally synchronized)
+		auto type() noexcept  -> index_t;			///< Get index of this entity in the component table (externally synchronized)
 
 		std::atomic<uint32_t>* mutex();				///< \returns address of the VECS mutex for this entity (internally synchronized)
 
@@ -631,7 +630,7 @@ namespace vecs {
 
 	protected:
 
-		using types = vtll::type_list<index_t, counter16_t, index16_t, std::atomic<uint32_t>>;	///< Type for the table
+		using types = vtll::type_list<index_t, counter_t, index_t, std::atomic<uint32_t>>;	///< Type for the table
 		static const uint32_t c_index{ 0 };		///< Index for accessing the index to next free or entry in component table
 		static const uint32_t c_counter{ 1 };	///< Index for accessing the generation counter
 		static const uint32_t c_type{ 2 };		///< Index for accessing the type index
@@ -716,7 +715,7 @@ namespace vecs {
 		//utility
 
 		auto index(VecsHandle h) noexcept	-> index_t;		///< \returns row index in component table (internally synchronized)
-		auto type(VecsHandle h) noexcept	-> index16_t;		///< \returns type of entity (internally synchronized)
+		auto type(VecsHandle h) noexcept	-> index_t;		///< \returns type of entity (internally synchronized)
 		virtual auto size() noexcept		-> size_t { return m_size.load(); };	///< \returns the total number of valid entities (internally synchronized)
 		virtual auto swap( VecsHandle h1, VecsHandle h2 ) noexcept -> bool;	///< Swap places of two entities in the component table (internally synchronized)
 		virtual auto contains(VecsHandle handle) noexcept	-> bool;		///< \returns true if the ECS still holds this entity  (externally synchronized)
@@ -809,7 +808,7 @@ namespace vecs {
 	* \param[in] handle The entity handle.
 	* \returns the index of the entity in the component table.
 	*/
-	auto VecsRegistryBaseClass::type(VecsHandle h) noexcept -> index16_t {
+	auto VecsRegistryBaseClass::type(VecsHandle h) noexcept -> index_t {
 		if (!h.is_valid()) return {};
 		return m_entity_table.comp_ref_idx<VecsRegistryBaseClass::c_type>(h.m_entity_index);
 	}
@@ -1010,12 +1009,12 @@ namespace vecs {
 		else {
 			idx = m_entity_table.push_back();
 			if (!idx.has_value()) return {};
-			m_entity_table.comp_ref_idx<c_counter>(idx) = counter16_t{ 0 };		//start with counter 0
+			m_entity_table.comp_ref_idx<c_counter>(idx) = counter_t{ 0 };		//start with counter 0
 		}
 
-		m_entity_table.comp_ref_idx<c_type>(idx) = index16_t{ vtll::index_of<VecsEntityTypeList, E>::value }; ///< Entity type index
+		m_entity_table.comp_ref_idx<c_type>(idx) = index_t{ vtll::index_of<VecsEntityTypeList, E>::value }; ///< Entity type index
 		
-		VecsHandle handle{ idx, m_entity_table.comp_ref_idx<c_counter>(idx), m_entity_table.comp_ref_idx<c_type>(idx) }; ///< The handle
+		VecsHandle handle{ idx, m_entity_table.comp_ref_idx<c_counter>(idx) }; ///< The handle
 		
 		m_entity_table.comp_ref_idx<c_index>(idx) 
 			= m_component_table.insert(handle, &m_entity_table.comp_ref_idx<c_mutex>(idx), std::forward<CCs>(args)...);	///< add data into component table
@@ -1490,7 +1489,7 @@ namespace vecs {
 	*
 	* \returns index of this entity in the component table.
 	*/
-	auto VecsHandle::type() noexcept -> index16_t {
+	auto VecsHandle::type() noexcept -> index_t {
 		return VecsRegistryBaseClass{}.type(*this);
 	}
 
