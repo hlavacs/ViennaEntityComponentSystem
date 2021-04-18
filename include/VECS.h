@@ -208,7 +208,7 @@ namespace vecs {
 		auto erase() noexcept -> bool;				///< Erase the entity (internally synchroinized)
 
 		auto index() noexcept -> index_t;			///< Get index of this entity in the component table (externally synchronized)
-		auto type() noexcept  -> index16_t;
+		auto type() noexcept  -> index16_t;			///< Get index of this entity in the component table (externally synchronized)
 
 		std::atomic<uint32_t>* mutex();				///< \returns address of the VECS mutex for this entity (internally synchronized)
 
@@ -749,7 +749,7 @@ namespace vecs {
 	requires is_component_type<C>
 	auto VecsRegistryBaseClass::has_component(VecsHandle handle) noexcept -> bool {
 		if (!handle.is_valid()) return false;
-		return m_dispatch[handle.type()]->has_componentE(handle, vtll::index_of<VecsComponentTypeList, std::decay_t<C>>::value);
+		return m_dispatch[type(handle)]->has_componentE(handle, vtll::index_of<VecsComponentTypeList, std::decay_t<C>>::value);
 	}
 
 	/**
@@ -766,7 +766,7 @@ namespace vecs {
 		C res{};
 		if (!handle.is_valid()) return res;
 		/// Dispatch to the correct subclass and return result
-		m_dispatch[handle.type()]->componentE(handle, vtll::index_of<VecsComponentTypeList, std::decay_t<C>>::value, (void*)&res, sizeof(C));
+		m_dispatch[type(handle)]->componentE(handle, vtll::index_of<VecsComponentTypeList, std::decay_t<C>>::value, (void*)&res, sizeof(C));
 		return res;
 	}
 
@@ -782,7 +782,7 @@ namespace vecs {
 		if (!handle.is_valid()) return false;
 
 		/// Dispatch the call to the correct subclass and return result
-		return m_dispatch[handle.type()]->updateC(handle, vtll::index_of<VecsComponentTypeList, std::decay_t<C>>::value, (void*)&comp, sizeof(C));
+		return m_dispatch[type(handle)]->updateC(handle, vtll::index_of<VecsComponentTypeList, std::decay_t<C>>::value, (void*)&comp, sizeof(C));
 	}
 
 	/**
@@ -792,7 +792,7 @@ namespace vecs {
 	*/
 	auto VecsRegistryBaseClass::erase(VecsHandle handle) noexcept -> bool {
 		if (!handle.is_valid()) return false;
-		return m_dispatch[handle.type()]->erase(handle); ///< Dispatch to the correct subclass for type E and return result
+		return m_dispatch[type(handle)]->erase(handle); ///< Dispatch to the correct subclass for type E and return result
 	}
 
 	/**
@@ -824,8 +824,8 @@ namespace vecs {
 	* \returns true if operation was successful.
 	*/
 	auto VecsRegistryBaseClass::swap(VecsHandle h1, VecsHandle h2) noexcept	-> bool {
-		if (!h1.is_valid() || !h1.is_valid() || h1.type() != h2.type()) return false;
-		return m_dispatch[h1.type()]->swap(h1, h2);				///< Dispatch to the correct subclass for type E and return result
+		if (!h1.is_valid() || !h1.is_valid() || type(h1) != type(h2)) return false;
+		return m_dispatch[type(h1)]->swap(h1, h2);				///< Dispatch to the correct subclass for type E and return result
 	}
 
 	/**
@@ -837,7 +837,7 @@ namespace vecs {
 	*/
 	auto VecsRegistryBaseClass::contains(VecsHandle handle) noexcept	-> bool {
 		if (!handle.is_valid()) return false;
-		return m_dispatch[handle.type()]->contains(handle); ///< Dispatch to the correct subclass for type E and return result
+		return m_dispatch[type(handle)]->contains(handle); ///< Dispatch to the correct subclass for type E and return result
 	}
 
 
@@ -1065,7 +1065,7 @@ namespace vecs {
 	template<typename E>
 	inline auto VecsRegistry<E>::swap(VecsHandle h1, VecsHandle h2) noexcept -> bool {
 		if (h1 == h2) return false;
-		if (!h1.is_valid() || !h1.is_valid() || h1.type() != h2.type()) return false;
+		if (!h1.is_valid() || !h1.is_valid() || type(h1) != type(h2)) return false;
 		if (h1.m_type_index != vtll::index_of<VecsEntityTypeList, E>::value) return false;
 		if (h2.m_type_index != vtll::index_of<VecsEntityTypeList, E>::value) return false;
 		
