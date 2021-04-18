@@ -719,6 +719,59 @@ namespace vtll {
 		"The implementation of filter_have_any_type is bad");
 
 	//-------------------------------------------------------------------------
+	//unique: test whether the elements in a type list are all unique
+
+	namespace detail {
+		template<typename Seq>
+		struct unique_impl;
+
+		template<template <typename...> typename Seq>
+		struct unique_impl<Seq<>> {
+			static const bool value = true;
+		};
+
+		template<template <typename...> typename Seq, typename C, typename... Cs >
+		struct unique_impl<Seq<C, Cs...>> {
+			static const bool value = !has_type<Seq<Cs...>, C>::value && unique_impl<Seq<Cs...>>::value;
+		};
+	}
+
+	template <typename Seq>
+	struct unique {
+		static const bool value = detail::unique_impl<Seq>::value;
+	};
+
+	static_assert( unique<type_list<int, char, float>>::value, "The implementation of unique is bad");
+	static_assert( !unique<type_list<int, char, char, float>>::value, "The implementation of unique is bad");
+
+	//-------------------------------------------------------------------------
+	//are_unique: test whether all given lists contain only unique elements
+
+	namespace detail {
+		template<typename Seq>
+		struct are_unique_impl;
+
+		template<template <typename...> typename Seq>
+		struct are_unique_impl<Seq<>> {
+			static const bool value = true;
+		};
+
+		template<template <typename...> typename Seq, typename... Cs >
+		struct are_unique_impl<Seq<Cs...>> {
+			static const bool value = ( unique<Cs>::value && ... );
+		};
+	}
+
+	template <typename Seq>
+	struct are_unique {
+		static const bool value = detail::are_unique_impl<Seq>::value;
+	};
+
+	static_assert( are_unique<type_list<type_list<int, char, float>, type_list<double, char, float, int>>>::value, "The implementation of are_unique is bad");
+	static_assert(!are_unique<type_list<type_list<int, char, float>, type_list<int, char, char, float>>>::value, "The implementation of are_unique is bad");
+
+
+	//-------------------------------------------------------------------------
 	//N_tuple: make a tuple containing a type T N times
 
 	template <typename T, size_t N>
