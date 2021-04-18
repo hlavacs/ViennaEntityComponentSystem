@@ -172,7 +172,6 @@ namespace vecs {
 	protected:
 		index_t		m_entity_index{};			///< The slot of the entity in the entity list
 		counter16_t	m_generation_counter{};		///< Generation counter
-		index16_t	m_type_index{};				///< Type index
 
 	public:
 		VecsHandle() noexcept {}; ///< Empty constructor of class VecsHandle
@@ -184,7 +183,7 @@ namespace vecs {
 		* \param[in] type Type index for the entity type E.
 		*/
 		VecsHandle(index_t idx, counter16_t cnt, index16_t type) noexcept
-			: m_entity_index{ idx }, m_generation_counter{ cnt }, m_type_index{ type } {};
+			: m_entity_index{ idx }, m_generation_counter{ cnt } {};
 
 		inline auto is_valid() noexcept	-> bool;	///< The data in the handle is non null (internally synchronized)
 		auto has_value() noexcept		-> bool;	///< The entity that is pointed to exists in the ECS (externally synchronized)
@@ -213,7 +212,7 @@ namespace vecs {
 		std::atomic<uint32_t>* mutex();				///< \returns address of the VECS mutex for this entity (internally synchronized)
 
 		bool operator==(const VecsHandle& rhs) {	///< Equality operator (externally synchronized)
-			return m_entity_index == rhs.m_entity_index && m_generation_counter == rhs.m_generation_counter && m_type_index == rhs.m_type_index;
+			return m_entity_index == rhs.m_entity_index && m_generation_counter == rhs.m_generation_counter;
 		}
 	};
 
@@ -1066,8 +1065,8 @@ namespace vecs {
 	inline auto VecsRegistry<E>::swap(VecsHandle h1, VecsHandle h2) noexcept -> bool {
 		if (h1 == h2) return false;
 		if (!h1.is_valid() || !h1.is_valid() || type(h1) != type(h2)) return false;
-		if (h1.m_type_index != vtll::index_of<VecsEntityTypeList, E>::value) return false;
-		if (h2.m_type_index != vtll::index_of<VecsEntityTypeList, E>::value) return false;
+		if (type(h1) != vtll::index_of<VecsEntityTypeList, E>::value) return false;
+		if (type(h2) != vtll::index_of<VecsEntityTypeList, E>::value) return false;
 		
 		if (h1.m_entity_index.value < h2.m_entity_index.value) {	//avoid deadlock by ordering 
 			VecsWriteLock::lock(h1.mutex());
@@ -1098,10 +1097,8 @@ namespace vecs {
 	*/
 	template<typename E>
 	inline auto VecsRegistry<E>::contains(VecsHandle handle) noexcept -> bool {
-		if (!handle.is_valid() || handle.m_type_index != vtll::index_of<VecsEntityTypeList, E>::value ) return false;
-		auto& type = m_entity_table.comp_ref_idx<c_type>(handle.m_entity_index);
-		auto& cnt = m_entity_table.comp_ref_idx<c_counter>(handle.m_entity_index);
-		if ( handle.m_generation_counter != cnt || handle.m_type_index	!= type ) return false;
+		if (!handle.is_valid() || type(handle) != vtll::index_of<VecsEntityTypeList, E>::value ) return false;
+		if ( handle.m_generation_counter != m_entity_table.comp_ref_idx<c_counter>(handle.m_entity_index)) return false;
 		return true;
 	}
 
@@ -1414,10 +1411,7 @@ namespace vecs {
 	* \returns true if the data in the handle is not null
 	*/
 	inline auto VecsHandle::is_valid() noexcept				-> bool {
-		return	m_entity_index.has_value() 
-				&& m_generation_counter.has_value() 
-				&& m_type_index.has_value() 
-				&& m_type_index.value < vtll::size<VecsEntityTypeList>::value;
+		return	m_entity_index.has_value() && m_generation_counter.has_value();
 	}
 
 	/**
