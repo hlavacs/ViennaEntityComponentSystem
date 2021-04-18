@@ -186,8 +186,6 @@ namespace vecs {
 		VecsHandle(index_t idx, counter16_t cnt, index16_t type) noexcept
 			: m_entity_index{ idx }, m_generation_counter{ cnt }, m_type_index{ type } {};
 
-		/** \returns the type index of the handle. */
-		auto type() const noexcept	-> uint32_t { return static_cast<uint32_t>(m_type_index); };
 		inline auto is_valid() noexcept	-> bool;	///< The data in the handle is non null (internally synchronized)
 		auto has_value() noexcept		-> bool;	///< The entity that is pointed to exists in the ECS (externally synchronized)
 
@@ -210,6 +208,7 @@ namespace vecs {
 		auto erase() noexcept -> bool;				///< Erase the entity (internally synchroinized)
 
 		auto index() noexcept -> index_t;			///< Get index of this entity in the component table (externally synchronized)
+		auto type() noexcept  -> index16_t;
 
 		std::atomic<uint32_t>* mutex();				///< \returns address of the VECS mutex for this entity (internally synchronized)
 
@@ -717,8 +716,9 @@ namespace vecs {
 		//-------------------------------------------------------------------------
 		//utility
 
-		auto index(VecsHandle h) noexcept -> index_t;				///< \returns row index in component table (internally synchronized)
-		virtual auto size() noexcept -> size_t { return m_size.load(); };	///< \returns the total number of valid entities (internally synchronized)
+		auto index(VecsHandle h) noexcept	-> index_t;		///< \returns row index in component table (internally synchronized)
+		auto type(VecsHandle h) noexcept	-> index16_t;		///< \returns type of entity (internally synchronized)
+		virtual auto size() noexcept		-> size_t { return m_size.load(); };	///< \returns the total number of valid entities (internally synchronized)
 		virtual auto swap( VecsHandle h1, VecsHandle h2 ) noexcept -> bool;	///< Swap places of two entities in the component table (internally synchronized)
 		virtual auto contains(VecsHandle handle) noexcept	-> bool;		///< \returns true if the ECS still holds this entity  (externally synchronized)
 	};
@@ -803,6 +803,16 @@ namespace vecs {
 	auto VecsRegistryBaseClass::index(VecsHandle h) noexcept -> index_t {
 		if (!h.is_valid()) return {};
 		return m_entity_table.comp_ref_idx<VecsRegistryBaseClass::c_index>(h.m_entity_index);
+	}
+
+	/**
+	* \brief Return index of an entity in the component table.
+	* \param[in] handle The entity handle.
+	* \returns the index of the entity in the component table.
+	*/
+	auto VecsRegistryBaseClass::type(VecsHandle h) noexcept -> index16_t {
+		if (!h.is_valid()) return {};
+		return m_entity_table.comp_ref_idx<VecsRegistryBaseClass::c_type>(h.m_entity_index);
 	}
 
 	/**
@@ -1479,6 +1489,15 @@ namespace vecs {
 	*/
 	auto VecsHandle::index() noexcept -> index_t {
 		return VecsRegistryBaseClass{}.index(*this);
+	}
+
+	/**
+	* \brief Get index of this entity in the component table.
+	*
+	* \returns index of this entity in the component table.
+	*/
+	auto VecsHandle::type() noexcept -> index16_t {
+		return VecsRegistryBaseClass{}.type(*this);
 	}
 
 	/**
