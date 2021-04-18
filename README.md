@@ -232,13 +232,11 @@ Using *VecsRegistry* is not bound to a specific entity type, but commands evenmt
     using VeEntityTypeDraw = vtll::type_list< VeComponentName, VeComponentPosition, VeComponentMaterial, VeComponentGeometry>;
 
 
-We assume that is has been registered as described in the previous section. Of course, any other similarly defined type can be used for the following examples as well. You can create an entity of type *VeEntityTypeNode* with any of these two methods:
+We assume that is has been registered as described in the previous section. Of course, any other similarly defined type can be used for the following examples as well. You can create an entity of type *VeEntityTypeNode* using:
 
-    VecsHandle handle1 = VecsRegistry{}.insert<VeEntityTypeNode>("Node1", VeComponentPosition{}, VeComponentOrientation{});
-    auto       handle2 = VecsRegistry<VeEntityTypeNode>{}.insert("Node2", {}, {}); //if handle of type VeEntityTypeNode
+    VecsHandle handle = VecsRegistry<VeEntityTypeNode>{}.insert("Node2", VeComponentPosition{}, VeComponentOrientation{});
 
-In fact, the first call simply calls the second call internally. Obviously, the parameters for this call must match the list of components that the entity is composed of.
-
+Obviously, the parameters for this call must match the list of components that the entity is composed of.
 The result of creating an entity is a *handle*. A handle is an 8-bytes structure that uniquely identifies the new entity and you can use it later to access the entity again. A handle can be invalid, meaning that it does not point to any entity. You can test whether a handle is valid or not by calling
 
     handle.is_valid();

@@ -661,13 +661,6 @@ namespace vecs {
 		VecsRegistryBaseClass( size_t r = VecsTableMaxSize::value ) noexcept;
 
 		//-------------------------------------------------------------------------
-		//insert data
-
-		template<typename E, typename... Cs>
-		requires is_composed_of<E, Cs...> [[nodiscard]]
-		auto insert(Cs&&... args) noexcept	-> VecsHandle;	///< Insert a new entity into the ECS (internally synchronized)
-
-		//-------------------------------------------------------------------------
 		//get data
 
 		template<typename C>
@@ -718,27 +711,13 @@ namespace vecs {
 		//-------------------------------------------------------------------------
 		//utility
 
-		auto index(VecsHandle h) noexcept	-> index_t;		///< \returns row index in component table (internally synchronized)
-		auto type(VecsHandle h) noexcept	-> index_t;		///< \returns type of entity (internally synchronized)
+		auto index(VecsHandle h) noexcept	-> index_t;		///< \returns row index in component table (externally synchronized)
+		auto type(VecsHandle h) noexcept	-> index_t;		///< \returns type of entity (externally synchronized)
 		virtual auto size() noexcept		-> size_t { return m_size.load(); };	///< \returns the total number of valid entities (internally synchronized)
 		virtual auto swap( VecsHandle h1, VecsHandle h2 ) noexcept -> bool;	///< Swap places of two entities in the component table (internally synchronized)
 		virtual auto contains(VecsHandle handle) noexcept	-> bool;		///< \returns true if the ECS still holds this entity  (externally synchronized)
 	};
 
-
-	/**
-	* \brief Insert a new entity into the ECS.  The call is dispatched to the correct subclass for entity type E.
-	*
-	* The correct entity type E is determined using the component types Cs. Then the
-	* call id forwarded to the correct subclass for E.
-	* \param[in] args The components for the entity.
-	* \returns the handle of thw new entity.
-	*/
-	template<typename E, typename... Cs>
-	requires is_composed_of<E, Cs...> [[nodiscard]]
-	auto VecsRegistryBaseClass::insert(Cs&&... args) noexcept	-> VecsHandle {
-		return VecsRegistry<E>().insert(std::forward<Cs>(args)...);
-	}
 
 	/**
 	* \brief Test whether an entity (pointed to by the handle) of type E contains a component of type C

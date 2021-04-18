@@ -44,7 +44,7 @@ int main() {
 			h1.has_value() && VecsRegistry().size() == 1, );
 
 		TESTRESULT(++number, "insert",
-			auto h1_2 = VecsRegistry{}.insert<VeEntityTypeNode>(VeComponentName{ "Node" }, pos2, orient, trans),
+			auto h1_2 = VecsRegistry<VeEntityTypeNode>{}.insert(VeComponentName{ "Node" }, pos2, orient, trans),
 			h1_2.has_value() && VecsRegistry().size() == 2, );
 
 		TESTRESULT(++number, "insert<type>",
