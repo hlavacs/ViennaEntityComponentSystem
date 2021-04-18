@@ -866,7 +866,11 @@ namespace vecs {
 
 		template<typename... CCs>
 		requires is_composed_of<E, CCs...> [[nodiscard]] 
-		auto insert(CCs&&... args) noexcept			-> VecsHandle;			///< Insert new entity of type E into VECS (internally synchronized)
+		auto insert(CCs&&... args) noexcept						-> VecsHandle;	///< Insert new entity of type E into VECS (internally synchronized)
+
+		template<typename... CCs>
+		[[nodiscard]]
+		auto transform(VecsHandle handle, CCs&&... args) noexcept	-> VecsHandle;	///< transorm entity into new type (internally synchronized)
 
 		//-------------------------------------------------------------------------
 		//get data
@@ -1007,6 +1011,29 @@ namespace vecs {
 		return handle;
 	};
 
+	/**
+	* \brief Transform an entity into a new type.
+	* 
+	* First all components of the old entity that can be moved to the new form are moved. Then
+	* the new parameters given are moved over the components that are fitting.
+	*
+	* \param[in] handle Handle of the entity to transform.
+	* \param[in] args The component arguments.
+	* \returns the handle of the entity.
+	*/
+	template<typename E>
+	template<typename... CCs>
+	[[nodiscard]]
+	inline auto VecsRegistry<E>::transform(VecsHandle handle, CCs&&... args) noexcept	-> VecsHandle {
+		{
+			VecsReadLock lock(handle.mutex());
+			if (!contains(handle)) return {};	///< Return the empty component
+
+			auto index = m_component_table.insert(handle, &m_entity_table.comp_ref_idx<c_mutex>(handle.index()), std::forward<CCs>(args)...);	///< add data into component table
+		}
+
+		return handle;
+	}
 	
 	/**
 	* \brief Return a tuple with pointers to the components. This call is externally synchronized!
