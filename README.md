@@ -428,19 +428,17 @@ Note that calls to *VecsRegistry\<\>* and *VecsHandle* are eventually forwarded 
 
 The following list shows the calls that are internally or externally synchronized in class *VecsRegistry\<E\>*:
 
-    template<template<typename...> typename E, typename... Cs>
-    class VecsRegistry<E<Cs...>> : public VecsRegistryBaseClass {
+    template<typename E>
+    class VecsRegistry : public VecsRegistryBaseClass {
 
       ...
 
-      auto updateC(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept	-> bool; ///< dispatch from base class (internally synchronized)
-      auto componentE(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept	-> bool; ///< dispatch from base class (internally synchronized)
-      auto has_componentE(VecsHandle handle, size_t compidx) noexcept						-> bool; ///< dispatch from base class (internally synchronized)
-      auto compressE() noexcept	-> void { return VecsComponentTable<E<Cs...>>().compress(); };	 ///< Forward to component table of type E (externally synchronized)
-
-      auto clearE() noexcept		-> size_t { 			///< Forward to component table of type E
-        return VecsComponentTable<E<Cs...>>().clear();	///< Call clear() in the correct component table
-      };
+      auto updateC(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept	-> bool; ///< Dispatch from base class (externally synchronized)
+  		auto componentE(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept	-> bool; ///< Dispatch from base class (externally synchronized)
+  		auto has_componentE(VecsHandle handle, size_t compidx) noexcept						-> bool; ///< Dispatch from base class (externally synchronized)
+  		auto eraseE(index_t index) noexcept	-> void { m_component_table.erase(index); };			 ///< Dispatch from base class (externally synchronized)
+  		auto compressE() noexcept	-> void { return m_component_table.compress(); };	///< Dispatch from base class (externally synchronized)
+  		auto clearE() noexcept		-> size_t { return m_component_table.clear(); };	///< Dispatch from base class (externally synchronized)
 
     public:
       VecsRegistry(size_t r = 1 << c_max_size) noexcept : VecsRegistryBaseClass() { 	///< Constructor of class VecsRegistry<E>
@@ -450,13 +448,15 @@ The following list shows the calls that are internally or externally synchronize
         m_sizeE = 0;
       };
 
-      template<typename... CCs>
-      requires is_composed_of<E<Cs...>, CCs...> [[nodiscard]]
+      template<typename... Cs>
+      requires is_composed_of<E<Cs...>, Cs...> [[nodiscard]]
       auto insert(CCs&&... args) noexcept			-> VecsHandle;			///< Insert new entity of type E into VECS (internally synchronized)
 
-      auto values(VecsHandle handle) noexcept		-> std::tuple<Cs...>;	///< Return a tuple with copies of the components (internally synchronized)
+      template<typename... Cs> [[nodiscard]]
+  		auto transform(VecsHandle handle, Cs&&... args) noexcept	-> VecsHandle;	///< transform entity into new type (internally synchronized)
 
-      auto pointers(VecsHandle handle) noexcept	-> std::tuple<Cs*...>;	///< Return a tuple with pointers to the components (externally synchronized)
+      auto values(VecsHandle handle) noexcept		-> vtll::to_tuple<E>;	///< Return a tuple with copies of the components (internally synchronized)
+  		auto pointers(VecsHandle handle) noexcept	-> vtll::to_ptr_tuple<E>;	///< Return a tuple with pointers to the components (externally synchronized)
 
       template<typename C>
       requires is_component_type<C>
@@ -464,13 +464,21 @@ The following list shows the calls that are internally or externally synchronize
         return is_component_of<E<Cs...>,C>;
       }
 
-      template<size_t I, typename C = vtll::Nth_type<E<Cs...>, I>>
-      requires is_component_of<E<Cs...>, C>
-      auto component(VecsHandle handle) noexcept	-> C;		///< Get copy of a component given index of component (internally synchronized)
+      template<size_t I, typename C = vtll::Nth_type<E, I>>
+  		requires is_component_of<E, C>
+  		auto component(VecsHandle handle) noexcept	-> C;		///< Get copy of a component given index of component (internally synchronized)
 
-      template<typename C>
-      requires is_component_of<E<Cs...>, C>
-      auto component(VecsHandle handle) noexcept	-> C;		///< Get copy of a component given type of component (internally synchronized)
+  		template<size_t I, typename C = vtll::Nth_type<E, I>>
+  		requires is_component_of<E, C>
+  		auto component_ptr(VecsHandle handle) noexcept	-> C*;	///< Get copy of a component given index of component (externally synchronized)
+
+  		template<typename C>
+  		requires is_component_of<E, C>
+  		auto component(VecsHandle handle) noexcept	-> C;		///< Get copy of a component given type of component (internally synchronized)
+
+  		template<typename C>
+  		requires is_component_of<E, C>
+  		auto component_ptr(VecsHandle handle) noexcept	-> C*;		///< Get copy of a component given type of component (externally synchronized)
 
       template<typename ET>
       requires is_tuple<ET, E<Cs...>>
