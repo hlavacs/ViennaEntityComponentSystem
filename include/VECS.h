@@ -1012,15 +1012,29 @@ namespace vecs {
 	* \returns the handle of the entity.
 	*/
 	template<typename E>
-	template<typename... CCs>
+	template<typename... Cs>
 	[[nodiscard]]
-	inline auto VecsRegistry<E>::transform(VecsHandle handle, CCs&&... args) noexcept	-> VecsHandle {
+	inline auto VecsRegistry<E>::transform(VecsHandle handle, Cs&&... args) noexcept	-> VecsHandle {
 		{
-			VecsReadLock lock(handle.mutex());
+			VecsWriteLock lock(handle.mutex()); //deadlock!
 			if (!contains(handle)) return {};	///< Return the empty component
 
-			auto index = m_component_table.insert(handle, &m_entity_table.comp_ref_idx<c_mutex>(handle.index()), std::forward<CCs>(args)...);	///< add data into component table
+			auto index = m_component_table.insert(handle, &m_entity_table.comp_ref_idx<c_mutex>(handle.index()));	///< add data into component table
+			
+			vtll::static_for<size_t, 0, vtll::size<E>::value >(
+				[&](auto i) {
+					using type = vtll::Nth_type<E, i>;
+					m_component_table.update<type>(index, VecsRegistry{}.component<type>(handle));
+				}
+			);
+
+			(m_component_table.update<Cs>(index, VecsRegistry{}.component<Cs>(handle)), ... );
 		}
+
+		//remove old row!!!
+
+		m_entity_table.comp_ref_idx<c_index>(handle.index()) = index;
+		m_entity_table.comp_ref_idx<c_type>(handle.index()) = vtll::index_of<VecsEntityTypeList,E>::value;
 
 		return handle;
 	}
