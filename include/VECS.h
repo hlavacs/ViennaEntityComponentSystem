@@ -1062,7 +1062,7 @@ namespace vecs {
 			}
 		);
 
-		(m_component_table.update<Cs>(index, std::forward<Cs>(args)), ... );	///< Move the arguments to the new entity type
+		m_component_table.update<Cs>(index, std::forward<Cs>(args)...);			///< Move the arguments to the new entity type
 
 		auto& map_index = m_entity_table.comp_ref_idx<c_index>(handle.index());	///< Index of olf component table in the map
 		m_dispatch[map_type]->eraseE(map_index);								///< Erase the entity from old component table
