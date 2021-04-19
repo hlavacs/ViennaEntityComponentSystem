@@ -72,7 +72,7 @@ int main() {
 
 		//--------------------------------------------------------------------------------------------------------------------------
 
-		TESTRESULT(++number, "update", h1.update(VeComponentPosition{ glm::vec3{-99.0f, -22.0f, -33.0f} }),
+		TESTRESULT(++number, "update", h1.update(VeComponentName{ "Node" }, VeComponentPosition{ glm::vec3{-99.0f, -22.0f, -33.0f} }),
 			(h1.component<VeComponentPosition>().m_position == glm::vec3{ -99.0f, -22.0f, -33.0f }), );
 
 		std::get<VeComponentPosition>(tup1).m_position = glm::vec3{ -9.0f, -255.0f, -3.0f };
@@ -85,13 +85,13 @@ int main() {
 		TESTRESULT(++number, "update handle", h1.update(VeComponentPosition{ glm::vec3{99.0f, 22.0f, 33.0f} }),
 			(h1.component<VeComponentPosition>().m_position == glm::vec3{ 99.0f, 22.0f, 33.0f }), );
 
-		TESTRESULT(++number, "update handle", h1.update<VeComponentPosition>(VeComponentPosition{ glm::vec3{-99.0f, -22.0f, -33.0f} }),
+		TESTRESULT(++number, "update handle", h1.update(VeComponentPosition{ glm::vec3{-99.0f, -22.0f, -33.0f} }),
 			(h1.component<VeComponentPosition>().m_position == glm::vec3{ -99.0f, -22.0f, -33.0f }), );
 
 		TESTRESULT(++number, "update registry", VecsRegistry{}.update(h1, VeComponentPosition{ glm::vec3{-90.0f, -22.0f, -33.0f} }),
 			(h1.component<VeComponentPosition>().m_position == glm::vec3{ -90.0f, -22.0f, -33.0f }), );
 
-		TESTRESULT(++number, "update registry", VecsRegistry{}.update<VeComponentPosition>(h1, VeComponentPosition{ glm::vec3{-98.0f, -20.0f, -33.0f} }),
+		TESTRESULT(++number, "update registry", VecsRegistry{}.update(h1, VeComponentName{ "Draw" }, VeComponentPosition{ glm::vec3{-98.0f, -20.0f, -33.0f} }),
 			(h1.component<VeComponentPosition>().m_position == glm::vec3{ -98.0f, -20.0f, -33.0f }), );
 
 		TESTRESULT(++number, "update registry", VecsRegistry<VeEntityTypeNode>{}.update(h1, VeComponentPosition{ glm::vec3{-97.0f, -22.0f, -33.0f} }),

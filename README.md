@@ -269,16 +269,11 @@ Again, all calls are finally handed to the last version, which then resolves the
 
 The last call is only a wrapper for the concept *is_component_of<VeEntityTypeNode,VeComponentPosition>* which is evaluated at compile time.
 
-You can update the value of a component through any of these update functions:
+You can update the value of one or many components through any of these update functions:
 
-    handle.update(VeComponentPosition{ glm::vec3{99.0f, 22.0f, 33.0f} };
-    handle.update<VeComponentPosition>(VeComponentPosition{ glm::vec3{-99.0f, -22.0f, -33.0f} });
-
+    handle.update(VeComponentPosition{ glm::vec3{99.0f, 22.0f, 33.0f}, VeComponentOrientation{} };
     VecsRegistry{}.update(handle, VeComponentPosition{ glm::vec3{-98.0f, -22.0f, -33.0f} });
-    VecsRegistry{}.update<VeComponentPosition>(handle, VeComponentPosition{ glm::vec3{-98.0f, -22.0f, -33.0f} });
-
-    VecsRegistry<VeEntityTypeNode>{}.update(handle, VeComponentPosition{ glm::vec3{-97.0f, -22.0f, -33.0f} });
-    VecsRegistry<VeEntityTypeNode>{}.update<VeComponentPosition>(handle, VeComponentPosition{ glm::vec3{-97.0f, -22.0f, -33.0f} }); //if handle of type VeEntityTypeNode
+    VecsRegistry<VeEntityTypeNode>{}.update(handle, VeComponentPosition{ glm::vec3{-97.0f, -22.0f, -33.0f } }, VeComponentOrientation{});
 
 Again, all calls are finally forwarded to the last version, which should only be called if it is certain that the entity does contain the component.
 

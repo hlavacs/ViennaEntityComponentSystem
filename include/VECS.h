@@ -203,9 +203,9 @@ namespace vecs {
 		requires is_tuple<ET>
 		auto update(ET&& ent) noexcept -> bool;		///< Update this entity using a std::tuple of the same type (internally synchronized)
 
-		template<typename C>
-		requires is_component_type<C>
-		auto update(C&& comp) noexcept -> bool;		///< Update a component of type C (internally synchroinized)
+		template<typename... Cs>
+		requires are_component_types<Cs...>
+		auto update(Cs&&... args) noexcept -> bool;		///< Update a component of type C (internally synchroinized)
 
 		auto erase() noexcept -> bool;				///< Erase the entity (internally synchroinized)
 
@@ -304,9 +304,9 @@ namespace vecs {
 		requires is_tuple<ET, E>
 		auto update(const index_t index, ET&& ent) noexcept		-> bool;
 
-		template<typename C>
-		requires is_component_of<E, C>
-		auto update(const index_t index, C&& comp) noexcept		-> bool;
+		template<typename... Cs>
+		requires are_components_of<E, Cs...>
+		auto update(const index_t index, Cs&&... args) noexcept		-> bool;
 
 		auto swap(index_t n1, index_t n2) -> bool { return m_data.swap(n1, n2); }
 
@@ -454,10 +454,11 @@ namespace vecs {
 	* \returns true if the operation was successful.
 	*/
 	template<typename E>
-	template<typename C>
-	requires is_component_of<E, C>
-	inline auto VecsComponentTable<E>::update(const index_t index, C&& comp) noexcept -> bool {
-		return m_data.update(index, std::forward<C>(comp));
+	template<typename... Cs>
+	requires are_components_of<E, Cs...>
+	inline auto VecsComponentTable<E>::update(const index_t index, Cs&&... args) noexcept -> bool {
+		( m_data.update(index, std::forward<Cs>(args)), ... );
+		return true;
 	}
 
 	/**
@@ -678,9 +679,9 @@ namespace vecs {
 		requires is_tuple<ET>
 		auto update(VecsHandle handle, ET&& ent) noexcept -> bool;		///< Update a whole entity with a tuple (internally synchronized)
 
-		template<typename C>
-		requires is_component_type<C>
-		auto update(VecsHandle handle, C&& comp) noexcept -> bool;		///< Update component of type C of an entity (internally synchronized)
+		template<typename... Cs>
+		requires are_component_types<Cs...>
+		auto update(VecsHandle handle, Cs&&... args) noexcept -> bool;		///< Update component of type C of an entity (internally synchronized)
 
 		//-------------------------------------------------------------------------
 		//erase
@@ -771,13 +772,14 @@ namespace vecs {
 	* \param[in] comp The component data.
 	* \returns true if the update was successful.
 	*/
-	template<typename C>
-	requires is_component_type<C>
-	auto VecsRegistryBaseClass::update(VecsHandle handle, C&& comp) noexcept -> bool {
+	template<typename... Cs>
+	requires are_component_types<Cs...>
+	auto VecsRegistryBaseClass::update(VecsHandle handle, Cs&&... args) noexcept -> bool {
 		if (!handle.is_valid()) return false;
 
 		/// Dispatch the call to the correct subclass and return result
-		return m_dispatch[type(handle)]->updateC(handle, vtll::index_of<VecsComponentTypeList, std::decay_t<C>>::value, (void*)&comp, sizeof(C));
+		( m_dispatch[type(handle)]->updateC(handle, vtll::index_of<VecsComponentTypeList, std::decay_t<Cs>>::value, (void*)&args, sizeof(Cs)), ... );
+		return true;
 	}
 
 	/**
@@ -917,9 +919,9 @@ namespace vecs {
 		requires is_tuple<ET, E>
 		auto update(VecsHandle handle, ET&& ent) noexcept	-> bool;		///< Update a whole entity with the given tuple (internally synchronized)
 
-		template<typename C> 
-		requires is_component_of<E, C>
-		auto update(VecsHandle handle, C&& comp) noexcept	-> bool;		///< Update one component of an entity (internally synchronized)
+		template<typename... Cs> 
+		requires are_components_of<E, Cs...>
+		auto update(VecsHandle handle, Cs&&... args) noexcept	-> bool;		///< Update one component of an entity (internally synchronized)
 
 		//-------------------------------------------------------------------------
 		//erase
@@ -1228,13 +1230,13 @@ namespace vecs {
 	* \returns true if the operation was successful.
 	*/
 	template<typename E>
-	template<typename C>
-	requires is_component_of<E, C>
-	inline auto VecsRegistry<E>::update( VecsHandle handle, C&& comp) noexcept -> bool {
+	template<typename... Cs>
+	requires are_components_of<E, Cs...>
+	inline auto VecsRegistry<E>::update( VecsHandle handle, Cs&&... args) noexcept -> bool {
 		VecsWriteLock lock(handle.mutex());
-		if constexpr (!vtll::has_type<E, std::decay_t<C>>::value) { return false; }
+		//if constexpr (!vtll::has_type<E, std::decay_t<Cs>>::value) { return false; }
 		if (!contains(handle)) return false;
-		m_component_table.update<C>(handle.m_entity_index, std::forward<C>(comp));
+		m_component_table.update(handle.m_entity_index, std::forward<Cs>(args)...);
 		return true;
 	}
 
@@ -1533,10 +1535,10 @@ namespace vecs {
 	* \param[in] comp Universal reference to the component data.
 	* \returns true if the operation was successful.
 	*/
-	template<typename C>
-	requires is_component_type<C>
-	inline auto VecsHandle::update(C&& comp) noexcept			-> bool {
-		return VecsRegistryBaseClass().update<C>(*this, std::forward<C>(comp));
+	template<typename... Cs>
+	requires are_component_types<Cs...>
+	inline auto VecsHandle::update(Cs&&... args) noexcept			-> bool {
+		return VecsRegistryBaseClass().update(*this, std::forward<Cs>(args)...);
 	}
 
 	/**
