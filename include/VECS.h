@@ -30,15 +30,6 @@ using namespace std::chrono_literals;
 
 namespace vecs {
 
-	/** 
-	* \brief Component type list: a list with all component types that an entity can have.
-	* 
-	* It is the sum of the components of the engine part, and the components as defined by the engine user
-	*/
-	using VecsComponentTypeList = vtll::cat< VeSystemComponentTypeList, VeUserComponentTypeList >;
-
-	static_assert(vtll::unique<VecsComponentTypeList>::value, "The elements of VecsComponentTypeList are not unique!");
-
 	/**
 	* \brief Entity type list: a list with all possible entity types the ECS can deal with.
 	* 
@@ -48,6 +39,13 @@ namespace vecs {
 	using VecsEntityTypeList = vtll::cat< VeSystemEntityTypeList, VeUserEntityTypeList >;
 
 	static_assert(vtll::are_unique<VecsEntityTypeList>::value, "The elements of VecsEntityTypeList lists are not unique!");
+
+	/**
+	* \brief Component type list: a list with all component types that an entity can have.
+	*
+	* It is the sum of the components of the engine part, and the components as defined by the engine user
+	*/
+	using VecsComponentTypeList = vtll::remove_duplicates< vtll::flatten<VecsEntityTypeList> >;
 
 	/**
 	* \brief Table size map: a VTLL map specifying the default sizes for component tables.

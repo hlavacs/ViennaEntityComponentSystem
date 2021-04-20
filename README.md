@@ -83,22 +83,12 @@ If you create your own game engine and use VECS as its core ECS, simply include 
 
     //...
 
-You can define arbitrarily many components like this. All component types must be put into this list:
-
-    using VeSystemComponentTypeList = vtll::type_list<
-        VeSystemComponentName
-      , VeSystemComponentPosition
-      //, ...
-    >;
-
 Once you have defined your component types, you can compose entities with them:
 
-    using VeSystemEntityTypeNode
-      = vtll::type_list<VeSystemComponentName, VeSystemComponentPosition>;
+    using VeSystemEntityTypeNode = vtll::type_list<VeSystemComponentName, VeSystemComponentPosition>;
 
 In this example, an entity type VeSystemEntityTypeNode is composed of the components VeSystemComponentName and VeSystemComponentPosition.
-You can define arbitrarily many entities like this. All entity
-types must be put into this list:
+You can define arbitrarily many entities like this. All entity types must be put into this list:
 
     using VeSystemEntityTypeList = vtll::type_list<
       VeSystemEntityTypeNode
@@ -138,13 +128,6 @@ If you are a user of a given game engine using VECS, you can edit the file *VECS
     struct VeComponentOrientation {
       glm::quat m_orientation;
     };
-
-    using VeUserComponentTypeList = vtll::type_list<
-        VeComponentName
-      , VeComponentPosition
-      , VeComponentOrientation
-      //, ...
-    >;
 
     using VeEntityTypeNode = vtll::type_list< VeComponentName, VeComponentPosition, VeComponentOrientation >;
 

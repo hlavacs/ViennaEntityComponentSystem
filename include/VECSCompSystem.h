@@ -26,12 +26,6 @@ namespace vecs {
 	//	std::string m_name;
 	//};
 
-	/** \brief List of all system components*/
-	using VeSystemComponentTypeList = vtll::type_list<
-		//VeSystemComponentName
-		//, ...
-	>;
-
 	//-------------------------------------------------------------------------
 	//engine entity types
 

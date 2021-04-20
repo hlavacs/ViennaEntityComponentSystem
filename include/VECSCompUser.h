@@ -40,12 +40,6 @@ namespace vecs {
 	//};
 
 
-	using VeUserComponentTypeList = vtll::type_list<
-		//VeComponentPosition
-		//, VeComponentOrientation
-		//, ...
-	>;
-
 	//-------------------------------------------------------------------------
 	//define user entity types here
 
