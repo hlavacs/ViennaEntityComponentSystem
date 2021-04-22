@@ -37,6 +37,12 @@ int main() {
 	VeComponentGeometry geo{ 11 };
 
 	{
+		auto range = VecsRange<VeComponentName>{};
+		auto it = range.begin();
+		auto res = *it;
+	}
+
+	{
 		TESTRESULT(++number, "size", , (VecsRegistry().size() == 0 && VecsRegistry<VeEntityTypeNode>().size() == 0 && VecsRegistry<VeEntityTypeDraw>().size() == 0), );
 
 		TESTRESULT(++number, "insert",
@@ -124,6 +130,10 @@ int main() {
 		int i = 0;
 		bool test = true;
 
+		auto range = VecsRange<VeComponentName>{};
+		auto it = range.begin();
+		auto res = *it;
+
 		for (auto&& [handle, name] : VecsRange<VeComponentName>{}) {
 			VecsReadLock lock( handle.mutex() );
 			if (!handle.has_value()) continue;
@@ -139,14 +149,14 @@ int main() {
 		const int num = 1000;
 
 		for (int i = 0; i < num; i++) {
-			auto h1 = VecsRegistry<VeEntityTypeNode>{}.insert(VeComponentName{ "Node" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentTransform{});
+			auto h1 = VecsRegistry<VeEntityTypeTaggedNode<>>{}.insert(VeComponentName{ "Node" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentTransform{});
 			auto h2 = VecsRegistry<VeEntityTypeDraw>{}.insert(VeComponentName{ "Draw" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentMaterial{ 1 }, VeComponentGeometry{ 1 });
 		}
 		TESTRESULT(++number, "system create", , (VecsRegistry().size() == 2 * num), );
 
 		int i = 0;
 		bool test = true;
-		for (auto&& [handle, name, pos, orient, trans] : VecsRange<VeEntityTypeNode>{}) {
+		for (auto&& [handle, name, pos, orient, trans] : VecsRange<VeEntityTypeTaggedNode<>>{}) {
 			VecsReadLock lock(handle.mutex());
 			if (!handle.has_value()) continue;
 			++i;

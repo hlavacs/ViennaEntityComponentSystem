@@ -69,6 +69,9 @@ namespace vecs {
 
 			using difference_type = size_t;
 
+			static inline value_type			m_dummy;
+			static inline std::atomic<uint32_t> m_dummy_mutex;
+
 			VecsIterator(bool is_end = false) noexcept;		///< Constructor that should be called always from outside
 			VecsIterator(const VecsIterator& v) noexcept;		///< Copy constructor
 
@@ -384,6 +387,9 @@ namespace vecs {
 			reference operator()(index_t index) {
 				return std::forward_as_tuple(VecsComponentTable<E>().handle(index), VecsComponentTable<E>().component<Cs>(index)...);
 			}
+			reference dummy() {
+				return std::forward_as_tuple(VecsHandle{}, std::get<Cs>(VecsIterator<Ts...>::m_dummy)...);
+			}
 		};
 
 	public:
@@ -430,6 +436,9 @@ namespace vecs {
 	*/
 	template<typename E, typename... Ts>
 	inline auto VecsIteratorEntity<E, Ts...>::mutex() noexcept		-> std::atomic<uint32_t>* {
+		if (this->m_current_index.value >= VecsRegistry<E>{}.size()) {
+			return &VecsIterator<Ts...>::m_dummy_mutex;
+		}
 		return VecsComponentTable<E>().mutex(this->m_current_index);
 	}
 
@@ -439,6 +448,9 @@ namespace vecs {
 	*/
 	template<typename E, typename... Ts>
 	inline auto VecsIteratorEntity<E, Ts...>::operator*() noexcept	-> reference {
+		if (this->m_current_index.value >= VecsRegistry<E>{}.size()) {
+			return component_access<component_types>{}.dummy();
+		}
 		return component_access<component_types>{}(this->m_current_index);
 	};
 
@@ -518,7 +530,7 @@ namespace vecs {
 				m_dispatch[i] = std::make_unique<VecsIteratorEntity<type, Ts...>>(is_end);
 				auto size = m_dispatch[i]->size();
 				m_size += size;
-				if (!is_end && size == 0 && i + 1 < vtll::size<entity_types>::value) {
+				if (!is_end && m_current_iterator == i && size == 0 && i + 1 < vtll::size<entity_types>::value) {
 					m_current_iterator++;
 				}
 			}
