@@ -76,10 +76,6 @@ namespace vecs {
 
 	using VeUserEntityTypeList = vtll::type_list<
 		VeEntityTypeNode
-		, VeEntityTypeTaggedNode<>
-		, VeEntityTypeTaggedNode<TAG1>
-		, VeEntityTypeTaggedNode<TAG2>
-		, VeEntityTypeTaggedNode<TAG1, TAG2>
 		, VeEntityTypeDraw
 		, VeEntityTypeAnimation
 		// ,... 

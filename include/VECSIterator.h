@@ -69,10 +69,10 @@ namespace vecs {
 
 			using difference_type = size_t;
 
-			static inline value_type			m_dummy;
-			static inline std::atomic<uint32_t> m_dummy_mutex;
+			static inline value_type			m_dummy;		///< Dummy values for returning references to if the handle is not valid
+			static inline std::atomic<uint32_t> m_dummy_mutex;	///< Dummy mutex for returning pointer to if the handle is not valid
 
-			VecsIterator(bool is_end = false) noexcept;		///< Constructor that should be called always from outside
+			VecsIterator(bool is_end = false) noexcept;			///< Constructor that should be called always from outside
 			VecsIterator(const VecsIterator& v) noexcept;		///< Copy constructor
 
 			auto operator=(const VecsIterator& v) noexcept			-> VecsIterator<Ts...>;	///< Copy
@@ -436,7 +436,7 @@ namespace vecs {
 	*/
 	template<typename E, typename... Ts>
 	inline auto VecsIteratorEntity<E, Ts...>::mutex() noexcept		-> std::atomic<uint32_t>* {
-		if (this->m_current_index.value >= VecsRegistry<E>{}.size()) {
+		if (this->m_current_index.value >= VecsIterator<Ts...>{}.size()) {
 			return &VecsIterator<Ts...>::m_dummy_mutex;
 		}
 		return VecsComponentTable<E>().mutex(this->m_current_index);
@@ -448,7 +448,7 @@ namespace vecs {
 	*/
 	template<typename E, typename... Ts>
 	inline auto VecsIteratorEntity<E, Ts...>::operator*() noexcept	-> reference {
-		if (this->m_current_index.value >= VecsRegistry<E>{}.size()) {
+		if (this->m_current_index.value >= VecsIterator<Ts...>{}.size()) {
 			return component_access<component_types>{}.dummy();
 		}
 		return component_access<component_types>{}(this->m_current_index);
@@ -479,22 +479,22 @@ namespace vecs {
 			}
 
 			auto split(size_t N) noexcept {
-				std::pmr::vector<VecsRange<Ts...>> result;
-				result.reserve(N);
-				size_t remain = m_begin.size();
-				size_t num = remain / N;
-				if (num * N < remain) ++num;
-				auto b = m_begin;
-				while (remain > 0 && b != m_end) {
-					if (remain > num) {
+				std::pmr::vector<VecsRange<Ts...>> result;	///< Result vector
+				result.reserve(N);							///< Need exactly N slots
+				size_t remain = m_begin.size();				///< Remaining entities
+				size_t num = remain / N;					///< Put the same number in each slot
+				if (num * N < remain) ++num;				///< We might need one more per slot
+				auto b = m_begin;							///< Begin iterator
+				while (remain > 0 && b != m_end) {			///< While there are remaining entities
+					if (remain > num) {						///< At least two slots left
 						size_t delta = (remain > num ? num : remain) - 1;
 						VecsIterator<Ts...> e = b + delta;
 						result.emplace_back(VecsRange(b, e));
 						remain -= (delta + 1);
 						b = e + 1;
 					}
-					else {
-						result.emplace_back(VecsRange(b, m_end));
+					else {											///< One last slot left
+						result.emplace_back(VecsRange(b, m_end));	///< Range lasts to the endf
 						remain = 0;
 					}
 				};

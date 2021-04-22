@@ -1344,6 +1344,27 @@ namespace vtll {
 		"The implementation of sum_value is bad");
 
 	//-------------------------------------------------------------------------
+	//power_set
+
+	/*namespace detail {
+		template <typename Seq>
+		struct power_set_impl;
+
+		template < template<typename...> typename Seq, typename... Ts, typename T>
+		struct power_set_impl<Seq<T, Ts...>> {
+			using type = cat< type_list<T>, power_set_impl<Ts...>  >;
+		};
+	}
+
+	template <typename Seq>
+	using power_set = typename detail::power_set_impl<Seq>::type;
+
+	static_assert(
+		std::is_same_v< power_set< value_list<char, int> >
+			, type_list< type_list<>, type_list<char>, type_list<int>, type_list<char, int>>  >,
+		"The implementation of power_set is bad");
+		*/
+	//-------------------------------------------------------------------------
 	//is_pow2_value: test whether a value is a power of 2
 
 	template <size_t I>
@@ -1353,7 +1374,6 @@ namespace vtll {
 
 	static_assert(is_pow2_value<64>(), "The implementation of is_pow2 is bad");
 	static_assert(!is_pow2_value<63>(), "The implementation of is_pow2 is bad");
-
 
 	//-------------------------------------------------------------------------
 	//function_value: compute function on a list of size_t s

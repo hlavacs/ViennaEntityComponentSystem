@@ -146,17 +146,21 @@ int main() {
 
 
 	{
-		const int num = 1000;
+		const int num = 100;
 
 		for (int i = 0; i < num; i++) {
-			auto h1 = VecsRegistry<VeEntityTypeTaggedNode<>>{}.insert(VeComponentName{ "Node" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentTransform{});
+			auto h1 = VecsRegistry<VeEntityTypeNode>{}.insert(VeComponentName{ "Node" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentTransform{});
 			auto h2 = VecsRegistry<VeEntityTypeDraw>{}.insert(VeComponentName{ "Draw" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentMaterial{ 1 }, VeComponentGeometry{ 1 });
 		}
-		TESTRESULT(++number, "system create", , (VecsRegistry().size() == 2 * num), );
+		TESTRESULT(++number, "system create", , (VecsRegistry().size() == 2 * num && VecsRegistry<VeEntityTypeNode>().size() == num && VecsRegistry<VeEntityTypeNode>().size() == num), );
+
+		VecsRange<VeComponentName> range0;
+		auto it0 = range0.begin();
+		auto res = *it0;
 
 		int i = 0;
 		bool test = true;
-		for (auto&& [handle, name, pos, orient, trans] : VecsRange<VeEntityTypeTaggedNode<>>{}) {
+		for (auto&& [handle, name, pos, orient, trans] : VecsRange<VeEntityTypeNode>{}) {
 			VecsReadLock lock(handle.mutex());
 			if (!handle.has_value()) continue;
 			++i;
@@ -166,9 +170,11 @@ int main() {
 		i = 0;
 		VecsRegistry().for_each<VeComponentName>([&](auto handle, auto& name) {
 			++i;
-			if (name.m_name != "Node" && name.m_name != "Draw") { test = false; }
-			name.m_name = "Name Holder " + std::to_string(i);
+			if (name.m_name != "Node" && name.m_name != "Draw") { 
+				test = false; 
+			}
 			//std::cout << "Entity " << name.m_name << " " << i << "\n";
+			name.m_name = "Name Holder " + std::to_string(i);
 			});
 
 		i = 0;

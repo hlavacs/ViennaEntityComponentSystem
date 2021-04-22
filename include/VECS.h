@@ -203,7 +203,7 @@ namespace vecs {
 
 		template<typename... Cs>
 		requires are_component_types<Cs...>
-		auto update(Cs&&... args) noexcept -> bool;		///< Update a component of type C (internally synchroinized)
+		auto update(Cs&&... args) noexcept -> bool;	///< Update a component of type C (internally synchroinized)
 
 		auto erase() noexcept -> bool;				///< Erase the entity (internally synchroinized)
 
@@ -304,7 +304,7 @@ namespace vecs {
 
 		template<typename... Cs>
 		requires are_components_of<E, Cs...>
-		auto update(const index_t index, Cs&&... args) noexcept		-> bool;
+		auto update(const index_t index, Cs&&... args) noexcept	-> bool;
 
 		auto swap(index_t n1, index_t n2) -> bool { return m_data.swap(n1, n2); }
 
