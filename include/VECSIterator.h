@@ -523,12 +523,11 @@ namespace vecs {
 		public:
 	};
 
-	/*template<typename E, typename... Cs>
+	template<typename E, typename... Cs>
 	requires (is_entity_type<E> && sizeof...(Cs)>0 && are_component_types<Cs...>)
 	class VecsRange<E, Cs...>
-		: public VecsRangeBaseClass< vtll::type_list<E>,
-		> {
-	};*/
+		: public VecsRangeBaseClass< vtll::filter_have_all_types< VecsEntityTypeList, vtll::cat< E, vtll::type_list<Cs...> > >, E > {
+	};
 
 	template<>
 	class VecsRange<> : public VecsRangeBaseClass < VecsEntityTypeList, VecsComponentTypeList > {
@@ -536,6 +535,8 @@ namespace vecs {
 	};
 
 
+	//-------------------------------------------------------------------------
+	//VecsRangeBaseClass - left over
 
 	/**
 	* \brief Constructor of class VecsIteratorBaseClass. If its not an end iterator then it also
