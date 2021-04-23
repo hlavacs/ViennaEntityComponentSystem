@@ -71,7 +71,7 @@ namespace vecs {
 	using VeEntityTypeAnimation = vtll::type_list<VeComponentName, VeComponentAnimation>;
 
 	template<typename... Ts>
-	using VeEntityTypeTaggedNode = vtll::cat< VeEntityTypeNode, vtll::type_list<Ts...> >;
+	using VeEntityTypeNodeTagged = vtll::cat< VeEntityTypeNode, vtll::type_list<Ts...> >;
 
 
 	using VeUserEntityTypeList = vtll::type_list<

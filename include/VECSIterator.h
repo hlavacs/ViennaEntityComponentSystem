@@ -17,7 +17,7 @@ namespace vecs {
 
 	template<typename... Ts>
 	requires (are_component_types<Ts...> || are_entity_types<Ts...>)
-		class VecsIterator {
+	class VecsIterator {
 
 		public:
 			using entity_types = typename std::conditional_t<are_component_types<Ts...>
