@@ -1407,7 +1407,7 @@ namespace vtll {
 		template < template<typename...> typename Seq, typename... Ts, typename T>
 		struct power_set_impl<Seq<T, Ts...>> {
 			using ps = power_set_impl<Ts...>;
-			using type = cat< ps, transform_front< ps, cat, T > >;
+			using type = cat< ps, transform_front< ps, cat, type_list<T> > >;
 		};
 	}
 
@@ -1419,8 +1419,8 @@ namespace vtll {
 		>, "The implementation of power_set is bad");
 
 	/*static_assert(
-		std::is_same_v< power_set< type_list<char, int> >
-			, type_list< type_list<>, type_list<char>, type_list<int>, type_list<char, int>>  
+		std::is_same_v< power_set< type_list<int, char> >
+			, type_list< type_list<>, type_list<char>, type_list<int>, type_list<int, char>>  
 		> , "The implementation of power_set is bad");*/
 
 	//-------------------------------------------------------------------------
