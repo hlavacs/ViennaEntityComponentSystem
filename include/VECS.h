@@ -137,10 +137,10 @@ namespace vecs {
 	template<typename E> class VecsComponentTable;
 	class VecsRegistryBaseClass;
 	template<typename E> class VecsRegistry;
-	template<typename... Ts> requires (are_component_types<Ts...> || are_entity_types<Ts...>) class VecsIterator;
-	template<typename... Cs> class VecsIteratorEntityBaseClass;
-	template<typename E, typename... Cs> class VecsIteratorEntity;
-	template<typename... Cs> requires (are_component_types<Cs...> || are_entity_types<Cs...>) class VecsRange;
+	template<typename... Ts> class VecsIterator;
+	template<typename ETL, typename CTL> class VecsIteratorEntityBaseClass;
+	template<typename E, typename ETL, typename CTL> class VecsIteratorEntity;
+	template<typename... Ts> class VecsRange;
 
 
 	/** 
@@ -242,8 +242,8 @@ namespace vecs {
 		template<typename E, size_t I> friend class VecsComponentAccessorDerived;
 		friend class VecsRegistryBaseClass;
 		template<typename E> friend class VecsRegistry;
-		template<typename... Ts> requires (are_component_types<Ts...> || are_entity_types<Ts...>) friend class VecsIterator;
-		template<typename E, typename... Cs> friend class VecsIteratorEntity;
+		template<typename... Ts> friend class VecsIterator;
+		template<typename E, typename ETL, typename CTL> friend class VecsIteratorEntity;
 
 	protected:
 		using value_type = vtll::to_tuple<E>;			///< A tuple storing all components of entity of type E
@@ -697,7 +697,9 @@ namespace vecs {
 
 		template<typename... Cs>
 		requires are_component_types<Cs...>
-		auto for_each(std::function<typename Functor<vtll::type_list<Cs...>>::type> f) -> void { for_each(VecsRange<Cs...>{}, f); }		///< Loop over components (internally synchronized)
+		auto for_each(std::function<typename Functor<vtll::type_list<Cs...>>::type> f) -> void { 
+			for_each(VecsRange<Cs...>{}, f); 		///< Loop over components (internally synchronized)
+		}
 
 		template<template<typename...> typename R, typename... Es>
 		requires (std::is_same_v<R<Es...>, VecsRange<Es...>> && are_entity_types<Es...>)
@@ -705,7 +707,9 @@ namespace vecs {
 
 		template<typename... Es>
 		requires are_entity_types<Es...>
-		auto for_each(std::function<typename Functor<typename VecsIterator<Es...>::component_types>::type> f) -> void { for_each(VecsRange<Es...>{}, f); }	///< Loop over entities (internally synchronized)
+		auto for_each(std::function<typename Functor<typename VecsIterator<Es...>::component_types>::type> f) -> void { 
+			for_each(VecsRange<Es...>{}, f);		///< Loop over entities (internally synchronized)
+		}	
 
 		//-------------------------------------------------------------------------
 		//utility
@@ -1464,7 +1468,8 @@ namespace vecs {
 	*/
 	template<template<typename...> typename R, typename... Es>
 	requires (std::is_same_v<R<Es...>, VecsRange<Es...>> && are_entity_types<Es...>)
-	inline auto VecsRegistryBaseClass::for_each(R<Es...>&& range, std::function<typename Functor<typename VecsIterator<Es...>::component_types>::type> f) -> void {
+	inline auto VecsRegistryBaseClass
+		::for_each(R<Es...>&& range, std::function<typename Functor<typename VecsIterator<Es...>::component_types>::type> f) -> void {
 		auto b = range.begin();
 		auto e = range.end();
 		for (; b != e; ++b) {
