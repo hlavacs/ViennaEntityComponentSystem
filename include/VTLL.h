@@ -1396,24 +1396,29 @@ namespace vtll {
 
 		template<template<typename...> typename Seq>
 		struct power_set_impl<Seq<>> {
-			using type = type_list<>;
+			using type = type_list<type_list<>>;
+		};
+
+		template<template<typename...> typename Seq, typename T>
+		struct power_set_impl<Seq<T>> {
+			using type = type_list<type_list<>, type_list<T>>;
 		};
 
 		template < template<typename...> typename Seq, typename... Ts, typename T>
 		struct power_set_impl<Seq<T, Ts...>> {
 			using ps = power_set_impl<Ts...>;
-			using type = cat< ps, transform_front< ps, cat, type_list<T> > >;
+			using type = cat< ps, transform_front< ps, cat, T > >;
 		};
 	}
 
 	template <typename Seq>
 	using power_set = typename detail::power_set_impl<Seq>::type;
 
-	/*static_assert(
+	static_assert(
 		std::is_same_v< power_set< type_list<char> >, type_list< type_list<>, type_list<char> >
 		>, "The implementation of power_set is bad");
 
-	static_assert(
+	/*static_assert(
 		std::is_same_v< power_set< type_list<char, int> >
 			, type_list< type_list<>, type_list<char>, type_list<int>, type_list<char, int>>  
 		> , "The implementation of power_set is bad");*/
