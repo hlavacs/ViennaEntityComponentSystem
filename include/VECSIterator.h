@@ -35,7 +35,7 @@ namespace vecs {
 			using pointer			= vtll::to_tuple< vtll::cat< vtll::type_list<VecsHandle>, vtll::to_ptr<CTL> > >;
 			using iterator_category = std::forward_iterator_tag;
 			using difference_type	= size_t;
-			using last_type = vtll::back<ETL>;	///< last type for end iterator
+			using last_type			= vtll::back<ETL>;	///< last type for end iterator
 
 			static inline value_type			m_dummy;		///< Dummy values for returning references to if the handle is not valid
 			static inline std::atomic<uint32_t> m_dummy_mutex;	///< Dummy mutex for returning pointer to if the handle is not valid
@@ -58,71 +58,6 @@ namespace vecs {
 			virtual auto is_vector_end() noexcept	-> bool;					///< Is currently at the end of any sub iterator
 			virtual auto size() noexcept			-> size_t;					///< Number of valid entities
 	};
-
-
-	template<typename... Ts>
-	class VecsIterator;
-
-	template<typename... Es>
-	requires are_entity_types<Es...>
-	class VecsIterator<Es...> 
-		: public VecsIteratorBaseClass< vtll::type_list<Es...>, vtll::intersection< vtll::type_list<Es...> > > {
-	public:
-		using component_types = vtll::intersection< vtll::type_list<Es...> >;
-	};
-
-	template<typename... Cs>
-	requires are_component_types<Cs...>
-	class VecsIterator<Cs...> 
-		: public VecsIteratorBaseClass< vtll::filter_have_all_types< VecsEntityTypeList, vtll::type_list<Cs...> >, vtll::type_list<Cs...> > {
-	public:
-		using component_types = vtll::type_list<Cs...>;
-	};
-
-	/*template<typename E, typename... Cs>
-	requires (is_entity_type<E> && sizeof...(Cs)>0 && are_component_types<Cs...>)
-	class VecsIterator<E, Cs...> 
-		: public VecsIteratorBaseClass< vtll::type_list<E>, 
-		> {
-	};*/
-
-	/*template<>
-	class VecsIterator<> : public VecsIteratorBaseClass < VecsEntityTypeList, VecsComponenTypeList > {
-	public:
-	};*/
-
-
-
-	//----------------------------------------------------------------------------------------------
-
-	/**
-	* \brief Iterator that iterates over a VecsComponentTable of type E
-	* and that is intested into components Ts
-	*/
-	template<typename ETL, typename CTL>
-	class VecsIteratorEntityBaseClass {
-		friend class VecsIteratorBaseClass<ETL, CTL>;
-
-	protected:
-		index_t m_current_index{ 0 };		///< Current index in the VecsComponentTable<E>
-		bool	m_is_end{ false };			///< True if this is an end iterator (for stopping the loop)
-		size_t	m_sizeE{ 0 };				///< Number of entities of type E
-
-	public:
-		VecsIteratorEntityBaseClass(bool is_end = false) noexcept : m_is_end(is_end) {};
-		virtual auto handle() noexcept		-> VecsHandle = 0;
-		virtual auto mutex() noexcept		-> std::atomic<uint32_t>* = 0;
-		virtual auto has_value() noexcept	-> bool = 0;
-		virtual auto operator*() noexcept	-> typename VecsIteratorBaseClass<ETL,CTL>::reference = 0;
-
-		auto operator++() noexcept			-> void;
-		auto operator++(int) noexcept		-> void;
-		auto is_vector_end() noexcept		-> bool;
-		auto size() noexcept				-> size_t;
-	};
-
-
-	//----------------------------------------------------------------------------------------------
 
 
 	/**
@@ -313,8 +248,85 @@ namespace vecs {
 	}
 
 
+	//----------------------------------------------------------------------------------------------
+	//VecsIterator - derived from VecsIteratorBaseClass
+
+
+	template<typename... Ts>
+	class VecsIterator;
+
+	/**
+	* \brief Iterator for given entity types.
+	*/
+	template<typename... Es>
+	requires are_entity_types<Es...>
+		class VecsIterator<Es...>
+		: public VecsIteratorBaseClass< vtll::type_list<Es...>, vtll::intersection< vtll::type_list<Es...> > > {
+		public:
+			using component_types = vtll::intersection< vtll::type_list<Es...> >;
+	};
+
+	/**
+	* \brief Iterator for given component types.
+	*/
+	template<typename... Cs>
+	requires are_component_types<Cs...>
+		class VecsIterator<Cs...>
+		: public VecsIteratorBaseClass< vtll::filter_have_all_types< VecsEntityTypeList, vtll::type_list<Cs...> >, vtll::type_list<Cs...> > {
+		public:
+			using component_types = vtll::type_list<Cs...>;
+	};
+
+	/**
+	* \brief Iterator for all entities having certain tag components
+	*/
+	template<typename E, typename... Cs>
+	requires (is_entity_type<E> && sizeof...(Cs)>0 && are_component_types<Cs...>)
+	class VecsIterator<E, Cs...>
+		: public VecsIteratorBaseClass< vtll::filter_have_all_types< VecsEntityTypeList, vtll::cat< E, vtll::type_list<Cs...> > >, E > {
+	public:
+		using component_types = E;
+	};
+
+	/**
+	* \brief Iterator for all entities.
+	*/
+	template<>
+	class VecsIterator<> : public VecsIteratorBaseClass < VecsEntityTypeList, VecsComponentTypeList > {
+	public:
+		using component_types = VecsComponentTypeList;
+	};
+
+
 	//-------------------------------------------------------------------------
 	//VecsIteratorEntityBaseClass
+
+	/**
+	* \brief Iterator that iterates over a VecsComponentTable of type E
+	* and that is intested into components Ts
+	*/
+	template<typename ETL, typename CTL>
+	class VecsIteratorEntityBaseClass {
+		friend class VecsIteratorBaseClass<ETL, CTL>;
+
+	protected:
+		index_t m_current_index{ 0 };		///< Current index in the VecsComponentTable<E>
+		bool	m_is_end{ false };			///< True if this is an end iterator (for stopping the loop)
+		size_t	m_sizeE{ 0 };				///< Number of entities of type E
+
+	public:
+		VecsIteratorEntityBaseClass(bool is_end = false) noexcept : m_is_end(is_end) {};
+		virtual auto handle() noexcept		-> VecsHandle = 0;
+		virtual auto mutex() noexcept		-> std::atomic<uint32_t>* = 0;
+		virtual auto has_value() noexcept	-> bool = 0;
+		virtual auto operator*() noexcept	-> typename VecsIteratorBaseClass<ETL, CTL>::reference = 0;
+
+		auto operator++() noexcept			-> void;
+		auto operator++(int) noexcept		-> void;
+		auto is_vector_end() noexcept		-> bool;
+		auto size() noexcept				-> size_t;
+	};
+
 
 	/**
 	* \brief Point to the next entity.
