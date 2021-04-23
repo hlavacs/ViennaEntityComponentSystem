@@ -74,11 +74,14 @@ namespace vecs {
 	using VeEntityTypeNodeTagged = vtll::cat< VeEntityTypeNode, vtll::type_list<Ts...> >;
 
 
-	using VeUserEntityTypeList = vtll::type_list<
-		VeEntityTypeNode
-		, VeEntityTypeDraw
-		, VeEntityTypeAnimation
-		// ,... 
+	using VeUserEntityTypeList = vtll::cat< 
+		vtll::type_list<
+			VeEntityTypeNode
+			, VeEntityTypeDraw
+			, VeEntityTypeAnimation
+			// ,...
+		>
+		, vtll::type_list<>
 	>;
 
 	//-------------------------------------------------------------------------

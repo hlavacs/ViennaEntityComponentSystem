@@ -243,10 +243,10 @@ namespace vtll {
 		"The implementation of index_of is bad");
 
 	//-------------------------------------------------------------------------
-	//cat: concatenate two type lists to one big type list, the result is of the first list type
+	//cat: concatenate type lists to one big type list, the result is of the first list type
 
 	namespace detail {
-		template <typename Seq1, typename Seq2>
+		template <typename... Seq>
 		struct cat_impl;
 
 		template <template <typename...> typename Seq1, template <typename...> typename Seq2>
@@ -263,13 +263,23 @@ namespace vtll {
 		struct cat_impl<Seq1<Ts1...>, Seq2<T, Ts2...>> {
 			using type = typename cat_impl<Seq1<Ts1..., T>, Seq2<Ts2...>>::type;
 		};
+
+		template <typename Seq1, typename Seq2, typename... Seq>
+		struct cat_impl<Seq1, Seq2, Seq...> {
+			using type0 = typename cat_impl<Seq1, Seq2>::type;
+			using type = typename cat_impl<type0, Seq...>::type;
+		};
 	}
 
-	template <typename Seq1, typename Seq2>
-	using cat = typename detail::cat_impl<Seq1, Seq2>::type;
+	template <typename... Seq>
+	using cat = typename detail::cat_impl<Seq...>::type;
 
 	static_assert(
 		std::is_same_v< cat< type_list<double, int>, detail::type_list2<char, float> >, type_list<double, int, char, float> >,
+		"The implementation of cat is bad");
+
+	static_assert(
+		std::is_same_v< cat< type_list<double, int>, type_list<char, float>, type_list<int, float> >, type_list<double, int, char, float, int, float> >,
 		"The implementation of cat is bad");
 
 	//-------------------------------------------------------------------------
@@ -1120,6 +1130,42 @@ namespace vtll {
 		"The implementation of intersection is bad");
 
 	//-------------------------------------------------------------------------
+	//power_set: turn a set into a set of all subsets
+
+	namespace detail {
+		template <typename Seq>
+		struct power_set_impl;
+
+		template<template<typename...> typename Seq>
+		struct power_set_impl<Seq<>> {
+			using type = type_list<type_list<>>;
+		};
+
+		template<template<typename...> typename Seq, typename T>
+		struct power_set_impl<Seq<T>> {
+			using type = type_list<type_list<>, type_list<T>>;
+		};
+
+		template < template<typename...> typename Seq, typename... Ts, typename T>
+		struct power_set_impl<Seq<T, Ts...>> {
+			using ps = typename power_set_impl<type_list<Ts...>>::type;
+			using type = cat< ps, transform_front< ps, cat, type_list<T> > >;
+		};
+	}
+
+	template <typename Seq>
+	using power_set = typename detail::power_set_impl<Seq>::type;
+
+	static_assert(
+		std::is_same_v< power_set< type_list<char> >, type_list< type_list<>, type_list<char> >
+		>, "The implementation of power_set is bad");
+
+	static_assert(
+		std::is_same_v< power_set< type_list<int, char> >
+		, type_list< type_list<>, type_list<char>, type_list<int>, type_list<int, char>>
+		>, "The implementation of power_set is bad");
+
+	//-------------------------------------------------------------------------
 	//static for: with this compile time for loop you can loop over any tuple, type list, or variadic argument list
 
 	namespace detail {
@@ -1386,42 +1432,6 @@ namespace vtll {
 
 	static_assert(std::is_same_v< sum_value< 1, 2, 3>, std::integral_constant<size_t, 6> >,
 		"The implementation of sum_value is bad");
-
-	//-------------------------------------------------------------------------
-	//power_set
-
-	namespace detail {
-		template <typename Seq>
-		struct power_set_impl;
-
-		template<template<typename...> typename Seq>
-		struct power_set_impl<Seq<>> {
-			using type = type_list<type_list<>>;
-		};
-
-		template<template<typename...> typename Seq, typename T>
-		struct power_set_impl<Seq<T>> {
-			using type = type_list<type_list<>, type_list<T>>;
-		};
-
-		template < template<typename...> typename Seq, typename... Ts, typename T>
-		struct power_set_impl<Seq<T, Ts...>> {
-			using ps = power_set_impl<Ts...>;
-			using type = cat< ps, transform_front< ps, cat, type_list<T> > >;
-		};
-	}
-
-	template <typename Seq>
-	using power_set = typename detail::power_set_impl<Seq>::type;
-
-	static_assert(
-		std::is_same_v< power_set< type_list<char> >, type_list< type_list<>, type_list<char> >
-		>, "The implementation of power_set is bad");
-
-	/*static_assert(
-		std::is_same_v< power_set< type_list<int, char> >
-			, type_list< type_list<>, type_list<char>, type_list<int>, type_list<int, char>>  
-		> , "The implementation of power_set is bad");*/
 
 	//-------------------------------------------------------------------------
 	//is_pow2_value: test whether a value is a power of 2
