@@ -312,7 +312,7 @@ namespace vecs {
 	protected:
 		index_t m_current_index{ 0 };		///< Current index in the VecsComponentTable<E>
 		bool	m_is_end{ false };			///< True if this is an end iterator (for stopping the loop)
-		size_t	m_sizeE{ 0 };				///< Number of entities of type E
+		size_t	m_sizeE{ 0 };				///< Number of valid and invalid entities of type E
 
 	public:
 		VecsIteratorEntityBaseClass(bool is_end = false) noexcept : m_is_end(is_end) {};
@@ -324,7 +324,7 @@ namespace vecs {
 		auto operator++() noexcept			-> void;
 		auto operator++(int) noexcept		-> void;
 		auto is_vector_end() noexcept		-> bool;
-		auto size() noexcept				-> size_t;
+		auto size() noexcept				-> size_t;	///< Total number of valid and invalid entities in the component table for type E
 	};
 
 
@@ -355,8 +355,8 @@ namespace vecs {
 	};
 
 	/**
-	* \brief Return the number of entities covered by this iterator.
-	* \returns the number of entities this iterator covers.
+	* \brief Return the total number of valid and invalid entities in the component table for type E.
+	* \returns the total number of valid and invalid entities in the component table for type E.
 	*/
 	template<typename ETL, typename CTL>
 	inline auto VecsIteratorEntityBaseClass<ETL,CTL>::size() noexcept			-> size_t {
@@ -432,7 +432,7 @@ namespace vecs {
 	*/
 	template<typename E, typename ETL, typename CTL>
 	inline auto VecsIteratorEntity<E,ETL,CTL>::mutex() noexcept		-> std::atomic<uint32_t>* {
-		if (this->m_current_index.value >= VecsIteratorBaseClass<ETL,CTL>{}.size()) {
+		if (this->m_current_index.value >= this->m_sizeE) {
 			return &VecsIteratorBaseClass<ETL,CTL>::m_dummy_mutex;
 		}
 		return VecsComponentTable<E>().mutex(this->m_current_index);
@@ -444,7 +444,7 @@ namespace vecs {
 	*/
 	template<typename E, typename ETL, typename CTL>
 	inline auto VecsIteratorEntity<E,ETL,CTL>::operator*() noexcept	-> reference {
-		if (this->m_current_index.value >= VecsIteratorBaseClass<ETL,CTL>{}.size()) {
+		if (this->m_current_index.value >= this->m_sizeE) {
 			return component_access<CTL>{}.dummy();
 		}
 		return component_access<CTL>{}(this->m_current_index);
@@ -530,10 +530,10 @@ namespace vecs {
 		> {
 	};*/
 
-	/*template<>
-	class VecsRange<> : public VecsRangeBaseClass < VecsEntityTypeList, VecsComponenTypeList > {
+	template<>
+	class VecsRange<> : public VecsRangeBaseClass < VecsEntityTypeList, VecsComponentTypeList > {
 	public:
-	};*/
+	};
 
 
 
