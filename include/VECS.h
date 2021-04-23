@@ -36,7 +36,11 @@ namespace vecs {
 	* An entity type is a collection of component types. 
 	* The list is the sum of the entitiy types of the engine part, and the entity types as defined by the engine user.
 	*/
-	using VecsEntityTypeList = vtll::cat< VeSystemEntityTypeList, VeUserEntityTypeList >;
+	using VecsEntityTypeListWOTags = vtll::cat< VeSystemEntityTypeList, VeUserEntityTypeList >;
+
+	//, vtll::transform_front< vtll::power_set< vtll::type_list<TAG1, TAG2> >, vtll::cat, VeEntityTypeNode >
+
+	using VecsEntityTypeList = VecsEntityTypeListWOTags;
 
 	static_assert(vtll::are_unique<VecsEntityTypeList>::value, "The elements of VecsEntityTypeList lists are not unique!");
 
