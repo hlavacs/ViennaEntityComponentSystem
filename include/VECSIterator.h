@@ -261,7 +261,7 @@ namespace vecs {
 	* \brief Iterator for given entity types.
 	*/
 	template<typename... Es>
-	requires are_entity_types<Es...>
+	requires (are_entity_types<Es...> && sizeof...(Es) > 1)
 		class VecsIterator<Es...>
 		: public VecsIteratorBaseClass< vtll::type_list<Es...>, vtll::intersection< vtll::type_list<Es...> > > {
 		public:
@@ -283,7 +283,7 @@ namespace vecs {
 	* \brief Iterator for all entities having certain tag components
 	*/
 	template<typename E, typename... Cs>
-	requires (is_entity_type<E> && sizeof...(Cs)>0 && are_component_types<Cs...>)
+	requires (is_entity_type<E> && are_component_types<Cs...>)
 	class VecsIterator<E, Cs...>
 		: public VecsIteratorBaseClass< vtll::filter_have_all_types< VecsEntityTypeList, vtll::cat< E, vtll::type_list<Cs...> > >, E > {
 	public:
@@ -518,7 +518,7 @@ namespace vecs {
 	* \brief Range over a set of entity types.
 	*/
 	template<typename... Es>
-	requires are_entity_types<Es...>
+	requires (are_entity_types<Es...> && sizeof...(Es) > 1)
 	class VecsRange<Es...>
 		: public VecsRangeBaseClass< vtll::type_list<Es...>, vtll::intersection< vtll::type_list<Es...> > > {
 		public:
@@ -538,7 +538,7 @@ namespace vecs {
 	* \brief Range over entities that stem from an initial entity and have the given tags.
 	*/
 	template<typename E, typename... Cs>
-	requires (is_entity_type<E> && sizeof...(Cs)>0 && are_component_types<Cs...>)
+	requires (is_entity_type<E> && are_component_types<Cs...>)
 	class VecsRange<E, Cs...>
 		: public VecsRangeBaseClass< vtll::filter_have_all_types< VecsEntityTypeList, vtll::cat< E, vtll::type_list<Cs...> > >, E > {
 	};

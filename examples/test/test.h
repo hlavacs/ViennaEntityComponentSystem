@@ -84,7 +84,7 @@ namespace vecs {
 	//-------------------------------------------------------------------------
 	//tag maps
 
-	using VeUserTableTagMap = vtll::type_list<
+	using VeUserEntityTagMap = vtll::type_list<
 		vtll::type_list< VeEntityTypeNode, vtll::type_list< TAG1, TAG2 > >
 		//, ...
 	>;

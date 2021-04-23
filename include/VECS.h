@@ -30,17 +30,55 @@ using namespace std::chrono_literals;
 
 namespace vecs {
 
+
 	/**
-	* \brief Entity type list: a list with all possible entity types the ECS can deal with.
+	* \brief Entity type list without tags: a list with all possible entity types the ECS can deal with.
 	* 
 	* An entity type is a collection of component types. 
 	* The list is the sum of the entitiy types of the engine part, and the entity types as defined by the engine user.
+	* The entities do not contain any tags in this list. Below they will be expanded to hold all partial sets of
+	* tag combinations at the end.
 	*/
 	using VecsEntityTypeListWOTags = vtll::cat< VeSystemEntityTypeList, VeUserEntityTypeList >;
 
-	//, vtll::transform_front< vtll::power_set< vtll::type_list<TAG1, TAG2> >, vtll::cat, VeEntityTypeNode >
+	/**
+	* \brief Entity tag map: The sum of all tag maps.
+	*
+	* An entity tag map defines the possible tags for each entity type. Tags are special components that
+	* can be appended to the end of the component list of entities. Entries in the map are type_lists of tags possible for
+	* each entry type.
+	*/
+	using VecsEntityTagMap = vtll::cat< VeSystemEntityTagMap, VeUserEntityTagMap >;
 
-	using VecsEntityTypeList = VecsEntityTypeListWOTags;
+	/**
+	* \brief List of all tags that are used for any entity type.
+	*
+	* Tags are special components that can be appended to the end of the component list of entities. 
+	*/
+	using VevsEntityTagList = vtll::flatten< vtll::transform< VecsEntityTagMap, vtll::back > >;
+
+	/**
+	* \brief Struct to expand tags to all possible combinations and append them to their entity type component lists.
+	*/
+	template<typename T>
+	struct expand_tags {
+		using type =
+			vtll::transform_front<	///< Cat all partial tag sets after the elements of Ts
+				vtll::power_set<	///< Create the set of all partial tag sets
+					vtll::map< VecsEntityTagMap, T, vtll::type_list<> > >	///< Get tags for entity type Ts from tag map
+				, vtll::cat			///< Use cat function on each partial tag set
+				, T					///< And put contents of Ts (the entity components) in front of the partial tag list
+			>;
+	};
+
+	/**
+	* \brief Entity type list: a list with all possible entity types the ECS can deal with.
+	*
+	* An entity type is a collection of component types.
+	* The list is the sum of the entitiy types of the engine part, and the entity types as defined by the engine user.
+	* This list contains all possible entity types, but also their variants created by tag combinations.
+	*/
+	using VecsEntityTypeList = vtll::flatten< vtll::function< VecsEntityTypeListWOTags, expand_tags > >;
 
 	static_assert(vtll::are_unique<VecsEntityTypeList>::value, "The elements of VecsEntityTypeList lists are not unique!");
 
@@ -100,9 +138,16 @@ namespace vecs {
 	*/
 	using VecsTableMaxSize = vtll::smallest_pow2_larger_eq<VecsTableMaxSeg>;
 
+	/**
+	* Defines whether the data layout for entity type E is row or column wise.
+	* 
+	* The default is columns wise.
+	*/
 	using VecsTableLayoutMap = vtll::cat< VeSystemTableLayoutMap, VeUserTableLayoutMap >;
 
-	/** basic concepts */
+	//-------------------------------------------------------------------------
+	//concepts
+
 	template<typename C>
 	concept is_component_type = (vtll::has_type<VecsComponentTypeList, std::decay_t<C>>::value); ///< C is a component
 
@@ -130,6 +175,9 @@ namespace vecs {
 	template<typename E, typename... Cs>
 	concept is_iterator = (std::is_same_v<std::decay_t<E>, VecsIterator<Cs...>>);	///< E is composed of Cs
 
+	//-------------------------------------------------------------------------
+	//declaration of Vecs classes
+
 	/**
 	* Declarations of the main VECS classes
 	*/
@@ -146,6 +194,8 @@ namespace vecs {
 	template<typename E, typename ETL, typename CTL> class VecsIteratorEntity;
 	template<typename... Ts> class VecsRange;
 
+	//-------------------------------------------------------------------------
+	//Functor for for_each looping
 
 	/** 
 	* \brief General functor type that can hold any function, and depends in a number of component types.
@@ -232,7 +282,7 @@ namespace vecs {
 	class VecsComponentAccessor {
 	public:
 		VecsComponentAccessor() noexcept {};	///<Constructor
-		virtual auto updateC(index_t index, size_t compidx, void* ptr, size_t size) noexcept		-> bool = 0;		///< Empty update
+		virtual auto updateC(index_t index, size_t compidx, void* ptr, size_t size) noexcept		-> bool = 0;	///< Empty update
 		virtual auto componentE(index_t entidx, size_t compidx, void* ptr, size_t size)  noexcept	-> bool = 0;	///< Empty component read
 		virtual auto has_componentE()  noexcept														-> bool = 0;	///< Test for component
 	};

@@ -60,6 +60,9 @@ namespace vecs {
 		int i;
 	};
 
+	struct TAG1 {};
+	struct TAG2 {};
+
 	//-------------------------------------------------------------------------
 	//define user entity types here
 
@@ -72,6 +75,14 @@ namespace vecs {
 		, VeEntityTypeDraw
 		, VeEntityTypeAnimation
 		// ,... 
+	>;
+
+	//-------------------------------------------------------------------------
+	//tag maps
+
+	using VeUserEntityTagMap = vtll::type_list<
+		vtll::type_list< VeEntityTypeNode, vtll::type_list< TAG1, TAG2 > >
+		//, ...
 	>;
 
 	//-------------------------------------------------------------------------

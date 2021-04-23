@@ -42,6 +42,11 @@ namespace vecs {
 		// ,... 
 	>;
 
+	using VeSystemEntityTagMap = vtll::type_list<
+		//vtll::type_list< VeEntityTypeNode, vtll::type_list< TAG1, TAG2 > >
+		//, ...
+	>;
+
 	//-------------------------------------------------------------------------
 	//engine size maps
 
