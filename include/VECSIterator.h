@@ -8,8 +8,7 @@ namespace vecs {
 	//iterator
 
 	/**
-	* \brief Base class for an iterator that iterates over a VecsComponentTable of any type
-	* and that is intested into components Ts
+	* \brief Base class for an iterator that iterates over a set of entity types.
 	*
 	* The iterator can be used to loop through the entities. By providing component types Ts..., only
 	* entities are included that contain ALL component types.
@@ -252,6 +251,9 @@ namespace vecs {
 	//VecsIterator - derived from VecsIteratorBaseClass
 
 
+	/**
+	* \brief Primary template for iterators
+	*/
 	template<typename... Ts>
 	class VecsIterator;
 
@@ -506,9 +508,15 @@ namespace vecs {
 	};
 
 
+	/**
+	* \brief Primary template for ranges.
+	*/
 	template<typename... Ts>
 	class VecsRange;
 
+	/**
+	* \brief Range over a set of entity types.
+	*/
 	template<typename... Es>
 	requires are_entity_types<Es...>
 	class VecsRange<Es...>
@@ -516,6 +524,9 @@ namespace vecs {
 		public:
 	};
 
+	/**
+	* \brief Range over a set of entities that contain all given component types.
+	*/
 	template<typename... Cs>
 	requires are_component_types<Cs...>
 	class VecsRange<Cs...>
@@ -523,12 +534,18 @@ namespace vecs {
 		public:
 	};
 
+	/**
+	* \brief Range over entities that stem from an initial entity and have the given tags.
+	*/
 	template<typename E, typename... Cs>
 	requires (is_entity_type<E> && sizeof...(Cs)>0 && are_component_types<Cs...>)
 	class VecsRange<E, Cs...>
 		: public VecsRangeBaseClass< vtll::filter_have_all_types< VecsEntityTypeList, vtll::cat< E, vtll::type_list<Cs...> > >, E > {
 	};
 
+	/**
+	* \brief Range over all entity types in VECS.
+	*/
 	template<>
 	class VecsRange<> : public VecsRangeBaseClass < VecsEntityTypeList, VecsComponentTypeList > {
 	public:
@@ -541,6 +558,7 @@ namespace vecs {
 	/**
 	* \brief Constructor of class VecsIteratorBaseClass. If its not an end iterator then it also
 	* creates subiterators for all entity types that have all component types.
+	* 
 	* \param[in] is_end If true then this iterator is an end iterator.
 	*/
 	template<typename ETL, typename CTL>
