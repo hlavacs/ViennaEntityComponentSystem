@@ -110,23 +110,23 @@ namespace vecs {
 	};
 
 	/**
-	* Table constants retrieves mappings for all entity types from the VecsTableSizeMap (which have the format vtll::value_list<A,B>).
+	* \brief Table constants retrieves mappings for all entity types from the VecsTableSizeMap (which have the format vtll::value_list<A,B>).
 	* Then it turns the value lists to type lists, each value is stored in a std::integral_constant<size_t, V> type.
 	*/
 	using VeTableSizeDefault = vtll::value_list< 10, 16 >;
 	using VecsTableConstants = vtll::transform < vtll::apply_map<VecsTableSizeMap, VecsEntityTypeList, VeTableSizeDefault>, vtll::value_to_type>;
 
 	/**
-	* Get the maximal exponent from the list of segment size exponents.
+	* \brief Get the maximal exponent from the list of segment size exponents.
 	* 
 	* This is used as segment size (exponent) for the map table in the VecsRegistryBaseClass. Since this table holds info to 
 	* all entities in the ECS (the aggregate), it makes sense to take the maximum for segmentation.
 	*/
-	using VecsTableMaxSegExp	= vtll::max< vtll::transform< VecsTableConstants, vtll::front > >;
-	using VecsTableMaxSeg		= typename left_shift_1<VecsTableMaxSegExp>::type;
+	using VecsTableMaxSegExp	= vtll::max< vtll::transform< VecsTableConstants, vtll::front > >;	///< Get max exponent from map
+	using VecsTableMaxSeg		= typename left_shift_1<VecsTableMaxSegExp>::type;	///< Compute power of 2 for the exponent
 
 	/**
-	* Compute the sum of all max sizes of for all entity types.
+	* \brief Compute the sum of all max sizes of for all entity types.
 	* 
 	* First get the second number (vtll::back) from the map, i.e. the exponents of the max number of entities of type E.
 	* Then use the 2^ function (vtll::function<L, left_shift_1>) to get the real max number. Then sum over all entity types.
@@ -134,14 +134,12 @@ namespace vecs {
 	using VecsTableMaxSizeSum = vtll::sum< vtll::function< vtll::transform< VecsTableConstants, vtll::back >, left_shift_1 > >;
 
 	/**
-	* Since the sum of all max sizes is probably not divisible by the segment size, get the next power of 2 larger or equ VecsTableMaxSeg.
+	* \brief Since the sum of all max sizes is probably not divisible by the segment size, get the next power of 2 larger or equ VecsTableMaxSeg.
 	*/
 	using VecsTableMaxSize = vtll::smallest_pow2_larger_eq<VecsTableMaxSeg>;
 
 	/**
-	* Defines whether the data layout for entity type E is row or column wise.
-	* 
-	* The default is columns wise.
+	* \brief Defines whether the data layout for entity type E is row or column wise. The default is columns wise.
 	*/
 	using VecsTableLayoutMap = vtll::cat< VeSystemTableLayoutMap, VeUserTableLayoutMap >;
 
@@ -200,13 +198,14 @@ namespace vecs {
 	template<typename... Ts> class VecsIterator;
 	template<typename ETL, typename CTL> class VecsIteratorEntityBaseClass;
 	template<typename E, typename ETL, typename CTL> class VecsIteratorEntity;
+	template<typename ETL, typename CTL> class VecsRangeBaseClass;
 	template<typename... Ts> class VecsRange;
 
 	//-------------------------------------------------------------------------
 	//Functor for for_each looping
 
 	/** 
-	* \brief General functor type that can hold any function, and depends in a number of component types.
+	* \brief General functor type that can hold any function, and depends on a number of component types.
 	* 
 	* Used in for_each to iterate over entities and call the functor for each entity.
 	*/
@@ -215,7 +214,7 @@ namespace vecs {
 
 	template<template<typename...> typename Seq, typename... Cs>
 	struct Functor<Seq<Cs...>> {
-		using type = void(VecsHandle, Cs&...);
+		using type = void(VecsHandle, Cs&...);	///< Arguments for the functor
 	};
 
 	//-------------------------------------------------------------------------
@@ -298,6 +297,10 @@ namespace vecs {
 
 	/**
 	* \brief This class stores all components of entities of type E.
+	* 
+	* Since templated functions cannot be virtual, the class emulates virtual functions to access components
+	* by creating a dispatch table. Each component from the component table gets its own entry, even if the 
+	* entity type does not contain this component type.
 	*/
 	template<typename E>
 	class VecsComponentTable : public VecsMonostate<VecsComponentTable<E>> {
@@ -333,43 +336,42 @@ namespace vecs {
 		/** Each component type C of the entity type E gets its own specialized class instance */
 		static inline std::array<std::unique_ptr<VecsComponentAccessor<E>>, vtll::size<VecsComponentTypeList>::value> m_dispatch;
 
-		auto updateC(index_t entidx, size_t compidx, void* ptr, size_t size) noexcept		-> bool;
-		auto componentE(index_t entidx, size_t compidx, void* ptr, size_t size)  noexcept	-> bool;
+		auto updateC(index_t entidx, size_t compidx, void* ptr, size_t size) noexcept		-> bool; ///< For dispatching
+		auto componentE(index_t entidx, size_t compidx, void* ptr, size_t size)  noexcept	-> bool; ///< For dispatching
 		auto has_componentE(size_t compidx)  noexcept										-> bool; ///< Test for component
 		auto remove_deleted_tail() noexcept -> void;	///< Remove empty slots at the end of the table
 
-		VecsComponentTable(size_t r = 1 << c_max_size) noexcept;
+		VecsComponentTable(size_t r = 1 << c_max_size) noexcept;	///< Protected constructor that does not allocate the dispatch table
 
 		template<typename... Cs>
 		requires is_composed_of<E, Cs...> [[nodiscard]]
-		auto insert(VecsHandle handle, std::atomic<uint32_t>* mutex, Cs&&... args) noexcept	-> index_t;
+		auto insert(VecsHandle handle, std::atomic<uint32_t>* mutex, Cs&&... args) noexcept	-> index_t; ///< Insert new entity
 
-		auto pointers(const index_t index) noexcept				-> ptr_type;
-		auto values(const index_t index) noexcept				-> value_type;
-		auto handle(const index_t index) noexcept				-> VecsHandle;
-		auto mutex(const index_t index) noexcept				-> std::atomic<uint32_t>*;
+		auto pointers(const index_t index) noexcept				-> ptr_type;	///< \returns tuple with pointers to the components
+		auto values(const index_t index) noexcept				-> value_type;	///< \returns tuple with copies of the components
+		auto handle(const index_t index) noexcept				-> VecsHandle;	///< \returns handle for an index in the table
+		auto mutex(const index_t index) noexcept				-> std::atomic<uint32_t>*; ///< \returns pointer to the mutex for a given index
 
 		/** \returns the number of entries currently in the table, can also be invalid ones */
 		auto size() noexcept									-> size_t { return m_data.size(); };
-		auto erase(const index_t idx) noexcept					-> bool;
-		auto compress() noexcept								-> void;
-		auto clear() noexcept									-> size_t;
-		auto max_capacity(size_t) noexcept						-> size_t;
+		auto erase(const index_t idx) noexcept					-> bool;	///< Mark a row as erased
+		auto compress() noexcept								-> void;	///< compress the table
+		auto clear() noexcept									-> size_t;	///< Mark all rows as erased
+		auto max_capacity(size_t) noexcept						-> size_t;	//< \returns the max number of entities that can be stored
 
 		template<typename C>
 		requires is_component_of<E, C>
-		auto component(const index_t index) noexcept			-> C&;
+		auto component(const index_t index) noexcept			-> C&;		///< Get reference to a component
 
 		template<typename ET>
 		requires is_tuple<ET, E>
-		auto update(const index_t index, ET&& ent) noexcept		-> bool;
+		auto update(const index_t index, ET&& ent) noexcept		-> bool;	///< Update a component
 
 		template<typename... Cs>
 		requires are_components_of<E, Cs...>
-		auto update(const index_t index, Cs&&... args) noexcept	-> bool;
+		auto update(const index_t index, Cs&&... args) noexcept	-> bool;	///< Update a component
 
-		auto swap(index_t n1, index_t n2) -> bool { return m_data.swap(n1, n2); }
-
+		auto swap(index_t n1, index_t n2) -> bool { return m_data.swap(n1, n2); }	///< Swap places for two rows
 	};
 
 	/**
