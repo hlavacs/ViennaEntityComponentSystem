@@ -160,6 +160,14 @@ namespace vecs {
 	template<typename... Es>
 	concept are_entity_types = (is_entity_type<Es> && ...);		///< Es are all entity types
 
+	template<typename ETL>
+	struct is_entity_type_list;		///< Es are all entity types
+
+	template<template<typename...> typename ETL, typename... Es>
+	struct is_entity_type_list<ETL<Es...>> {		///< Es are all entity types
+		static const bool value = (is_entity_type<Es> && ...);
+	};
+
 	template<typename E, typename C>
 	concept is_component_of = (vtll::has_type<E, std::decay_t<C>>::value);	///< C is a component of E
 

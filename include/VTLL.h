@@ -37,10 +37,16 @@ namespace vtll {
 		using size = std::integral_constant<std::size_t, 0>;
 	};
 
+	template<typename... Ts>
+	using tl = type_list<Ts...>;
+
 	template <size_t... Is>
 	struct value_list {
 		using size = std::integral_constant<std::size_t, sizeof...(Is)>;
 	};
+
+	template<size_t... Is>
+	using vl = value_list<Is...>;
 
 	namespace detail {
 		template <typename... Ts>
@@ -281,6 +287,20 @@ namespace vtll {
 	static_assert(
 		std::is_same_v< cat< type_list<double, int>, type_list<char, float>, type_list<int, float> >, type_list<double, int, char, float, int, float> >,
 		"The implementation of cat is bad");
+
+	//-------------------------------------------------------------------------
+	//app: append a parameter pack to a type list
+
+	template <typename Seq, typename... Ts>
+	using app = cat< Seq, type_list<Ts>... >;
+
+	static_assert(
+		std::is_same_v< app< type_list<double, int>, char, float>, type_list<double, int, char, float> >,
+		"The implementation of app is bad");
+
+	static_assert(
+		std::is_same_v< app< type_list<double, int, char, float>, int, float >, type_list<double, int, char, float, int, float> >,
+		"The implementation of app is bad");
 
 	//-------------------------------------------------------------------------
 	//to_ref: turn list elements into references
