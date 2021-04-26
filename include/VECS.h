@@ -61,7 +61,7 @@ namespace vecs {
 	* \brief Struct to expand tags to all possible combinations and append them to their entity type component lists.
 	*/
 	template<typename T>
-	struct expand_tags {
+	struct expand_tags_for_one {
 		using type =
 			vtll::transform_front<	///< Cat all partial tag sets after the elements of Ts
 				vtll::power_set<	///< Create the set of all partial tag sets
@@ -72,13 +72,24 @@ namespace vecs {
 	};
 
 	/**
+	* \brief Expand the entity types of a list for all their tags.
+	*
+	* An entity type is a collection of component types. In the tag map, tags can be defined for an entity type.
+	* Thus there are variants of this entity type that also hold one or more tags as components.
+	* expand_tags takes a list of entity types, uses the tags from the tag map and creates all variants of each 
+	* entity type, holding zero to all tags for this entity type.
+	*/
+	template<typename T>
+	using expand_tags = vtll::remove_duplicates< vtll::flatten< vtll::function< T, expand_tags_for_one > > >;
+
+	/**
 	* \brief Entity type list: a list with all possible entity types the ECS can deal with.
 	*
 	* An entity type is a collection of component types.
 	* The list is the sum of the entitiy types of the engine part, and the entity types as defined by the engine user.
 	* This list contains all possible entity types, but also their variants created by tag combinations.
 	*/
-	using VecsEntityTypeList = vtll::flatten< vtll::function< VecsEntityTypeListWOTags, expand_tags > >;
+	using VecsEntityTypeList = expand_tags< VecsEntityTypeListWOTags >;
 
 	static_assert(vtll::are_unique<VecsEntityTypeList>::value, "The elements of VecsEntityTypeList lists are not unique!");
 
@@ -743,14 +754,13 @@ namespace vecs {
 
 		template<typename... Cs>
 		requires are_component_types<Cs...>
-		auto update(VecsHandle handle, Cs&&... args) noexcept -> bool;		///< Update component of type C of an entity (internally synchronized)
+		auto update(VecsHandle handle, Cs&&... args) noexcept -> bool;	///< Update component of type C of an entity (internally synchronized)
 
 		//-------------------------------------------------------------------------
 		//erase
 
 		virtual auto erase(VecsHandle handle) noexcept -> bool;		///< Erase a specific entity (internally synchronized)
-		auto clear() noexcept -> size_t;					///< Clear the whole ECS (internally synchronized)
-		auto compress() noexcept -> void;					///< Compress all component tables (externally synchronized)
+		auto compress() noexcept -> void;							///< Compress all component tables (externally synchronized)
 
 		//-------------------------------------------------------------------------
 		//for_each 
@@ -766,9 +776,16 @@ namespace vecs {
 		//-------------------------------------------------------------------------
 		//utility
 
+		template<typename... Es>
+		requires (are_entity_types<Es...>)
+		auto size() noexcept				-> size_t;		///< \returns the total number of valid entities of types Es (internally synchronized)
+
+		template<typename... Es>
+		requires (are_entity_types<Es...>)
+		auto clear() noexcept				-> size_t;		///< Clear the whole ECS (internally synchronized)
+
 		auto index(VecsHandle h) noexcept	-> index_t;		///< \returns row index in component table (externally synchronized)
 		auto type(VecsHandle h) noexcept	-> index_t;		///< \returns type of entity (externally synchronized)
-		virtual auto size() noexcept		-> size_t { return m_size.load(); };	///< \returns the total number of valid entities (internally synchronized)
 		virtual auto swap( VecsHandle h1, VecsHandle h2 ) noexcept -> bool;	///< Swap places of two entities in the component table (internally synchronized)
 		virtual auto contains(VecsHandle handle) noexcept	-> bool;		///< \returns true if the ECS still holds this entity  (externally synchronized)
 	};
@@ -985,16 +1002,11 @@ namespace vecs {
 		//-------------------------------------------------------------------------
 		//utility
 
-		auto clear() noexcept -> size_t { return clearE(); };				///< Clear entities of type E (externally synchronized)
-
-		auto compress() noexcept -> void { compressE(); }					///< Remove erased rows from the component table (externally synchronized)
-
-		auto max_capacity(size_t) noexcept					-> size_t;		///< Set max number of entities of this type (externally synchronized)
-
 		auto size() noexcept -> size_t { return m_sizeE.load(); };			///< \returns the number of valid entities of type E (internally synchronized)
-
+		auto clear() noexcept -> size_t { return clearE(); };				///< Clear entities of type E (externally synchronized)
+		auto compress() noexcept -> void { compressE(); }					///< Remove erased rows from the component table (externally synchronized)
+		auto max_capacity(size_t) noexcept					-> size_t;		///< Set max number of entities of this type (externally synchronized)
 		auto swap(VecsHandle h1, VecsHandle h2) noexcept	-> bool;		///< Swap rows in component table (internally synchronized)
-
 		auto contains(VecsHandle handle) noexcept			-> bool;		///< Test if an entity is still in VECS (externally synchronized)
 	};
 
@@ -1446,6 +1458,25 @@ namespace vecs {
 	}
 
 	/**
+	* \brief Return the total number of valid entities of types Es
+	* \returns the total number of valid entities of types Es 
+	*/
+	template<typename... Es>
+	requires (are_entity_types<Es...>)
+	inline auto VecsRegistryBaseClass::size() noexcept	-> size_t {
+		using entity_list = std::conditional_t< (sizeof...(Es) > 0), expand_tags< vtll::tl<Es...> >, VecsEntityTypeList >;
+
+		size_t sum = 0;
+		vtll::static_for<size_t, 0, vtll::size<entity_list>::value >(
+			[&](auto i) {
+				using type = vtll::Nth_type<entity_list, i>;
+				sum += VecsRegistry<type>().size();
+			}
+		);
+		return sum;
+	}
+
+	/**
 	* \brief Erase all entities from the ECS.
 	* 
 	* The entities are not really removed, but rather invalidated. Call compress()
@@ -1453,11 +1484,15 @@ namespace vecs {
 	* 
 	* \returns the total number of erased entities.
 	*/
+	template<typename... Es>
+	requires (are_entity_types<Es...>)
 	inline auto VecsRegistryBaseClass::clear() noexcept	 -> size_t {
+		using entity_list = std::conditional_t< (sizeof...(Es) > 0), expand_tags< vtll::tl<Es...> >, VecsEntityTypeList >;
+
 		size_t num = 0;
-		vtll::static_for<size_t, 0, vtll::size<VecsEntityTypeList>::value >(
+		vtll::static_for<size_t, 0, vtll::size<entity_list>::value >(
 			[&](auto i) {
-				using type = vtll::Nth_type<VecsEntityTypeList, i>;
+				using type = vtll::Nth_type<entity_list, i>;
 				num += VecsRegistry<type>().clearE();
 			}
 		);

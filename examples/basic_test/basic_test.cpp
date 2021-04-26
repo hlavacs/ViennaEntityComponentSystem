@@ -16,6 +16,9 @@ int main() {
     std::cout << sizeof(VecsHandle) << " " << sizeof(flag) << std::endl;
     std::cout << vtll::size<VecsEntityTypeList>::value << std::endl;
 
+    //std::cout << typeid(vecs::VecsEntityTypeList).name() << std::endl << std::endl;
+    //std::cout << typeid(vecs::expand_tags<VecsEntityTypeList>).name() << std::endl;
+
     auto h1 = VecsRegistry<VeEntityTypeNode>{}.insert(VeComponentName{ "Node" }, VeComponentPosition{ glm::vec3{9.0f, 2.0f, 3.0f} }, VeComponentOrientation{}, VeComponentTransform{});
     std::cout << typeid(VeEntityTypeNode).hash_code() << " " << typeid(VeEntityTypeNode).name() << std::endl;
 

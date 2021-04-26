@@ -277,8 +277,7 @@ namespace vecs {
 	*/
 	template<typename... Es>
 	requires (are_entity_types<Es...>)
-	class VecsIterator<Es...> : public VecsIteratorBaseClass< 
-		vtll::flatten< vtll::function< vtll::tl<Es...>, expand_tags > >, vtll::intersection< vtll::tl<Es...> > 	> {
+	class VecsIterator<Es...> : public VecsIteratorBaseClass< expand_tags< vtll::tl<Es...> >, vtll::intersection< vtll::tl<Es...> > > {
 	public:
 		using component_types = vtll::intersection< vtll::tl<Es...> > ;
 	};
@@ -511,6 +510,9 @@ namespace vecs {
 	template<typename... Ts>
 	class VecsRange;
 
+	/**
+	* \brief Range over a list of entity types. In this case, entity types are taken as is, and are NOT expanded with the tag map.
+	*/
 	template<typename ETL>
 	requires (is_entity_type_list<ETL>::value)
 	class VecsRange<ETL> : public VecsIteratorBaseClass< ETL, vtll::intersection< ETL > > {};
@@ -520,19 +522,17 @@ namespace vecs {
 	*/
 	template<typename... Es>
 	requires (are_entity_types<Es...>)
-	class VecsRange<Es...> : public VecsRangeBaseClass< 
-		vtll::flatten< vtll::function< vtll::tl<Es...>, expand_tags > >, vtll::intersection< vtll::tl<Es...> > > {};
+	class VecsRange<Es...> : public VecsRangeBaseClass< expand_tags< vtll::tl<Es...> >, vtll::intersection< vtll::tl<Es...> > > {};
 
 	/**
 	* \brief Range over a set of entities that contain all given component types.
 	*/
 	template<typename... Cs>
 	requires are_component_types<Cs...>
-	class VecsRange<Cs...>
-		: public VecsRangeBaseClass< vtll::filter_have_all_types< VecsEntityTypeList, vtll::tl<Cs...> >, vtll::tl<Cs...> > {};
+	class VecsRange<Cs...> : public VecsRangeBaseClass< vtll::filter_have_all_types< VecsEntityTypeList, vtll::tl<Cs...> >, vtll::tl<Cs...> > {};
 
 	/**
-	* \brief Range over all entity types in VECS.
+	* \brief Range over all entity types in VECS. This includes all tag variants.
 	*/
 	template<>
 	class VecsRange<> : public VecsRangeBaseClass < VecsEntityTypeList, VecsComponentTypeList > {};
