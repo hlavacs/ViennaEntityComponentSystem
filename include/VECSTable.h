@@ -16,7 +16,7 @@ namespace vecs {
 	* VecsTable has the following properties:
 	* 1) It stores tuples of data, thus the result is a table.
 	* 2) The memory layout can be row-oriented or column-oriented.
-	* 3) It can grow even when used with multiple threads. This is achieved by storing data in segements,
+	* 3) It can grow even when used with multiple threads. This is achieved by storing data in segments,
 	* which are accessed over via a std::vector of unique_ptr. New segments can simply be added to the 
 	* std::vector, and no reallocation occurs if the std::vector has a large enough capacity.
 	* If more segments are needed then multithreaded operations must be stopped to reallocate this std::vector. 
@@ -52,8 +52,7 @@ namespace vecs {
 
 	public:
 		VecsTable(size_t r = 1 << 16, std::pmr::memory_resource* mr = std::pmr::new_delete_resource()) noexcept : m_segment{ mr }  { 
-			m_seg_max = (r % N == 0) ? r / N : r / N + 1;
-			//max_capacity(r);
+			m_seg_max = (r % N == 0) ? r / N : r / N + 1;	///< Max number of segments, but do not allocate any yet
 		};
 
 		size_t size() { return m_size.load(); };	///< \returns the current numbers of rows in the table

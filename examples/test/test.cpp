@@ -283,7 +283,6 @@ int main() {
 
 	}
 
-
 	{
 		int i = 0;
 		bool test = true;
@@ -294,10 +293,12 @@ int main() {
 			});
 		
 		TESTRESULT(++number, "system run 6", , test, );
-
-
-
 	}
+
+	{
+		TESTRESULT(++number, "clear", VecsRegistry{}.clear(), VecsRegistry{}.size() == 0, );
+	}
+
 
     return 0;
 }
