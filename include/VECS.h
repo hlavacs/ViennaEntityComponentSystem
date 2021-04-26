@@ -365,8 +365,7 @@ namespace vecs {
 		auto handle(const index_t index) noexcept				-> VecsHandle;	///< \returns handle for an index in the table
 		auto mutex(const index_t index) noexcept				-> std::atomic<uint32_t>*; ///< \returns pointer to the mutex for a given index
 
-		/** \returns the number of entries currently in the table, can also be invalid ones */
-		auto size() noexcept									-> size_t { return m_data.size(); };
+		auto size() noexcept -> size_t { return m_data.size(); }; ///< \returns the number of entries currently in the table, can also be invalid ones
 		auto erase(const index_t idx) noexcept					-> bool;	///< Mark a row as erased
 		auto compress() noexcept								-> void;	///< compress the table
 		auto clear() noexcept									-> size_t;	///< Mark all rows as erased
@@ -452,7 +451,7 @@ namespace vecs {
 	* \returns a tuple holding the components of an entity.
 	*/
 	template<typename E>
-	inline auto VecsComponentTable<E>::pointers(const index_t index) noexcept -> typename VecsComponentTable<E>::ptr_type {
+	inline auto VecsComponentTable<E>::pointers(const index_t index) noexcept -> ptr_type {
 		assert(index < m_data.size());
 		auto tup = m_data.tuple_ptr(index);												///< Get the whole data from the data
 		return vtll::sub_tuple< c_info_size, std::tuple_size_v<decltype(tup)> >(tup);	///< Return only entity components in a subtuple
@@ -464,7 +463,7 @@ namespace vecs {
 	* \returns a tuple holding the components of an entity.
 	*/
 	template<typename E>
-	inline auto VecsComponentTable<E>::values(const index_t index) noexcept -> typename VecsComponentTable<E>::value_type {
+	inline auto VecsComponentTable<E>::values(const index_t index) noexcept -> value_type {
 		assert(index < m_data.size());
 		auto tup = m_data.tuple_value(index);											///< Get the whole data from the data
 		return vtll::sub_tuple< c_info_size, std::tuple_size_v<decltype(tup)> >(tup);	///< Return only entity components in a subtuple
