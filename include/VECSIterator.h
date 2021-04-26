@@ -258,9 +258,7 @@ namespace vecs {
 	class VecsIterator;
 
 	/**
-	* \brief Iterator for given list of entity types.
-	* 
-	* Entity types are taken as is, and NOT extended by possible tags from the tags map.
+	* \brief Iterator for given list of entity types. Entity types are taken as is, and NOT extended by possible tags from the tags map.
 	*/
 	template<typename ETL>
 	requires (is_entity_type_list<ETL>::value)

@@ -344,8 +344,10 @@ namespace vecs {
 		static inline VecsTable<types,			c_segment_size, layout_type::value>		m_data;		///< Data per entity
 		static inline VecsTable<types_deleted,  c_segment_size, VECS_LAYOUT_ROW::value>	m_deleted;	///< Table holding the indices of erased entities
 
-		/** Each component type C of the entity type E gets its own specialized class instance */
-		static inline std::array<std::unique_ptr<VecsComponentAccessor<E>>, vtll::size<VecsComponentTypeList>::value> m_dispatch;
+		using array_type = std::array<std::unique_ptr<VecsComponentAccessor<E>>, vtll::size<VecsComponentTypeList>::value>;
+		static inline array_type m_dispatch;	///< Each component type C of the entity type E gets its own specialized class instance
+
+		//-------------------------------------------------------------------------
 
 		auto updateC(index_t entidx, size_t compidx, void* ptr, size_t size) noexcept		-> bool; ///< For dispatching
 		auto componentE(index_t entidx, size_t compidx, void* ptr, size_t size)  noexcept	-> bool; ///< For dispatching
