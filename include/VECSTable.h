@@ -51,8 +51,10 @@ namespace vecs {
 		size_t						m_seg_max = 0;			///< Current max number of segments
 
 	public:
-		VecsTable(size_t r = 1 << 16, std::pmr::memory_resource* mr = std::pmr::new_delete_resource()) noexcept
-			: m_segment{ mr }  { max_capacity(r); };
+		VecsTable(size_t r = 1 << 16, std::pmr::memory_resource* mr = std::pmr::new_delete_resource()) noexcept : m_segment{ mr }  { 
+			m_seg_max = (r % N == 0) ? r / N : r / N + 1;
+			//max_capacity(r);
+		};
 
 		size_t size() { return m_size.load(); };	///< \returns the current numbers of rows in the table
 		void clear() { m_size = 0; };				///< Set the number if rows to zero - effectively clear the table
@@ -266,11 +268,12 @@ namespace vecs {
 		* \returns true if the operation was successful.
 		*/
 		auto reserve(size_t r) noexcept -> bool {
-			if (r > m_seg_max * N) return false;
-			while (m_segment.size() * N < r) { 
+			if (r > m_seg_max * N) return false;						///< is there enough space in the table?
+			if (m_seg_allocated == 0) max_capacity(m_seg_max * N);		///< Is there space for segment pointers?
+			while (m_segment.size() * N < r) {							///< Allocate enough segments
 				m_segment.push_back(std::make_unique<array_tuple_t>()); ///< Create new segment
 			}
-			m_seg_allocated = m_segment.size();	///< Publish new size
+			m_seg_allocated = m_segment.size();		///< Publish new size
 			return true;
 		}
 
