@@ -274,7 +274,7 @@ namespace vecs {
 	* Component types are the intersection of the entity types.
 	*/
 	template<typename... Es>
-	requires (are_entity_types<Es...>)
+	requires (sizeof...(Es) > 0 && are_entity_types<Es...>)
 	class VecsIterator<Es...> : public VecsIteratorBaseClass< expand_tags< vtll::tl<Es...> >, vtll::intersection< vtll::tl<Es...> > > {
 	public:
 		using component_types = vtll::intersection< vtll::tl<Es...> > ;
@@ -284,7 +284,7 @@ namespace vecs {
 	* \brief Iterator for given component types.
 	*/
 	template<typename... Cs>
-	requires are_component_types<Cs...>
+	requires (sizeof...(Cs) > 0 && are_component_types<Cs...>)
 	class VecsIterator<Cs...> : public VecsIteratorBaseClass< vtll::filter_have_all_types< VecsEntityTypeList, vtll::tl<Cs...> >, vtll::tl<Cs...> > {
 	public:
 		using component_types = vtll::tl<Cs...>;
@@ -304,7 +304,7 @@ namespace vecs {
 	* \brief Iterator for all entities.
 	*/
 	template<>
-	class VecsIterator<> : public VecsIteratorBaseClass < VecsEntityTypeList, VecsComponentTypeList > {
+	class VecsIterator<> : public VecsIteratorBaseClass < VecsEntityTypeList, vtll::intersection< VecsEntityTypeList > > {
 	public:
 		using component_types = VecsComponentTypeList;
 	};
@@ -527,14 +527,14 @@ namespace vecs {
 	* \brief Range over a set of entity types. Entity types are expanded using the tag map.
 	*/
 	template<typename... Es>
-	requires (are_entity_types<Es...>)
+	requires (sizeof...(Es) > 0 && are_entity_types<Es...>)
 	class VecsRange<Es...> : public VecsRangeBaseClass< expand_tags< vtll::tl<Es...> >, vtll::intersection< vtll::tl<Es...> > > {};
 
 	/**
 	* \brief Range over a set of entities that contain all given component types.
 	*/
 	template<typename... Cs>
-	requires are_component_types<Cs...>
+	requires (sizeof...(Cs) > 0 && are_component_types<Cs...>)
 	class VecsRange<Cs...> : public VecsRangeBaseClass< vtll::filter_have_all_types< VecsEntityTypeList, vtll::tl<Cs...> >, vtll::tl<Cs...> > {};
 
 	/**
@@ -548,7 +548,7 @@ namespace vecs {
 	* \brief Range over all entity types in VECS. This includes all tag variants.
 	*/
 	template<>
-	class VecsRange<> : public VecsRangeBaseClass < VecsEntityTypeList, VecsComponentTypeList > {};
+	class VecsRange<> : public VecsRangeBaseClass < VecsEntityTypeList, vtll::intersection< VecsEntityTypeList > > {};
 
 
 	//-------------------------------------------------------------------------
