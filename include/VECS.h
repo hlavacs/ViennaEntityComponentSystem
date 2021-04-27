@@ -308,6 +308,7 @@ namespace vecs {
 		VecsComponentAccessor() noexcept {};	///<Constructor
 		virtual auto updateC(index_t index, size_t compidx, void* ptr, size_t size) noexcept		-> bool = 0;	///< Empty update
 		virtual auto componentE(index_t entidx, size_t compidx, void* ptr, size_t size)  noexcept	-> bool = 0;	///< Empty component read
+		virtual auto componentE_ptr(index_t entidx, size_t compidx, void* ptr, size_t size) noexcept-> void* = 0;	///< Empty component read
 		virtual auto has_componentE()  noexcept														-> bool = 0;	///< Test for component
 	};
 
@@ -357,6 +358,7 @@ namespace vecs {
 
 		auto updateC(index_t entidx, size_t compidx, void* ptr, size_t size) noexcept		-> bool; ///< For dispatching
 		auto componentE(index_t entidx, size_t compidx, void* ptr, size_t size)  noexcept	-> bool; ///< For dispatching
+		auto componentE_ptr(index_t entidx, size_t compidx, void* ptr, size_t size) noexcept-> void*; ///< For dispatching
 		auto has_componentE(size_t compidx)  noexcept										-> bool; ///< Test for component
 		auto remove_deleted_tail() noexcept -> void;	///< Remove empty slots at the end of the table
 
@@ -430,6 +432,11 @@ namespace vecs {
 	template<typename E>
 	inline auto VecsComponentTable<E>::componentE(index_t entidx, size_t compidx, void* ptr, size_t size)  noexcept -> bool {
 		return m_dispatch[compidx]->componentE(entidx, compidx, ptr, size);
+	}
+
+	template<typename E>
+	inline auto VecsComponentTable<E>::componentE_ptr(index_t entidx, size_t compidx, void* ptr, size_t size)  noexcept -> void* {
+		return m_dispatch[compidx]->componentE_ptr(entidx, compidx, ptr, size);
 	}
 
 	/**
@@ -656,6 +663,13 @@ namespace vecs {
 			}
 			return false;
 		}
+
+		auto componentE_ptr(index_t entidx, size_t compidx, void* ptr, size_t size)  noexcept -> void* {
+			if constexpr (is_component_of<E, C>) {
+				return (void*)&VecsComponentTable<E>().m_data.comp_ref_idx<VecsComponentTable<E>::c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(entidx);
+			}
+			return nullptr;
+		}
 	};
 
 
@@ -727,7 +741,7 @@ namespace vecs {
 		virtual auto componentE(VecsHandle handle, size_t compidx, void*ptr, size_t size) noexcept -> bool { return false; };
 
 		/** Virtual function for dispatching component reads to the correct subclass for entity type E. */
-		virtual auto component_ptrE(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept -> void* { return nullptr; };
+		virtual auto componentE_ptr(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept -> void* { return nullptr; };
 
 		/** Virtual function for dispatching whether an entity type E contains a component type C */
 		virtual auto has_componentE(VecsHandle handle, size_t compidx) noexcept -> bool { return false; };
@@ -842,7 +856,7 @@ namespace vecs {
 		auto VecsRegistryBaseClass::component_ptr(VecsHandle handle) noexcept -> C* {
 		if (!handle.is_valid()) return nullptr;
 		/// Dispatch to the correct subclass and return result
-		return (C*)m_dispatch[type(handle)]->component_ptrE(handle, vtll::index_of<VecsComponentTypeList, std::decay_t<C>>::value, nullptr, sizeof(C));
+		return (C*)m_dispatch[type(handle)]->componentE_ptr(handle, vtll::index_of<VecsComponentTypeList, std::decay_t<C>>::value, nullptr, sizeof(C));
 	}
 
 	/**
@@ -939,6 +953,7 @@ namespace vecs {
 		/** Implementations of functions that receive dispatches from the base class. */
 		auto updateC(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept	-> bool; ///< Dispatch from base class (externally synchronized)
 		auto componentE(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept	-> bool; ///< Dispatch from base class (externally synchronized)
+		auto componentE_ptr(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept -> void*;
 		auto has_componentE(VecsHandle handle, size_t compidx) noexcept						-> bool; ///< Dispatch from base class (externally synchronized)
 		auto eraseE(index_t index) noexcept	-> void { m_component_table.erase(index); };			 ///< Dispatch from base class (externally synchronized)
 		auto compressE() noexcept	-> void { return m_component_table.compress(); };	///< Dispatch from base class (externally synchronized)
@@ -1046,7 +1061,6 @@ namespace vecs {
 	*/
 	template<typename E>
 	inline auto VecsRegistry<E>::has_componentE(VecsHandle handle, size_t compidx) noexcept -> bool {
-		VecsReadLock lock(handle.mutex());
 		if (!contains(handle)) return false;
 		return m_component_table.has_componentE(compidx);
 	}
@@ -1067,6 +1081,13 @@ namespace vecs {
 		if (!contains(handle)) return {};
 		return m_component_table.componentE(m_entity_table.comp_ref_idx<c_index>(handle.m_entity_index), compidx, ptr, size);
 	}
+
+	template<typename E>
+	inline auto VecsRegistry<E>::componentE_ptr(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept -> void* {
+		if (!contains(handle)) return {};	///< Return the empty component
+		auto& comp_table_idx = m_entity_table.comp_ref_idx<c_index>(handle.m_entity_index); ///< Get reference to component
+		return m_component_table.componentE_ptr(comp_table_idx, compidx, ptr, size);	///< Return the component
+	};
 
 	/**
 	* \brief Insert a new entity into the ECS.
@@ -1128,9 +1149,9 @@ namespace vecs {
 			
 		vtll::static_for<size_t, 0, vtll::size<E>::value >(	///< Move old components to new entity type
 			[&](auto i) {
-				using type = VeComponentName; // vtll::Nth_type<E, i>;
-				if (handle.has_component<type>()) {
-					auto ptr = this->VecsRegistryBaseClass::component_ptr<type>(handle);
+				using type = vtll::Nth_type<E, i>;
+				auto ptr = componentE_ptr(handle, vtll::index_of<VecsComponentTypeList, type>::value, nullptr, 0);
+				if( ptr != nullptr ) {
 					m_component_table.update<type>(index, std::move(*static_cast<type*>(ptr)));
 				}
 			}
@@ -1278,7 +1299,7 @@ namespace vecs {
 	template<typename C>
 	requires is_component_of<E, C>
 	inline auto VecsRegistry<E>::component_ptr(VecsHandle handle) noexcept -> C* {
-		return component_ptr<vtll::index_of<E, C>>();
+		return component_ptr<vtll::index_of<E, C>>(handle);
 	}
 
 	/**
@@ -1549,19 +1570,17 @@ namespace vecs {
 		auto b = range.begin();
 		auto e = range.end();
 		for (; b != e; ++b) {
-			typename VecsIterator<Ts...>::value_type data;
-
 			VecsReadLock::lock(b.mutex());		///< Read lock
 			if (!b.has_value()) {
 				VecsReadLock::unlock(b.mutex());
 				continue;
 			}
-			data = *b;
-			VecsReadLock::unlock(b.mutex())
-			std::apply(f, data);					///< Run the function on the references
+			typename VecsIterator<Ts...>::value_type tup = *b;
+			VecsReadLock::unlock(b.mutex());
+			std::apply(f, tup);					///< Run the function on the references
 			VecsWriteLock lock(b.mutex());
 			if (b.has_value()) {
-				*b = data;
+				*b = tup;
 			}
 		}
 	}

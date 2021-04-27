@@ -330,7 +330,7 @@ int main() {
 
 		//using ttt = vtll::index_of<vecs::VecsEntityTypeList, vtll::type_list<vecs::VeComponentName, vecs::VeComponentPosition, vecs::VeComponentOrientation, vecs::VeComponentTransform, vecs::TAG1>>;
 
-		for (auto [handle, name, pos, orient, transf] : VecsRange<VeEntityTypeNode>{} ) {
+		for (auto [handle, name, pos, orient, transf, tag1] : VecsRange<VeEntityTypeNodeTagged<TAG1>>{} ) {
 			VecsRegistry<VeEntityTypeNode>{}.transform(handle);
 		}
 
