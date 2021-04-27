@@ -55,7 +55,7 @@ namespace vecs {
 	*
 	* Tags are special components that can be appended to the end of the component list of entities. 
 	*/
-	using VevsEntityTagList = vtll::flatten< vtll::transform< VecsEntityTagMap, vtll::back > >;
+	using VecsEntityTagList = vtll::flatten< vtll::transform< VecsEntityTagMap, vtll::back > >;
 
 	/**
 	* \brief Struct to expand tags to all possible combinations and append them to their entity type component lists.
@@ -162,6 +162,12 @@ namespace vecs {
 
 	template<typename... Cs>
 	concept are_component_types = (is_component_type<Cs> && ...);	///< Cs are all components
+
+	template<typename T>
+	concept is_entity_tag = (vtll::has_type<VecsEntityTagList, std::decay_t<T>>::value); ///< T is a tag
+
+	template<typename... Ts>
+	concept are_entity_tags = (is_entity_tag<Ts> && ...);	///< Ts are all tags
 
 	template<typename E>
 	concept is_entity_type = (vtll::has_type<VecsEntityTypeList, std::decay_t<E>>::value); ///< E is an entity type

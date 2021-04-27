@@ -285,12 +285,20 @@ namespace vecs {
 	*/
 	template<typename... Cs>
 	requires are_component_types<Cs...>
-	class VecsIterator<Cs...>
-		: public VecsIteratorBaseClass< vtll::filter_have_all_types< VecsEntityTypeList, vtll::tl<Cs...> >, vtll::tl<Cs...> > {
+	class VecsIterator<Cs...> : public VecsIteratorBaseClass< vtll::filter_have_all_types< VecsEntityTypeList, vtll::tl<Cs...> >, vtll::tl<Cs...> > {
 	public:
 		using component_types = vtll::tl<Cs...>;
 	};
 
+	/**
+	* \brief Iterator for given entity tape that has all tags.
+	*/
+	template<typename E, typename... Ts>
+	requires (is_entity_type<E> && (sizeof...(Ts) > 0) && are_entity_tags<Ts...>)
+	class VecsIterator<E,Ts...> : public VecsIteratorBaseClass< vtll::filter_have_all_types< expand_tags<E>, vtll::tl<Ts...> >, E > {
+	public:
+		using component_types = E;
+	};
 
 	/**
 	* \brief Iterator for all entities.
@@ -528,6 +536,13 @@ namespace vecs {
 	template<typename... Cs>
 	requires are_component_types<Cs...>
 	class VecsRange<Cs...> : public VecsRangeBaseClass< vtll::filter_have_all_types< VecsEntityTypeList, vtll::tl<Cs...> >, vtll::tl<Cs...> > {};
+
+	/**
+	* \brief Iterator for given entity tape that has all tags.
+	*/
+	template<typename E, typename... Ts>
+	requires (is_entity_type<E> && (sizeof...(Ts) > 0) && are_entity_tags<Ts...>)
+	class VecsRange<E, Ts...> : public VecsRangeBaseClass< vtll::filter_have_all_types< expand_tags<E>, vtll::tl<Ts...> >, E > {};
 
 	/**
 	* \brief Range over all entity types in VECS. This includes all tag variants.
