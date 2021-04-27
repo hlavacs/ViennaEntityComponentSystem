@@ -297,6 +297,52 @@ int main() {
 
 	{
 		TESTRESULT(++number, "clear", VecsRegistry{}.clear(), VecsRegistry{}.size() == 0, );
+
+		const int num = 100;
+		bool flag = true;
+		for (int i = 0; i < num; i++) {
+			auto h1 = VecsRegistry<VeEntityTypeNode>{}.insert(VeComponentName{ "Node" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentTransform{});
+			auto h2 = VecsRegistry<vtll::app<VeEntityTypeNode, TAG1>>{}.insert(VeComponentName{ "Node T1" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentTransform{});
+			auto h3 = VecsRegistry<vtll::app<VeEntityTypeNode, TAG2 >>{}.insert(VeComponentName{ "Node T2" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentTransform{});
+			auto h4 = VecsRegistry<vtll::app<VeEntityTypeNode, TAG1, TAG2 >>{}.insert(VeComponentName{ "Node T1+T2" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentTransform{});
+
+			flag = flag && VecsRegistry{}.has_component<VeComponentName>(h1);
+			flag = flag && VecsRegistry{}.has_component<TAG1>(h2);
+			flag = flag && VecsRegistry{}.has_component<TAG2>(h3);
+			flag = flag && VecsRegistry{}.has_component<TAG1>(h4) && VecsRegistry {}.has_component<TAG2>(h4);
+		}
+
+		TESTRESULT(++number, "tags", , (VecsRegistry().size() == 4 * num 
+			&& VecsRegistry().size<VeEntityTypeNode>() == 4*num
+			&& VecsRegistry<VeEntityTypeNode>().size() == num
+			&& VecsRegistry<VeEntityTypeNodeTagged<TAG1>>().size() == num
+			&& VecsRegistry<VeEntityTypeNodeTagged<TAG2>>().size() == num
+			&& VecsRegistry<VeEntityTypeNodeTagged<TAG1,TAG2>>().size() == num
+			&& flag
+			), );
+
+
+		VecsIterator<VeEntityTypeNode> b;
+		VecsRange<VeEntityTypeNode> range;
+
+		VecsIterator<VeEntityTypeNodeTagged<TAG1>> bt;
+		VecsRange<VeEntityTypeNodeTagged<TAG1>> ranget;
+
+		//using ttt = vtll::index_of<vecs::VecsEntityTypeList, vtll::type_list<vecs::VeComponentName, vecs::VeComponentPosition, vecs::VeComponentOrientation, vecs::VeComponentTransform, vecs::TAG1>>;
+
+		for (auto [handle, name, pos, orient, transf] : VecsRange<VeEntityTypeNode>{} ) {
+			VecsRegistry<VeEntityTypeNode>{}.transform(handle);
+		}
+
+		TESTRESULT(++number, "tags", , (VecsRegistry().size() == 4 * num
+			&& VecsRegistry().size<VeEntityTypeNode>() == 4 * num
+			&& VecsRegistry<VeEntityTypeNode>().size() == num
+			&& VecsRegistry<VeEntityTypeNodeTagged<TAG1>>().size() == 0
+			&& VecsRegistry<VeEntityTypeNodeTagged<TAG2>>().size() == 2*num
+			&& VecsRegistry<VeEntityTypeNodeTagged<TAG1, TAG2>>().size() == num
+			), );
+
+
 	}
 
 

@@ -363,7 +363,7 @@ namespace vecs {
 		VecsComponentTable(size_t r = 1 << c_max_size) noexcept;	///< Protected constructor that does not allocate the dispatch table
 
 		template<typename... Cs>
-		requires is_composed_of<E, Cs...> [[nodiscard]]
+		requires are_components_of<E, Cs...> [[nodiscard]]
 		auto insert(VecsHandle handle, std::atomic<uint32_t>* mutex, Cs&&... args) noexcept	-> index_t; ///< Insert new entity
 
 		auto pointers(const index_t index) noexcept				-> ptr_type;	///< \returns tuple with pointers to the components
@@ -373,9 +373,9 @@ namespace vecs {
 
 		auto size() noexcept -> size_t { return m_data.size(); }; ///< \returns the number of entries currently in the table, can also be invalid ones
 		auto erase(const index_t idx) noexcept					-> bool;	///< Mark a row as erased
-		auto compress() noexcept								-> void;	///< compress the table
+		auto compress() noexcept								-> void;	///< Compress the table
 		auto clear() noexcept									-> size_t;	///< Mark all rows as erased
-		auto max_capacity(size_t) noexcept						-> size_t;	//< \returns the max number of entities that can be stored
+		auto max_capacity(size_t) noexcept						-> size_t;	///< \returns the max number of entities that can be stored
 
 		template<typename C>
 		requires is_component_of<E, C>
@@ -441,7 +441,7 @@ namespace vecs {
 	*/
 	template<typename E> 
 	template<typename... Cs>
-	requires is_composed_of<E, Cs...> [[nodiscard]]
+	requires are_components_of<E, Cs...> [[nodiscard]]
 	inline auto VecsComponentTable<E>::insert(VecsHandle handle, std::atomic<uint32_t>* mutex, Cs&&... args) noexcept -> index_t {
 		auto idx = m_data.push_back();			///< Allocate space a the end of the table
 		if (!idx.has_value()) return idx;		///< Check if the allocation was successfull
@@ -702,6 +702,7 @@ namespace vecs {
 
 		friend class VecsHandle;
 		template<typename E> friend class VecsComponentTable;
+		template<typename E> friend class VecsRegistry;
 
 	protected:
 
@@ -956,11 +957,11 @@ namespace vecs {
 		//insert data
 
 		template<typename... Cs>
-		requires is_composed_of<E, Cs...> [[nodiscard]] 
+		requires are_components_of<E, Cs...> [[nodiscard]]
 		auto insert(Cs&&... args) noexcept						-> VecsHandle;	///< Insert new entity of type E into VECS (internally synchronized)
 
-		template<typename... Cs> [[nodiscard]]
-		auto transform(VecsHandle handle, Cs&&... args) noexcept	-> VecsHandle;	///< transform entity into new type (internally synchronized)
+		template<typename... Cs>
+		auto transform(VecsHandle handle, Cs&&... args) noexcept -> bool;	///< transform entity into new type (internally synchronized)
 
 		//-------------------------------------------------------------------------
 		//get data
@@ -1076,7 +1077,7 @@ namespace vecs {
 	*/
 	template<typename E>
 	template<typename... Cs>
-	requires is_composed_of<E, Cs...> [[nodiscard]]
+	requires are_components_of<E, Cs...> [[nodiscard]]
 	inline auto VecsRegistry<E>::insert(Cs&&... args) noexcept	-> VecsHandle {
 		index_t idx{};
 
@@ -1116,33 +1117,35 @@ namespace vecs {
 	*/
 	template<typename E>
 	template<typename... Cs>
-	[[nodiscard]]
-	inline auto VecsRegistry<E>::transform(VecsHandle handle, Cs&&... args) noexcept	-> VecsHandle {
+	inline auto VecsRegistry<E>::transform(VecsHandle handle, Cs&&... args) noexcept	-> bool {
 		VecsWriteLock lock(handle.mutex());
-		if (!contains(handle)) return {};	///< Return the empty component
+		if (!contains(handle)) return false;	///< Return the empty component
 
 		auto& map_type = m_entity_table.comp_ref_idx<c_type>(handle.index());	///< Old type index
-		if (map_type == vtll::index_of<VecsEntityTypeList, E>) return handle;	///< New type = old type -> do nothing
+		if (map_type == vtll::index_of<VecsEntityTypeList, E>::value) return true;	///< New type = old type -> do nothing
 
 		auto index = m_component_table.insert(handle, &m_entity_table.comp_ref_idx<c_mutex>(handle.index()));	///< add data into component table
 			
 		vtll::static_for<size_t, 0, vtll::size<E>::value >(	///< Move old components to new entity type
 			[&](auto i) {
-				using type = vtll::Nth_type<E, i>;
-				if (VecsRegistry{}.has_component<type>()) {
-					m_component_table.update<type>(index, std::move(*static_cast<type*>(VecsRegistry{}.component_ptr<type>(handle))));
+				using type = VeComponentName; // vtll::Nth_type<E, i>;
+				if (handle.has_component<type>()) {
+					auto ptr = this->VecsRegistryBaseClass::component_ptr<type>(handle);
+					m_component_table.update<type>(index, std::move(*static_cast<type*>(ptr)));
 				}
 			}
 		);
 
-		m_component_table.update<Cs>(index, std::forward<Cs>(args)...);			///< Move the arguments to the new entity type
+		if constexpr (sizeof...(Cs) > 0) {
+			m_component_table.update<Cs>(index, std::forward<Cs>(args)...);			///< Move the arguments to the new entity type
+		}
 
 		auto& map_index = m_entity_table.comp_ref_idx<c_index>(handle.index());	///< Index of olf component table in the map
 		m_dispatch[map_type]->eraseE(map_index);								///< Erase the entity from old component table
 		map_index = index;														///< Index in new component table
 		map_type = vtll::index_of<VecsEntityTypeList,E>::value;					///< New type index
 
-		return handle;
+		return true;
 	}
 	
 	/**
@@ -1274,7 +1277,7 @@ namespace vecs {
 	template<typename E>
 	template<typename C>
 	requires is_component_of<E, C>
-		inline auto VecsRegistry<E>::component_ptr(VecsHandle handle) noexcept -> C* {
+	inline auto VecsRegistry<E>::component_ptr(VecsHandle handle) noexcept -> C* {
 		return component_ptr<vtll::index_of<E, C>>();
 	}
 
@@ -1546,9 +1549,20 @@ namespace vecs {
 		auto b = range.begin();
 		auto e = range.end();
 		for (; b != e; ++b) {
-			VecsWriteLock lock(b.mutex());		///< Write lock
-			if (!b.has_value()) continue;
-			std::apply(f, *b);					///< Run the function on the references
+			typename VecsIterator<Ts...>::value_type data;
+
+			VecsReadLock::lock(b.mutex());		///< Read lock
+			if (!b.has_value()) {
+				VecsReadLock::unlock(b.mutex());
+				continue;
+			}
+			data = *b;
+			VecsReadLock::unlock(b.mutex())
+			std::apply(f, data);					///< Run the function on the references
+			VecsWriteLock lock(b.mutex());
+			if (b.has_value()) {
+				*b = data;
+			}
 		}
 	}
 
