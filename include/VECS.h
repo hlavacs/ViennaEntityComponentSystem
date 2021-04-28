@@ -176,10 +176,10 @@ namespace vecs {
 	concept are_entity_types = (is_entity_type<Es> && ...);		///< Es are all entity types
 
 	template<typename ETL>
-	struct is_entity_type_list;		///< Es are all entity types
+	struct is_entity_type_list;									///< Es are all entity types
 
 	template<template<typename...> typename ETL, typename... Es>
-	struct is_entity_type_list<ETL<Es...>> {		///< Es are all entity types
+	struct is_entity_type_list<ETL<Es...>> {					///< A list of entity types
 		static const bool value = (is_entity_type<Es> && ...);
 	};
 
@@ -192,8 +192,14 @@ namespace vecs {
 	template<typename E, typename... Cs>
 	concept is_composed_of = (vtll::is_same<E, std::decay_t<Cs>...>::value);	///< E is composed of Cs
 
-	template<typename ET, typename E = vtll::front<ET>>
-	concept is_tuple = (is_entity_type<E> && std::is_same_v<std::decay_t<ET>, vtll::to_tuple<E>>); ///< ET is a std::tuple
+	template<typename T>
+	struct is_tuple_t : std::true_type {};
+
+	template<typename... Cs>
+	struct is_tuple_t<std::tuple<Cs...>> : std::true_type {};
+
+	template<typename T>
+	concept is_tuple = is_tuple_t<T>::value;
 
 	template<typename E, typename... Cs>
 	concept is_iterator = (std::is_same_v<std::decay_t<E>, VecsIterator<Cs...>>);	///< E is composed of Cs
@@ -384,7 +390,7 @@ namespace vecs {
 		auto component(const index_t index) noexcept			-> C&;		///< Get reference to a component
 
 		template<typename ET>
-		requires is_tuple<ET, E>
+		requires is_tuple<ET>
 		auto update(const index_t index, ET&& ent) noexcept		-> bool;	///< Update a component
 
 		template<typename... Cs>
@@ -522,7 +528,7 @@ namespace vecs {
 	*/
 	template<typename E>
 	template<typename ET>
-	requires is_tuple<ET, E>
+	requires is_tuple<ET>
 	inline auto VecsComponentTable<E>::update(const index_t index, ET&& ent) noexcept -> bool {
 		vtll::static_for<size_t, 0, vtll::size<E>::value >(							///< Loop over all components
 			[&](auto i) {
@@ -1010,7 +1016,7 @@ namespace vecs {
 		//update data
 
 		template<typename ET>
-		requires is_tuple<ET, E>
+		requires is_tuple<ET>
 		auto update(VecsHandle handle, ET&& ent) noexcept	-> bool;		///< Update a whole entity with the given tuple (internally synchronized)
 
 		template<typename... Cs> 
@@ -1311,7 +1317,7 @@ namespace vecs {
 	*/
 	template<typename E>
 	template<typename ET>
-	requires is_tuple<ET, E>
+	requires is_tuple<ET>
 	inline auto VecsRegistry<E>::update(VecsHandle handle, ET&& ent) noexcept -> bool {
 		VecsWriteLock lock(handle.mutex());
 		if (!contains(handle)) return false;
@@ -1579,7 +1585,10 @@ namespace vecs {
 			auto handle = b.handle();
 			VecsReadLock::unlock(handle.mutex());
 			std::apply(f, tup);					///< Run the function on the references
+			VecsWriteLock lock(handle.mutex());
 			if (handle.has_value()) {
+
+
 				vtll::static_for<size_t, 1, std::tuple_size_v<decltype(tup)> >(		///< Loop over all components
 					[&](auto i) {
 						handle.update(std::get<i>(tup));
