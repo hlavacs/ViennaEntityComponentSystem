@@ -1576,11 +1576,16 @@ namespace vecs {
 				continue;
 			}
 			typename VecsIterator<Ts...>::value_type tup = *b;
-			VecsReadLock::unlock(b.mutex());
+			auto handle = b.handle();
+			VecsReadLock::unlock(handle.mutex());
 			std::apply(f, tup);					///< Run the function on the references
-			VecsWriteLock lock(b.mutex());
-			if (b.has_value()) {
-				*b = tup;
+			if (handle.has_value()) {
+				vtll::static_for<size_t, 1, std::tuple_size_v<decltype(tup)> >(		///< Loop over all components
+					[&](auto i) {
+						handle.update(std::get<i>(tup));
+					}
+				);
+
 			}
 		}
 	}
