@@ -193,13 +193,16 @@ namespace vecs {
 	concept is_composed_of = (vtll::is_same<E, std::decay_t<Cs>...>::value);	///< E is composed of Cs
 
 	template<typename T>
-	struct is_tuple_t : std::true_type {};
+	struct is_tuple_t : std::false_type {};
 
 	template<typename... Cs>
 	struct is_tuple_t<std::tuple<Cs...>> : std::true_type {};
 
-	template<typename T>
-	concept is_tuple = is_tuple_t<T>::value;
+	//template<typename T>
+	//concept is_tuple = is_tuple_t<T>::value;
+
+	template<typename ET, typename E = vtll::front<ET>>
+	concept is_tuple = (is_entity_type<E> && std::is_same_v<std::decay_t<ET>, vtll::to_tuple<E>>); ///< ET is a std::tuple
 
 	template<typename E, typename... Cs>
 	concept is_iterator = (std::is_same_v<std::decay_t<E>, VecsIterator<Cs...>>);	///< E is composed of Cs
@@ -390,7 +393,7 @@ namespace vecs {
 		auto component(const index_t index) noexcept			-> C&;		///< Get reference to a component
 
 		template<typename ET>
-		requires is_tuple<ET>
+		requires is_tuple<ET,E>
 		auto update(const index_t index, ET&& ent) noexcept		-> bool;	///< Update a component
 
 		template<typename... Cs>
@@ -528,7 +531,7 @@ namespace vecs {
 	*/
 	template<typename E>
 	template<typename ET>
-	requires is_tuple<ET>
+	requires is_tuple<ET,E>
 	inline auto VecsComponentTable<E>::update(const index_t index, ET&& ent) noexcept -> bool {
 		vtll::static_for<size_t, 0, vtll::size<E>::value >(							///< Loop over all components
 			[&](auto i) {
@@ -1016,7 +1019,7 @@ namespace vecs {
 		//update data
 
 		template<typename ET>
-		requires is_tuple<ET>
+		requires is_tuple<ET,E>
 		auto update(VecsHandle handle, ET&& ent) noexcept	-> bool;		///< Update a whole entity with the given tuple (internally synchronized)
 
 		template<typename... Cs> 
@@ -1317,7 +1320,7 @@ namespace vecs {
 	*/
 	template<typename E>
 	template<typename ET>
-	requires is_tuple<ET>
+	requires is_tuple<ET,E>
 	inline auto VecsRegistry<E>::update(VecsHandle handle, ET&& ent) noexcept -> bool {
 		VecsWriteLock lock(handle.mutex());
 		if (!contains(handle)) return false;
@@ -1585,10 +1588,7 @@ namespace vecs {
 			auto handle = b.handle();
 			VecsReadLock::unlock(handle.mutex());
 			std::apply(f, tup);					///< Run the function on the references
-			VecsWriteLock lock(handle.mutex());
 			if (handle.has_value()) {
-
-
 				vtll::static_for<size_t, 1, std::tuple_size_v<decltype(tup)> >(		///< Loop over all components
 					[&](auto i) {
 						handle.update(std::get<i>(tup));
