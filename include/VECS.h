@@ -1579,23 +1579,11 @@ namespace vecs {
 		auto b = range.begin();
 		auto e = range.end();
 		for (; b != e; ++b) {
-			VecsReadLock::lock(b.mutex());		///< Read lock
-			if (!b.has_value()) {
-				VecsReadLock::unlock(b.mutex());
-				continue;
+			{
+				VecsReadLock lock(b.mutex());		///< Read lock
+				if (!b.has_value()) continue;
 			}
-			typename VecsIterator<Ts...>::value_type tup = *b;
-			auto handle = b.handle();
-			VecsReadLock::unlock(handle.mutex());
-			std::apply(f, tup);					///< Run the function on the references
-			if (handle.has_value()) {
-				vtll::static_for<size_t, 1, std::tuple_size_v<decltype(tup)> >(		///< Loop over all components
-					[&](auto i) {
-						handle.update(std::get<i>(tup));
-					}
-				);
-
-			}
+			std::apply(f, *b);					///< Run the function on the references
 		}
 	}
 

@@ -40,6 +40,14 @@ int main() {
 		auto range = VecsRange<VeComponentName>{};
 		auto it = range.begin();
 		auto res = *it;
+
+		for (auto&& [handle, name] : VecsRange<VeComponentName>{}) {
+		}
+		for (auto&& [handle, name] : VecsRange<>{}) {
+		}
+		for (auto&& [handle, name, pos, orient, transf] : VecsRange<VeEntityTypeNode>{}) {
+		}
+
 	}
 
 	{
