@@ -305,6 +305,8 @@ int main() {
 
 	{
 		TESTRESULT(++number, "clear", VecsRegistry{}.clear(), VecsRegistry{}.size() == 0, );
+		VecsRegistry{}.compress();
+
 
 		const int num = 100;
 		bool flag = true;
@@ -338,9 +340,9 @@ int main() {
 
 		//using ttt = vtll::index_of<vecs::VecsEntityTypeList, vtll::type_list<vecs::VeComponentName, vecs::VeComponentPosition, vecs::VeComponentOrientation, vecs::VeComponentTransform, vecs::TAG1>>;
 
-		for (auto [handle, name, pos, orient, transf, tag1] : VecsRange<VeEntityTypeNodeTagged<TAG1>>{} ) {
+		VecsRegistry().for_each<VeEntityTypeNodeTagged<TAG1>>([&](auto handle, auto& name, auto& pos, auto& orient, auto& transf) {
 			VecsRegistry<VeEntityTypeNode>{}.transform(handle);
-		}
+		});
 
 		TESTRESULT(++number, "tags", , (VecsRegistry().size() == 4 * num
 			&& VecsRegistry().size<VeEntityTypeNode>() == 4 * num

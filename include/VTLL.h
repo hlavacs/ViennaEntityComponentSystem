@@ -691,6 +691,31 @@ namespace vtll {
 	static_assert(has_all_types<type_list<double, int, char>, type_list<int, char>>::value, "The implementation of has_all_types is bad");
 	static_assert(!has_all_types<type_list<double, int, char>, type_list<bool, char>>::value, "The implementation of has_all_types is bad");
 
+	//-------------------------------------------------------------------------
+	//filter_remove_types: remove types from a list, that are also part of another list
+
+	namespace detail {
+		template< typename Seq1, typename Seq2>
+		struct remove_types_impl;
+
+		template<template <typename...> typename Seq1, typename Seq2>
+		struct remove_types_impl<Seq1<>, Seq2> {
+			using type = Seq1<>;
+		};
+
+		template<template <typename...> typename Seq1, typename T, typename... Ts, typename Seq2 >
+		struct remove_types_impl<Seq1<T, Ts...>, Seq2> {
+			using rest = typename remove_types_impl<Seq1<Ts...>, Seq2>::type;
+			using type = std::conditional_t< has_type<Seq2, T>::value, rest, cat< type_list<T>, rest > >;
+		};
+	}
+	template <typename Seq1, typename Seq2>
+	using remove_types = typename detail::remove_types_impl<Seq1, Seq2>::type;
+
+	static_assert(std::is_same_v <
+		remove_types < type_list<char, float, char, int, bool, double>, type_list < char, double > >
+		, type_list<float, int, bool> >,
+		"The implementation of remove_types is bad");
 
 	//-------------------------------------------------------------------------
 	//filter_have_type: keep only those type lists Ts<...> that have a specific type C as member
