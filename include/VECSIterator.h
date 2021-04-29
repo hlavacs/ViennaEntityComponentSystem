@@ -66,12 +66,15 @@ namespace vecs {
 	*/
 	template<typename ETL, typename CTL>
 	inline VecsIteratorBaseClass<ETL,CTL>::VecsIteratorBaseClass(const VecsIteratorBaseClass<ETL,CTL>& v) noexcept : VecsIteratorBaseClass<ETL,CTL>(v.m_is_end) {
+
+		//std::cout << "VecsIteratorBaseClass<ETL,CTL>(const VecsIteratorBaseClass<ETL,CTL>& v): " << typeid(ETL).name() << std::endl << std::endl;
+
 		m_current_iterator = v.m_current_iterator;
 		m_current_index = v.m_current_index;
 		m_size = v.m_size;
 		if (m_is_end) return;
 		for (int i = 0; i < m_dispatch.size(); ++i) {
-			m_dispatch[i]->m_current_index = v.m_dispatch[i]->m_current_index;
+			*m_dispatch[i] = *v.m_dispatch[i];
 		}
 	};
 
@@ -117,7 +120,7 @@ namespace vecs {
 		m_current_index = v.m_current_index;
 		m_size = v.m_size;
 		for (int i = 0; i < m_dispatch.size(); ++i) {
-			m_dispatch[i]->m_current_index = v.m_dispatch[i]->m_current_index;
+			*m_dispatch[i] = *v.m_dispatch[i];
 		}
 		return *this;
 	}
@@ -265,6 +268,7 @@ namespace vecs {
 	class VecsIterator<ETL> : public VecsIteratorBaseClass< ETL, vtll::remove_types< vtll::intersection< ETL >, VecsEntityTagList > > {
 	public:
 		using component_types = vtll::remove_types< vtll::intersection< ETL >, VecsEntityTagList >;
+		VecsIterator(bool end = false) noexcept : VecsIteratorBaseClass< ETL, vtll::remove_types< vtll::intersection< ETL >, VecsEntityTagList > >(end) {};
 	};
 
 	/**
@@ -278,6 +282,7 @@ namespace vecs {
 	class VecsIterator<Es...> : public VecsIteratorBaseClass< expand_tags< vtll::tl<Es...> >, vtll::remove_types< vtll::intersection< vtll::tl<Es...> >, VecsEntityTagList > > {
 	public:
 		using component_types = vtll::remove_types< vtll::intersection< vtll::tl<Es...> >, VecsEntityTagList >;
+		VecsIterator(bool end = false) noexcept : VecsIteratorBaseClass< expand_tags< vtll::tl<Es...> >, vtll::remove_types< vtll::intersection< vtll::tl<Es...> >, VecsEntityTagList > >(end) {};
 	};
 
 	/**
@@ -288,6 +293,7 @@ namespace vecs {
 	class VecsIterator<Cs...> : public VecsIteratorBaseClass< vtll::filter_have_all_types< VecsEntityTypeList, vtll::tl<Cs...> >, vtll::remove_types< vtll::tl<Cs...>, VecsEntityTagList > > {
 	public:
 		using component_types = vtll::remove_types< vtll::tl<Cs...>, VecsEntityTagList >;
+		VecsIterator(bool end = false) noexcept : VecsIteratorBaseClass< vtll::filter_have_all_types< VecsEntityTypeList, vtll::tl<Cs...> >, vtll::remove_types< vtll::tl<Cs...>, VecsEntityTagList > >(end) {};
 	};
 
 	/**
@@ -298,6 +304,7 @@ namespace vecs {
 	class VecsIterator<E,Ts...> : public VecsIteratorBaseClass< vtll::filter_have_all_types< expand_tags<E>, vtll::tl<Ts...> >, vtll::remove_types< E, VecsEntityTagList > > {
 	public:
 		using component_types = vtll::remove_types< E, VecsEntityTagList >;
+		VecsIterator(bool end = false) noexcept : VecsIteratorBaseClass< vtll::filter_have_all_types< expand_tags<E>, vtll::tl<Ts...> >, vtll::remove_types< E, VecsEntityTagList > >(end) {};
 	};
 
 	/**
@@ -307,6 +314,7 @@ namespace vecs {
 	class VecsIterator<> : public VecsIteratorBaseClass < VecsEntityTypeList, vtll::remove_types< vtll::intersection< VecsEntityTypeList >, VecsEntityTagList > > {
 	public:
 		using component_types = vtll::remove_types< vtll::intersection< VecsEntityTypeList >, VecsEntityTagList >;
+		VecsIterator(bool end = false) noexcept :  VecsIteratorBaseClass < VecsEntityTypeList, vtll::remove_types< vtll::intersection< VecsEntityTypeList >, VecsEntityTagList > >(end) {};
 	};
 
 
@@ -332,12 +340,23 @@ namespace vecs {
 		virtual auto has_value() noexcept	-> bool = 0;
 		virtual auto operator*() noexcept	-> typename VecsIteratorBaseClass<ETL, CTL>::reference = 0;
 
+		auto operator=(const VecsIteratorEntityBaseClass& rhs) noexcept	-> void;
 		auto operator++() noexcept			-> void;
 		auto operator++(int) noexcept		-> void;
 		auto is_vector_end() noexcept		-> bool;
 		auto size() noexcept				-> size_t;	///< Total number of valid and invalid entities in the component table for type E
 	};
 
+
+	/**
+	* \brief Copy operator
+	*/
+	template<typename ETL, typename CTL>
+	inline auto VecsIteratorEntityBaseClass<ETL, CTL>::operator=(const VecsIteratorEntityBaseClass& rhs) noexcept -> void {
+		m_current_index = rhs.m_current_index;
+		m_is_end = rhs.m_is_end;
+		m_sizeE = rhs.m_sizeE;
+	};
 
 	/**
 	* \brief Point to the next entity.
@@ -467,7 +486,9 @@ namespace vecs {
 		VecsIteratorBaseClass<ETL,CTL> m_end;
 
 		public:
-			VecsRangeBaseClass() noexcept : m_begin{ VecsIteratorBaseClass<ETL,CTL>(false) }, m_end{ VecsIteratorBaseClass<ETL,CTL>(true) } {};
+			VecsRangeBaseClass() noexcept : m_begin{ false }, m_end{ true } {
+				//std::cout << "VecsRangeBaseClass<ETL,CTL>: " << typeid(ETL).name() << std::endl << std::endl;
+			};
 			VecsRangeBaseClass(VecsIteratorBaseClass<ETL,CTL>& begin, VecsIteratorBaseClass<ETL,CTL>& end) noexcept : m_begin{ begin }, m_end{ end } {};
 			VecsRangeBaseClass(const VecsRangeBaseClass<ETL,CTL>& rhs) noexcept : m_begin{ rhs.m_begin }, m_end{ rhs.m_end } {};
 
@@ -521,7 +542,7 @@ namespace vecs {
 	*/
 	template<typename ETL>
 	requires (is_entity_type_list<ETL>::value)
-	class VecsRange<ETL> : public VecsIteratorBaseClass< ETL, vtll::remove_types< vtll::intersection< ETL >, VecsEntityTagList > > {};
+	class VecsRange<ETL> : public VecsRangeBaseClass< ETL, vtll::remove_types< vtll::intersection< ETL >, VecsEntityTagList > > {};
 
 	/**
 	* \brief Range over a set of entity types. Entity types are expanded using the tag map.
@@ -562,8 +583,12 @@ namespace vecs {
 	*/
 	template<typename ETL, typename CTL>
 	inline VecsIteratorBaseClass<ETL, CTL>::VecsIteratorBaseClass(bool is_end) noexcept : m_is_end{ is_end } {
+
+		//std::cout << "VecsIteratorBaseClass<ETL,CTL>(): " << typeid(ETL).name() << std::endl << std::endl;
+
 		if (is_end) {
 			m_current_iterator = static_cast<decltype(m_current_iterator)>(m_dispatch.size() - 1);
+			//std::cout << "last_type: " << typeid(last_type).name() << std::endl << std::endl;
 			m_current_index = static_cast<decltype(m_current_index)>(VecsRegistry<last_type>().size());
 		}
 

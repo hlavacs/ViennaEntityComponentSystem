@@ -728,7 +728,6 @@ namespace vecs {
 		template<typename E> friend class VecsRegistry;
 
 	protected:
-
 		using types = vtll::type_list<index_t, counter_t, index_t, std::atomic<uint32_t>>;	///< Type for the table
 		static const uint32_t c_index{ 0 };		///< Index for accessing the index to next free or entry in component table
 		static const uint32_t c_counter{ 1 };	///< Index for accessing the generation counter
@@ -757,6 +756,8 @@ namespace vecs {
 
 		/** Virtual function for dispatching erasing an entity from a component table */
 		virtual auto eraseE(index_t index) noexcept	-> void { };	
+
+		virtual auto sizeE() noexcept -> std::atomic<uint32_t>& { return m_size; };
 
 	public:
 		VecsRegistryBaseClass( size_t r = VecsTableMaxSize::value ) noexcept;
@@ -819,6 +820,10 @@ namespace vecs {
 		auto type(VecsHandle h) noexcept	-> index_t;		///< \returns type of entity
 		virtual auto swap( VecsHandle h1, VecsHandle h2 ) noexcept -> bool;	///< Swap places of two entities in the component table
 		virtual auto contains(VecsHandle handle) noexcept	-> bool;		///< \returns true if the ECS still holds this entity 
+		virtual void print_type(VecsHandle handle) { 
+			auto t = type(handle);
+			m_dispatch[t]->print_type(handle); 
+		};
 	};
 
 
@@ -953,8 +958,8 @@ namespace vecs {
 		friend class VecsRegistryBaseClass;
 
 	protected:
-		static inline std::atomic<uint32_t>		m_sizeE{0};	///< Store the number of valid entities of type E currently in the ECS
 		static inline VecsComponentTable<E>		m_component_table;
+		static inline std::atomic<uint32_t>		m_sizeE{ 0 };	///< Store the number of valid entities of type E currently in the ECS
 
 		/** Maximum number of entites of type E that can be stored. */
 		static const size_t c_max_size = vtll::back_value<vtll::map< VecsTableSizeMap, E, VeTableSizeDefault > >::value;
@@ -967,6 +972,7 @@ namespace vecs {
 		auto eraseE(index_t index) noexcept	-> void { m_component_table.erase(index); };			 ///< Dispatch from base class
 		auto compressE() noexcept	-> void { return m_component_table.compress(); };	///< Dispatch from base class
 		auto clearE() noexcept		-> size_t { return m_component_table.clear(); };	///< Dispatch from base class
+		auto sizeE() noexcept		-> std::atomic<uint32_t>& { return m_sizeE; };
 
 	public:
 		/** Constructors for class VecsRegistry<E>. */
@@ -1040,6 +1046,7 @@ namespace vecs {
 		auto max_capacity(size_t) noexcept					-> size_t;		///< Set max number of entities of this type
 		auto swap(VecsHandle h1, VecsHandle h2) noexcept	-> bool;		///< Swap rows in component table
 		auto contains(VecsHandle handle) noexcept			-> bool;		///< Test if an entity is still in VECS
+		virtual void print_type(VecsHandle handle) { std::cout << "<" << typeid(E).name() << ">"; };
 	};
 
 
@@ -1146,9 +1153,16 @@ namespace vecs {
 	template<typename E>
 	template<typename... Cs>
 	inline auto VecsRegistry<E>::transform(VecsHandle handle, Cs&&... args) noexcept	-> bool {
+
 		if (!contains(handle)) return false;	///< Return the empty component
 
+		//VecsRegistryBaseClass::print_type(handle);
+		//std::cout << " type " << VecsRegistry{}.type(handle) << std::endl;
+
 		auto& map_type = m_entity_table.comp_ref_idx<c_type>(handle.index());	///< Old type index
+
+		std::cout << "Transform from " << map_type.value << " to " << typeid(E).name() << " " << vtll::index_of<VecsEntityTypeList, E>::value << std::endl << std::endl;
+
 		if (map_type == vtll::index_of<VecsEntityTypeList, E>::value) return true;	///< New type = old type -> do nothing
 
 		auto index = m_component_table.insert(handle, &m_entity_table.comp_ref_idx<c_mutex>(handle.index()));	///< add data into component table
@@ -1169,6 +1183,10 @@ namespace vecs {
 
 		auto& map_index = m_entity_table.comp_ref_idx<c_index>(handle.index());	///< Index of olf component table in the map
 		m_dispatch[map_type]->eraseE(map_index);								///< Erase the entity from old component table
+
+		sizeE()++;
+		m_dispatch[map_type]->sizeE()--;
+
 		map_index = index;														///< Index in new component table
 		map_type = vtll::index_of<VecsEntityTypeList,E>::value;					///< New type index
 
@@ -1231,7 +1249,7 @@ namespace vecs {
 	*/
 	template<typename E>
 	inline auto VecsRegistry<E>::contains(VecsHandle handle) noexcept -> bool {
-		if (!handle.is_valid() || type(handle) != vtll::index_of<VecsEntityTypeList, E>::value ) return false;
+		if (!handle.is_valid()) return false;
 		if ( handle.m_generation_counter != m_entity_table.comp_ref_idx<c_counter>(handle.m_entity_index)) return false;
 		return true;
 	}

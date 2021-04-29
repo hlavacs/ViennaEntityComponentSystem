@@ -36,6 +36,8 @@ int main() {
 	VeComponentMaterial mat{ 99 };
 	VeComponentGeometry geo{ 11 };
 
+
+	/*
 	{
 		auto range = VecsRange<VeComponentName>{};
 		auto it = range.begin();
@@ -302,19 +304,20 @@ int main() {
 		
 		TESTRESULT(++number, "system run 6", , test, );
 	}
-
+	*/
 	{
-		TESTRESULT(++number, "clear", VecsRegistry{}.clear(), VecsRegistry{}.size() == 0, );
-		VecsRegistry{}.compress();
+		//TESTRESULT(++number, "clear", VecsRegistry{}.clear(), VecsRegistry{}.size() == 0, );
+		//VecsRegistry{}.compress();
 
+		std::cout << typeid(vecs::VecsEntityTypeList).name() << std::endl << std::endl;
 
-		const int num = 100;
+		const int num = 10;
 		bool flag = true;
 		for (int i = 0; i < num; i++) {
 			auto h1 = VecsRegistry<VeEntityTypeNode>{}.insert(VeComponentName{ "Node" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentTransform{});
-			auto h2 = VecsRegistry<vtll::app<VeEntityTypeNode, TAG1>>{}.insert(VeComponentName{ "Node T1" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentTransform{});
-			auto h3 = VecsRegistry<vtll::app<VeEntityTypeNode, TAG2 >>{}.insert(VeComponentName{ "Node T2" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentTransform{});
-			auto h4 = VecsRegistry<vtll::app<VeEntityTypeNode, TAG1, TAG2 >>{}.insert(VeComponentName{ "Node T1+T2" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentTransform{});
+			auto h2 = VecsRegistry<VeEntityTypeNodeTagged<TAG1>>{}.insert(VeComponentName{ "Node T1" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentTransform{});
+			auto h3 = VecsRegistry<VeEntityTypeNodeTagged<TAG2>>{}.insert(VeComponentName{ "Node T2" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentTransform{});
+			auto h4 = VecsRegistry<VeEntityTypeNodeTagged<TAG1,TAG2>>{}.insert(VeComponentName{ "Node T1+T2" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentTransform{});
 
 			flag = flag && VecsRegistry{}.has_component<VeComponentName>(h1);
 			flag = flag && VecsRegistry{}.has_component<TAG1>(h2);
@@ -333,23 +336,32 @@ int main() {
 
 
 		VecsIterator<VeEntityTypeNode> b;
+		VecsIterator<VeEntityTypeNode> e( true );
 		VecsRange<VeEntityTypeNode> range;
 
+		auto s = VecsRegistry<VeEntityTypeNodeTagged<TAG1>>().size();
+
 		VecsIterator<VeEntityTypeNodeTagged<TAG1>> bt;
+		VecsIterator<VeEntityTypeNodeTagged<TAG1>> et(true);
 		VecsRange<VeEntityTypeNodeTagged<TAG1>> ranget;
 
 		//using ttt = vtll::index_of<vecs::VecsEntityTypeList, vtll::type_list<vecs::VeComponentName, vecs::VeComponentPosition, vecs::VeComponentOrientation, vecs::VeComponentTransform, vecs::TAG1>>;
 
 		VecsRegistry().for_each<VeEntityTypeNodeTagged<TAG1>>([&](auto handle, auto& name, auto& pos, auto& orient, auto& transf) {
+			VecsRegistry{}.print_type(handle);
+			std::cout << " type " << VecsRegistry{}.type(handle) << std::endl;
+
 			VecsRegistry<VeEntityTypeNode>{}.transform(handle);
+
+			std::cout << "" << VecsRegistry<VeEntityTypeNodeTagged<TAG1>>().size() << std::endl;
 		});
 
 		TESTRESULT(++number, "tags", , (VecsRegistry().size() == 4 * num
 			&& VecsRegistry().size<VeEntityTypeNode>() == 4 * num
-			&& VecsRegistry<VeEntityTypeNode>().size() == num
+			&& VecsRegistry<VeEntityTypeNode>().size() == 3*num
 			&& VecsRegistry<VeEntityTypeNodeTagged<TAG1>>().size() == 0
-			&& VecsRegistry<VeEntityTypeNodeTagged<TAG2>>().size() == 2*num
-			&& VecsRegistry<VeEntityTypeNodeTagged<TAG1, TAG2>>().size() == num
+			&& VecsRegistry<VeEntityTypeNodeTagged<TAG2>>().size() == num
+			&& VecsRegistry<VeEntityTypeNodeTagged<TAG1, TAG2>>().size() == 0
 			), );
 
 
