@@ -24,7 +24,6 @@ namespace vecs {
 	using counter32_t = int_type<uint32_t, struct P5, std::numeric_limits<uint32_t>::max()>;
 	using counter_t = counter32_t;
 
-	using map_index_t = int_type<uint32_t, struct P6, std::numeric_limits<uint32_t>::max()>;
 	using table_index_t = int_type<uint32_t, struct P7, std::numeric_limits<uint32_t>::max()>;
 	using type_index_t = int_type<uint32_t, struct P8, std::numeric_limits<uint32_t>::max()>;
 

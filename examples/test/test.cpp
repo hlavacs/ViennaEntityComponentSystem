@@ -37,7 +37,6 @@ int main() {
 	VeComponentGeometry geo{ 11 };
 
 
-	/*
 	{
 		auto range = VecsRange<VeComponentName>{};
 		auto it = range.begin();
@@ -290,7 +289,6 @@ int main() {
 
 		}
 		TESTRESULT(++number, "system run 5", , test, );
-
 	}
 
 	{
@@ -304,12 +302,12 @@ int main() {
 		
 		TESTRESULT(++number, "system run 6", , test, );
 	}
-	*/
+	
 	{
-		//TESTRESULT(++number, "clear", VecsRegistry{}.clear(), VecsRegistry{}.size() == 0, );
+		TESTRESULT(++number, "clear", VecsRegistry{}.clear(), VecsRegistry{}.size() == 0, );
 		//VecsRegistry{}.compress();
 
-		std::cout << typeid(vecs::VecsEntityTypeList).name() << std::endl << std::endl;
+		//std::cout << typeid(vecs::VecsEntityTypeList).name() << std::endl << std::endl;
 
 		const int num = 10;
 		bool flag = true;
@@ -345,15 +343,8 @@ int main() {
 		VecsIterator<VeEntityTypeNodeTagged<TAG1>> et(true);
 		VecsRange<VeEntityTypeNodeTagged<TAG1>> ranget;
 
-		//using ttt = vtll::index_of<vecs::VecsEntityTypeList, vtll::type_list<vecs::VeComponentName, vecs::VeComponentPosition, vecs::VeComponentOrientation, vecs::VeComponentTransform, vecs::TAG1>>;
-
 		VecsRegistry().for_each<VeEntityTypeNode, TAG1>([&](auto handle, auto& name, auto& pos, auto& orient, auto& transf) {
-			//VecsRegistry{}.print_type(handle);
-			//std::cout << " type " << VecsRegistry{}.type(handle) << std::endl;
-
 			VecsRegistry<VeEntityTypeNode>{}.transform(handle);
-
-			//std::cout << "VeEntityTypeNodeTagged<TAG1>: " << VecsRegistry<VeEntityTypeNodeTagged<TAG1>>().size() << " VeEntityTypeNodeTagged<TAG1,TAG2>: " << VecsRegistry<VeEntityTypeNodeTagged<TAG1,TAG2>>().size()  << "\n\n";
 		});
 
 		TESTRESULT(++number, "tags", , (VecsRegistry().size() == 4 * num

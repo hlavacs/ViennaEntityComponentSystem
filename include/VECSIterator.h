@@ -21,10 +21,10 @@ namespace vecs {
 
 			array_type m_dispatch;				///< Subiterators for each entity type E
 
-			index_t m_current_iterator{ 0 };	///< Current iterator of type E that is used
-			index_t m_current_index{ 0 };		///< Current index in the VecsComponentTable<E>
-			bool	m_is_end{ false };			///< True if this is an end iterator (for stopping the loop)
-			size_t	m_size{ 0 };				///< Number of entities max covered by the iterator
+			type_index_t	m_current_iterator{ 0 };	///< Current iterator of type E that is used
+			table_index_t	m_current_index{ 0 };		///< Current index in the VecsComponentTable<E>
+			bool			m_is_end{ false };			///< True if this is an end iterator (for stopping the loop)
+			size_t			m_size{ 0 };				///< Number of entities max covered by the iterator
 
 			VecsIteratorBaseClass(std::nullopt_t n) noexcept {};		///< Needed for derived iterator to call
 
@@ -343,9 +343,9 @@ namespace vecs {
 		friend class VecsIteratorBaseClass<ETL, CTL>;
 
 	protected:
-		index_t m_current_index{ 0 };		///< Current index in the VecsComponentTable<E>
-		bool	m_is_end{ false };			///< True if this is an end iterator (for stopping the loop)
-		size_t	m_sizeE{ 0 };				///< Number of valid and invalid entities of type E
+		table_index_t	m_current_index{ 0 };		///< Current index in the VecsComponentTable<E>
+		bool			m_is_end{ false };			///< True if this is an end iterator (for stopping the loop)
+		size_t			m_sizeE{ 0 };				///< Number of valid and invalid entities of type E
 
 	public:
 		VecsIteratorEntityBaseClass(bool is_end = false) noexcept : m_is_end(is_end) {};
