@@ -79,8 +79,36 @@ namespace vecs {
 	* expand_tags takes a list of entity types, uses the tags from the tag map and creates all variants of each 
 	* entity type, holding zero to all tags for this entity type.
 	*/
+	template<typename TL>
+	using expand_tags = vtll::remove_duplicates< vtll::flatten< vtll::function< TL, expand_tags_for_one > > >;
+
+	/*namespace detail {
+		template<typename E>
+		struct expand_tags_detail;
+
+		template<template<typename...> typename Seq>
+		struct expand_tags_detail<Seq<>> {
+			using type = Seq<>;
+		};
+
+		template<template<typename...> typename E, typename... Cs>
+		requires ((!vtll::is_type_list<Cs>::value) && ...)
+		struct expand_tags_detail<E<Cs...>> {
+			using type = vtll::remove_duplicates< vtll::flatten< vtll::function< vtll::tl<E<Cs...>>, expand_tags_for_one > > >;
+		};
+
+		template<template<typename...> typename ETL, typename... Es>
+		requires (vtll::is_type_list<Es>::value && ...)
+		struct expand_tags_detail<ETL<Es...>> {
+			using type = vtll::remove_duplicates< vtll::flatten< vtll::function< ETL<Es...>, expand_tags_for_one > > >;
+		};
+	}
+
 	template<typename T>
-	using expand_tags = vtll::remove_duplicates< vtll::flatten< vtll::function< T, expand_tags_for_one > > >;
+	using expand_tags = typename detail::expand_tags_detail<T>::type;*/
+
+
+
 
 	/**
 	* \brief Entity type list: a list with all possible entity types the ECS can deal with.
@@ -295,7 +323,7 @@ namespace vecs {
 		auto erase() noexcept -> bool;				///< Erase the entity 
 
 		auto index() noexcept -> index_t;			///< Get index of this entity in the component table
-		auto type() noexcept  -> index_t;			///< Get index of this entity in the component table
+		auto type() noexcept  -> index_t;			///< Get type of this entity
 
 		std::atomic<uint32_t>* mutex();				///< \returns address of the VECS mutex for this entity
 
@@ -1159,7 +1187,7 @@ namespace vecs {
 		//VecsRegistryBaseClass::print_type(handle);
 		//std::cout << " type " << VecsRegistry{}.type(handle) << std::endl;
 
-		auto& map_type = m_entity_table.comp_ref_idx<c_type>(handle.index());	///< Old type index
+		auto& map_type = m_entity_table.comp_ref_idx<c_type>(handle.m_entity_index);	///< Old type index
 
 		std::cout << "Transform from " << map_type.value << " to " << typeid(E).name() << " " << vtll::index_of<VecsEntityTypeList, E>::value << std::endl << std::endl;
 
@@ -1181,7 +1209,7 @@ namespace vecs {
 			m_component_table.update<Cs>(index, std::forward<Cs>(args)...);			///< Move the arguments to the new entity type
 		}
 
-		auto& map_index = m_entity_table.comp_ref_idx<c_index>(handle.index());	///< Index of olf component table in the map
+		auto& map_index = m_entity_table.comp_ref_idx<c_index>(handle.m_entity_index);	///< Index of old component table in the map
 		m_dispatch[map_type]->eraseE(map_index);								///< Erase the entity from old component table
 
 		sizeE()++;

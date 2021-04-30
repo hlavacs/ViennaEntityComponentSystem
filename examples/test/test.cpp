@@ -347,13 +347,13 @@ int main() {
 
 		//using ttt = vtll::index_of<vecs::VecsEntityTypeList, vtll::type_list<vecs::VeComponentName, vecs::VeComponentPosition, vecs::VeComponentOrientation, vecs::VeComponentTransform, vecs::TAG1>>;
 
-		VecsRegistry().for_each<VeEntityTypeNodeTagged<TAG1>>([&](auto handle, auto& name, auto& pos, auto& orient, auto& transf) {
+		VecsRegistry().for_each<VeEntityTypeNode, TAG1>([&](auto handle, auto& name, auto& pos, auto& orient, auto& transf) {
 			VecsRegistry{}.print_type(handle);
 			std::cout << " type " << VecsRegistry{}.type(handle) << std::endl;
 
 			VecsRegistry<VeEntityTypeNode>{}.transform(handle);
 
-			std::cout << "" << VecsRegistry<VeEntityTypeNodeTagged<TAG1>>().size() << std::endl;
+			std::cout << "VeEntityTypeNodeTagged<TAG1>: " << VecsRegistry<VeEntityTypeNodeTagged<TAG1>>().size() << " VeEntityTypeNodeTagged<TAG1,TAG2>: " << VecsRegistry<VeEntityTypeNodeTagged<TAG1,TAG2>>().size()  << "\n\n";
 		});
 
 		TESTRESULT(++number, "tags", , (VecsRegistry().size() == 4 * num

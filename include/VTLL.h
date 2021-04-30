@@ -155,7 +155,25 @@ namespace vtll {
 	//-------------------------------------------------------------------------
 	//type list algorithms
 
+	//-------------------------------------------------------------------------
+	//is_type_list: test if a template is a type list
 
+	namespace detail {
+		template <typename T>
+		struct is_type_list_impl : std::false_type {};
+
+		template <template <typename...> typename Seq, typename... Ts>
+		struct is_type_list_impl<Seq<Ts...>> : std::true_type {};
+
+		template <template <typename...> typename Seq>
+		struct is_type_list_impl<Seq<>> : std::true_type {};
+	}
+	template <typename T>
+	using is_type_list = detail::is_type_list_impl<T>;
+
+	static_assert(!is_type_list<int>::value, "The implementation of is_type_list is bad");
+	static_assert(is_type_list<type_list<double, char, bool, double>>::value, "The implementation of is_type_list is bad");
+	static_assert(is_type_list<type_list<>>::value, "The implementation of is_type_list is bad");
 
 	//-------------------------------------------------------------------------
 	//size: size of a type list
