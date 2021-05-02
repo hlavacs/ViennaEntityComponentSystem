@@ -82,33 +82,6 @@ namespace vecs {
 	template<typename TL>
 	using expand_tags = vtll::remove_duplicates< vtll::flatten< vtll::function< TL, expand_tags_for_one > > >;
 
-	/*namespace detail {
-		template<typename E>
-		struct expand_tags_detail;
-
-		template<template<typename...> typename Seq>
-		struct expand_tags_detail<Seq<>> {
-			using type = Seq<>;
-		};
-
-		template<template<typename...> typename E, typename... Cs>
-		requires ((!vtll::is_type_list<Cs>::value) && ...)
-		struct expand_tags_detail<E<Cs...>> {
-			using type = vtll::remove_duplicates< vtll::flatten< vtll::function< vtll::tl<E<Cs...>>, expand_tags_for_one > > >;
-		};
-
-		template<template<typename...> typename ETL, typename... Es>
-		requires (vtll::is_type_list<Es>::value && ...)
-		struct expand_tags_detail<ETL<Es...>> {
-			using type = vtll::remove_duplicates< vtll::flatten< vtll::function< ETL<Es...>, expand_tags_for_one > > >;
-		};
-	}
-
-	template<typename T>
-	using expand_tags = typename detail::expand_tags_detail<T>::type;*/
-
-
-
 
 	/**
 	* \brief Entity type list: a list with all possible entity types the ECS can deal with.
@@ -122,11 +95,19 @@ namespace vecs {
 	static_assert(vtll::are_unique<VecsEntityTypeList>::value, "The elements of VecsEntityTypeList lists are not unique!");
 
 	/**
+	* \brief A list of all components but excuding the tags
+	*
+	* It is the sum of the components of the engine part, and the components as defined by the engine user, but w/o tags.
+	*/
+	using VecsComponentTypeListWOTags = vtll::remove_types< vtll::remove_duplicates< vtll::flatten<VecsEntityTypeList> >, VecsEntityTagList>;
+
+	/**
 	* \brief Component type list: a list with all component types that an entity can have.
 	*
-	* It is the sum of the components of the engine part, and the components as defined by the engine user
+	* It is the sum of the components of the engine part, and the components as defined by the engine user, including tags 
+	* at the END of the list.
 	*/
-	using VecsComponentTypeList = vtll::remove_duplicates< vtll::flatten<VecsEntityTypeList> >;
+	using VecsComponentTypeList = vtll::cat< VecsComponentTypeListWOTags, VecsEntityTagList>;
 
 	/**
 	* \brief Table size map: a VTLL map specifying the default sizes for component tables.
