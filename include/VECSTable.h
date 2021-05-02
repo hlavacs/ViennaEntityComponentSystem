@@ -56,10 +56,7 @@ namespace vecs {
 		inline void clear() noexcept { m_size = 0; };				///< Set the number if rows to zero - effectively clear the table
 
 		template<size_t I, typename C = vtll::Nth_type<DATA,I>>
-		inline auto comp_ref_idx(table_index_t n) noexcept	-> C&;		///< \returns a reference to a component
-
-		template<typename C>
-		inline auto comp_ref_type(table_index_t n) noexcept	-> C&;		///< \returns a reference to a component
+		inline auto component_ref(table_index_t n) noexcept	-> C&;		///< \returns a reference to a component
 
 		inline auto tuple_ref(table_index_t n) noexcept		-> tuple_ref_t;		///< \returns a tuple with refs to all components
 		inline auto tuple_value(table_index_t n) noexcept	-> tuple_value_t;	///< \returns a tuple with copies of all components
@@ -74,10 +71,6 @@ namespace vecs {
 
 		template<size_t I, typename C = vtll::Nth_type<DATA, I>>
 		inline auto update(table_index_t n, C&& data) noexcept		-> bool;	///< Update a component  for a given row
-
-		template<typename C>
-		requires vtll::has_type<DATA, std::decay_t<C>>::value
-		inline auto update(table_index_t n, C&& data) noexcept		-> bool;	///< Update a component for a given row
 
 		template<template<typename... Cs> typename T, typename... Cs>
 		requires std::is_same_v<vtll::to_tuple<DATA>, std::tuple<std::decay_t<Cs>...>>
@@ -108,30 +101,12 @@ namespace vecs {
 	*/
 	template<typename DATA, size_t L, bool ROW>
 	template<size_t I, typename C>
-	inline auto VecsTable<DATA, L, ROW>::comp_ref_idx(table_index_t n) noexcept -> C& {
+	inline auto VecsTable<DATA, L, ROW>::component_ref(table_index_t n) noexcept -> C& {
 		if constexpr (ROW) {
 			return std::get<I>((*m_segment[n >> L])[n & BIT_MASK]);
 		}
 		else {
 			return std::get<I>(*m_segment[n >> L])[n & BIT_MASK];
-		}
-	};
-
-	/**
-	* \brief Get a reference to a particular component with type C.
-	* The first component found having this type is used.
-	*
-	* \param[in] n Index to the entry.
-	* \returns a reference to component with type C of entry n.
-	*/
-	template<typename DATA, size_t L, bool ROW>
-	template<typename C>
-	inline auto VecsTable<DATA, L, ROW>::comp_ref_type(table_index_t n) noexcept -> C& {
-		if constexpr (ROW) {
-			return std::get<vtll::index_of<DATA, C>::value>((*m_segment[n >> L])[n & BIT_MASK]);
-		}
-		else {
-			return std::get<vtll::index_of<DATA, C>::value>(*m_segment[n >> L])[n & BIT_MASK];
 		}
 	};
 
@@ -237,22 +212,7 @@ namespace vecs {
 	template<size_t I, typename C>
 	inline auto VecsTable<DATA, L, ROW>::update(table_index_t n, C&& data) noexcept -> bool {
 		if (n >= m_size) return false;
-		comp_ref_idx<I>(n) = data;
-		return true;
-	}
-
-	/**
-	* \brief Update the component with type C of an entry. The first component with this type is used.
-	* \param[in] n Index of entry holding the component.
-	* \param[in] C Universal reference to the component holding the data.
-	* \returns true if the operation was successful.
-	*/
-	template<typename DATA, size_t L, bool ROW>
-	template<typename C>
-	requires vtll::has_type<DATA, std::decay_t<C>>::value
-	inline auto VecsTable<DATA, L, ROW>::update(table_index_t n, C&& data) noexcept -> bool {
-		if (n >= m_size) return false;
-		comp_ref_type<std::decay_t<C>>(n) = data;
+		component_ref<I>(n) = data;
 		return true;
 	}
 
