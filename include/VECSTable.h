@@ -36,7 +36,7 @@ namespace vecs {
 		static const uint64_t BIT_MASK = N - 1;		///< Bit mask to mask off lower bits to get index inside segment
 
 		using tuple_value_t = vtll::to_tuple<DATA>;		///< Tuple holding the entries as value
-		using tuple_ref_t	= vtll::to_ref_tuple<DATA>;	///< Tuple holding references to the entries
+		//using tuple_ref_t	= vtll::to_ref_tuple<DATA>;	///< Tuple holding references to the entries
 		using tuple_ptr_t	= vtll::to_ptr_tuple<DATA>;	///< Tuple holding references to the entries
 
 		using array_tuple_t1 = std::array<tuple_value_t, N>;								///< ROW: an array of tuples
@@ -55,29 +55,44 @@ namespace vecs {
 		inline size_t size() noexcept { return m_size.load(); };	///< \returns the current numbers of rows in the table
 		inline void clear() noexcept { m_size = 0; };				///< Set the number if rows to zero - effectively clear the table
 
+		//-------------------------------------------------------------------------------------------
+		//read data
+
 		template<size_t I, typename C = vtll::Nth_type<DATA,I>>
 		inline auto component_ptr(table_index_t n) noexcept	-> C*;		///< \returns a reference to a component
 
-		inline auto tuple_ref(table_index_t n) noexcept		-> tuple_ref_t;		///< \returns a tuple with refs to all components
 		inline auto tuple_value(table_index_t n) noexcept	-> tuple_value_t;	///< \returns a tuple with copies of all components
 		inline auto tuple_ptr(table_index_t n) noexcept		-> tuple_ptr_t;		///< \returns a tuple with pointers to all components
-		inline auto push_back() noexcept					-> table_index_t;	///< Create an empty slot at end of the table
+		
+		//-------------------------------------------------------------------------------------------
+		//add data
+
+		inline auto push_back() noexcept						-> table_index_t;	///< Create an empty row at end of the table
 
 		template<template<typename... Cs> typename T, typename... Cs>
 		requires std::is_same_v<vtll::to_tuple<DATA>, std::tuple<std::decay_t<Cs>...>>
 		inline auto push_back(T<Cs...>&& data) noexcept			-> table_index_t;	///< Push new component data to the end of the table
 
-		inline auto pop_back()	noexcept						-> void { m_size--; }	///< Remove the last row
+		//-------------------------------------------------------------------------------------------
+		//update data
 
 		template<size_t I, typename C = vtll::Nth_type<DATA, I>>
-		inline auto update(table_index_t n, C&& data) noexcept	-> bool;	///< Update a component  for a given row
+		inline auto update(table_index_t n, C&& data) noexcept			-> bool;	///< Update a component  for a given row
 
 		template<template<typename... Cs> typename T, typename... Cs>
 		requires std::is_same_v<vtll::to_tuple<DATA>, std::tuple<std::decay_t<Cs>...>>
-		inline auto update(table_index_t n, T<Cs...>&& data) noexcept -> bool;	///< Update components for a given row
+		inline auto update(table_index_t n, T<Cs...>&& data) noexcept	-> bool;	///< Update components for a given row
 
+		//-------------------------------------------------------------------------------------------
+		//move and remove data
+
+		inline auto pop_back()	noexcept									-> void { m_size--; }	///< Remove the last row
 		inline auto move(table_index_t idst, table_index_t isrc) noexcept	-> bool;	///< Move contents of a row to another row
 		inline auto swap(table_index_t n1, table_index_t n2) noexcept		-> bool;	///< Swap contents of two rows
+
+		//-------------------------------------------------------------------------------------------
+		//memory management
+
 		inline auto reserve(size_t r) noexcept		-> bool;		///< Reserve enough memory ny allocating segments
 		inline auto max_capacity(size_t r) noexcept	-> size_t;		///< Set new max capacity -> might reallocate the segment vector!
 		inline auto compress() noexcept				-> void;		///< Deallocate unsused segements
@@ -108,24 +123,6 @@ namespace vecs {
 		else {
 			return &std::get<I>(*m_segment[n >> L])[n & BIT_MASK];
 		}
-	};
-
-	/**
-	* \brief Get a tuple with references to all components of an entry.
-	* \param[in] n Index to the entry.
-	* \returns a tuple with references to all components of entry n.
-	*/
-	template<typename DATA, size_t L, bool ROW>	
-	inline auto VecsTable<DATA, L, ROW>::tuple_ref(table_index_t n) noexcept -> tuple_ref_t {
-		auto f = [&]<size_t... Is>(std::index_sequence<Is...>) {
-			if constexpr (ROW) {
-				return std::tie(std::get<Is>((*m_segment[n >> L])[n & BIT_MASK])...);
-			}
-			else {
-				return std::tie(std::get<Is>(*m_segment[n >> L])[n & BIT_MASK]...);
-			}
-		};
-		return f(std::make_index_sequence<vtll::size<DATA>::value>{});
 	};
 
 	/**
@@ -194,9 +191,9 @@ namespace vecs {
 			m_size--;
 			return table_index_t{};			///< If not return an invalid index.
 		}
-		decltype(auto) ref = tuple_ref(table_index_t{ idx });				///< Get references to components
+		auto ptr = tuple_ptr(table_index_t{ idx });				///< Get references to components
 		vtll::static_for<size_t, 0, vtll::size<DATA>::value >([&](auto i) {
-			std::get<i>(ref) = std::get<i>(data);							///< Copy/move data over components
+			*std::get<i>(ptr) = std::get<i>(data);							///< Copy/move data over components
 			});
 		return table_index_t{ static_cast<decltype(table_index_t::value)>(idx) };		///< Return new index
 	}
@@ -226,9 +223,9 @@ namespace vecs {
 	requires std::is_same_v<vtll::to_tuple<DATA>, std::tuple<std::decay_t<Cs>...>>
 	inline auto VecsTable<DATA, L, ROW>::update(table_index_t n, T<Cs...>&& data) noexcept -> bool {
 		if (n >= m_size) return false;
-		decltype(auto) ref = tuple_ref(n);
+		auto ptr = tuple_ptr(n);
 		vtll::static_for<size_t, 0, vtll::size<DATA>::value >([&](auto i) {
-			std::get<i>(ref) = std::get<i>(data);
+			*std::get<i>(ptr) = std::get<i>(data);
 			});
 		return true;
 	}
@@ -242,11 +239,11 @@ namespace vecs {
 	template<typename DATA, size_t L, bool ROW>
 	inline auto VecsTable<DATA, L, ROW>::move(table_index_t idst, table_index_t isrc) noexcept -> bool {
 		if (idst >= m_size || isrc >= m_size) return false;
-		decltype(auto) src = tuple_ref(isrc);
-		decltype(auto) dst = tuple_ref(idst);
+		auto src = tuple_ptr(isrc);
+		auto dst = tuple_ptr(idst);
 		vtll::static_for<size_t, 0, vtll::size<DATA>::value >([&](auto i) {
-			std::get<i>(dst) = std::move(std::get<i>(src));
-			});
+			*std::get<i>(dst) = std::move(*std::get<i>(src));
+		});
 		return true;
 	}
 
@@ -257,11 +254,13 @@ namespace vecs {
 	* \returns true if the operation was successful.
 	*/
 	template<typename DATA, size_t L, bool ROW>
-	inline auto VecsTable<DATA, L, ROW>::swap(table_index_t n1, table_index_t n2) noexcept -> bool {
-		if (n1 >= m_size || n2 >= m_size) return false;
-		tuple_value_t tmp = std::move(tuple_ref(n1));
-		move(n1, n2);
-		update(n2, std::move(tmp));
+	inline auto VecsTable<DATA, L, ROW>::swap(table_index_t idst, table_index_t isrc) noexcept -> bool {
+		if (idst >= m_size || isrc >= m_size) return false;
+		auto src = tuple_ptr(isrc);
+		auto dst = tuple_ptr(idst);
+		vtll::static_for<size_t, 0, vtll::size<DATA>::value >([&](auto i) {
+			std::swap( *std::get<i>(dst), *std::get<i>(src) );
+		});
 		return true;
 	}
 

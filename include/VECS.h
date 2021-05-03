@@ -386,13 +386,13 @@ namespace vecs {
 		requires are_components_of<E, Cs...> [[nodiscard]]
 		auto insert(VecsHandle handle, std::atomic<uint32_t>* mutex, Cs&&... args) noexcept	-> table_index_t; ///< Insert new entity
 
-		auto pointers(const table_index_t index) noexcept				-> ptr_type;	///< \returns tuple with pointers to the components
-		auto values(const table_index_t index) noexcept				-> value_type;	///< \returns tuple with copies of the components
+		auto tuple_ptr(const table_index_t index) noexcept			-> ptr_type;	///< \returns tuple with pointers to the components
+		auto tuple_value(const table_index_t index) noexcept		-> value_type;	///< \returns tuple with copies of the components
 		auto handle(const table_index_t index) noexcept				-> VecsHandle;	///< \returns handle for an index in the table
 		auto mutex(const table_index_t index) noexcept				-> std::atomic<uint32_t>*; ///< \returns pointer to the mutex for a given index
 
 		auto size() noexcept -> size_t { return m_data.size(); }; ///< \returns the number of entries currently in the table, can also be invalid ones
-		auto erase(const table_index_t idx) noexcept					-> bool;	///< Mark a row as erased
+		auto erase(const table_index_t idx) noexcept			-> bool;	///< Mark a row as erased
 		auto compress() noexcept								-> void;	///< Compress the table
 		auto clear() noexcept									-> size_t;	///< Mark all rows as erased
 		auto max_capacity(size_t) noexcept						-> size_t;	///< \returns the max number of entities that can be stored
@@ -482,7 +482,7 @@ namespace vecs {
 	* \returns a tuple holding the components of an entity.
 	*/
 	template<typename E>
-	inline auto VecsComponentTable<E>::pointers(const table_index_t index) noexcept -> ptr_type {
+	inline auto VecsComponentTable<E>::tuple_ptr(const table_index_t index) noexcept -> ptr_type {
 		assert(index < m_data.size());
 		auto tup = m_data.tuple_ptr(index);												///< Get the whole data from the data
 		return vtll::sub_tuple< c_info_size, std::tuple_size_v<decltype(tup)> >(tup);	///< Return only entity components in a subtuple
@@ -494,7 +494,7 @@ namespace vecs {
 	* \returns a tuple holding the components of an entity.
 	*/
 	template<typename E>
-	inline auto VecsComponentTable<E>::values(const table_index_t index) noexcept -> value_type {
+	inline auto VecsComponentTable<E>::tuple_value(const table_index_t index) noexcept -> value_type {
 		assert(index < m_data.size());
 		auto tup = m_data.tuple_value(index);											///< Get the whole data from the data
 		return vtll::sub_tuple< c_info_size, std::tuple_size_v<decltype(tup)> >(tup);	///< Return only entity components in a subtuple
@@ -1220,7 +1220,7 @@ namespace vecs {
 	inline auto VecsRegistry<E>::pointers(VecsHandle handle) noexcept -> vtll::to_ptr_tuple<E> {
 		if (!contains(handle)) return {};	///< Return the empty component
 		auto& comp_table_idx = *m_entity_table.component_ptr<c_index>(handle.m_map_index); ///< Get reference to component
-		return m_component_table.pointers( comp_table_idx );
+		return m_component_table.tuple_ptr( comp_table_idx );
 	}
 
 	/**
@@ -1233,7 +1233,7 @@ namespace vecs {
 	inline auto VecsRegistry<E>::values(VecsHandle handle) noexcept -> vtll::to_tuple<E> {
 		if (!contains(handle)) return {};	///< Return the empty component
 		auto& comp_table_idx = *m_entity_table.component_ptr<c_index>(handle.m_map_index); ///< Get component copies
-		return m_component_table.values(comp_table_idx);
+		return m_component_table.tuple_value(comp_table_idx);
 	}
 
 	/**
