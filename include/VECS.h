@@ -120,20 +120,10 @@ namespace vecs {
 	using VecsTableSizeMap = vtll::cat< VeSystemTableSizeMap, VeUserTableSizeMap >;
 
 	/**
-	* \brief This struct implements the exponential function power of 2.
-	* 
-	* It is used to transfer table size entries to their real values, so we can compute max and sum of all values.
-	*/
-	template<typename T>
-	struct left_shift_1 {
-		using type = std::integral_constant<size_t, 1 << T::value>;
-	};
-
-	/**
 	* \brief Table constants retrieves mappings for all entity types from the VecsTableSizeMap (which have the format vtll::value_list<A,B>).
 	* Then it turns the value lists to type lists, each value is stored in a std::integral_constant<size_t, V> type.
 	*/
-	using VeTableSizeDefault = vtll::value_list< 10, 16 >;
+	using VeTableSizeDefault = vtll::value_list< 10 >;
 	using VecsTableConstants = vtll::transform < vtll::apply_map<VecsTableSizeMap, VecsEntityTypeList, VeTableSizeDefault>, vtll::value_to_type>;
 
 	/**
@@ -142,21 +132,7 @@ namespace vecs {
 	* This is used as segment size (exponent) for the map table in the VecsRegistryBaseClass. Since this table holds info to 
 	* all entities in the ECS (the aggregate), it makes sense to take the maximum for segmentation.
 	*/
-	using VecsTableMaxSegExp	= vtll::max< vtll::transform< VecsTableConstants, vtll::front > >;	///< Get max exponent from map
-	using VecsTableMaxSeg		= typename left_shift_1<VecsTableMaxSegExp>::type;	///< Compute power of 2 for the exponent
-
-	/**
-	* \brief Compute the sum of all max sizes of for all entity types.
-	* 
-	* First get the second number (vtll::back) from the map, i.e. the exponents of the max number of entities of type E.
-	* Then use the 2^ function (vtll::function<L, left_shift_1>) to get the real max number. Then sum over all entity types.
-	*/
-	using VecsTableMaxSizeSum = vtll::sum< vtll::function< vtll::transform< VecsTableConstants, vtll::back >, left_shift_1 > >;
-
-	/**
-	* \brief Since the sum of all max sizes is probably not divisible by the segment size, get the next power of 2 larger or equ VecsTableMaxSeg.
-	*/
-	using VecsTableMaxSize = vtll::smallest_pow2_larger_eq<VecsTableMaxSeg>;
+	using VecsTableMaxSegExp = vtll::max< vtll::transform< VecsTableConstants, vtll::front > >;	///< Get max exponent from map
 
 	/**
 	* \brief Defines whether the data layout for entity type E is row or column wise. The default is columns wise.
@@ -361,9 +337,6 @@ namespace vecs {
 		/** Power of 2 exponent for the size of segments inthe tables */
 		static const size_t c_segment_size	= vtll::front_value< vtll::map< VecsTableSizeMap, E, VeTableSizeDefault > >::value;
 		
-		/** Power of 2 exponent for the max number of entries in the tables */
-		static const size_t c_max_size		= vtll::back_value<  vtll::map< VecsTableSizeMap, E, VeTableSizeDefault > >::value;
-
 		static inline VecsTable<types,			c_segment_size, layout_type_t::value>	m_data;		///< Data per entity
 		static inline VecsTable<types_deleted,  c_segment_size, VECS_LAYOUT_ROW::value>	m_deleted;	///< Table holding the indices of erased entities
 
@@ -970,9 +943,6 @@ namespace vecs {
 	protected:
 		static inline VecsComponentTable<E>		m_component_table;
 		static inline std::atomic<uint32_t>		m_sizeE{ 0 };	///< Store the number of valid entities of type E currently in the ECS
-
-		/** Maximum number of entites of type E that can be stored. */
-		static const size_t c_max_size = vtll::back_value<vtll::map< VecsTableSizeMap, E, VeTableSizeDefault > >::value;
 
 		/** Implementations of functions that receive dispatches from the base class. */
 		auto updateC(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept	-> bool; ///< Dispatch from base class

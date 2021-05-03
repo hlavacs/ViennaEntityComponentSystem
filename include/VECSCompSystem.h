@@ -53,11 +53,10 @@ namespace vecs {
 	/** 
 	* \brief A map defining table sizes for entity types. If no entry is given then a default value is chosen.
 	* 
-	* The entries A and B define the size of a table segment (2^A) and default maximum number of entities of this type possible (2^B).
-	* The maximum number can later be changed to a larger value. 
+	* The entry A defines the size of a table segment (2^A). 
 	*/
 	using VeSystemTableSizeMap = vtll::tl<
-  	    //vtll::tl< VeSystemEntityTypeNode, vtll::value_list< 15, 20 > >
+  	    //vtll::tl< VeSystemEntityTypeNode, vtll::value_list< 15 > >
 		//, ...
 	>;
 
