@@ -42,7 +42,7 @@ namespace vecs {
 		using array_tuple_t2 = vtll::to_tuple<vtll::transform_size_t<DATA,std::array,N>>;	///< COLUMN: a tuple of arrays
 		using array_tuple_t  = std::conditional_t<ROW, array_tuple_t1, array_tuple_t2>;		///< Memory layout of the table
 
-		using seg_ptr = std::unique_ptr<array_tuple_t>;		///< Unique ptr to a segment
+		using seg_ptr = std::shared_ptr<array_tuple_t>;		///< Unique ptr to a segment
 
 		std::pmr::vector<seg_ptr>	m_segment;				///< Vector of unique ptrs to the segments
 		std::atomic<size_t>			m_size = 0;				///< Number of rows in the table
@@ -274,7 +274,7 @@ namespace vecs {
 		if (r > m_seg_max * N) return false;						///< is there enough space in the table?
 		if (m_seg_allocated == 0) max_capacity(m_seg_max * N);		///< Is there space for segment pointers?
 		while (m_segment.size() * N < r) {							///< Allocate enough segments
-			m_segment.push_back(std::make_unique<array_tuple_t>()); ///< Create new segment
+			m_segment.push_back(std::make_shared<array_tuple_t>()); ///< Create new segment
 		}
 		m_seg_allocated = m_segment.size();		///< Publish new size
 		return true;
