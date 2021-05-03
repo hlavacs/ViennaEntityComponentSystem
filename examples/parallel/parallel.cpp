@@ -91,7 +91,7 @@ vgjs::Coro<> start( size_t num ) {
 
 	auto ranges = VecsRange<VeComponentPosition>{}.split(thr);
 	for (int i = 0; i < ranges.size(); ++i) {
-		vec.push_back(vgjs::Function([=]() { do_work( ranges[i]); }, vgjs::thread_index_t{}, vgjs::thread_type_t{ 1 }, vgjs::thread_id_t{ i }));
+		vec.push_back(vgjs::Function([=]() { do_work(ranges[i]); }, vgjs::thread_index_t{}, vgjs::thread_type_t{ 1 }, vgjs::thread_id_t{ i }));
 	}
 
 	auto lin =

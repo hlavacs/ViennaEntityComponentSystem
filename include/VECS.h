@@ -808,8 +808,8 @@ namespace vecs {
 		//-------------------------------------------------------------------------
 		//for_each 
 
-		template<template<typename...> typename R, typename... Ts>
-		auto for_each( R<Ts...>&& r, std::function<typename Functor<typename VecsIterator<Ts...>::component_types>::type> f) -> void;	///< Loop over entities
+		template<typename ETL, typename CTL>
+		auto for_each(VecsRangeBaseClass<ETL, CTL>&& r, std::function<typename Functor<CTL>::type> f) -> void;	///< Loop over entities
 
 		template<typename... Ts>
 		auto for_each(std::function<typename Functor<typename VecsIterator<Ts...>::component_types>::type> f) -> void { 
@@ -1570,13 +1570,11 @@ namespace vecs {
 	/**
 	* \brief takes two iterators and loops from begin to end, and for each entity calls the provided function.
 	*
-	* \param[in] b Begin iterator.
-	* \param[in] e End iterator.
+	* \param[in] range Range to iterate over
 	* \param[in] f Functor to be called for every entity the iterator visits.
 	*/
-	template<template<typename...> typename R, typename... Ts>
-	inline auto VecsRegistryBaseClass
-		::for_each(R<Ts...>&& range, std::function<typename Functor<typename VecsIterator<Ts...>::component_types>::type> f) -> void {
+	template<typename ETL, typename CLT>
+	inline auto VecsRegistryBaseClass::for_each(VecsRangeBaseClass<ETL, CLT>&& range, std::function<typename Functor<CLT>::type> f) -> void {
 		auto b = range.begin();
 		auto e = range.end();
 		for (; b != e; ++b) {
@@ -1585,7 +1583,6 @@ namespace vecs {
 			std::apply(f, *b);					///< Run the function on the references
 		}
 	}
-
 
 	//-------------------------------------------------------------------------
 	//VecsHandle

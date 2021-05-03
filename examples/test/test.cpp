@@ -343,7 +343,17 @@ int main() {
 		VecsIterator<VeEntityTypeNodeTagged<TAG1>> et(true);
 		VecsRange<VeEntityTypeNodeTagged<TAG1>> ranget;
 
-		VecsRegistry().for_each<VeEntityTypeNode, TAG1>([&](auto handle, auto& name, auto& pos, auto& orient, auto& transf) {
+		//VecsRegistry().for_each<VeEntityTypeNode, TAG1>([&](auto handle, auto& name, auto& pos, auto& orient, auto& transf) {
+		//	VecsRegistry<VeEntityTypeNode>{}.transform(handle);
+		//);
+
+		VecsRange<VeEntityTypeNode> range_par;
+		auto split = range_par.split(2);
+
+		VecsRegistry().for_each( std::move(split[0]), [&](auto handle, auto& name, auto& pos, auto& orient, auto& transf) {
+			VecsRegistry<VeEntityTypeNode>{}.transform(handle);
+		});
+		VecsRegistry().for_each(std::move(split[1]), [&](auto handle, auto& name, auto& pos, auto& orient, auto& transf) {
 			VecsRegistry<VeEntityTypeNode>{}.transform(handle);
 		});
 
