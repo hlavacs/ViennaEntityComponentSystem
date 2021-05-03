@@ -378,7 +378,7 @@ namespace vecs {
 		auto has_componentE(size_t compidx)  noexcept											-> bool;	///< Test for component
 		auto remove_deleted_tail() noexcept														-> void;	///< Remove empty slots at the end of the table
 
-		VecsComponentTable(size_t r = 1 << c_max_size) noexcept;	///< Protected constructor that does not allocate the dispatch table
+		VecsComponentTable() noexcept;			///< Protected constructor that does not allocate the dispatch table
 
 		template<typename... Cs>
 		requires are_components_of<E, Cs...> [[nodiscard]]
@@ -704,10 +704,8 @@ namespace vecs {
 	* \param[in] r Max capacity for the data table.
 	*/
 	template<typename E>
-	inline VecsComponentTable<E>::VecsComponentTable(size_t r) noexcept {
+	inline VecsComponentTable<E>::VecsComponentTable() noexcept {
 		if (!this->init()) return;
-		m_data.max_capacity(r);			///< Set max capacities
-		m_deleted.max_capacity(r);
 
 		vtll::static_for<size_t, 0, vtll::size<VecsComponentTypeList>::value >( ///< Create dispatch table for all component types
 			[&](auto i) {
@@ -772,7 +770,7 @@ namespace vecs {
 		virtual auto sizeE() noexcept -> std::atomic<uint32_t>& { return m_size; };
 
 	public:
-		VecsRegistryBaseClass( size_t r = VecsTableMaxSize::value ) noexcept;
+		VecsRegistryBaseClass() noexcept;
 
 		//-------------------------------------------------------------------------
 		//get data
@@ -988,10 +986,9 @@ namespace vecs {
 
 	public:
 		/** Constructors for class VecsRegistry<E>. */
-		VecsRegistry(size_t r = 1 << c_max_size) noexcept : VecsRegistryBaseClass() { 	///< Constructor of class VecsRegistry<E>
-			VecsComponentTable<E>{r}.max_capacity(r);
-		};
-		VecsRegistry(std::nullopt_t u) noexcept : VecsRegistryBaseClass() { 			///< Constructor of class VecsRegistry<E>
+		VecsRegistry() noexcept : VecsRegistryBaseClass() {};					///< Constructor of class VecsRegistry<E>
+
+		VecsRegistry(std::nullopt_t u) noexcept : VecsRegistryBaseClass() { 	///< Constructor of class VecsRegistry<E>
 			m_sizeE = 0; 
 		};
 
@@ -1412,8 +1409,8 @@ namespace vecs {
 	template<>
 	class VecsRegistry<vtll::type_list<>> : public VecsRegistryBaseClass {
 	public:
-		VecsRegistry(size_t r = VecsTableMaxSize::value) noexcept : VecsRegistryBaseClass(r) {};	///< Constructor of class VecsRegistry<vtll::type_list<>>
-		VecsRegistry(std::nullopt_t u) noexcept : VecsRegistryBaseClass() {};						///< Constructor of class VecsRegistry<vtll::type_list<>>
+		VecsRegistry() noexcept : VecsRegistryBaseClass() {};					///< Constructor of class VecsRegistry<vtll::type_list<>>
+		VecsRegistry(std::nullopt_t u) noexcept : VecsRegistryBaseClass() {};	///< Constructor of class VecsRegistry<vtll::type_list<>>
 	};
 
 
@@ -1487,9 +1484,8 @@ namespace vecs {
 	*
 	* \param[in] r Max size of all entities stored in the ECS.
 	*/
-	inline VecsRegistryBaseClass::VecsRegistryBaseClass(size_t r) noexcept {
+	inline VecsRegistryBaseClass::VecsRegistryBaseClass() noexcept {
 		if (!this->init()) [[likely]] return;
-		m_entity_table.max_capacity(r);
 
 		vtll::static_for<size_t, 0, vtll::size<VecsEntityTypeList>::value >(
 			[&](auto i) {

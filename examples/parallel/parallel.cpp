@@ -79,11 +79,6 @@ void init(size_t num) {
 vgjs::Coro<> start( size_t num ) {
     std::cout << "Start \n";
 
-	VecsRegistry{ 1 << 23 };
-	VecsRegistry<VeEntityTypeNode>{ 1 << 20 };
-	VecsRegistry<VeEntityTypeDraw>{ 1 << 20 };
-	VecsRegistry<VeEntityTypeAnimation>{ 1 << 20 };
-
 	co_await [&]() { init(num); };
 
 	int thr = 12;
@@ -142,10 +137,10 @@ void func4(size_t);
 void func1(size_t num) {
 	std::cout << "Start \n";
 
-	VecsRegistry{ 1 << 23 };
-	VecsRegistry<VeEntityTypeNode>{ 1 << 20 };
-	VecsRegistry<VeEntityTypeDraw>{ 1 << 20 };
-	VecsRegistry<VeEntityTypeAnimation>{ 1 << 20 };
+	VecsRegistry{};
+	VecsRegistry<VeEntityTypeNode>{};
+	VecsRegistry<VeEntityTypeDraw>{};
+	VecsRegistry<VeEntityTypeAnimation>{};
 
 	vgjs::schedule( [=]() { init(num); });
 	vgjs::continuation( vgjs::Function( [=]() {func2(num); }, vgjs::thread_index_t{}, vgjs::thread_type_t{ 1 }, vgjs::thread_id_t{ 52 }) );
