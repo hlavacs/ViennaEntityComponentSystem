@@ -584,7 +584,7 @@ namespace vecs {
 	template<typename E>
 	inline auto VecsComponentTable<E>::erase(const table_index_t index) noexcept -> bool {
 		assert(index < m_data.size());
-		m_data.component_ref<c_handle>(index) = {};		///< Invalidate handle	
+		m_data.component_ref<c_handle>(index) = {};						///< Invalidate handle	
 		m_deleted.push_back(std::make_tuple(index));	///< Push the index to the deleted table.
 
 		vtll::static_for<size_t, 0, vtll::size<E>::value >(			///< Loop over all components
