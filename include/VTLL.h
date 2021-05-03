@@ -199,6 +199,17 @@ namespace vtll {
 		template <typename Seq, size_t N>
 		struct Nth_type_impl;
 
+		template <template <typename...> typename Seq, typename... Ts>
+		requires (sizeof...(Ts)>0)
+		struct Nth_type_impl<Seq<Ts...>, std::numeric_limits<size_t>::max()> {
+			using type = Seq<>;
+		};
+
+		template <int N, template <typename...> typename Seq>
+		struct Nth_type_impl<Seq<>, N> {
+			using type = Seq<>;
+		};
+
 		template <int N, template <typename...> typename Seq, typename... Ts>
 		struct Nth_type_impl<Seq<Ts...>, N> {
 			using type = typename std::tuple_element<N, std::tuple<Ts...>>::type;
@@ -1057,14 +1068,21 @@ namespace vtll {
 	//map: find a type key in a map, i.e. a list of type key - type value pairs, and retrieve its type value, or a default type if not found
 
 	namespace detail {
+
 		template<typename Map, typename Key, typename Default>
 		struct map_impl {
 			using Keys = transform<Map, front>;
-			using type = typename	std::conditional< 
-										has_type<Keys, Key>::value								//keys contain the key?
-										, back< Nth_type<Map, index_of<Keys, Key>::value> >		//yes - get the value
-										, Default												//no - get default value
-									>::type;
+
+			using type = typename	std::conditional<
+				has_type<Keys, Key>::value									//keys contain the key?
+				, back< Nth_type<Map, index_of<Keys, Key>::value> >			//yes - get the value
+				, Default													//no - get default value
+			>::type;
+		};
+
+		template<template<typename...> typename Map, typename Key, typename Default>
+		struct map_impl<Map<>, Key, Default> {
+			using type = Default;
 		};
 
 		using test_map = type_list<
@@ -1072,12 +1090,16 @@ namespace vtll {
 			, type_list<float, double>
 			, type_list<double, float>
 		>;
+
+		using test_map2 = type_list<>;
 	}
 	template <typename Map, typename Key, typename Default>
 	using map = typename detail::map_impl<Map, Key, Default>::type;
 
 	static_assert(std::is_same_v< map<detail::test_map, int, float >, char >, "The implementation of map is bad");
 	static_assert(std::is_same_v< map<detail::test_map, char, float >, float >, "The implementation of map is bad");
+	static_assert(std::is_same_v< map<detail::test_map2, int, float >, float >, "The implementation of map is bad");
+
 
 	//-------------------------------------------------------------------------
 	//apply_map: apply a list of keys to a map, get the list of their values, of defaults if the keys are not found
