@@ -119,8 +119,8 @@ vgjs::Coro<> start( size_t num ) {
 	size_t size = VecsRegistry().size();
 
 	std::cout << "Num " << 2 * num << " Size " << size << "\n";
-	std::cout << "Linear " << dt1        << " Parallel 1 " << dt2        << " Speedup " << dt1 / dt2 << "\n\n";
-	std::cout << "Linear " << dt1 / size << " Parallel 1 " << dt2 / size << "\n";
+	std::cout << "Linear " << dt1        << " ns Parallel 1 " << dt2        << " ns Speedup " << dt1 / dt2 << "\n\n";
+	std::cout << "Linear " << dt1 / size << " ns Parallel 1 " << dt2 / size << " ns \n";
 
     vgjs::terminate();
     co_return;

@@ -154,7 +154,7 @@ int main() {
 
 
 	{
-		const int num = 10000;
+		const int num = 100000;
 
 		for (int i = 0; i < num; i++) {
 			auto h1 = VecsRegistry<VeEntityTypeNode>{}.insert(VeComponentName{ "Node" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentTransform{});

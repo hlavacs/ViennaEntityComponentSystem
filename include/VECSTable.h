@@ -308,16 +308,11 @@ namespace vecs {
 		if (r <= m_segment.load()->capacity() * N) return true;	///< Retest, since another thread could have beaten us to here
 
 		seg_vector* segment_ptr{ m_segment.load() };
-		bool flag{ false };
 		auto num_segs = (r - 1) / N + 1;			///< Number of segments necessary
 		if (num_segs > segment_ptr->capacity()) {	///< Is it larger than the one we have?
 			segment_ptr = new seg_vector;			///< Create new segment ptr
 			segment_ptr->reserve(num_segs);			///< Make vector large enough
 			*segment_ptr = *m_segment.load();		///< Copy old shared pointers to the new vector
-			flag = true;
-		}
-
-		if (flag) {												///< If the vector was reallocated
 			auto old = m_segment.load();						///< Remember old vector
 			m_segment.store(segment_ptr);						///< Copy new to old -> now all threads use the new vector
 			m_old_segment = std::unique_ptr<seg_vector>(old);	///< Remember the old vector, deallocate the previous segment
