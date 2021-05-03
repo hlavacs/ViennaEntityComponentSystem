@@ -201,12 +201,10 @@ namespace vecs {
 	template<typename E, typename... Cs>
 	concept is_composed_of = (vtll::is_same<E, std::decay_t<Cs>...>::value);	///< E is composed of Cs
 
-	template<typename T>
-	struct is_tuple_t : std::false_type {};
-
-	template<typename... Cs>
-	struct is_tuple_t<std::tuple<Cs...>> : std::true_type {};
-
+	//template<typename T>
+	//struct is_tuple_t : std::false_type {};
+	//template<typename... Cs>
+	//struct is_tuple_t<std::tuple<Cs...>> : std::true_type {};
 	//template<typename T>
 	//concept is_tuple = is_tuple_t<T>::value;
 
@@ -347,17 +345,16 @@ namespace vecs {
 		template<typename E, typename ETL, typename CTL> friend class VecsIteratorEntity;
 
 	protected:
-		using value_type = vtll::to_tuple<E>;			///< A tuple storing all components of entity of type E
-		using ref_type   = vtll::to_ref_tuple<E>;		///< A tuple storing references to all components of entity of type E
-		using ptr_type	 = vtll::to_ptr_tuple<E>;		///< A tuple storing references to all components of entity of type E
-		using layout_type = vtll::map<VecsTableLayoutMap, E, VECS_LAYOUT_DEFAULT>;
+		using tuple_value_t = vtll::to_tuple<E>;			///< A tuple storing all components of entity of type E
+		using tuple_ptr_t	= vtll::to_ptr_tuple<E>;		///< A tuple storing references to all components of entity of type E
+		using layout_type_t = vtll::map<VecsTableLayoutMap, E, VECS_LAYOUT_DEFAULT>; ///< ROW or COLUMN
 
 		using info = vtll::type_list<VecsHandle, std::atomic<uint32_t>*>;	///< List of management data per entity (handle and mutex)
 		static const size_t c_handle = 0;		///< Component index of the handle info
 		static const size_t c_mutex = 1;		///< Component index of the handle info
 		static const size_t c_info_size = 2;	///< Index where the entity data starts
 
-		using types = vtll::cat< info, E >;						///< List with management and component types
+		using types = vtll::cat< info, E >;						///< List with management (info) and component (data) types
 		using types_deleted = vtll::type_list< table_index_t >;	///< List with types for holding info about erased entities 
 
 		/** Power of 2 exponent for the size of segments inthe tables */
@@ -366,7 +363,7 @@ namespace vecs {
 		/** Power of 2 exponent for the max number of entries in the tables */
 		static const size_t c_max_size		= vtll::back_value<  vtll::map< VecsTableSizeMap, E, VeTableSizeDefault > >::value;
 
-		static inline VecsTable<types,			c_segment_size, layout_type::value>		m_data;		///< Data per entity
+		static inline VecsTable<types,			c_segment_size, layout_type_t::value>	m_data;		///< Data per entity
 		static inline VecsTable<types_deleted,  c_segment_size, VECS_LAYOUT_ROW::value>	m_deleted;	///< Table holding the indices of erased entities
 
 		using array_type = std::array<std::unique_ptr<VecsComponentAccessor<E>>, vtll::size<VecsComponentTypeList>::value>;
@@ -374,10 +371,10 @@ namespace vecs {
 
 		//-------------------------------------------------------------------------
 
-		auto updateC(table_index_t entidx, size_t compidx, void* ptr, size_t size) noexcept		-> bool; ///< For dispatching
-		auto componentE(table_index_t entidx, size_t compidx, void* ptr, size_t size)  noexcept	-> bool; ///< For dispatching
-		auto componentE_ptr(table_index_t entidx, size_t compidx) noexcept						-> void*; ///< For dispatching
-		auto has_componentE(size_t compidx)  noexcept											-> bool; ///< Test for component
+		auto updateC(table_index_t entidx, size_t compidx, void* ptr, size_t size) noexcept		-> bool;	///< For dispatching
+		auto componentE(table_index_t entidx, size_t compidx, void* ptr, size_t size)  noexcept	-> bool;	///< For dispatching
+		auto componentE_ptr(table_index_t entidx, size_t compidx) noexcept						-> void*;	///< For dispatching
+		auto has_componentE(size_t compidx)  noexcept											-> bool;	///< Test for component
 		auto remove_deleted_tail() noexcept														-> void;	///< Remove empty slots at the end of the table
 
 		VecsComponentTable(size_t r = 1 << c_max_size) noexcept;	///< Protected constructor that does not allocate the dispatch table
@@ -386,12 +383,11 @@ namespace vecs {
 		requires are_components_of<E, Cs...> [[nodiscard]]
 		auto insert(VecsHandle handle, std::atomic<uint32_t>* mutex, Cs&&... args) noexcept	-> table_index_t; ///< Insert new entity
 
-		auto tuple_ptr(const table_index_t index) noexcept			-> ptr_type;	///< \returns tuple with pointers to the components
-		auto tuple_value(const table_index_t index) noexcept		-> value_type;	///< \returns tuple with copies of the components
-		auto handle(const table_index_t index) noexcept				-> VecsHandle;	///< \returns handle for an index in the table
-		auto mutex(const table_index_t index) noexcept				-> std::atomic<uint32_t>*; ///< \returns pointer to the mutex for a given index
-
-		auto size() noexcept -> size_t { return m_data.size(); }; ///< \returns the number of entries currently in the table, can also be invalid ones
+		auto tuple_ptr(const table_index_t index) noexcept		-> tuple_ptr_t;	///< \returns tuple with pointers to the components
+		auto tuple_value(const table_index_t index) noexcept	-> tuple_value_t;	///< \returns tuple with copies of the components
+		auto handle(const table_index_t index) noexcept			-> VecsHandle;	///< \returns handle for an index in the table
+		auto mutex(const table_index_t index) noexcept			-> std::atomic<uint32_t>*; ///< \returns pointer to the mutex for a given index
+		auto size() noexcept -> size_t { return m_data.size(); };	///< \returns the number of entries currently in the table, can also be invalid ones
 		auto erase(const table_index_t idx) noexcept			-> bool;	///< Mark a row as erased
 		auto compress() noexcept								-> void;	///< Compress the table
 		auto clear() noexcept									-> size_t;	///< Mark all rows as erased
@@ -399,7 +395,7 @@ namespace vecs {
 
 		template<typename C>
 		requires is_component_of<E, C>
-		auto component(const table_index_t index) noexcept			-> C&;		///< Get reference to a component
+		auto component(const table_index_t index) noexcept		-> C&;		///< Get reference to a component
 
 		template<typename ET>
 		requires is_tuple<ET,E>
@@ -482,7 +478,7 @@ namespace vecs {
 	* \returns a tuple holding the components of an entity.
 	*/
 	template<typename E>
-	inline auto VecsComponentTable<E>::tuple_ptr(const table_index_t index) noexcept -> ptr_type {
+	inline auto VecsComponentTable<E>::tuple_ptr(const table_index_t index) noexcept -> tuple_ptr_t {
 		assert(index < m_data.size());
 		auto tup = m_data.tuple_ptr(index);												///< Get the whole data from the data
 		return vtll::sub_tuple< c_info_size, std::tuple_size_v<decltype(tup)> >(tup);	///< Return only entity components in a subtuple
@@ -494,7 +490,7 @@ namespace vecs {
 	* \returns a tuple holding the components of an entity.
 	*/
 	template<typename E>
-	inline auto VecsComponentTable<E>::tuple_value(const table_index_t index) noexcept -> value_type {
+	inline auto VecsComponentTable<E>::tuple_value(const table_index_t index) noexcept -> tuple_value_t {
 		assert(index < m_data.size());
 		auto tup = m_data.tuple_value(index);											///< Get the whole data from the data
 		return vtll::sub_tuple< c_info_size, std::tuple_size_v<decltype(tup)> >(tup);	///< Return only entity components in a subtuple
