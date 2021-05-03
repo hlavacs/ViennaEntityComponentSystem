@@ -42,9 +42,11 @@ namespace vecs {
 		using array_tuple_t2 = vtll::to_tuple<vtll::transform_size_t<DATA,std::array,N>>;	///< COLUMN: a tuple of arrays
 		using array_tuple_t  = std::conditional_t<ROW, array_tuple_t1, array_tuple_t2>;		///< Memory layout of the table
 
-		using seg_ptr = std::shared_ptr<array_tuple_t>;		///< Unique ptr to a segment
+		//using seg_ptr = std::shared_ptr<array_tuple_t>;		///< Unique ptr to a segment
+		using seg_vector = std::pmr::vector<std::shared_ptr<array_tuple_t>>;
 
-		std::pmr::vector<seg_ptr>	m_segment;				///< Vector of unique ptrs to the segments
+		std::atomic<seg_vector*>	m_segment;		///< Vector of unique ptrs to the segments
+		//std::pmr::vector<seg_ptr>	m_segment;				///< Vector of unique ptrs to the segments
 		std::atomic<size_t>			m_size = 0;				///< Number of rows in the table
 		std::atomic<size_t>			m_seg_allocated = 0;	///< Thread safe number of segments in the table
 		size_t						m_seg_max = 0;			///< Current max number of segments
@@ -104,7 +106,7 @@ namespace vecs {
 	* \param[in] mr Memory allocator.
 	*/
 	template<typename DATA, size_t L, bool ROW>
-	inline VecsTable<DATA,L,ROW>::VecsTable(size_t r, std::pmr::memory_resource* mr) noexcept : m_segment{ mr } {
+	inline VecsTable<DATA,L,ROW>::VecsTable(size_t r, std::pmr::memory_resource* mr) noexcept : m_segment{ new seg_vector } {
 		m_seg_max = (r % N == 0) ? r / N : r / N + 1;	///< Max number of segments, but do not allocate any yet
 	};
 
@@ -117,10 +119,10 @@ namespace vecs {
 	template<size_t I, typename C>
 	inline auto VecsTable<DATA, L, ROW>::component_ptr(table_index_t n) noexcept -> C* {
 		if constexpr (ROW) {
-			return &std::get<I>((*m_segment[n >> L])[n & BIT_MASK]);
+			return &std::get<I>( (* (*m_segment.load()) [n >> L] )[n & BIT_MASK]);
 		}
 		else {
-			return &std::get<I>(*m_segment[n >> L])[n & BIT_MASK];
+			return &std::get<I>(* (*m_segment.load()) [n >> L])[n & BIT_MASK];
 		}
 	};
 
@@ -133,10 +135,10 @@ namespace vecs {
 	inline auto VecsTable<DATA, L, ROW>::tuple_value(table_index_t n) noexcept -> tuple_value_t {
 		auto f = [&]<size_t... Is>(std::index_sequence<Is...>) {
 			if constexpr (ROW) {
-				return std::make_tuple(std::get<Is>((*m_segment[n >> L])[n & BIT_MASK])...);
+				return std::make_tuple(std::get<Is>((* (*m_segment.load()) [n >> L])[n & BIT_MASK])...);
 			}
 			else {
-				return std::make_tuple(std::get<Is>(*m_segment[n >> L])[n & BIT_MASK]...);
+				return std::make_tuple(std::get<Is>(* (*m_segment.load()) [n >> L])[n & BIT_MASK]...);
 			}
 		};
 		return f(std::make_index_sequence<vtll::size<DATA>::value>{});
@@ -151,10 +153,10 @@ namespace vecs {
 	inline auto VecsTable<DATA, L, ROW>::tuple_ptr(table_index_t n) noexcept -> tuple_ptr_t {
 		auto f = [&]<size_t... Is>(std::index_sequence<Is...>) {
 			if constexpr (ROW) {
-				return std::make_tuple(&std::get<Is>((*m_segment[n >> L])[n & BIT_MASK])...);
+				return std::make_tuple(&std::get<Is>((* (*m_segment.load()) [n >> L])[n & BIT_MASK])...);
 			}
 			else {
-				return std::make_tuple(&std::get<Is>(*m_segment[n >> L])[n & BIT_MASK]...);
+				return std::make_tuple(&std::get<Is>(* (*m_segment.load()) [n >> L])[n & BIT_MASK]...);
 			}
 		};
 		return f(std::make_index_sequence<vtll::size<DATA>::value>{});
@@ -273,10 +275,10 @@ namespace vecs {
 	inline auto VecsTable<DATA, L, ROW>::reserve(size_t r) noexcept -> bool {
 		if (r > m_seg_max * N) return false;						///< is there enough space in the table?
 		if (m_seg_allocated == 0) max_capacity(m_seg_max * N);		///< Is there space for segment pointers?
-		while (m_segment.size() * N < r) {							///< Allocate enough segments
-			m_segment.push_back(std::make_shared<array_tuple_t>()); ///< Create new segment
+		while (m_segment.load()->size() * N < r) {							///< Allocate enough segments
+			m_segment.load()->push_back(std::make_shared<array_tuple_t>()); ///< Create new segment
 		}
-		m_seg_allocated = m_segment.size();		///< Publish new size
+		m_seg_allocated = m_segment.load()->size();		///< Publish new size
 		return true;
 	}
 
@@ -289,10 +291,10 @@ namespace vecs {
 	inline auto VecsTable<DATA, L, ROW>::max_capacity(size_t r) noexcept -> size_t {
 		if (r == 0) return m_seg_max * N;
 		auto segs = (r - 1) / N + 1;				///< Number of segments necessary
-		if (segs > m_segment.capacity()) {		///< Is it larger than the one we have?
-			m_segment.reserve(segs);			///< If yes, reallocate the vector.
+		if (segs > m_segment.load()->capacity()) {		///< Is it larger than the one we have?
+			m_segment.load()->reserve(segs);			///< If yes, reallocate the vector.
 		}
-		m_seg_max = m_segment.capacity();		///< Publish the new capacity.
+		m_seg_max = m_segment.load()->capacity();		///< Publish the new capacity.
 		return m_seg_max * N;
 	}
 
@@ -302,10 +304,10 @@ namespace vecs {
 	*/
 	template<typename DATA, size_t L, bool ROW>
 	inline auto VecsTable<DATA, L, ROW>::compress() noexcept -> void {
-		while (m_segment.size() > 1 && m_size + N <= m_segment.size() * N) {
-			m_segment.pop_back();
+		while (m_segment.load()->size() > 1 && m_size + N <= m_segment.load()->size() * N) {
+			m_segment.load()->pop_back();
 		}
-		m_seg_allocated = m_segment.size();
+		m_seg_allocated = m_segment.load()->size();
 	}
 
 }
