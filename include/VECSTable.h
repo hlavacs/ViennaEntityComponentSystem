@@ -45,6 +45,7 @@ namespace vecs {
 		using seg_vector = std::pmr::vector<std::shared_ptr<array_tuple_t>>; ///< A seg_vector is a vector holding shared pointers to segments
 
 		std::atomic<seg_vector*>	m_segment;		///< Vector of shared ptrs to the segments
+		std::unique_ptr<seg_vector> m_old_segment;	///< Late deallocation of old segment
 		std::atomic<size_t>			m_size = 0;		///< Number of rows in the table
 		std::mutex					m_mutex;		///< Needed when reallocating the vector
 
@@ -271,25 +272,25 @@ namespace vecs {
 		if (r <= m_segment.load()->capacity() * N) return true;	///< is there enough space in the table?
 
 		std::lock_guard<std::mutex> lock(m_mutex);
-		if (r <= m_segment.load()->capacity() * N) return true;	///< is there enough space in the table?
+		if (r <= m_segment.load()->capacity() * N) return true;	///< Retest, since another thread could have beaten us to here
 
 		seg_vector* segment_ptr{ m_segment.load() };
 		bool flag{false};
-		auto num_segs = (r - 1) / N + 1;				///< Number of segments necessary
-		if (num_segs > m_segment.load()->capacity()) {	///< Is it larger than the one we have?
-			segment_ptr = new seg_vector;				///< Create new segment ptr
-			segment_ptr->reserve(num_segs);				///< Make vector large enough
-			*segment_ptr = *m_segment.load();			///< Copy old shared pointers to the new vector
+		auto num_segs = (r - 1) / N + 1;			///< Number of segments necessary
+		if (num_segs > segment_ptr->capacity()) {	///< Is it larger than the one we have?
+			segment_ptr = new seg_vector;			///< Create new segment ptr
+			segment_ptr->reserve(num_segs);			///< Make vector large enough
+			*segment_ptr = *m_segment.load();		///< Copy old shared pointers to the new vector
 			flag = true;
 		}
 
 		while (segment_ptr->size() * N < r) {							///< Allocate enough segments
 			segment_ptr->push_back(std::make_shared<array_tuple_t>());	///< Create new segment
 		}
-		if (flag) {							///< If the vector was reallocated
-			auto old = m_segment.load();	///< Remember old vector
-			m_segment.store(segment_ptr);	///< Copy new to old
-			delete old;						///< Delete the old vector
+		if (flag) {												///< If the vector was reallocated
+			auto old = m_segment.load();						///< Remember old vector
+			m_segment.store(segment_ptr);						///< Copy new to old -> now all threads use the new vector
+			m_old_segment = std::unique_ptr<seg_vector>(old);	///< Remember the old vector, deallocate the previous segment
 		}
 		return true;
 	}
