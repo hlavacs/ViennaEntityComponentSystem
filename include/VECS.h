@@ -177,13 +177,6 @@ namespace vecs {
 	template<typename E, typename... Cs>
 	concept is_composed_of = (vtll::is_same<E, std::decay_t<Cs>...>::value);	///< E is composed of Cs
 
-	//template<typename T>
-	//struct is_tuple_t : std::false_type {};
-	//template<typename... Cs>
-	//struct is_tuple_t<std::tuple<Cs...>> : std::true_type {};
-	//template<typename T>
-	//concept is_tuple = is_tuple_t<T>::value;
-
 	template<typename ET, typename E = vtll::front<ET>>
 	concept is_tuple = (is_entity_type<E> && std::is_same_v<std::decay_t<ET>, vtll::to_tuple<E>>); ///< ET is a std::tuple
 
@@ -334,7 +327,7 @@ namespace vecs {
 		using types = vtll::cat< info, E >;						///< List with management (info) and component (data) types
 		using types_deleted = vtll::type_list< table_index_t >;	///< List with types for holding info about erased entities 
 
-		/** Power of 2 exponent for the size of segments inthe tables */
+		/// Power of 2 exponent for the size of segments inthe tables
 		static const size_t c_segment_size	= vtll::front_value< vtll::map< VecsTableSizeMap, E, VeTableSizeDefault > >::value;
 		
 		static inline VecsTable<types,			c_segment_size, layout_type_t::value>	m_data;		///< Data per entity
@@ -722,22 +715,22 @@ namespace vecs {
 		static inline table_index_t				m_first_free{};	///< First free entry to be reused
 		static inline std::atomic<uint32_t>		m_size{0};		///< Number of valid entities in the map
 
-		/** Every subclass for entity type E has an entry in this table. */
+		/// Every subclass for entity type E has an entry in this table.
 		static inline std::array<std::unique_ptr<VecsRegistryBaseClass>, vtll::size<VecsEntityTypeList>::value> m_dispatch;
 
-		/** Virtual function for dispatching component updates to the correct subclass for entity type E. */
+		/// Virtual function for dispatching component updates to the correct subclass for entity type E.
 		virtual auto updateC(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept -> bool { return false; };
 
-		/** Virtual function for dispatching component reads to the correct subclass for entity type E. */
+		/// Virtual function for dispatching component reads to the correct subclass for entity type E.
 		virtual auto componentE(VecsHandle handle, size_t compidx, void*ptr, size_t size) noexcept -> bool { return false; };
 
-		/** Virtual function for dispatching component reads to the correct subclass for entity type E. */
+		/// Virtual function for dispatching component reads to the correct subclass for entity type E.
 		virtual auto componentE_ptr(VecsHandle handle, size_t compidx) noexcept -> void* { return nullptr; };
 
-		/** Virtual function for dispatching whether an entity type E contains a component type C */
+		/// Virtual function for dispatching whether an entity type E contains a component type C
 		virtual auto has_componentE(VecsHandle handle, size_t compidx) noexcept -> bool { return false; };
 
-		/** Virtual function for dispatching erasing an entity from a component table */
+		/// Virtual function for dispatching erasing an entity from a component table 
 		virtual auto eraseE(table_index_t index) noexcept	-> void { };
 
 		virtual auto sizeE() noexcept -> std::atomic<uint32_t>& { return m_size; };
@@ -944,7 +937,7 @@ namespace vecs {
 		static inline VecsComponentTable<E>		m_component_table;
 		static inline std::atomic<uint32_t>		m_sizeE{ 0 };	///< Store the number of valid entities of type E currently in the ECS
 
-		/** Implementations of functions that receive dispatches from the base class. */
+		/// Implementations of functions that receive dispatches from the base class.
 		auto updateC(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept	-> bool; ///< Dispatch from base class
 		auto componentE(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept	-> bool; ///< Dispatch from base class
 		auto componentE_ptr(VecsHandle handle, size_t compidx) noexcept						-> void*;
@@ -955,9 +948,7 @@ namespace vecs {
 		auto sizeE() noexcept		-> std::atomic<uint32_t>& { return m_sizeE; };
 
 	public:
-		/** Constructors for class VecsRegistry<E>. */
 		VecsRegistry() noexcept : VecsRegistryBaseClass() {};					///< Constructor of class VecsRegistry<E>
-
 		VecsRegistry(std::nullopt_t u) noexcept : VecsRegistryBaseClass() { 	///< Constructor of class VecsRegistry<E>
 			m_sizeE = 0; 
 		};
@@ -1416,9 +1407,9 @@ namespace vecs {
 	inline auto VecsComponentTable<E>::compress() noexcept -> void {
 		for (size_t i = 0; i < m_deleted.size(); ++i) {
 			remove_deleted_tail();											///< Remove invalid entities at end of table
-			auto index = *m_deleted.component_ptr<0>(table_index_t{i});				///< Get next deleted entity from deleted table
+			auto index = *m_deleted.component_ptr<0>(table_index_t{i});		///< Get next deleted entity from deleted table
 			if (index.value < m_data.size()) {								///< Is it inside the table still?		
-				m_data.move(index, table_index_t{ m_data.size() - 1 });			///< Yes, move last entity to this position
+				m_data.move(index, table_index_t{ m_data.size() - 1 });		///< Yes, move last entity to this position
 				auto& handle = *m_data.component_ptr<c_handle>(index);		///< Handle of moved entity
 				*VecsRegistryBaseClass().m_entity_table.component_ptr<VecsRegistryBaseClass::c_index>(handle.m_map_index) = index; ///< Change map entry of moved last entity
 			}

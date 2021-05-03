@@ -302,7 +302,7 @@ namespace vecs {
 	*/
 	template<typename DATA, size_t L, bool ROW>
 	inline auto VecsTable<DATA, L, ROW>::max_capacity(size_t r) noexcept -> size_t {
-		/*if (r <= m_segment.load()->capacity() * N) return true;	///< is there enough space in the table?
+		if (r <= m_segment.load()->capacity() * N) return true;	///< is there enough space in the table?
 
 		std::lock_guard<std::mutex> lock(m_mutex);
 		if (r <= m_segment.load()->capacity() * N) return true;	///< Retest, since another thread could have beaten us to here
@@ -321,7 +321,7 @@ namespace vecs {
 			auto old = m_segment.load();						///< Remember old vector
 			m_segment.store(segment_ptr);						///< Copy new to old -> now all threads use the new vector
 			m_old_segment = std::unique_ptr<seg_vector>(old);	///< Remember the old vector, deallocate the previous segment
-		}*/
+		}
 		return m_segment.load()->capacity() * N;
 	}
 
