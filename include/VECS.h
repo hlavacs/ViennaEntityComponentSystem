@@ -301,6 +301,7 @@ namespace vecs {
 
 		auto erase() noexcept -> bool;				///< Erase the entity 
 
+		auto map_index() noexcept -> table_index_t { return m_map_index; };
 		auto index() noexcept -> table_index_t;		///< Get index of this entity in the component table
 		auto type() noexcept  -> type_index_t;		///< Get type of this entity
 

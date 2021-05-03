@@ -521,10 +521,10 @@ namespace vecs {
 				auto b = m_begin;							///< Begin iterator
 				while (remain > 0 && b != m_end) {			///< While there are remaining entities
 					if (remain > num) {						///< At least two slots left
-						size_t delta = (remain > num ? num : remain) - 1;
+						size_t delta = (remain > num ? num : remain);
 						VecsIteratorBaseClass<ETL,CTL> e = b + delta;
 						result.emplace_back(VecsRangeBaseClass(b, e));
-						remain -= (delta + 1);
+						remain -= delta;
 						b = e + 1;
 					}
 					else {													///< One last slot left

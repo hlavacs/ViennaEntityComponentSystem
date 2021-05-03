@@ -36,7 +36,6 @@ int main() {
 	VeComponentMaterial mat{ 99 };
 	VeComponentGeometry geo{ 11 };
 
-
 	{
 		auto range = VecsRange<VeComponentName>{};
 		auto it = range.begin();
@@ -309,7 +308,7 @@ int main() {
 
 		//std::cout << typeid(vecs::VecsEntityTypeList).name() << std::endl << std::endl;
 
-		const int num = 10;
+		const int num = 2;
 		bool flag = true;
 		for (int i = 0; i < num; i++) {
 			auto h1 = VecsRegistry<VeEntityTypeNode>{}.insert(VeComponentName{ "Node" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentTransform{});
@@ -343,17 +342,25 @@ int main() {
 		VecsIterator<VeEntityTypeNodeTagged<TAG1>> et(true);
 		VecsRange<VeEntityTypeNodeTagged<TAG1>> ranget;
 
-		//VecsRegistry().for_each<VeEntityTypeNode, TAG1>([&](auto handle, auto& name, auto& pos, auto& orient, auto& transf) {
-		//	VecsRegistry<VeEntityTypeNode>{}.transform(handle);
-		//);
+		VecsRegistry().for_each<VeEntityTypeNode, TAG1>([&](VecsHandle handle, auto& name, auto& pos, auto& orient, auto& transf) {
+			//std::cout << handle.map_index().value << "\n";
+		});
 
-		VecsRange<VeEntityTypeNode> range_par;
+		VecsRange<VeEntityTypeNode, TAG1> range_par;
 		auto split = range_par.split(2);
 
-		VecsRegistry().for_each( std::move(split[0]), [&](auto handle, auto& name, auto& pos, auto& orient, auto& transf) {
+		VecsRegistry().for_each(std::move(split[0]), [&](auto handle, auto& name, auto& pos, auto& orient, auto& transf) {
+			//std::cout << handle.map_index().value << "\n";
 			VecsRegistry<VeEntityTypeNode>{}.transform(handle);
-		});
+			});
+
 		VecsRegistry().for_each(std::move(split[1]), [&](auto handle, auto& name, auto& pos, auto& orient, auto& transf) {
+			//std::cout << handle.map_index().value << "\n";
+			VecsRegistry<VeEntityTypeNode>{}.transform(handle);
+			});
+
+
+		VecsRegistry().for_each<VeEntityTypeNode, TAG1>([&](VecsHandle handle, auto& name, auto& pos, auto& orient, auto& transf) {
 			VecsRegistry<VeEntityTypeNode>{}.transform(handle);
 		});
 
