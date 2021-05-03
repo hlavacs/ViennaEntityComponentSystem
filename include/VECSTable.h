@@ -42,14 +42,15 @@ namespace vecs {
 		using array_tuple_t2 = vtll::to_tuple<vtll::transform_size_t<DATA,std::array,N>>;	///< COLUMN: a tuple of arrays
 		using array_tuple_t  = std::conditional_t<ROW, array_tuple_t1, array_tuple_t2>;		///< Memory layout of the table
 
-		//using seg_ptr = std::shared_ptr<array_tuple_t>;		///< Unique ptr to a segment
-		using seg_vector = std::pmr::vector<std::shared_ptr<array_tuple_t>>;
+		//using seg_ptr = std::shared_ptr<array_tuple_t>;		///< Shared ptr to a segment
+		using seg_vector = std::pmr::vector<std::shared_ptr<array_tuple_t>>; ///< A seg_vector is a vector holding shared pointers to segments
 
-		std::atomic<seg_vector*>	m_segment;		///< Vector of unique ptrs to the segments
+		std::atomic<seg_vector*>	m_segment;				///< Vector of shared ptrs to the segments
 		//std::pmr::vector<seg_ptr>	m_segment;				///< Vector of unique ptrs to the segments
 		std::atomic<size_t>			m_size = 0;				///< Number of rows in the table
 		std::atomic<size_t>			m_seg_allocated = 0;	///< Thread safe number of segments in the table
-		size_t						m_seg_max = 0;			///< Current max number of segments
+		//size_t						m_seg_max = 0;			///< Current max number of segments
+		std::mutex					m_mutex;
 
 	public:
 		VecsTable(size_t r = 1 << 16, std::pmr::memory_resource* mr = std::pmr::new_delete_resource()) noexcept;
@@ -107,7 +108,7 @@ namespace vecs {
 	*/
 	template<typename DATA, size_t L, bool ROW>
 	inline VecsTable<DATA,L,ROW>::VecsTable(size_t r, std::pmr::memory_resource* mr) noexcept : m_segment{ new seg_vector } {
-		m_seg_max = (r % N == 0) ? r / N : r / N + 1;	///< Max number of segments, but do not allocate any yet
+		//m_seg_max = (r % N == 0) ? r / N : r / N + 1;	///< Max number of segments, but do not allocate any yet
 	};
 
 	/**
@@ -273,10 +274,26 @@ namespace vecs {
 	*/
 	template<typename DATA, size_t L, bool ROW>
 	inline auto VecsTable<DATA, L, ROW>::reserve(size_t r) noexcept -> bool {
-		if (r > m_seg_max * N) return false;						///< is there enough space in the table?
-		if (m_seg_allocated == 0) max_capacity(m_seg_max * N);		///< Is there space for segment pointers?
-		while (m_segment.load()->size() * N < r) {							///< Allocate enough segments
-			m_segment.load()->push_back(std::make_shared<array_tuple_t>()); ///< Create new segment
+		if (r <= m_seg_allocated.load() * N) return true;	///< is there enough space in the table?
+
+		std::lock_guard<std::mutex> lock(m_mutex);
+		if (r <= m_seg_allocated.load() * N) return true;	///< is there enough space in the table?
+
+		seg_vector* segment_ptr{ m_segment.load() };
+		auto num_segs = (r - 1) / N + 1;				///< Number of segments necessary
+		if (num_segs > m_segment.load()->capacity()) {	///< Is it larger than the one we have?
+			segment_ptr = new seg_vector;				///< Create new segment ptr
+			segment_ptr->reserve(num_segs);				///< Make vector large enough
+			*segment_ptr = *m_segment.load();			///< Copy old shared pointers to the new vector
+		}
+
+		while (segment_ptr->size() * N < r) {							///< Allocate enough segments
+			segment_ptr->push_back(std::make_shared<array_tuple_t>());	///< Create new segment
+		}
+		if (num_segs > m_segment.load()->capacity()) {
+			auto old = m_segment.load();
+			m_segment.store(segment_ptr);
+			delete old;
 		}
 		m_seg_allocated = m_segment.load()->size();		///< Publish new size
 		return true;
@@ -289,13 +306,7 @@ namespace vecs {
 	*/
 	template<typename DATA, size_t L, bool ROW>
 	inline auto VecsTable<DATA, L, ROW>::max_capacity(size_t r) noexcept -> size_t {
-		if (r == 0) return m_seg_max * N;
-		auto segs = (r - 1) / N + 1;				///< Number of segments necessary
-		if (segs > m_segment.load()->capacity()) {		///< Is it larger than the one we have?
-			m_segment.load()->reserve(segs);			///< If yes, reallocate the vector.
-		}
-		m_seg_max = m_segment.load()->capacity();		///< Publish the new capacity.
-		return m_seg_max * N;
+		return 0;
 	}
 
 	/**
