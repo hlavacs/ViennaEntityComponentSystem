@@ -524,7 +524,7 @@ namespace vecs {
 	template<typename C>
 	requires is_component_of<E, C>
 	inline auto VecsComponentTable<E>::component(const table_index_t index) noexcept -> C& {
-		//assert(index < m_data.size());
+		assert(index < m_data.size());
 		return *m_data.component_ptr<c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(index); ///< Get ref to the entity and return component
 	}
 
@@ -558,8 +558,6 @@ namespace vecs {
 	template<typename... Cs>
 	requires are_components_of<E, Cs...>
 	inline auto VecsComponentTable<E>::update(const table_index_t index, Cs&&... args) noexcept -> bool {
-		//( m_data.update(index, std::forward<Cs>(args)), ... );
-
 		using types = vtll::tl<Cs...>;
 		auto tuple = std::forward_as_tuple(args...);
 		vtll::static_for<size_t, 0, sizeof...(Cs) >([&](auto i) {
@@ -580,14 +578,14 @@ namespace vecs {
 	template<typename E>
 	inline auto VecsComponentTable<E>::erase(const table_index_t index) noexcept -> bool {
 		assert(index < m_data.size());
-		*m_data.component_ptr<c_handle>(index) = {};						///< Invalidate handle	
+		*m_data.component_ptr<c_handle>(index) = {};	///< Invalidate handle	
 		m_deleted.push_back(std::make_tuple(index));	///< Push the index to the deleted table.
 
 		vtll::static_for<size_t, 0, vtll::size<E>::value >(			///< Loop over all components
 			[&](auto i) {
 				using type = vtll::Nth_type<E, i>;
 				if constexpr (std::is_destructible_v<type> && !std::is_trivially_destructible_v<type>) {
-					m_data.component_ptr<c_info_size + i>(index)->~type();
+					m_data.component_ptr<c_info_size + i>(index)->~type();	///< Call destructor
 				}
 			}
 		);

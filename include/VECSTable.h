@@ -225,7 +225,7 @@ namespace vecs {
 		auto ptr = tuple_ptr(n);
 		vtll::static_for<size_t, 0, vtll::size<DATA>::value >([&](auto i) {
 			*std::get<i>(ptr) = std::get<i>(data);
-			});
+		});
 		return true;
 	}
 
