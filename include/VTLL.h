@@ -78,8 +78,7 @@ namespace vtll {
 
 	static_assert(
 		std::is_same_v<
-		type_to_value<
-		type_list< std::integral_constant<size_t, 2>, std::integral_constant<size_t, 4>, std::integral_constant<size_t, 6> > >
+			type_to_value<type_list< std::integral_constant<size_t, 2>, std::integral_constant<size_t, 4>, std::integral_constant<size_t, 6> > >
 		, value_list<2, 4, 6>
 		>,
 		"The implementation of type_to_value is bad");
@@ -1034,6 +1033,55 @@ namespace vtll {
 		, std::integral_constant<size_t, 64> >
 		, "The implementation of smallest_pow2_larger is bad");
 	
+	//-------------------------------------------------------------------------
+	//index_largest_bit: Find index of largest bit, starting with 1
+
+	namespace detail {
+		template<size_t Is, typename T>
+		struct larger_or_max_pow2 {
+			using type = typename std::conditional< 
+				( (1ULL << Is) > T::value )
+				, std::integral_constant<size_t, Is >
+				, std::integral_constant<size_t, std::numeric_limits<size_t>::max()>
+			>::type;
+		};
+
+		template<typename Seq, typename T>
+		struct index_largest_bit_impl;
+
+		template<template<size_t...> typename Seq, size_t... Is, typename T>
+		struct index_largest_bit_impl<Seq<Is...>, T> {
+			using type = min < type_list< typename larger_or_max_pow2<Is, T>::type... > >;
+		};
+
+		using ttv = value_list< 
+			0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+			30,31,32,33,34,35,36,37,38,39,40,41,42,43,4,4,4,4,4,
+			50,51,52,53,54,55,56,57,58,59,60,61,62,63
+		>;
+	}
+
+
+	template <typename T>
+	using index_largest_bit = typename detail::index_largest_bit_impl< detail::ttv, T>::type;
+
+	static_assert(std::is_same_v< index_largest_bit< std::integral_constant<size_t, 0> >
+		, std::integral_constant<size_t, 0> >, "The implementation of index_largest_bit is bad");
+
+	static_assert(std::is_same_v< index_largest_bit< std::integral_constant<size_t, 1> >
+		, std::integral_constant<size_t, 1> >, "The implementation of index_largest_bit is bad");
+
+	static_assert(std::is_same_v< index_largest_bit< std::integral_constant<size_t, 2> >
+		, std::integral_constant<size_t, 2> >, "The implementation of index_largest_bit is bad");
+
+	static_assert(std::is_same_v< index_largest_bit< std::integral_constant<size_t, 3> >
+		, std::integral_constant<size_t, 2> >, "The implementation of index_largest_bit is bad");
+
+	static_assert(std::is_same_v< index_largest_bit< std::integral_constant<size_t, 8> >
+		, std::integral_constant<size_t, 4> >, "The implementation of index_largest_bit is bad");
+
+	static_assert(std::is_same_v< index_largest_bit< std::integral_constant<size_t, 15> >
+		, std::integral_constant<size_t, 4> >, "The implementation of index_largest_bit is bad");
 
 	//-------------------------------------------------------------------------
 	//function: compute function on list of std::integral_constant<size_t, I>
@@ -1073,7 +1121,7 @@ namespace vtll {
 		struct map_impl {
 			using Keys = transform<Map, front>;
 
-			using type = typename	std::conditional<
+			using type = typename std::conditional<
 				has_type<Keys, Key>::value									//keys contain the key?
 				, back< Nth_type<Map, index_of<Keys, Key>::value> >			//yes - get the value
 				, Default													//no - get default value
