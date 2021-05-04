@@ -329,7 +329,8 @@ namespace vecs {
 
 		/// Power of 2 exponent for the size of segments inthe tables
 		static const size_t c_segment_size	= vtll::front_value< vtll::map< VecsTableSizeMap, E, VeTableSizeDefault > >::value;
-		
+		//static const size_t c_segment_size	= smallest_pow2_leq_value< vtll::front_value< vtll::map< VecsTableSizeMap, E, VeTableSizeDefault > >::value >::value;
+	
 		static inline VecsTable<types,			c_segment_size, layout_type_t::value>	m_data;		///< Data per entity
 		static inline VecsTable<types_deleted,  c_segment_size, VECS_LAYOUT_ROW::value>	m_deleted;	///< Table holding the indices of erased entities
 

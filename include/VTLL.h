@@ -302,6 +302,7 @@ namespace vtll {
 		struct cat_impl<Seq1, Seq2, Seq...> {
 			using type0 = typename cat_impl<Seq1, Seq2>::type;
 			using type = typename cat_impl<type0, Seq...>::type;
+
 		};
 	}
 
@@ -1034,56 +1035,6 @@ namespace vtll {
 		, "The implementation of smallest_pow2_larger is bad");
 	
 	//-------------------------------------------------------------------------
-	//index_largest_bit: Find index of largest bit, starting with 1
-
-	namespace detail {
-		template<size_t Is, typename T>
-		struct larger_or_max_pow2 {
-			using type = typename std::conditional< 
-				( (1ULL << Is) > T::value )
-				, std::integral_constant<size_t, Is >
-				, std::integral_constant<size_t, std::numeric_limits<size_t>::max()>
-			>::type;
-		};
-
-		template<typename Seq, typename T>
-		struct index_largest_bit_impl;
-
-		template<template<size_t...> typename Seq, size_t... Is, typename T>
-		struct index_largest_bit_impl<Seq<Is...>, T> {
-			using type = min < type_list< typename larger_or_max_pow2<Is, T>::type... > >;
-		};
-
-		using ttv = value_list< 
-			0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
-			30,31,32,33,34,35,36,37,38,39,40,41,42,43,4,4,4,4,4,
-			50,51,52,53,54,55,56,57,58,59,60,61,62,63
-		>;
-	}
-
-
-	template <typename T>
-	using index_largest_bit = typename detail::index_largest_bit_impl< detail::ttv, T>::type;
-
-	static_assert(std::is_same_v< index_largest_bit< std::integral_constant<size_t, 0> >
-		, std::integral_constant<size_t, 0> >, "The implementation of index_largest_bit is bad");
-
-	static_assert(std::is_same_v< index_largest_bit< std::integral_constant<size_t, 1> >
-		, std::integral_constant<size_t, 1> >, "The implementation of index_largest_bit is bad");
-
-	static_assert(std::is_same_v< index_largest_bit< std::integral_constant<size_t, 2> >
-		, std::integral_constant<size_t, 2> >, "The implementation of index_largest_bit is bad");
-
-	static_assert(std::is_same_v< index_largest_bit< std::integral_constant<size_t, 3> >
-		, std::integral_constant<size_t, 2> >, "The implementation of index_largest_bit is bad");
-
-	static_assert(std::is_same_v< index_largest_bit< std::integral_constant<size_t, 8> >
-		, std::integral_constant<size_t, 4> >, "The implementation of index_largest_bit is bad");
-
-	static_assert(std::is_same_v< index_largest_bit< std::integral_constant<size_t, 15> >
-		, std::integral_constant<size_t, 4> >, "The implementation of index_largest_bit is bad");
-
-	//-------------------------------------------------------------------------
 	//function: compute function on list of std::integral_constant<size_t, I>
 
 	namespace detail {
@@ -1577,6 +1528,32 @@ namespace vtll {
 		"The implementation of sum_value is bad");
 
 	//-------------------------------------------------------------------------
+	//cat_value: concatenate value lists
+
+	template <typename... Seq>
+	using cat_value = type_to_value< cat< value_to_type<Seq>... > >;
+
+	//-------------------------------------------------------------------------
+	//make_value_list: make a value list going from 0 to N-1
+
+	namespace detail {
+		template <size_t N, size_t K>
+		struct make_value_list_impl {
+			using type = cat_value < value_list<K - 1>, typename make_value_list_impl<N, K+1>::type > ;
+		};
+
+		template <size_t N>
+		struct make_value_list_impl<N,N> {
+			using type = value_list<N-1>;
+		};
+	}
+
+	template <size_t N>
+	using make_value_list = typename detail::make_value_list_impl<N,1>::type;
+
+	static_assert(std::is_same_v< make_value_list<6>, value_list<0,1,2,3,4,5> >, "The implementation of make_value_list is bad");
+
+	//-------------------------------------------------------------------------
 	//is_pow2_value: test whether a value is a power of 2
 
 	template <size_t I>
@@ -1586,6 +1563,15 @@ namespace vtll {
 
 	static_assert(is_pow2_value<64>(), "The implementation of is_pow2 is bad");
 	static_assert(!is_pow2_value<63>(), "The implementation of is_pow2 is bad");
+
+	//-------------------------------------------------------------------------
+	//smallest_pow2_leq_value: find smallest power of 2 that is larger or equal to a given size_t
+
+	template<size_t I>
+	using smallest_pow2_leq_value = smallest_pow2_larger_eq<std::integral_constant<size_t, I>>;
+
+	static_assert( (smallest_pow2_leq_value<3>::value == 4), "The implementation of smallest_pow2_leq_value is bad");
+	static_assert( (smallest_pow2_leq_value<5>::value == 8), "The implementation of smallest_pow2_leq_value is bad");
 
 	//-------------------------------------------------------------------------
 	//function_value: compute function on a list of size_t s
@@ -1607,6 +1593,50 @@ namespace vtll {
 		>,
 		"The implementation of function_value is bad");
 
+
+	//-------------------------------------------------------------------------
+	//index_largest_bit: Find index of largest bit, starting with 1
+
+	namespace detail {
+		template<size_t Is, typename T>
+		struct larger_or_max_pow2 {
+			using type = typename std::conditional<
+				((1ULL << Is) > T::value)
+				, std::integral_constant<size_t, Is >
+				, std::integral_constant<size_t, std::numeric_limits<size_t>::max()>
+			>::type;
+		};
+
+		template<typename Seq, typename T>
+		struct index_largest_bit_impl;
+
+		template<template<size_t...> typename Seq, size_t... Is, typename T>
+		struct index_largest_bit_impl<Seq<Is...>, T> {
+			using type = min < type_list< typename larger_or_max_pow2<Is, T>::type... > >;
+		};
+	}
+
+
+	template <typename T>
+	using index_largest_bit = typename detail::index_largest_bit_impl< make_value_list<64>, T>::type;
+
+	static_assert(std::is_same_v< index_largest_bit< std::integral_constant<size_t, 0> >
+		, std::integral_constant<size_t, 0> >, "The implementation of index_largest_bit is bad");
+
+	static_assert(std::is_same_v< index_largest_bit< std::integral_constant<size_t, 1> >
+		, std::integral_constant<size_t, 1> >, "The implementation of index_largest_bit is bad");
+
+	static_assert(std::is_same_v< index_largest_bit< std::integral_constant<size_t, 2> >
+		, std::integral_constant<size_t, 2> >, "The implementation of index_largest_bit is bad");
+
+	static_assert(std::is_same_v< index_largest_bit< std::integral_constant<size_t, 3> >
+		, std::integral_constant<size_t, 2> >, "The implementation of index_largest_bit is bad");
+
+	static_assert(std::is_same_v< index_largest_bit< std::integral_constant<size_t, 8> >
+		, std::integral_constant<size_t, 4> >, "The implementation of index_largest_bit is bad");
+
+	static_assert(std::is_same_v< index_largest_bit< std::integral_constant<size_t, 15> >
+		, std::integral_constant<size_t, 4> >, "The implementation of index_largest_bit is bad");
 
 
 
