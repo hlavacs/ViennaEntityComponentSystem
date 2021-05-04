@@ -54,7 +54,7 @@ namespace vecs {
 	//user size maps
 
 	using VeUserTableSizeMap = vtll::type_list<
-		//vtll::type_list< VeEntityTypeNode, vtll::value_list< 15 > >
+		//vtll::type_list< VeEntityTypeNode, vtll::value_list< 1<<15 > >
 		//, ...
 	>;
 

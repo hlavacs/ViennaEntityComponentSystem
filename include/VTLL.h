@@ -1551,7 +1551,7 @@ namespace vtll {
 	template <size_t N>
 	using make_value_list = typename detail::make_value_list_impl<N,1>::type;
 
-	static_assert(std::is_same_v< make_value_list<6>, value_list<0,1,2,3,4,5> >, "The implementation of make_value_list is bad");
+	static_assert(std::is_same_v< make_value_list<7>, value_list<0,1,2,3,4,5,6> >, "The implementation of make_value_list is bad");
 
 	//-------------------------------------------------------------------------
 	//is_pow2_value: test whether a value is a power of 2
@@ -1570,8 +1570,10 @@ namespace vtll {
 	template<size_t I>
 	using smallest_pow2_leq_value = smallest_pow2_larger_eq<std::integral_constant<size_t, I>>;
 
-	static_assert( (smallest_pow2_leq_value<3>::value == 4), "The implementation of smallest_pow2_leq_value is bad");
-	static_assert( (smallest_pow2_leq_value<5>::value == 8), "The implementation of smallest_pow2_leq_value is bad");
+	static_assert((smallest_pow2_leq_value<3>::value == 4), "The implementation of smallest_pow2_leq_value is bad");
+	static_assert((smallest_pow2_leq_value<4>::value == 4), "The implementation of smallest_pow2_leq_value is bad");
+	static_assert((smallest_pow2_leq_value<5>::value == 8), "The implementation of smallest_pow2_leq_value is bad");
+	static_assert((smallest_pow2_leq_value<8>::value == 8), "The implementation of smallest_pow2_leq_value is bad");
 
 	//-------------------------------------------------------------------------
 	//function_value: compute function on a list of size_t s
@@ -1615,7 +1617,6 @@ namespace vtll {
 			using type = min < type_list< typename larger_or_max_pow2<Is, T>::type... > >;
 		};
 	}
-
 
 	template <typename T>
 	using index_largest_bit = typename detail::index_largest_bit_impl< make_value_list<64>, T>::type;

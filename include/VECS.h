@@ -123,7 +123,7 @@ namespace vecs {
 	* \brief Table constants retrieves mappings for all entity types from the VecsTableSizeMap (which have the format vtll::value_list<A,B>).
 	* Then it turns the value lists to type lists, each value is stored in a std::integral_constant<size_t, V> type.
 	*/
-	using VeTableSizeDefault = vtll::value_list< 10 >;
+	using VeTableSizeDefault = vtll::value_list< 1<<10 >;
 	using VecsTableConstants = vtll::transform < vtll::apply_map<VecsTableSizeMap, VecsEntityTypeList, VeTableSizeDefault>, vtll::value_to_type>;
 
 	/**
@@ -327,10 +327,7 @@ namespace vecs {
 		using types = vtll::cat< info, E >;						///< List with management (info) and component (data) types
 		using types_deleted = vtll::type_list< table_index_t >;	///< List with types for holding info about erased entities 
 
-		/// Power of 2 exponent for the size of segments inthe tables
-		static const size_t c_segment_size	= vtll::front_value< vtll::map< VecsTableSizeMap, E, VeTableSizeDefault > >::value;
-		//static const size_t c_segment_size	= smallest_pow2_leq_value< vtll::front_value< vtll::map< VecsTableSizeMap, E, VeTableSizeDefault > >::value >::value;
-	
+		static const size_t c_segment_size = vtll::front_value< vtll::map< VecsTableSizeMap, E, VeTableSizeDefault > >::value;
 		static inline VecsTable<types,			c_segment_size, layout_type_t::value>	m_data;		///< Data per entity
 		static inline VecsTable<types_deleted,  c_segment_size, VECS_LAYOUT_ROW::value>	m_deleted;	///< Table holding the indices of erased entities
 
@@ -711,7 +708,8 @@ namespace vecs {
 		static const uint32_t c_type{ 2 };		///< Index for accessing the type index
 		static const uint32_t c_mutex{ 3 };		///< Index for accessing the lock mutex
 
-		static inline VecsTable<types, VecsTableMaxSegExp::value, VECS_LAYOUT_ROW::value> m_entity_table;	///< The main mapping table
+		static const size_t c_segment_size = VecsTableMaxSegExp::value;
+		static inline VecsTable<types, c_segment_size, VECS_LAYOUT_ROW::value> m_entity_table;	///< The main mapping table
 		static inline std::mutex				m_mutex;		///< Mutex for syncing insert and erase
 		static inline table_index_t				m_first_free{};	///< First free entry to be reused
 		static inline std::atomic<uint32_t>		m_size{0};		///< Number of valid entities in the map
