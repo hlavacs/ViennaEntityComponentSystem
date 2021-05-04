@@ -263,7 +263,6 @@ namespace vecs {
 		return true;
 	}
 
-
 	/**
 	* \brief Allocate segements to make sure enough memory is available.
 	* \param[in] r Number of entries to be stored in the table.
