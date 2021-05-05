@@ -262,7 +262,7 @@ namespace vecs {
 
 		template<typename C>
 		requires is_component_type<C> 
-		auto component() noexcept		-> C& { return *component_ptr<C>(); };		///< Get a component of type C of the entity (first found is copied) 
+		auto component() noexcept		-> C& { return *component_ptr<C>(); };	///< Get a component of type C of the entity (first found is copied) 
 
 		template<typename ET>
 		requires is_tuple<ET>
@@ -357,10 +357,14 @@ namespace vecs {
 		//read data
 		template<typename C>
 		requires is_component_of<E, C>
-		auto component_ref(const table_index_t index) noexcept	-> C&;		///< Get reference to a component
+		auto component(const table_index_t index) noexcept -> C& { return *component_ptr<C>(index); };	///< Get reference to a component
 
+		template<typename C>
+		requires is_component_of<E, C>
+		auto component_ptr(const table_index_t index) noexcept	-> C*;		///< Get pointer to a component
+
+		auto tuple(const table_index_t index) noexcept			-> tuple_ref_t;	///< \returns tuple with copies of the components
 		auto tuple_ptr(const table_index_t index) noexcept		-> tuple_ptr_t;	///< \returns tuple with pointers to the components
-		auto tuple_ref(const table_index_t index) noexcept		-> tuple_ref_t;	///< \returns tuple with copies of the components
 
 		//-------------------------------------------------------------------------
 		//update data
@@ -445,6 +449,7 @@ namespace vecs {
 		return idx;								///< Return the index of the new data
 	};
 
+
 	/**
 	* \param[in] index Index of the entity in the component table.
 	* \returns the component of type C for an entity.
@@ -452,9 +457,9 @@ namespace vecs {
 	template<typename E>
 	template<typename C>
 	requires is_component_of<E, C>
-		inline auto VecsComponentTable<E>::component_ref(const table_index_t index) noexcept -> C& {
+		inline auto VecsComponentTable<E>::component_ptr(const table_index_t index) noexcept -> C* {
 		assert(index < m_data.size());
-		return *m_data.component_ptr<c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(index); ///< Get ref to the entity and return component
+		return m_data.component_ptr<c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(index); ///< Get ref to the entity and return component
 	}
 
 	/**
@@ -473,7 +478,7 @@ namespace vecs {
 	* \returns a tuple holding the components of an entity.
 	*/
 	template<typename E>
-	inline auto VecsComponentTable<E>::tuple_ref(const table_index_t index) noexcept -> tuple_ref_t {
+	inline auto VecsComponentTable<E>::tuple(const table_index_t index) noexcept -> tuple_ref_t {
 		assert(index < m_data.size());
 		auto tup = m_data.tuple_ref(index);													///< Get the whole data from the data
 		return vtll::sub_ref_tuple< c_info_size, std::tuple_size_v<decltype(tup)> >(tup);	///< Return only entity components in a subtuple
@@ -1172,7 +1177,7 @@ namespace vecs {
 	template<typename E>
 	inline auto VecsRegistry<E>::tuple(VecsHandle handle) noexcept -> vtll::to_ref_tuple<E> {
 		auto& comp_table_idx = *m_entity_table.component_ptr<c_index>(handle.m_map_index); ///< Get component copies
-		return m_component_table.tuple_ref(comp_table_idx);
+		return m_component_table.tuple(comp_table_idx);
 	}
 
 	/**
