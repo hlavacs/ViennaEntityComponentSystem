@@ -264,14 +264,15 @@ namespace vecs {
 		requires is_component_type<C> 
 		auto component() noexcept		-> C& { return *component_ptr<C>(); };	///< Get a component of type C of the entity (first found is copied) 
 
-		template<typename ET>
+		/*template<typename ET>
 		requires is_tuple<ET>
 		auto update(ET&& ent) noexcept	-> bool;	///< Update this entity using a std::tuple of the same type
+		*/
 
 		template<typename... Cs>
 		requires are_component_types<Cs...>
 		auto update(Cs&&... args) noexcept -> bool;	///< Update a component of type C
-
+		
 		auto erase() noexcept -> bool;				///< Erase the entity 
 
 		auto map_index() noexcept	-> table_index_t { return m_map_index; }; ///< \returns index of entity in the map
@@ -368,14 +369,15 @@ namespace vecs {
 
 		//-------------------------------------------------------------------------
 		//update data
-		template<typename ET>
+		/*template<typename ET>
 		requires is_tuple<ET, E>
 		auto update(const table_index_t index, ET&& ent) noexcept		-> bool;	///< Update a component
+		*/
 
 		template<typename... Cs>
 		requires are_components_of<E, Cs...>
 		auto update(const table_index_t index, Cs&&... args) noexcept	-> bool;	///< Update a component
-
+		
 		//-------------------------------------------------------------------------
 		//erase data
 		auto erase(const table_index_t idx) noexcept			-> bool;	///< Mark a row as erased
@@ -490,7 +492,7 @@ namespace vecs {
 	* \param[in] ent Universal reference to the new entity data.
 	* \returns true if the update was successful.
 	*/
-	template<typename E>
+	/*template<typename E>
 	template<typename ET>
 	requires is_tuple<ET, E>
 		inline auto VecsComponentTable<E>::update(const table_index_t index, ET&& ent) noexcept -> bool {
@@ -501,7 +503,7 @@ namespace vecs {
 			}
 		);
 		return true;
-	}
+	}*/
 
 	/**
 	* \brief Update a component of type C for an entity of type E.
@@ -607,13 +609,13 @@ namespace vecs {
 		* \param[in] comp Universal reference to the new component data.
 		* \returns true if the update was successful.
 		*/
-		auto update(const table_index_t index, C&& comp) noexcept -> bool {
+		/*auto update(const table_index_t index, C&& comp) noexcept -> bool {
 			if constexpr (is_component_of<E, C>) {
 				*VecsComponentTable<E>().m_data.component_ptr<VecsComponentTable<E>::c_info_size + vtll::index_of<E, std::decay_t<C>>::value>() = comp;
 				return true;
 			}
 			return false;
-		}
+		}*/
 
 		/**
 		* \brief Update the component C of entity E.
@@ -750,14 +752,15 @@ namespace vecs {
 		//-------------------------------------------------------------------------
 		//update data
 
-		template<typename ET>
+		/*template<typename ET>
 		requires is_tuple<ET>
 		auto update(VecsHandle handle, ET&& ent) noexcept -> bool;		///< Update a whole entity with a tuple
+		*/
 
 		template<typename... Cs>
 		requires are_component_types<Cs...>
 		auto update(VecsHandle handle, Cs&&... args) noexcept -> bool;	///< Update component of type C of an entity
-
+		
 		//-------------------------------------------------------------------------
 		//erase
 
@@ -963,14 +966,14 @@ namespace vecs {
 		//-------------------------------------------------------------------------
 		//update data
 
-		template<typename ET>
+		/*template<typename ET>
 		requires is_tuple<ET,E>
 		auto update(VecsHandle handle, ET&& ent) noexcept	-> bool;		///< Update a whole entity with the given tuple
-
+		*/
 		template<typename... Cs> 
 		requires are_components_of<E, Cs...>
 		auto update(VecsHandle handle, Cs&&... args) noexcept	-> bool;		///< Update one component of an entity
-
+		
 		//-------------------------------------------------------------------------
 		//erase
 
@@ -1215,14 +1218,14 @@ namespace vecs {
 	* \param[in] ent A universal reference to the std::tuple<Cs...> that contains the data.
 	* \returns true if the operation was successful.
 	*/
-	template<typename E>
+	/*template<typename E>
 	template<typename ET>
 	requires is_tuple<ET,E>
 	inline auto VecsRegistry<E>::update(VecsHandle handle, ET&& ent) noexcept -> bool {
 		if (!contains(handle)) return false;
 		m_component_table.update(handle.m_map_index, std::forward<ET>(ent));
 		return true;
-	}
+	}*/
 
 	/**
 	* \brief Update a component of type C for an entity of type E.
@@ -1444,11 +1447,11 @@ namespace vecs {
 	* \param[in] ent The entity data.
 	* \returns true if the operation was successful.
 	*/
-	template<typename ET>
+	/*template<typename ET>
 	requires is_tuple<ET>
 	inline auto VecsRegistryBaseClass::update( VecsHandle handle, ET&& ent) noexcept	-> bool {
 		return VecsRegistry<vtll::front<ET>>().update({ handle }, std::forward<ET>(ent));
-	}
+	}*/
 
 	//-------------------------------------------------------------------------
 	//for_each
@@ -1515,12 +1518,12 @@ namespace vecs {
 	* \param[in] ent Universal reference to the data that is to be copied over the old data.
 	* \returns true if the operation was successful.
 	*/
-	template<typename ET>
+	/*template<typename ET>
 	requires is_tuple<ET>
 	inline auto VecsHandle::update(ET&& ent) noexcept			-> bool {
 		using type = vtll::front<std::decay_t<ET>>;
 		return VecsRegistry<type>().update(*this, std::forward<ET>(ent));
-	}
+	}*/
 
 	/**
 	* \brief Update a component of type C for the entity that this handle belongs to.

@@ -87,7 +87,7 @@ namespace vecs {
 		template<template<typename... Cs> typename T, typename... Cs>
 		requires std::is_same_v<vtll::to_tuple<DATA>, std::tuple<std::decay_t<Cs>...>>
 		inline auto update(table_index_t n, T<Cs...>&& data) noexcept	-> bool;	///< Update components for a given row
-
+		
 		//-------------------------------------------------------------------------------------------
 		//move and remove data
 

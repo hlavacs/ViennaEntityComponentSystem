@@ -25,10 +25,12 @@ int main() {
     auto comp1_2 = h1.component<VeComponentPosition>();
     auto comp1_3 = h1.component<VeComponentMaterial>();
 
-    h1.update(VeComponentPosition{ glm::vec3{-9.0f, -2.0f, -3.0f} });
+    //h1.update(VeComponentPosition{ glm::vec3{-9.0f, -2.0f, -3.0f} });
+    h1.component<VeComponentPosition>() = VeComponentPosition{ glm::vec3{-9.0f, -2.0f, -3.0f} };
     auto comp1_4 = h1.component<VeComponentPosition>();
 
-    h1.update(VeComponentPosition{ glm::vec3{-999.0f, -2.0f, -3.0f} });
+    //h1.update(VeComponentPosition{ glm::vec3{-999.0f, -2.0f, -3.0f} });
+    h1.component<VeComponentPosition>() = VeComponentPosition{ glm::vec3{-999.0f, -2.0f, -3.0f} };
     auto comp1_5 = h1.component<VeComponentPosition>();
 
     VecsHandle h2{ VecsRegistry<VeEntityTypeDraw>{}.insert(VeComponentName{ "Draw" }, VeComponentPosition{ glm::vec3{9.0f, 2.0f, 3.0f} }, VeComponentOrientation{}, VeComponentTransform{}, VeComponentMaterial{ 99 }, VeComponentGeometry{}) };
