@@ -316,7 +316,8 @@ namespace vecs {
 
 	protected:
 		using tuple_value_t = vtll::to_tuple<E>;			///< A tuple storing all components of entity of type E
-		using tuple_ptr_t	= vtll::to_ptr_tuple<E>;		///< A tuple storing references to all components of entity of type E
+		using tuple_ref_t	= vtll::to_ref_tuple<E>;		///< A tuple storing references to all components of entity of type E
+		using tuple_ptr_t	= vtll::to_ptr_tuple<E>;		///< A tuple storing pointers to all components of entity of type E
 		using layout_type_t = vtll::map<VecsTableLayoutMap, E, VECS_LAYOUT_DEFAULT>; ///< ROW or COLUMN
 
 		using info = vtll::type_list<VecsHandle, std::atomic<uint32_t>*>;	///< List of management data per entity (handle and mutex)
@@ -349,18 +350,18 @@ namespace vecs {
 		auto insert(VecsHandle handle, std::atomic<uint32_t>* mutex, Cs&&... args) noexcept	-> table_index_t; ///< Insert new entity
 
 		auto tuple_ptr(const table_index_t index) noexcept		-> tuple_ptr_t;	///< \returns tuple with pointers to the components
-		auto tuple_value(const table_index_t index) noexcept	-> tuple_value_t;	///< \returns tuple with copies of the components
+		auto tuple_ref(const table_index_t index) noexcept		-> tuple_ref_t;	///< \returns tuple with copies of the components
 		auto handle(const table_index_t index) noexcept			-> VecsHandle;	///< \returns handle for an index in the table
 		auto mutex(const table_index_t index) noexcept			-> std::atomic<uint32_t>*; ///< \returns pointer to the mutex for a given index
 		auto size() noexcept -> size_t { return m_data.size(); };	///< \returns the number of entries currently in the table, can also be invalid ones
 		auto erase(const table_index_t idx) noexcept			-> bool;	///< Mark a row as erased
 		auto compress() noexcept								-> void;	///< Compress the table
 		auto clear() noexcept									-> size_t;	///< Mark all rows as erased
-		auto max_capacity(size_t) noexcept						-> size_t;	///< \returns the max number of entities that can be stored
+		auto capacity(size_t) noexcept							-> size_t;	///< \returns the max number of entities that can be stored
 
 		template<typename C>
 		requires is_component_of<E, C>
-		auto component(const table_index_t index) noexcept		-> C&;		///< Get reference to a component
+		auto component_ref(const table_index_t index) noexcept	-> C&;		///< Get reference to a component
 
 		template<typename ET>
 		requires is_tuple<ET,E>
@@ -455,10 +456,10 @@ namespace vecs {
 	* \returns a tuple holding the components of an entity.
 	*/
 	template<typename E>
-	inline auto VecsComponentTable<E>::tuple_value(const table_index_t index) noexcept -> tuple_value_t {
+	inline auto VecsComponentTable<E>::tuple_ref(const table_index_t index) noexcept -> tuple_ref_t {
 		assert(index < m_data.size());
-		auto tup = m_data.tuple_value(index);											///< Get the whole data from the data
-		return vtll::sub_tuple< c_info_size, std::tuple_size_v<decltype(tup)> >(tup);	///< Return only entity components in a subtuple
+		auto tup = m_data.tuple_ref(index);													///< Get the whole data from the data
+		return vtll::sub_ref_tuple< c_info_size, std::tuple_size_v<decltype(tup)> >(tup);	///< Return only entity components in a subtuple
 	}
 
 	/**
@@ -488,7 +489,7 @@ namespace vecs {
 	template<typename E>
 	template<typename C>
 	requires is_component_of<E, C>
-	inline auto VecsComponentTable<E>::component(const table_index_t index) noexcept -> C& {
+	inline auto VecsComponentTable<E>::component_ref(const table_index_t index) noexcept -> C& {
 		assert(index < m_data.size());
 		return *m_data.component_ptr<c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(index); ///< Get ref to the entity and return component
 	}
@@ -567,9 +568,9 @@ namespace vecs {
 	* \returns the current max number, or the new one.
 	*/
 	template<typename E>
-	inline auto VecsComponentTable<E>::max_capacity(size_t r) noexcept -> size_t {
-		m_data.max_capacity(r);
-		return m_deleted.max_capacity(r);
+	inline auto VecsComponentTable<E>::capacity(size_t r) noexcept -> size_t {
+		m_data.capacity(r);
+		return m_deleted.capacity(r);
 	}
 
 
@@ -965,7 +966,7 @@ namespace vecs {
 		//-------------------------------------------------------------------------
 		//get data
 
-		auto values(VecsHandle handle) noexcept		-> vtll::to_tuple<E>;	///< Return a tuple with copies of the components
+		auto references(VecsHandle handle) noexcept	-> vtll::to_ref_tuple<E>;	///< Return a tuple with copies of the components
 		auto pointers(VecsHandle handle) noexcept	-> vtll::to_ptr_tuple<E>;	///< Return a tuple with pointers to the components
 
 		template<typename C>
@@ -1012,7 +1013,7 @@ namespace vecs {
 		auto size() noexcept -> size_t { return m_sizeE.load(); };			///< \returns the number of valid entities of type E
 		auto clear() noexcept -> size_t { return clearE(); };				///< Clear entities of type E
 		auto compress() noexcept -> void { compressE(); }					///< Remove erased rows from the component table
-		auto max_capacity(size_t) noexcept					-> size_t;		///< Set max number of entities of this type
+		auto capacity(size_t) noexcept						-> size_t;		///< Set max number of entities of this type
 		auto swap(VecsHandle h1, VecsHandle h2) noexcept	-> bool;		///< Swap rows in component table
 		auto contains(VecsHandle handle) noexcept			-> bool;		///< Test if an entity is still in VECS
 		virtual void print_type(VecsHandle handle) { std::cout << "<" << typeid(E).name() << ">"; };
@@ -1184,10 +1185,10 @@ namespace vecs {
 	* \returns tuple with copies of the components.
 	*/
 	template<typename E>
-	inline auto VecsRegistry<E>::values(VecsHandle handle) noexcept -> vtll::to_tuple<E> {
-		if (!contains(handle)) return {};	///< Return the empty component
+	inline auto VecsRegistry<E>::references(VecsHandle handle) noexcept -> vtll::to_ref_tuple<E> {
+		//if (!contains(handle)) return m_component_table.tuple_ref(table_index_t{0});		///< Return the empty component
 		auto& comp_table_idx = *m_entity_table.component_ptr<c_index>(handle.m_map_index); ///< Get component copies
-		return m_component_table.tuple_value(comp_table_idx);
+		return m_component_table.tuple_ref(comp_table_idx);
 	}
 
 	/**
@@ -1344,19 +1345,19 @@ namespace vecs {
 	* \returns the current max number, or the new one.
 	*/
 	template<typename E>
-	inline auto VecsRegistry<E>::max_capacity(size_t r) noexcept -> size_t {
-		auto maxE = m_component_table.max_capacity(r);
+	inline auto VecsRegistry<E>::capacity(size_t r) noexcept -> size_t {
+		auto maxE = m_component_table.capacity(r);
 
 		size_t sum_max = 0;
 
 		vtll::static_for<size_t, 0, vtll::size<VecsEntityTypeList>::value >(
 			[&](auto i) {
 				using type = vtll::Nth_type<VecsEntityTypeList, i>;
-				sum_max += VecsRegistry<type>.max_capacity(0);
+				sum_max += VecsRegistry<type>.capacity(0);
 			}
 		);
 
-		m_entity_table.max_capacity(sum_max);
+		m_entity_table.capacity(sum_max);
 
 		return maxE;
 	}

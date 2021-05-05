@@ -1392,18 +1392,18 @@ namespace vtll {
 
 	namespace detail {
 		template<typename T, size_t... Is>
-		constexpr auto is_same_tuple_impl(const T& t1, const T& t2, std::index_sequence<Is...>) {
+		constexpr auto is_same_tuple_impl(T&& t1, T&& t2, std::index_sequence<Is...>) {
 			return ((std::get<Is>(t1) == std::get<Is>(t2)) && ...);
 		}
 	}
 
 	template <typename T>
-	constexpr auto is_same_tuple(const T& t1, const T& t2) {
-		return detail::is_same_tuple_impl(t1, t2, std::make_index_sequence<std::tuple_size_v<T>>{ });
+	constexpr auto is_same_tuple(T&& t1, T&& t2) {
+		return detail::is_same_tuple_impl(std::forward<T>(t1), std::forward<T>(t2), std::make_index_sequence<std::tuple_size_v<T>>{ });
 	}
 
 	template <typename T1, typename T2>
-	constexpr auto is_same_tuple(const T1& t1, const T2& t2) {
+	constexpr auto is_same_tuple(T1&& t1, T2&& t2) {
 		return false;
 	}
 
@@ -1427,18 +1427,23 @@ namespace vtll {
 	}
 
 	static_assert(is_same_tuple(sub_tuple<2, 4>(std::make_tuple(1, "a", 4.5, 'C', 5.0f)), std::make_tuple(4.5, 'C')), "The implementation of sub_tuple is bad");
+	static_assert(is_same_tuple(sub_tuple<0, 3>(std::make_tuple(0.0, 1, 5.7f, 4.5, 'C', 5.0f)), std::make_tuple(0.0, 1, 5.7f)), "The implementation of sub_tuple is bad");
 	static_assert(!is_same_tuple(sub_tuple<2, 4>(std::make_tuple(1, "a", 4.5, 'C', 5.0f)), std::make_tuple("a", 4.5, 'C')), "The implementation of sub_tuple is bad");
 	static_assert(!is_same_tuple(sub_tuple<2, 4>(std::make_tuple(1, "a", 4.5, 'C', 5.0f)), std::make_tuple('C')), "The implementation of sub_tuple is bad");
 
-
 	//-------------------------------------------------------------------------
-	//sub_ref_tuple: extract a subtuple of references from a tuple
+	//sub_ref_tuple: extract a subtuple from a tuple of references
 
 	namespace detail {
 		template<size_t Begin, typename T, size_t... Is>
 		constexpr auto sub_ref_tuple_impl(T&& tup, std::index_sequence<Is...>) {
-			return std::make_tuple(std::ref(std::get<Begin + Is>(tup))...);
+			return std::tie(std::get<Begin + Is>(tup)...);
 		}
+		float data0 = 0.0f;
+		int data1 = 1;
+		char data2 = 'A';
+		double data3 = 3.0;
+		bool data4 = true;
 	}
 
 	template <size_t Begin, size_t End, typename T>
@@ -1446,14 +1451,12 @@ namespace vtll {
 		return detail::sub_ref_tuple_impl<Begin>(std::forward<T>(tup), std::make_integer_sequence<size_t, End - Begin>{ });
 	}
 
-	/*assert(
+	/*static_assert( 
 		is_same_tuple(
-			sub_ref_tuple<2, 4>(
-				std::make_tuple(detail::a, detail::b, detail::c, detail::d, detail::e ))
-
-			, std::make_tuple(std::ref(detail::c), std::ref(detail::d)))
-		, "The implementation of sub_ref_tuple is bad");
-		*/
+			sub_ref_tuple<2, 4>(std::make_tuple(detail::data0, detail::data1, detail::data2, detail::data3, detail::data4))
+			, std::make_tuple(1, 2)
+		)
+		, "The implementation of sub_ref_tuple is bad");*/
 
 
 

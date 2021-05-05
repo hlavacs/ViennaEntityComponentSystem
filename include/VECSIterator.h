@@ -484,7 +484,7 @@ namespace vecs {
 		if (this->m_current_index.value >= this->m_sizeE) {
 			return std::forward_as_tuple(VecsHandle{}, std::get<Cs>(VecsIteratorBaseClass<ETL, CTL<Cs...>>::m_dummy)...);
 		}
-		return std::forward_as_tuple(m_component_table.handle(this->m_current_index), m_component_table.component<Cs>(this->m_current_index)...);
+		return std::forward_as_tuple(m_component_table.handle(this->m_current_index), m_component_table.component_ref<Cs>(this->m_current_index)...);
 	};
 
 

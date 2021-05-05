@@ -38,6 +38,7 @@ namespace vecs {
 		static const uint64_t BIT_MASK = N - 1;		///< Bit mask to mask off lower bits to get index inside segment
 
 		using tuple_value_t = vtll::to_tuple<DATA>;		///< Tuple holding the entries as value
+		using tuple_ref_t	= vtll::to_ref_tuple<DATA>;	///< Tuple holding the entries as value
 		using tuple_ptr_t	= vtll::to_ptr_tuple<DATA>;	///< Tuple holding references to the entries
 
 		using array_tuple_t1 = std::array<tuple_value_t, N>;								///< ROW: an array of tuples
@@ -59,11 +60,14 @@ namespace vecs {
 		//-------------------------------------------------------------------------------------------
 		//read data
 
-		template<size_t I, typename C = vtll::Nth_type<DATA,I>>
-		inline auto component_ptr(table_index_t n) noexcept	-> C*;		///< \returns a reference to a component
+		template<size_t I, typename C = vtll::Nth_type<DATA, I>>
+		inline auto component_ref(table_index_t n) noexcept	-> C&;		///< \returns a reference to a component
 
-		inline auto tuple_value(table_index_t n) noexcept	-> tuple_value_t;	///< \returns a tuple with copies of all components
-		inline auto tuple_ptr(table_index_t n) noexcept		-> tuple_ptr_t;		///< \returns a tuple with pointers to all components
+		template<size_t I, typename C = vtll::Nth_type<DATA,I>>
+		inline auto component_ptr(table_index_t n) noexcept	-> C*;		///< \returns a pointer to a component
+
+		inline auto tuple_ref(table_index_t n) noexcept	-> tuple_ref_t;	///< \returns a tuple with copies of all components
+		inline auto tuple_ptr(table_index_t n) noexcept	-> tuple_ptr_t;		///< \returns a tuple with pointers to all components
 		
 		//-------------------------------------------------------------------------------------------
 		//add data
@@ -94,9 +98,9 @@ namespace vecs {
 		//-------------------------------------------------------------------------------------------
 		//memory management
 
-		inline auto reserve(size_t r) noexcept		-> bool;		///< Reserve enough memory ny allocating segments
-		inline auto max_capacity(size_t r) noexcept	-> size_t;		///< Set new max capacity -> might reallocate the segment vector!
-		inline auto compress() noexcept				-> void;		///< Deallocate unsused segements
+		inline auto reserve(size_t r) noexcept	-> bool;		///< Reserve enough memory ny allocating segments
+		inline auto capacity(size_t r) noexcept	-> size_t;		///< Set new max capacity -> might reallocate the segment vector!
+		inline auto compress() noexcept			-> void;		///< Deallocate unsused segements
 	};
 
 
@@ -115,12 +119,28 @@ namespace vecs {
 	*/
 	template<typename DATA, size_t N0, bool ROW>
 	template<size_t I, typename C>
-	inline auto VecsTable<DATA, N0, ROW>::component_ptr(table_index_t n) noexcept -> C* {
+	inline auto VecsTable<DATA, N0, ROW>::component_ref(table_index_t n) noexcept -> C& {
 		if constexpr (ROW) {
-			return &std::get<I>( (* (*m_segment.load()) [n >> L] )[n & BIT_MASK]);
+			return std::get<I>( (* (*m_segment.load()) [n >> L] )[n & BIT_MASK]);
 		}
 		else {
-			return &std::get<I>(* (*m_segment.load()) [n >> L])[n & BIT_MASK];
+			return std::get<I>(* (*m_segment.load()) [n >> L])[n & BIT_MASK];
+		}
+	};
+
+	/**
+	* \brief Get a pointger to a particular component with index I.
+	* \param[in] n Index to the entry.
+	* \returns a pointer to the Ith component of entry n.
+	*/
+	template<typename DATA, size_t N0, bool ROW>
+	template<size_t I, typename C>
+	inline auto VecsTable<DATA, N0, ROW>::component_ptr(table_index_t n) noexcept -> C* {
+		if constexpr (ROW) {
+			return &std::get<I>((*(*m_segment.load())[n >> L])[n & BIT_MASK]);
+		}
+		else {
+			return &std::get<I>(*(*m_segment.load())[n >> L])[n & BIT_MASK];
 		}
 	};
 
@@ -130,13 +150,13 @@ namespace vecs {
 	* \returns a tuple with values of all components of entry n.
 	*/
 	template<typename DATA, size_t N0, bool ROW>
-	inline auto VecsTable<DATA, N0, ROW>::tuple_value(table_index_t n) noexcept -> tuple_value_t {
+	inline auto VecsTable<DATA, N0, ROW>::tuple_ref(table_index_t n) noexcept -> tuple_ref_t {
 		auto f = [&]<size_t... Is>(std::index_sequence<Is...>) {
 			if constexpr (ROW) {
-				return std::make_tuple(std::get<Is>((* (*m_segment.load()) [n >> L])[n & BIT_MASK])...);
+				return std::tie(std::get<Is>((* (*m_segment.load()) [n >> L])[n & BIT_MASK])...);
 			}
 			else {
-				return std::make_tuple(std::get<Is>(* (*m_segment.load()) [n >> L])[n & BIT_MASK]...);
+				return std::tie(std::get<Is>(* (*m_segment.load()) [n >> L])[n & BIT_MASK]...);
 			}
 		};
 		return f(std::make_index_sequence<vtll::size<DATA>::value>{});
@@ -302,7 +322,7 @@ namespace vecs {
 	* \param[in] r Max number of entities to be allowed in the table.
 	*/
 	template<typename DATA, size_t N0, bool ROW>
-	inline auto VecsTable<DATA, N0, ROW>::max_capacity(size_t r) noexcept -> size_t {
+	inline auto VecsTable<DATA, N0, ROW>::capacity(size_t r) noexcept -> size_t {
 		if (r > m_segment.load()->capacity() * N) {	///< is there enough space in the table?
 
 			std::lock_guard<std::mutex> lock(m_mutex);
