@@ -292,7 +292,7 @@ namespace vecs {
 	class VecsComponentAccessor {
 	public:
 		VecsComponentAccessor() noexcept {};	///<Constructor
-		virtual auto updateC(table_index_t index, size_t compidx, void* ptr, size_t size) noexcept		-> bool = 0;	///< Empty update
+		virtual auto updateC(table_index_t index, size_t compidx, void* ptr, size_t size, bool move=false) noexcept	-> bool = 0;	///< Empty update
 		virtual auto componentE_ptr(table_index_t entidx, size_t compidx) noexcept						-> void* = 0;	///< Empty component read
 		virtual auto has_componentE()  noexcept															-> bool = 0;	///< Test for component
 	};
@@ -336,7 +336,7 @@ namespace vecs {
 
 		//-------------------------------------------------------------------------
 
-		auto updateC(table_index_t entidx, size_t compidx, void* ptr, size_t size) noexcept		-> bool;	///< For dispatching
+		auto updateC(table_index_t entidx, size_t compidx, void* ptr, size_t size, bool move = false) noexcept		-> bool;	///< For dispatching
 		auto componentE_ptr(table_index_t entidx, size_t compidx) noexcept						-> void*;	///< For dispatching
 		auto has_componentE(size_t compidx)  noexcept											-> bool;	///< Test for component
 		auto remove_deleted_tail() noexcept														-> void;	///< Remove empty slots at the end of the table
@@ -398,8 +398,8 @@ namespace vecs {
 	* \returns true if the update was successful
 	*/
 	template<typename E> 
-	inline auto VecsComponentTable<E>::updateC(table_index_t entidx, size_t compidx, void* ptr, size_t size) noexcept -> bool {
-		return m_dispatch[compidx]->updateC(entidx, compidx, ptr, size);
+	inline auto VecsComponentTable<E>::updateC(table_index_t entidx, size_t compidx, void* ptr, size_t size, bool move ) noexcept -> bool {
+		return m_dispatch[compidx]->updateC(entidx, compidx, ptr, size, move);
 	}
 
 	/**
@@ -587,7 +587,7 @@ namespace vecs {
 		* \param[in] size Size of the component data.
 		* \returns true if the update was successful.
 		*/
-		auto updateC(table_index_t index, size_t compidx, void* ptr, size_t size) noexcept -> bool {
+		auto updateC(table_index_t index, size_t compidx, void* ptr, size_t size, bool move ) noexcept -> bool {
 			if constexpr (is_component_of<E, C>) {
 				*VecsComponentTable<E>().m_data.component_ptr<VecsComponentTable<E>::c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(index) = *((C*)ptr);
 				return true;
@@ -680,7 +680,7 @@ namespace vecs {
 		static inline std::array<std::unique_ptr<VecsRegistryBaseClass>, vtll::size<VecsEntityTypeList>::value> m_dispatch;
 
 		/// Virtual function for dispatching component updates to the correct subclass for entity type E.
-		virtual auto updateC(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept -> bool { return false; };
+		virtual auto updateC(VecsHandle handle, size_t compidx, void* ptr, size_t size, bool move = false) noexcept -> bool { return false; };
 
 		/// Virtual function for dispatching component reads to the correct subclass for entity type E.
 		virtual auto componentE_ptr(VecsHandle handle, size_t compidx) noexcept -> void* { return nullptr; };
@@ -875,7 +875,7 @@ namespace vecs {
 		static inline std::atomic<uint32_t>		m_sizeE{ 0 };	///< Store the number of valid entities of type E currently in the ECS
 
 		/// Implementations of functions that receive dispatches from the base class.
-		auto updateC(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept	-> bool; ///< Dispatch from base class
+		auto updateC(VecsHandle handle, size_t compidx, void* ptr, size_t size, bool move = false) noexcept	-> bool; ///< Dispatch from base class
 		auto componentE(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept	-> bool; ///< Dispatch from base class
 		auto componentE_ptr(VecsHandle handle, size_t compidx) noexcept						-> void*;
 		auto has_componentE(VecsHandle handle, size_t compidx) noexcept						-> bool; ///< Dispatch from base class
@@ -956,9 +956,9 @@ namespace vecs {
 	* \returns true if the update was sucessful.
 	*/
 	template<typename E>
-	inline auto VecsRegistry<E>::updateC(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept -> bool {
+	inline auto VecsRegistry<E>::updateC(VecsHandle handle, size_t compidx, void* ptr, size_t size, bool move ) noexcept -> bool {
 		if (!contains(handle)) return {};
-		return m_component_table.updateC(*m_map_table.component_ptr<c_index>(handle.m_map_index), compidx, ptr, size);
+		return m_component_table.updateC(*m_map_table.component_ptr<c_index>(handle.m_map_index), compidx, ptr, size, move);
 	}
 
 	/**
