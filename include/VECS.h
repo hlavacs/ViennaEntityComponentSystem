@@ -272,7 +272,7 @@ namespace vecs {
 
 		auto map_index() noexcept	-> table_index_t { return m_map_index; }; ///< \returns index of entity in the map
 		auto table_index() noexcept -> table_index_t;	///< Get index of this entity in the component table
-		auto type_index() noexcept  -> type_index_t;	///< Get type of this entity
+		auto type() noexcept		-> type_index_t;	///< Get type of this entity
 
 		auto mutex() noexcept		-> std::atomic<uint32_t>*;				///< \returns address of the VECS mutex for this entity
 
@@ -608,7 +608,12 @@ namespace vecs {
 					*VecsComponentTable<E>().m_data.component_ptr<VecsComponentTable<E>::c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(index) = std::move(*((C*)ptr));
 				}
 				else {
-					*VecsComponentTable<E>().m_data.component_ptr<VecsComponentTable<E>::c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(index) = *((C*)ptr);
+					if constexpr (std::is_copy_assignable_v<C>) {
+						*VecsComponentTable<E>().m_data.component_ptr<VecsComponentTable<E>::c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(index) = *((C*)ptr);
+					}
+					else {
+						*VecsComponentTable<E>().m_data.component_ptr<VecsComponentTable<E>::c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(index) = std::move(*((C*)ptr));
+					}
 				}
 				return true;
 			}
@@ -647,7 +652,6 @@ namespace vecs {
 	* the component dispatch. Every possible component gets its own entry in the dispatch
 	* array. 
 	* 
-	* \param[in] r Max capacity for the data table.
 	*/
 	template<typename E>
 	inline VecsComponentTable<E>::VecsComponentTable() noexcept {
@@ -767,8 +771,8 @@ namespace vecs {
 		auto size() noexcept				-> size_t;		///< \returns the total number of valid entities of types Es
 
 		auto compress() noexcept -> void;							///< Compress all component tables
-		auto index(VecsHandle h) noexcept	-> table_index_t;	///< \returns row index in component table
-		auto type(VecsHandle h) noexcept	-> type_index_t;	///< \returns type of entity
+		auto table_index(VecsHandle h) noexcept	-> table_index_t;	///< \returns row index in component table
+		auto type(VecsHandle h) noexcept		-> type_index_t;	///< \returns type of entity
 		virtual auto swap( VecsHandle h1, VecsHandle h2 ) noexcept -> bool;	///< Swap places of two entities in the component table
 		virtual auto contains(VecsHandle handle) noexcept	-> bool;		///< \returns true if the ECS still holds this entity 
 		virtual void print_type(VecsHandle handle) { 
@@ -836,7 +840,7 @@ namespace vecs {
 	* \param[in] handle The entity handle.
 	* \returns the index of the entity in the component table.
 	*/
-	auto VecsRegistryBaseClass::index(VecsHandle h) noexcept -> table_index_t {
+	auto VecsRegistryBaseClass::table_index(VecsHandle h) noexcept -> table_index_t {
 		if (!h.is_valid()) return {};
 		return *m_map_table.component_ptr<VecsRegistryBaseClass::c_index>(h.m_map_index);
 	}
@@ -1460,7 +1464,7 @@ namespace vecs {
 	* \returns index of this entity in the component table.
 	*/
 	inline auto VecsHandle::table_index() noexcept			-> table_index_t {
-		return VecsRegistryBaseClass{}.index(*this);
+		return VecsRegistryBaseClass{}.table_index(*this);
 	}
 
 	/**
@@ -1468,7 +1472,7 @@ namespace vecs {
 	*
 	* \returns index of this entity in the component table.
 	*/
-	inline auto VecsHandle::type_index() noexcept			-> type_index_t {
+	inline auto VecsHandle::type() noexcept			-> type_index_t {
 		return VecsRegistryBaseClass{}.type(*this);
 	}
 

@@ -6,57 +6,57 @@
 #include <typeindex>
 #include "VECSUtil.h"
 
-#include "VECSCompSystem.h"
+#include "VECSCompSystem.h" //get basic type list
 
-#define VECS_USER_DATA
+#define VECS_USER_DATA		//define macro to prevent loading VECSCompUser.h
 
 namespace vecs {
 
 	//-------------------------------------------------------------------------
 	//define user components here
 
-	/** \brief Example for a user component*/
+	/// \brief Example for a user component
 	struct VeComponentName {
 		std::string m_name;
 	};
 
-	/** \brief Example for a user component*/
+	/// \brief Example for a user component
 	struct VeComponentPosition {
 		glm::vec3 m_position;
 	};
 
-	/** \brief Example for a user component*/
+	/// \brief Example for a user component
 	struct VeComponentOrientation {
 		glm::quat m_orientation;
 	};
 
-	/** \brief Example for a user component*/
+	/// \brief Example for a user component
 	struct VeComponentTransform {
 		glm::mat4 m_transform;
-		//std::unique_ptr<int> ptr;
+		std::unique_ptr<int> ptr;
 	};
 
-	/** \brief Example for a user component*/
+	/// \brief Example for a user component
 	struct VeComponentMaterial {
 		int i;
 	};
 
-	/** \brief Example for a user component*/
+	/// \brief Example for a user component
 	struct VeComponentGeometry {
 		int i;
 	};
 
-	/** \brief Example for a user component*/
+	/// \brief Example for a user component
 	struct VeComponentAnimation {
 		int i;
 	};
 
-	/** \brief Example for a user component*/
+	/// \brief Example for a user component
 	struct VeComponentCollisionShape {
 		int i;
 	};
 
-	/** \brief Example for a user component*/
+	/// \brief Example for a user component
 	struct VeComponentRigidBody {
 		int i;
 	};

@@ -15,47 +15,47 @@ namespace vecs {
 	//-------------------------------------------------------------------------
 	//define user components here
 
-	/** \brief Example for a user component*/
+	/// \brief Example for a user component
 	struct VeComponentName {
 		std::string m_name;
 	};
 
-	/** \brief Example for a user component*/
+	/// \brief Example for a user component
 	struct VeComponentPosition {
 		glm::vec3 m_position;
 	};
 
-	/** \brief Example for a user component*/
+	/// \brief Example for a user component
 	struct VeComponentOrientation {
 		glm::quat m_orientation;
 	};
 
-	/** \brief Example for a user component*/
+	/// \brief Example for a user component
 	struct VeComponentTransform {
 		glm::mat4 m_transform;
 	};
 
-	/** \brief Example for a user component*/
+	/// \brief Example for a user component
 	struct VeComponentMaterial {
 		int i;
 	};
 
-	/** \brief Example for a user component*/
+	/// \brief Example for a user component
 	struct VeComponentGeometry {
 		int i;
 	};
 
-	/** \brief Example for a user component*/
+	/// \brief Example for a user component
 	struct VeComponentAnimation {
 		int i;
 	};
 
-	/** \brief Example for a user component*/
+	/// \brief Example for a user component
 	struct VeComponentCollisionShape {
 		int i;
 	};
 
-	/** \brief Example for a user component*/
+	/// \brief Example for a user component
 	struct VeComponentRigidBody {
 		int i;
 	};

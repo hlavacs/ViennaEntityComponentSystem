@@ -23,6 +23,7 @@ VECS is a header only library, consisting of the following header files:
 * *IntType.h*: Template for strong integral types like *table_index_t* or *counter_t*. Such types enforce to use them explicitly as function parameters and prevent users from mixing them up with *size_t, int* or *unsigned long*. Also such a type can store a NULL value, and can be tested with *has_value()*.
 * *VECSUtil.h*: Contains utility classes such as a class for implementing CRTP, mono state, and simple low-overhead read and write locks.
 * *VECS.h*: The main include file containing most of VECS functionality.
+* *VECSTable.h*: Defines a table data structure that can grow with minimal synchronization overhead, even when accessed by multiple threads.
 * *VECSIterator.h*: Functionality for iterating over entities in VECS.
 * *VECSCompSystem.h*: Examples for component types and entity types used in a game engine itself.
 * *VECSCompUser.h*: Examples for components and entities that could be defined by the engine users to store their own entities.
@@ -43,7 +44,7 @@ VGJS is not necessary to run VECS, and as stated it is only used as an example f
 
 ## The VECS API
 
-An *Entity Component System* is a data structure that stores data components in some flat way, meaning that data is stored linearly in memory as a vector or table. The stored data is called *components*. Components can by in principle any type that in this case is *movable* and *default constructible*.
+An *Entity Component System* is a data structure that stores data components in some flat way, meaning that data is stored linearly in memory as a vector or table. The stored data are called *components*. Components can in principle be any type that in this case is *movable* and *default constructible*.
 This can be plain old data types, structs, classes, (smart) pointers etc.
 but not references since they must be bound to something when created. An example is given by
 
@@ -57,7 +58,11 @@ but not references since they must be bound to something when created. An exampl
       float z;
     };
 
-As can be seen, these two components consist of a std::string and floats, and thus satisfy the conditions on components. Components are then used to define *entities*. Entities are composed of one or more components. This composition is defined using type lists, like
+    struct VeUserComponentResource {
+      std::unique_ptr<my_resource_t> my_resource;
+    };
+
+As can be seen, these components consist of a std::string, floats and a unique pointer (which is movable but NOT copyable), and thus satisfy the conditions on components. Components are then used to define *entities*. Entities are composed of one or more components. This composition is defined using type lists, like
 
     using VeSystemEntityTypeNode
       = vtll::type_list<VeSystemComponentName, VeSystemComponentPosition>;
@@ -66,9 +71,13 @@ which defines the entity type *VeSystemEntityTypeNode* to be composed of the two
 
 For defining components and entities, there are two major use cases. If you *create a game engine* yourself, you should define components and entities as belonging to the *system* in file *VECSCompSystem.h*.
 
-If you are a *user of a VECS based engine*, then you can define your own types either in *VECSCompUser.h*, or in your own include files and by defining a macro prevent *VECSCompUser.h* from being loaded. Both cases are internally treated the same way and are discussed in the following.
+If you are a *user of a VECS based engine*, then you can define your own types either in *VECSCompUser.h*, or in your own include files and by defining the macro
 
-### Using VECS in the Core of your Game engine
+    #define VECS_USER_DATA
+
+prevent *VECSCompUser.h* from being loaded (see e.g. *test.h*). Both cases are internally treated the same way and are discussed in the following.
+
+### Option 1 - Using VECS in the Core of your Game engine
 
 If you create your own game engine and use VECS as its core ECS, simply include *VECS.h* in your CPP files. Also edit *VECSCompSystem.h* to define the components you use, and how entity types are composed of them. Initially, VECS comes with an empty list of system components, and you are free to define them as you like. Components should be structs or other data types that are *movable* and *default constructible*.
 
@@ -89,23 +98,27 @@ Once you have defined your component types, you can compose entities with them:
     using VeSystemEntityTypeNode = vtll::type_list<VeSystemComponentName, VeSystemComponentPosition>;
 
 In this example, an entity type VeSystemEntityTypeNode is composed of the components VeSystemComponentName and VeSystemComponentPosition.
-You can define arbitrarily many entities like this. All entity types must be put into this list:
+You can define arbitrarily many entities like this. However, component types must be *unique* within each entity type. Thus, an entity type is *not allowed* to contain the same component type twice! If you need the same data twice, pack it into different structs.
+
+All system entity types must be put into this list:
 
     using VeSystemEntityTypeList = vtll::type_list<
       VeSystemEntityTypeNode
       // ,...
     >;
 
-Components of entities are stored in tables, one table for each entity type. Tables are organized in segments, each segment is able to store *S = 2^A* rows of component data. Furthermore, there is always a limit on how many entities of a given type E can be stored in VECS, this being *N = 2^B*. The latter can be changed any time, but must be externally synchronized, i.e., at the time this number is changed, no parallel accesses are allowed for the given table. You can define *A* and a default value for *B* in a map:
+Components of entities are stored in tables, one table for each entity type *E*. Tables are organized in segments, each segment is able to store *N = 2^L* rows of component data. For each entity type you can define *N* in a map:
 
     using VeSystemTableSizeMap = vtll::type_list<
-      vtll::type_list< VeSystemEntityTypeNode, vtll::value_list< 15, 20 > >
+      vtll::type_list< VeSystemEntityTypeNode, vtll::value_list< 1<<15 > >
       //, ...
     >;
 
-In this example, *A=15* (this is fixed), and a default value for *B=20*. If there is no entry for a specific entity type E, then the default values used are *A=10* and *B=16*. Be careful not to set *A* to a too high value.
+In this example, *N = 1<<15*, and this is fixed at compile time. Note that *N* eventually must be a power of 2. If you specify any other number *N0*, VECS at compile time for *N* uses the smallest power of 2 that is larger or equal to *N0*. If nothing is specified, the default value for *N* is
 
-Another choice relates to the layout of segments. Layouts of segments can be row wise or column wise. In row wise, the components of each entity are stored next to each other. Thus when accessing all components at once, cache efficiency is best. In column wise, components are stored in separate arrays, and cache performance is optimal if only single components are accessed in for loops. You can choose the layout for a specific entity type E like so:
+    using VeTableSizeDefault = vtll::value_list< 1<<10 >;
+
+Another choice relates to the layout of segments. Layouts of segments can be row wise or column wise. In row wise, the components of each entity are stored next to each other. Thus when accessing all components at once, cache efficiency is best. In column wise, components are stored in separate arrays, and cache performance is optimal if only single components are accessed in for-loops. You can choose the layout for a specific entity type *E* like so:
 
     using VeSystemTableLayoutMap = vtll::type_list<
       vtll::type_list< VeSystemEntityTypeNode, VECS_LAYOUT_COLUMN >
@@ -114,7 +127,7 @@ Another choice relates to the layout of segments. Layouts of segments can be row
 
 Possible values are VECS_LAYOUT_COLUMN or VECS_LAYOUT_ROW, the default is VECS_LAYOUT_COLUMN.
 
-### You are a User of a Game Engine that is based on VECS
+### Option 2 - Being User of a Game Engine that is based on VECS
 
 If you are a user of a given game engine using VECS, you can edit the file *VECSCompUser.h* for defining user based components and entity types. Like with system related types, there are lists holding user related types:
 
@@ -151,7 +164,7 @@ If you are a user of a given game engine using VECS, you can edit the file *VECS
 
 The names for component types and entity types can be arbitrarily chosen, but must be unique amongst all components and entity types.
 
-Alternatively, you can define this in your own include file, and define  VECS_USER_DATA in order to prevent later on using the definitions from *VECSCompUser.h*. The example projects use this approach, for example in *test.h*:
+Alternatively, you can define this in your own include file, and define the macro *VECS_USER_DATA* in order to prevent later on using the definitions from *VECSCompUser.h*. The example projects use this approach, for example in *test.h*:
 
     #ifndef TEST_H
     #define TEST_H
@@ -163,11 +176,14 @@ Alternatively, you can define this in your own include file, and define  VECS_US
 
     #include "VECSCompSystem.h" //get basic type list
 
-    #define VECS_USER_DATA   //define macro to prevent loading VECSCompUser.h
+    #define VECS_USER_DATA      //define macro to prevent loading VECSCompUser.h
 
     namespace vecs {
 
-    	/** \brief Example for a user component*/
+      //-------------------------------------------------------------------------
+    	//define user components here
+
+      /// \brief Example for a user component
     	struct VeComponentName {
     		std::string m_name;
     	};
@@ -186,64 +202,68 @@ In your CPP file, make sure to include first your own include file, then afterwa
     #include "glm.hpp"
     #include "gtc/quaternion.hpp"
 
-    #include "basic_test.h" //your own definitions, including VECS_USER_DATA
+    #include "basic_test.h" //your own definitions, also #define VECS_USER_DATA
 
     #include "VECS.h"       //VECS does not load VECSCompUser.h since you defined VECS_USER_DATA
 
     using namespace vecs;
 
     int main() {
-        std::atomic_flag flag;
-
         //...
     }
 
 
 ### The VECS Registry
 
-Entities are stored in the *VecsRegistry*. This data structure uses the *mono state* pattern, so if you want to use it you simply instantiate it:
+Entities are stored in the *VecsRegistry*. This data structure uses the *mono state* pattern, so if you want to use it you simply instantiate it
 
     VecsRegistry reg{};
 
-There is only one version, and you can instantiate it any number of times, the result is always the same version. In the first instantiation you can pass a parameter specifying the maximum number of entities to be stored in the ECS. If no parameter is given, then *VecsTableMaxSize::value* is used, which is the smallest power of 2 larger than the sum of the number of entities of any type E.
-If you just want to initialize the registry you can do it like this:
+of create a temp object and directly use it
 
-    VecsRegistry{ 1 << 20 };
+    std::cout << VecsRegistry{}.size() << "\n"; //number of entities currently in VECS
 
-Using *VecsRegistry* is not bound to a specific entity type, but commands evenmtually need this information. However, all calls are eventually passed on to *VecsRegistry<E>*, where *E* is an entity type. This is a specialized version of the registry made only for entity type *E*. It is recommended to always use this specialized version, if possible. For instance, if you want to create an entity of type *E*, you have at some point to specify the entity type. In the following, we define an *example* entity type *VeEntityTypeNode* like so:
+There is only one registry state, and you can instantiate it any number of times, the result is always the same.
+
+Using *VecsRegistry* is not bound to a specific entity type *E*, but commands eventually need this information. However, all calls are then passed on to *VecsRegistry<E>*, where *E* is an entity type and must be registered in either entity list *VeSystemEntityTypeList* or *VeUserEntityTypeList*. Note that VECS concatenates these two lists into the list *VecsEntityTypeListWOTags*, and later on creates the overall entity list *VecsEntityTypeList*. So *E* can be any member of *VecsEntityTypeList*.
+
+*VecsRegistry<E>* is a specialized version of the registry made only for entity type *E*. It is recommended to always use this specialized version, if possible. For instance, if you want to create an entity of type *E*, you have at some point to specify the entity type. In the following, we define an *example* entity type *VeEntityTypeNode* like so:
 
     using VeEntityTypeNode = vtll::type_list< VeComponentName, VeComponentPosition, VeComponentOrientation >;
     using VeEntityTypeDraw = vtll::type_list< VeComponentName, VeComponentPosition, VeComponentMaterial, VeComponentGeometry>;
-
 
 We assume that is has been registered as described in the previous section. Of course, any other similarly defined type can be used for the following examples as well. You can create an entity of type *VeEntityTypeNode* using:
 
     VecsHandle handle = VecsRegistry<VeEntityTypeNode>{}.insert("Node2", VeComponentPosition{}, VeComponentOrientation{});
 
-Obviously, the parameters for this call must match the list of components that the entity is composed of.
-The result of creating an entity is a *handle*. A handle is an 8-bytes structure that uniquely identifies the new entity and you can use it later to access the entity again. A handle can be invalid, meaning that it does not point to any entity. You can test whether a handle is valid or not by calling
+Note that the parameters for this call must match the list of components that the entity is composed of. Move-semantics automatically apply. The result of creating an entity is a *handle*. A handle is an 8-bytes structure that uniquely identifies the new entity and you can use it later to access the entity again. A handle can be invalid, meaning that it does not point to any entity. You can test whether a handle is valid or not by calling
 
     handle.is_valid();
 
-If the handle is valid, then it IDs an entity in VECS. However, the entity might have been erased from VECS previously. You can test whether the entity that the handle represents is still in VECS by calling either of these:
+If the handle is valid, then it IDs an entity in VECS. However, the entity might have been erased from VECS previously, e.g. by some other thread. You can test whether the entity that the handle represents is still in VECS by calling either of these:
 
     handle.has_value();
     VecsRegistry{}.contains(handle); //any type
-    VecsRegistry<VeEntityTypeNode>{}.contains(handle); //if certain that entity is of type VeEntityTypeNode
+    VecsRegistry<VeEntityTypeNode>{}.contains(handle); //call only if entity is of type VeEntityTypeNode
 
-A part of a handle contains an ID for the entity type. You can get the type index by calculating
+A part of a handle contains an ID for the entity type. You can get the type index by calling
 
-    handle.type();
+    handle.type();               //call this
+    VecsRegistry{}.type(handle); //or this
 
 Reading a component from a given entity can be done by any of these methods:
 
-    VeComponentPosition pos1 = handle.component<VeComponentPosition>(handle);
-    auto pos2 = VecsRegistry{}.component<VeComponentPosition>(handle);
-    auto pos3 = VecsRegistry<VeEntityTypeNode>{}.component<VeComponentPosition>(handle); //if handle of type VeEntityTypeNode
+    VeComponentPosition pos1 = handle.component<VeComponentPosition>();  //copy
+    VeComponentPosition& pos2 = handle.component<VeComponentPosition>(); //reference
+    VeComponentPosition* pos3 = handle.component_ptr<VeComponentPosition>(); //pointer
 
-Since entities are composed of a list of components, and components have a unique index in them, you can also retrieve a component by specifying its index like so:
+    auto  pos4 = VecsRegistry{}.component<VeComponentPosition>(handle); //copy
+    auto& pos5 = VecsRegistry{}.component<VeComponentPosition>(handle); //reference
+    auto* pos6 = VecsRegistry{}.component_ptr<VeComponentPosition>(handle); //pointer
 
-    auto pos3 = VecsRegistry<VeEntityTypeNode>{}.component<1>(handle); //if handle of type VeEntityTypeNode
+    auto pos7 = VecsRegistry<VeEntityTypeNode>{}.component<VeComponentPosition>(handle); //if handle of type VeEntityTypeNode
+    auto& pos8 = VecsRegistry<VeEntityTypeNode>{}.component<VeComponentPosition>(handle); //if handle of type VeEntityTypeNode
+    auto* pos9 = VecsRegistry<VeEntityTypeNode>{}.component_ptr<VeComponentPosition>(handle); //if handle of type VeEntityTypeNode
 
 Again, all calls are finally handed to the last version, which then resolves the data. Only the last version is actually checked by the compiler at compile time, and the first two version thus could result in an empty component being returned. You can call *has_component<C()* to check whether an entity pointed represented by a handle does contain a specific component of type *C* using any of these methods:
 
@@ -253,13 +273,31 @@ Again, all calls are finally handed to the last version, which then resolves the
 
 The last call is only a wrapper for the concept *is_component_of<VeEntityTypeNode,VeComponentPosition>* which is evaluated at compile time.
 
-You can update the value of one or many components through any of these update functions:
+Additionally, you can obtain all components at once packed into a tuple:
 
-    handle.update(VeComponentPosition{ glm::vec3{99.0f, 22.0f, 33.0f}, VeComponentOrientation{} };
-    VecsRegistry{}.update(handle, VeComponentPosition{ glm::vec3{-98.0f, -22.0f, -33.0f} });
-    VecsRegistry<VeEntityTypeNode>{}.update(handle, VeComponentPosition{ glm::vec3{-97.0f, -22.0f, -33.0f } }, VeComponentOrientation{});
+    auto tuple_ref = VecsRegistry<VeEntityTypeNode>{}.tuple(handle); //tuple with references to the components
+    auto tuple_ptr = VecsRegistry<VeEntityTypeNode>{}.tuple_ptr(handle); //tuple with pointers to the components
 
-Again, all calls are finally forwarded to the last version, which should only be called if it is certain that the entity does contain the component.
+You can access the components either by speciyfing the index, or by specifying the type (which is unique for each entity type):
+
+    auto  comp1 = std::get<VeComponentPosition&>(tuple_ref); //copy
+    auto& comp2 = std::get<VeComponentPosition&>(tuple_ref); //reference
+    auto* comp3 = std::get<VeComponentPosition*>(tuple_ptr); //pointer
+
+Since the above calls may yield references or addresses of components in VECS, you can directly read and modify the component directly. You can also utilize *std::move()* on any of them:
+
+    handle.component<VeComponentPosition>() = VeComponentPosition{};
+
+**NOTE:** references and pointers as obtained above may become eventually invalid. Do not store them for later use, only use them immediately and if you are sure that the entity is still valid. Store the handles instead, and test whether the handle is valid. When using multithreading, use read or write locks (see below) to ensure safe accesses.
+
+You can also update several components with one *update* call (again, move semantics apply):
+
+    handle.update(VeComponentPosition{ glm::vec3{99.0f, 22.0f, 33.0f}, VeComponentOrientation{} }; //move semantics due to rvalue references
+
+    VeComponentPosition pos{ glm::vec3{-98.0f, -22.0f, -33.0f} };
+    VecsRegistry{}.update(handle, pos); //copy semantics due to value reference
+
+    VecsRegistry<VeEntityTypeNode>{}.update(handle, pos, VeComponentOrientation{}); //copy for first, move for the second
 
 Finally, you can erase entities from VECS using any of these calls:
 
@@ -267,20 +305,20 @@ Finally, you can erase entities from VECS using any of these calls:
     VecsRegistry{}.erase(handle);
     VecsRegistry<VeEntityTypeNode>{}.erase(handle); //if handle of type VeEntityTypeNode
 
-When an entity is erased, for any of its components, the component *destructor* is called, if it has one and it is not trivially destructible. You can erase all entities by calling *clear()*:
+When an entity is erased, for any of its components, each component's *destructor* is called, if it has one and it is not trivially destructible. You can erase all entities by calling *clear()*:
 
-    VecsRegistry{}.clear(); //erase all entities in VECS
+    VecsRegistry{}.clear();                   //erase all entities in VECS
     VecsRegistry<VeEntityTypeNode>{}.clear(); //erase all entities of type VeEntityTypeNode
 
 If an entity is erased, the space in the component table is *not* removed, just invalidated. Thus, erasing entities produces gaps in the data and iterating through all entities gets increasingly less efficient. In order to compress the component table, you have to stop multithreaded access to VECS, and call either
 
-    VecsRegistry{}.compress(); //compress all tables
+    VecsRegistry{}.compress();                    //compress all tables
     VecsRegistry<VeEntityTypeNode>{}.compress();  // compress only table for entity type VeEntityTypeNode
 
-This will remove any gap in the component table(s) to speed up iterating through the entities in VECS. In a game, this can be done typically once per game loop iteration. Compressing may reshuffle rows, and if the ordering of entities is important, you may want to go through the entities once more and make sure that the ordering is ensured. An example for this is a scene graph, where nodes in a scene can have siblings and children, thus spanning up a tree that is stored in a flat table. When calculating the world matrices of the nodes, it is important to compute in the order from the tree root down to the leaves. Thus, when looping through the node entities, parent nodes must occur before child nodes. You can compare the positions in the component table using the function *index()*, use either of these:
+This will remove any gap in the component table(s) to speed up iterating through the entities in VECS. In a game, this can be done typically once per game loop iteration. Compressing may reshuffle rows, and if the ordering of entities is important, you may want to go through the entities once more and make sure that the ordering is ensured. An example for this is a scene graph, where nodes in a scene can have siblings and children, thus spanning up a tree that is stored in a flat table. When calculating the world matrices of the nodes, it is important to compute in the order from the tree root down to the leaves. Thus, when looping through the node entities, parent nodes must occur before child nodes. You can compare the positions in the component table using the function *table_index()*, use either of these:
 
-    index_t first = handle.index();
-    index_t second = VecsRegistry{}.index(handle);
+    table_index_t first = handle.table_index();
+    table_index_t second = VecsRegistry{}.table_index(handle);
 
 If a child comes before a parent then you can swap the places of two entities in the component table using either
 
@@ -293,28 +331,56 @@ The entities are swapped only if they are of the same type. You can ask for the 
     VecsRegistry<VeEntityTypeNode>{}.size(); //return number of entities of type VeEntityTypeNode in VECS
 
 
-### Entity Tuples
+## Tags
 
-You can make a local copy of an entity by calling
+Any unique combination of components results in a new entity type. Tags are empty components that can be appended to entity types, in any combination. Consider for example the Tags
 
-    auto tuple_val = VecsRegistry<VeEntityTypeNode>{}.values(handle);
+    struct TAG1{};
+    struct TAG2{};
 
-The result is a *std::tuple* holding a copy of all components of the entity. Of course this is only possible if all components are copyable. You can access the components by using the *std::get* function on the tuple, by either using the index of the component or its type (which should be unique):
+Also consider the definition of *VeEntityTypeNode*
 
-    auto& comp1 = std::get<0>(tuple_val); //use index, or
-    auto& comp2 = std::get<VeComponentPosition>(tuple_val); //use type as an index
+    using VeEntityTypeNode = vtll::type_list< VeComponentName, VeComponentPosition, VeComponentOrientation >;
 
-The outcome is a reference that can be used for reading and writing the value in the tuple. Of course, writing a new value does not affect the entity in VECS. You can write the tuple back to VECS using
+By defining this helper, we can easily create variants for *VeEntityTypeNode*:
 
-    VecsRegistry<VeEntityTypeNode>{}.update(handle, tuple_val);
+    template<typename... Ts>
+    using VeEntityTypeNodeTagged = vtll::app< VeEntityTypeNode, Ts... >;
 
-On the other hand, if you want quick access without the need for updates, you can calls
+For example, *VeEntityTypeNodeTagged\<TAG1\>* is the same as
 
-    auto tuple_ptr = VecsRegistry<VeEntityTypeNode>{}.pointer(handle);
+    vtll::type_list< VeComponentName, VeComponentPosition, VeComponentOrientation, TAG1 >
 
-The result is a *std::tuple* that contains pointers to the components of the entity. Accessing them results in a direct read or writing of the original entity. In single thread operations, this is not a problem. However, in multithreaded operations, you should lock the entity first using either a read or write lock (see Parallel Operations).
+Note that since VECS does not know the component types you plan to add, it is your task to define a similar helper for each entity type, if you want to use them for tags.
+VECS supports creating tagged variants by offering a tag map, e.g.
 
-  auto pos = std::get<VeComponentPosition*>(tuple_ptr)->m_position; //use * since it is a pointer!
+    using VeUserEntityTagMap = vtll::type_list<
+      vtll::type_list< VeEntityTypeNode, vtll::type_list< TAG1, TAG2 > >
+      //, ...
+    >;
+
+For each entity type, you can note the tags that this type can have. In the above example, the
+type *VeEntityTypeNode* can have the tags TAG1 and TAG2. There are again two tag maps, one for the system, and one for the user space. At compile time, VECS takes all entity types from the list *VecsEntityTypeListWOTags* and expands all types with all possible tag combinations they can have. Thus, using the above example, the final list *VecsEntityTypeList* containing all entity types will also contain the following types:
+
+    vtll::type_list< VeComponentName, VeComponentPosition, VeComponentOrientation >;
+    vtll::type_list< VeComponentName, VeComponentPosition, VeComponentOrientation, TAG1 >;
+    vtll::type_list< VeComponentName, VeComponentPosition, VeComponentOrientation, TAG2 >;
+    vtll::type_list< VeComponentName, VeComponentPosition, VeComponentOrientation, TAG1, TAG2 >;
+
+Furthermore, all tags from the tag maps are also copied to the global tag list *VecsEntityTagList*, which for the above example will also contain *TAG1* and *TAG2*.
+Tags are useful for grouping entity types, since any of the above tagged entity type lands in its own table. You can create tagged entities by creating them:
+
+    auto h1 = VecsRegistry<VeEntityTypeNode>{}.insert(VeComponentName{ "Node" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentTransform{});
+    auto h2 = VecsRegistry<VeEntityTypeNodeTagged<TAG1>>{}.insert(VeComponentName{ "Node T1" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentTransform{});
+
+In this example, two entities derived from the same basic entity type *VeEntityTypeNode*, one without a tag, and one with a tag. As you see, you do not have to specify any value for tags, nor will tag references be included when using iterators or ranges (this is true for any member of the list *VecsEntityTagList*).
+You can always add or remove tags, by calling the *transform()* function:
+
+    VecsRegistry<VeEntityTypeNode>{}.transform(h2);
+
+The above call turns an entity of type *VeEntityTypeNodeTagged<TAG1>* into an entity of type *VeEntityTypeNode*, thus effectively removing the tag. Internally, all components are moved from the *VeEntityTypeNodeTagged<TAG1>* table to the *VeEntityTypeNode* table. Thus note that references to the components for the previous type are no longer valid after this operation.
+
+In the next section, iterators and ranges are described, which enable you to efficiently loop over groups of entities.
 
 
 ## Iterators, Ranges and Loops

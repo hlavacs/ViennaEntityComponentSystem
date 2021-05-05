@@ -32,7 +32,7 @@ int main() {
 	VeComponentPosition pos3{ glm::vec3{33.0f, 2.0f, 3.0f} };
 	VeComponentPosition pos4{ glm::vec3{44.0f, 2.0f, 3.0f} };
 	VeComponentOrientation orient{ glm::quat{glm::vec3{90.0f, 45.0f, 0.0f}} };
-	VeComponentTransform trans{ glm::mat4{ 1.0f } };
+	//VeComponentTransform trans{ glm::mat4{ 1.0f } };
 	VeComponentMaterial mat{ 99 };
 	VeComponentGeometry geo{ 11 };
 
@@ -54,11 +54,11 @@ int main() {
 		TESTRESULT(++number, "size", , (VecsRegistry().size() == 0 && VecsRegistry<VeEntityTypeNode>().size() == 0 && VecsRegistry<VeEntityTypeDraw>().size() == 0), );
 
 		TESTRESULT(++number, "insert",
-			auto h1 = VecsRegistry<VeEntityTypeNode>{}.insert(VeComponentName{ "Node" }, pos, orient, trans),
+			auto h1 = VecsRegistry<VeEntityTypeNode>{}.insert(VeComponentName{ "Node" }, pos, orient, VeComponentTransform{ glm::mat4{ 1.0f } }),
 			h1.has_value() && VecsRegistry().size() == 1, );
 
 		TESTRESULT(++number, "insert",
-			auto h1_2 = VecsRegistry<VeEntityTypeNode>{}.insert(VeComponentName{ "Node" }, pos2, orient, trans),
+			auto h1_2 = VecsRegistry<VeEntityTypeNode>{}.insert(VeComponentName{ "Node" }, pos2, orient, VeComponentTransform{ glm::mat4{ 1.0f } }),
 			h1_2.has_value() && VecsRegistry().size() == 2, );
 
 		TESTRESULT(++number, "insert<type>",
@@ -276,7 +276,7 @@ int main() {
 
 		for (int l = 0; l < L; ++l) {
 			for (int i = 0; i < num; ++i) {
-				auto h1 = VecsRegistry<VeEntityTypeNode>{}.insert(VeComponentName{ "Node" }, pos, orient, trans);
+				auto h1 = VecsRegistry<VeEntityTypeNode>{}.insert(VeComponentName{ "Node" }, pos, orient, VeComponentTransform{ glm::mat4{ 1.0f } });
 				test = test && VecsRegistry<VeEntityTypeNode>{}.size() == i + 1;
 
 				auto h2 = VecsRegistry<VeEntityTypeDraw>{}.insert(VeComponentName{ "Draw" }, pos, orient, VeComponentMaterial{ 1 }, VeComponentGeometry{ 1 });
