@@ -274,7 +274,7 @@ namespace vecs {
 		auto table_index() noexcept -> table_index_t;	///< Get index of this entity in the component table
 		auto type_index() noexcept  -> type_index_t;	///< Get type of this entity
 
-		std::atomic<uint32_t>* mutex();				///< \returns address of the VECS mutex for this entity
+		auto mutex() noexcept		-> std::atomic<uint32_t>*;				///< \returns address of the VECS mutex for this entity
 
 		bool operator==(const VecsHandle& rhs) {	///< Equality operator
 			return m_map_index == rhs.m_map_index && m_generation_counter == rhs.m_generation_counter;
@@ -395,6 +395,7 @@ namespace vecs {
 	* \param[in] compidx Index of the component of the entity.
 	* \param[in] ptr Pointer to the component data to use.
 	* \param[in] size Size of the component data.
+	* \param[in] move If true then the data should be moved.
 	* \returns true if the update was successful
 	*/
 	template<typename E> 
@@ -561,6 +562,19 @@ namespace vecs {
 		return m_deleted.capacity(r);
 	}
 
+	/**
+	* \brief Remove invalid erased entity data at the end of the component table.
+	*/
+	template<typename E>
+	inline auto VecsComponentTable<E>::remove_deleted_tail() noexcept -> void {
+		while (m_data.size() > 0) {
+			auto& handle = *m_data.component_ptr<c_handle>(table_index_t{ m_data.size() - 1 });
+			if (handle.is_valid()) return; ///< is last entity is valid, then return
+			m_data.pop_back();				///< Else remove it and continue the loop
+		}
+	}
+
+
 
 	//-------------------------------------------------------------------------
 	//component accessor derived class
@@ -585,6 +599,7 @@ namespace vecs {
 		* \param[in] compidx Component index incomponent type list.
 		* \param[in] ptr Pointer to where the data comes from.
 		* \param[in] size Size of the component data.
+		* \param[in] move If true then the data should be moved.
 		* \returns true if the update was successful.
 		*/
 		auto updateC(table_index_t index, size_t compidx, void* ptr, size_t size, bool move ) noexcept -> bool {
@@ -724,7 +739,7 @@ namespace vecs {
 		auto update(VecsHandle handle, Cs&&... args) noexcept -> bool;	///< Update component of type C of an entity
 		
 		//-------------------------------------------------------------------------
-		//erase
+		//erase data
 
 		virtual auto erase(VecsHandle handle) noexcept -> bool;		///< Erase a specific entity
 
@@ -867,7 +882,7 @@ namespace vecs {
 	//VecsRegistry<E>
 
 	/**
-	* \brief VecsRegistry<E> is used as access interface for all entities of type E
+	* \brief VecsRegistry<E> is used as access interface for all entities of type E.
 	*/
 	template<typename E = vtll::type_list<>>
 	class VecsRegistry : public VecsRegistryBaseClass {
@@ -875,17 +890,16 @@ namespace vecs {
 		friend class VecsRegistryBaseClass;
 
 	protected:
-		static inline VecsComponentTable<E>		m_component_table;
-		static inline std::atomic<uint32_t>		m_sizeE{ 0 };	///< Store the number of valid entities of type E currently in the ECS
+		static inline VecsComponentTable<E>		m_component_table;	///< The component table for entity type E
+		static inline std::atomic<uint32_t>		m_sizeE{ 0 };		///< Store the number of valid entities of type E currently in the ECS
 
 		/// Implementations of functions that receive dispatches from the base class.
 		auto updateC(VecsHandle handle, size_t compidx, void* ptr, size_t size, bool move = false) noexcept	-> bool; ///< Dispatch from base class
-		auto componentE(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept	-> bool; ///< Dispatch from base class
-		auto componentE_ptr(VecsHandle handle, size_t compidx) noexcept						-> void*;
-		auto has_componentE(VecsHandle handle, size_t compidx) noexcept						-> bool; ///< Dispatch from base class
-		auto eraseE(table_index_t index) noexcept	-> void { m_component_table.erase(index); };			 ///< Dispatch from base class
-		auto compressE() noexcept	-> void { return m_component_table.compress(); };	///< Dispatch from base class
-		auto clearE() noexcept		-> size_t { return m_component_table.clear(); };	///< Dispatch from base class
+		auto componentE_ptr(VecsHandle handle, size_t compidx) noexcept						-> void*;///< Get a pointer to a component
+		auto has_componentE(VecsHandle handle, size_t compidx) noexcept						-> bool; ///< Check if E has a component
+		auto eraseE(table_index_t index) noexcept	-> void { m_component_table.erase(index); };	 ///< Erase some entity
+		auto compressE() noexcept	-> void { return m_component_table.compress(); };	///< Compress the table
+		auto clearE() noexcept		-> size_t { return m_component_table.clear(); };	///< Erase all entities from table
 		auto sizeE() noexcept		-> std::atomic<uint32_t>& { return m_sizeE; };
 
 	public:
@@ -957,6 +971,7 @@ namespace vecs {
 	* \param[in] compidx The index of the component in the VecsComponentTypeList
 	* \param[in] ptr Pointer to the data to be used.
 	* \param[in] size Size of the component.
+	* \param[in] move If true then the data should be moved.
 	* \returns true if the update was sucessful.
 	*/
 	template<typename E>
@@ -980,21 +995,13 @@ namespace vecs {
 	}
 
 	/**
-	* \brief Retrieve component data for an entity of type E.
+	* \brief Retrieve pointer to component data for an entity of type E.
 	* This call has been dispatched from base class using the entity type index.
 	*
 	* \param[in] handle The entity handle.
-	* \param[in] compidx The index of the component in the VecsComponentTypeList
-	* \param[in] ptr Pointer to the data to copy the result to.
-	* \param[in] size Size of the component.
-	* \returns true if the retrieval was sucessful.
+	* \param[in] compidx The index of the component in the VecsComponentTypeList.
+	* \returns pointer to a component.
 	*/
-	template<typename E>
-	inline auto VecsRegistry<E>::componentE(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept -> bool {
-		if (!contains(handle)) return {};
-		return m_component_table.componentE(*m_map_table.component_ptr<c_index>(handle.m_map_index), compidx, ptr, size);
-	}
-
 	template<typename E>
 	inline auto VecsRegistry<E>::componentE_ptr(VecsHandle handle, size_t compidx) noexcept -> void* {
 		if (!contains(handle)) return {};	///< Return the empty component
@@ -1253,18 +1260,6 @@ namespace vecs {
 	//VecsComponentTable
 
 	/**
-	* \brief Remove invalid erased entity data at the end of the component table.
-	*/
-	template<typename E>
-	inline auto VecsComponentTable<E>::remove_deleted_tail() noexcept -> void {
-		while (m_data.size() > 0) {
-			auto & handle = *m_data.component_ptr<c_handle>(table_index_t{ m_data.size() - 1 });
-			if (handle.is_valid()) return; ///< is last entity is valid, then return
-			m_data.pop_back();				///< Else remove it and continue the loop
-		}
-	}
-
-	/**
 	* \brief Remove all invalid entities from the component table.
 	* 
 	* The algorithm makes sure that there are no deleted entities at the end of the table.
@@ -1414,7 +1409,7 @@ namespace vecs {
 	* \brief Check whether a handle belongs to an entity that is still in the ECS.
 	* \returns true if the entity this handle belongs to is still in the ECS.
 	*/
-	inline auto VecsHandle::has_value() noexcept				-> bool {
+	inline auto VecsHandle::has_value() noexcept			-> bool {
 		return VecsRegistryBaseClass().contains(*this);
 	}
 
@@ -1424,7 +1419,7 @@ namespace vecs {
 	*/
 	template<typename C>
 	requires is_component_type<C>
-	inline auto VecsHandle::has_component() noexcept				-> bool {
+	inline auto VecsHandle::has_component() noexcept		-> bool {
 		return VecsRegistryBaseClass().has_component<C>(*this);
 	}
 
@@ -1434,7 +1429,7 @@ namespace vecs {
 	*/
 	template<typename C>
 	requires is_component_type<C>
-	inline auto VecsHandle::component_ptr() noexcept				-> C* {
+	inline auto VecsHandle::component_ptr() noexcept		-> C* {
 		return VecsRegistryBaseClass().component_ptr<C>(*this);
 	}
 
@@ -1446,7 +1441,7 @@ namespace vecs {
 	*/
 	template<typename... Cs>
 	requires are_component_types<Cs...>
-	inline auto VecsHandle::update(Cs&&... args) noexcept			-> bool {
+	inline auto VecsHandle::update(Cs&&... args) noexcept	-> bool {
 		return VecsRegistryBaseClass().update(*this, std::forward<Cs>(args)...);
 	}
 
@@ -1455,7 +1450,7 @@ namespace vecs {
 	*
 	* \returns true if the operation was successful.
 	*/
-	inline auto VecsHandle::erase() noexcept					-> bool {
+	inline auto VecsHandle::erase() noexcept				-> bool {
 		return VecsRegistryBaseClass().erase(*this);
 	}
 
@@ -1464,7 +1459,7 @@ namespace vecs {
 	*
 	* \returns index of this entity in the component table.
 	*/
-	auto VecsHandle::table_index() noexcept -> table_index_t {
+	inline auto VecsHandle::table_index() noexcept			-> table_index_t {
 		return VecsRegistryBaseClass{}.index(*this);
 	}
 
@@ -1473,7 +1468,7 @@ namespace vecs {
 	*
 	* \returns index of this entity in the component table.
 	*/
-	auto VecsHandle::type_index() noexcept -> type_index_t {
+	inline auto VecsHandle::type_index() noexcept			-> type_index_t {
 		return VecsRegistryBaseClass{}.type(*this);
 	}
 
@@ -1482,7 +1477,7 @@ namespace vecs {
 	*
 	* \returns a pointer to the mutex of this entity.
 	*/
-	inline std::atomic<uint32_t>* VecsHandle::mutex() {
+	inline auto VecsHandle::mutex() noexcept				-> std::atomic<uint32_t>* {
 		if (!is_valid()) return nullptr;
 		return VecsRegistryBaseClass::m_map_table.component_ptr<VecsRegistryBaseClass::c_mutex>(m_map_index);
 	}
