@@ -1083,26 +1083,28 @@ namespace vecs {
 	template<typename... Cs>
 	requires are_components_of<E, Cs...> [[nodiscard]]
 	inline auto VecsRegistry<E>::insert(Cs&&... args) noexcept	-> VecsHandle {
-		table_index_t idx{};
+		table_index_t map_idx{};	///< index in the map
 
-		std::lock_guard<std::mutex> guard(m_mutex);
+		bool locked = m_mutex.try_lock();			///< Try to acquire the lock on m_first_free
 
-		if (m_first_free.has_value()) {
-			idx = m_first_free;
-			m_first_free = *m_entity_table.component_ptr<c_index>(idx);
+		if (locked && m_first_free.has_value()) {	///< If we got the lock and there is a free slot -> reuse the free slot
+			map_idx = m_first_free;
+			m_first_free = *m_entity_table.component_ptr<c_index>(map_idx);
+			m_mutex.unlock();
 		}
-		else {
-			idx = m_entity_table.push_back();
-			if (!idx.has_value()) return {};
-			*m_entity_table.component_ptr<c_counter>(idx) = counter_t{ 0 };		//start with counter 0
+		else {										///< Either did not get the lock or no free slot -> create new map entry
+			if (locked) m_mutex.unlock();			///< If we got the lock, unlock again
+			map_idx = m_entity_table.push_back();
+			if (!map_idx.has_value()) return {};
+			*m_entity_table.component_ptr<c_counter>(map_idx) = counter_t{ 0 };		//start with counter 0
 		}
 
-		*m_entity_table.component_ptr<c_type>(idx) = table_index_t{ vtll::index_of<VecsEntityTypeList, E>::value }; ///< Entity type index
+		*m_entity_table.component_ptr<c_type>(map_idx) = table_index_t{ vtll::index_of<VecsEntityTypeList, E>::value }; ///< Entity type index
 		
-		VecsHandle handle{ idx, *m_entity_table.component_ptr<c_counter>(idx) }; ///< The handle
+		VecsHandle handle{ map_idx, *m_entity_table.component_ptr<c_counter>(map_idx) }; ///< The new handle
 		
-		*m_entity_table.component_ptr<c_index>(idx)
-			= m_component_table.insert(handle, m_entity_table.component_ptr<c_mutex>(idx), std::forward<Cs>(args)...);	///< add data into component table
+		*m_entity_table.component_ptr<c_index>(map_idx) ///< Need new handle here so we can put it into the component table 
+			= m_component_table.insert(handle, m_entity_table.component_ptr<c_mutex>(map_idx), std::forward<Cs>(args)...);	///< add data into component table
 
 		m_size++;
 		m_sizeE++;
