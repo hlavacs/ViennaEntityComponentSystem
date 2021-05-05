@@ -207,7 +207,7 @@ namespace vecs {
 	template<size_t I, typename C>
 	inline auto VecsTable<DATA, N0, ROW>::update(table_index_t n, C&& data) noexcept -> bool {
 		if (n >= m_size) return false;
-		*component_ptr<I>(n) = data;
+		*component_ptr<I>(n) = std::forward<C>(data);
 		return true;
 	}
 

@@ -10,16 +10,17 @@ Systems do not have to be specially defined, anything that specifies a number of
 Important features of VECS are:
 * C++20
 * Header only, simply include the headers to your project
-* Generic compile time definition of entities
-* Designed to be used by multiple threads in parallel
-* Easy to use, various ways to access the entities and their components
-* High performance, components are ordered sequentially for cache friendly update access
+* Compile time definition of components and entities. VECS creates a rigorous compile time frame around your data, minimizing runtime overhead.
+* Can use tags to define subsets of entities dynamically.
+* Designed to be used by multiple threads in parallel, low overhead locking.
+* Easy to use, various ways to access the entities and their components.
+* High performance by default, components are ordered sequentially in memory (row or column wise) for cache friendly  access.
 
 
 ## The VECS Include Files
 
 VECS is a header only library, consisting of the following header files:
-* *IntType.h*: Template for strong integral types like *index_t* or *counter16_t*. Such types enforce to use them explicitly as function parameters and prevent users from mixing them up with *size_t, int* or *unsigned long*. Also such a type can store a NULL value, and can be tested with *is_valid()*.
+* *IntType.h*: Template for strong integral types like *table_index_t* or *counter_t*. Such types enforce to use them explicitly as function parameters and prevent users from mixing them up with *size_t, int* or *unsigned long*. Also such a type can store a NULL value, and can be tested with *has_value()*.
 * *VECSUtil.h*: Contains utility classes such as a class for implementing CRTP, mono state, and simple low-overhead read and write locks.
 * *VECS.h*: The main include file containing most of VECS functionality.
 * *VECSIterator.h*: Functionality for iterating over entities in VECS.

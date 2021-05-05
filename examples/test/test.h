@@ -33,6 +33,7 @@ namespace vecs {
 	/** \brief Example for a user component*/
 	struct VeComponentTransform {
 		glm::mat4 m_transform;
+		//std::unique_ptr<int> ptr;
 	};
 
 	/** \brief Example for a user component*/
