@@ -258,11 +258,11 @@ namespace vecs {
 
 		template<typename C>
 		requires is_component_type<C>
-		auto component_ptr() noexcept	-> C*;		///< Get a pointer to component of type C of the entity (first found is copied) 
+		auto component() noexcept		-> C& { return *component_ptr<C>(); };	///< Get a component of type C of the entity (first found is copied) 
 
 		template<typename C>
-		requires is_component_type<C> 
-		auto component() noexcept		-> C& { return *component_ptr<C>(); };	///< Get a component of type C of the entity (first found is copied) 
+		requires is_component_type<C>
+		auto component_ptr() noexcept	-> C*;		///< Get a pointer to component of type C of the entity (first found is copied) 
 
 		template<typename... Cs>
 		requires are_component_types<Cs...>
@@ -801,9 +801,8 @@ namespace vecs {
 	requires are_component_types<Cs...>
 	auto VecsRegistryBaseClass::update(VecsHandle handle, Cs&&... args) noexcept -> bool {
 		if (!handle.is_valid()) return false;
-
 		/// Dispatch the call to the correct subclass and return result
-		( m_dispatch[type(handle)]->updateC(handle, vtll::index_of<VecsComponentTypeList, std::decay_t<Cs>>::value, (void*)&args, sizeof(Cs), std::is_rvalue_reference<Cs>::value), ... );
+		( m_dispatch[type(handle)]->updateC(handle, vtll::index_of<VecsComponentTypeList, std::decay_t<Cs>>::value, (void*)&args, sizeof(Cs), std::is_rvalue_reference<decltype(args)>::value), ... );
 		return true;
 	}
 
