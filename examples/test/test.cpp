@@ -78,10 +78,10 @@ int main() {
 
 		TESTRESULT(++number, "component handle", auto comp3 = h2.component<VeComponentMaterial>(), (comp3.i == 99), );
 
-		TESTRESULT(++number, "value tuple", auto tup1 = VecsRegistry<VeEntityTypeNode>{}.references(h1),
+		TESTRESULT(++number, "value tuple", auto tup1 = VecsRegistry<VeEntityTypeNode>{}.tuple(h1),
 			(std::get<VeComponentPosition&>(tup1).m_position == glm::vec3{ 9.0f, 2.0f, 3.0f }), );
 
-		TESTRESULT(++number, "ptr tuple", auto tup2 = VecsRegistry<VeEntityTypeNode>{}.pointers(h1_2),
+		TESTRESULT(++number, "ptr tuple", auto tup2 = VecsRegistry<VeEntityTypeNode>{}.tuple_ptr(h1_2),
 			(std::get<VeComponentPosition*>(tup2)->m_position == glm::vec3{ 22.0f, 2.0f, 3.0f }), );
 
 		//--------------------------------------------------------------------------------------------------------------------------
