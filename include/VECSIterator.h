@@ -489,6 +489,23 @@ namespace vecs {
 
 
 	//-------------------------------------------------------------------------
+	//Functor for for_each looping
+
+	/**
+	* \brief General functor type that can hold any function, and depends on a number of component types.
+	*
+	* Used in for_each to iterate over entities and call the functor for each entity.
+	*/
+	template<typename C>
+	struct Functor;
+
+	template<template<typename...> typename Seq, typename... Cs>
+	struct Functor<Seq<Cs...>> {
+		using type = void(VecsHandle, Cs&...);	///< Arguments for the functor
+	};
+
+
+	//-------------------------------------------------------------------------
 	//VecsRangeBaseClass
 
 	/**
@@ -534,6 +551,17 @@ namespace vecs {
 				};
 				return result;
 			}
+
+			inline auto for_each(std::function<typename Functor<CTL>::type> f) -> void {
+				auto b = begin();
+				auto e = end();
+				for (; b != e; ++b) {
+					VecsWriteLock lock(b.mutex());		///< Read lock
+					if (!b.has_value()) continue;
+					std::apply(f, *b);					///< Run the function on the references
+				}
+			}
+
 
 			auto begin() noexcept	->	VecsIteratorBaseClass<ETL,CTL> {
 				return m_begin;

@@ -42,7 +42,7 @@ int main() {
     using entity_types = vtll::filter_have_all_types< VecsEntityTypeList, vtll::type_list<VeComponentPosition> >;
     std::cout << typeid(entity_types).name() << std::endl;
 
-    VecsRegistry().for_each<VeComponentPosition, VeComponentOrientation>( [&]( auto handle, auto& pos, auto& orient) {
+    VecsRange<VeComponentPosition, VeComponentOrientation>{}.for_each([&](auto handle, auto& pos, auto& orient) {
         pos = VeComponentPosition{ glm::vec3{12345.0f, -299.0f, -334.0f} };
         std::cout << "entity\n";
     });

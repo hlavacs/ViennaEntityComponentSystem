@@ -176,7 +176,7 @@ int main() {
 		}
 
 		i = 0;
-		VecsRegistry().for_each<VeComponentName>([&](auto handle, auto& name) {
+		VecsRange<VeComponentName>{}.for_each([&](auto handle, auto& name) {
 			++i;
 			if (name.m_name != "Node" && name.m_name != "Draw") { 
 				test = false; 
@@ -186,7 +186,7 @@ int main() {
 			});
 
 		i = 0;
-		VecsRegistry().for_each<VeComponentName>([&](auto handle, auto& name) {
+		VecsRange<VeComponentName>{}.for_each([&](auto handle, auto& name) {
 			++i;
 			if (name.m_name != "Name Holder " + std::to_string(i)) { test = false; }
 			//std::cout << "Entity " << name.m_name << " " << i << "\n";
@@ -206,7 +206,7 @@ int main() {
 		}
 
 		i = 0;
-		VecsRegistry().for_each<VeComponentName>([&](auto handle, auto& name) {
+		VecsRange<VeComponentName>{}.for_each([&](auto handle, auto& name) {
 			++i;
 			if (name.m_name != ("Name Holder 2 " + std::to_string(i))) { test = false; }
 			//std::cout << "Entity " << name.m_name << " " << i << "\n";
@@ -241,7 +241,7 @@ int main() {
 
 		i = 0;
 		test = true;
-		VecsRegistry().for_each<VeComponentName>([&](auto handle, auto& name) {
+		VecsRange<VeComponentName>{}.for_each([&](auto handle, auto& name) {
 			++i;
 			if (name.m_name != ("Name Holder 3 " + std::to_string(i))) { test = false; }
 			name.m_name = "Name Holder 4 " + std::to_string(i);
@@ -252,7 +252,7 @@ int main() {
 
 
 		i = 0;
-		VecsRegistry().for_each<VeComponentName>([&](auto handle, auto& name) {
+		VecsRange<VeComponentName>{}.for_each([&](auto handle, auto& name) {
 			++i;
 			if (name.m_name != ("Name Holder 4 " + std::to_string(i))) { test = false; }
 			//std::cout << "Entity " << name.m_name << " " << i << "\n";
@@ -293,7 +293,7 @@ int main() {
 	{
 		int i = 0;
 		bool test = true;
-		VecsRegistry().for_each<VeEntityTypeNode, VeEntityTypeDraw>( [&](auto handle, auto name, auto pos, auto orient) {
+		VecsRange<VeEntityTypeNode, VeEntityTypeDraw>{}.for_each([&](auto handle, auto name, auto pos, auto orient) {
 			++i;
 			if (name.m_name != ("Name Holder 4 " + std::to_string(i))) { test = false; }
 			//std::cout << "Entity " << name.m_name << " " << i << "\n";
@@ -342,25 +342,25 @@ int main() {
 		VecsIterator<VeEntityTypeNodeTagged<TAG1>> et(true);
 		VecsRange<VeEntityTypeNodeTagged<TAG1>> ranget;
 
-		VecsRegistry().for_each<VeEntityTypeNode, TAG1>([&](VecsHandle handle, auto& name, auto& pos, auto& orient, auto& transf) {
+		VecsRange<VeEntityTypeNode, TAG1>{}.for_each([&](VecsHandle handle, auto& name, auto& pos, auto& orient, auto& transf) {
 			//std::cout << handle.map_index().value << "\n";
 		});
 
 		VecsRange<VeEntityTypeNode, TAG1> range_par;
 		auto split = range_par.split(2);
 
-		VecsRegistry().for_each(std::move(split[0]), [&](auto handle, auto& name, auto& pos, auto& orient, auto& transf) {
+		split[0].for_each([&](auto handle, auto& name, auto& pos, auto& orient, auto& transf) {
 			//std::cout << handle.map_index().value << "\n";
 			VecsRegistry<VeEntityTypeNode>{}.transform(handle);
 			});
 
-		VecsRegistry().for_each(std::move(split[1]), [&](auto handle, auto& name, auto& pos, auto& orient, auto& transf) {
+		split[1].for_each([&](auto handle, auto& name, auto& pos, auto& orient, auto& transf) {
 			//std::cout << handle.map_index().value << "\n";
 			VecsRegistry<VeEntityTypeNode>{}.transform(handle);
 			});
 
 
-		VecsRegistry().for_each<VeEntityTypeNode, TAG1>([&](VecsHandle handle, auto& name, auto& pos, auto& orient, auto& transf) {
+		VecsRange<VeEntityTypeNode, TAG1>{}.for_each([&](VecsHandle handle, auto& name, auto& pos, auto& orient, auto& transf) {
 			VecsRegistry<VeEntityTypeNode>{}.transform(handle);
 		});
 

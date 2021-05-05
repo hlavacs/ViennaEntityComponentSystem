@@ -204,22 +204,6 @@ namespace vecs {
 	template<typename... Ts> class VecsRange;
 
 	//-------------------------------------------------------------------------
-	//Functor for for_each looping
-
-	/** 
-	* \brief General functor type that can hold any function, and depends on a number of component types.
-	* 
-	* Used in for_each to iterate over entities and call the functor for each entity.
-	*/
-	template<typename C>
-	struct Functor;
-
-	template<template<typename...> typename Seq, typename... Cs>
-	struct Functor<Seq<Cs...>> {
-		using type = void(VecsHandle, Cs&...);	///< Arguments for the functor
-	};
-
-	//-------------------------------------------------------------------------
 	//entity handle
 
 	/**
@@ -750,18 +734,6 @@ namespace vecs {
 		template<typename... Es>
 		requires (are_entity_types<Es...>)
 		auto clear() noexcept				-> size_t;		///< Clear the whole ECS
-
-
-		//-------------------------------------------------------------------------
-		//for_each 
-
-		template<typename ETL, typename CTL>
-		auto for_each(VecsRangeBaseClass<ETL, CTL>&& r, std::function<typename Functor<CTL>::type> f) -> void;	///< Loop over entities
-
-		template<typename... Ts>
-		auto for_each(std::function<typename Functor<typename VecsIterator<Ts...>::component_types>::type> f) -> void { 
-			for_each(VecsRange<Ts...>{}, f);		///< Loop over entities
-		}	
 
 		//-------------------------------------------------------------------------
 		//utility
@@ -1375,27 +1347,6 @@ namespace vecs {
 				VecsRegistry<vtll::Nth_type<VecsEntityTypeList, i>>().compressE();
 			}
 		);
-	}
-
-
-	//-------------------------------------------------------------------------
-	//for_each
-
-	/**
-	* \brief takes two iterators and loops from begin to end, and for each entity calls the provided function.
-	*
-	* \param[in] range Range to iterate over
-	* \param[in] f Functor to be called for every entity the iterator visits.
-	*/
-	template<typename ETL, typename CLT>
-	inline auto VecsRegistryBaseClass::for_each(VecsRangeBaseClass<ETL, CLT>&& range, std::function<typename Functor<CLT>::type> f) -> void {
-		auto b = range.begin();
-		auto e = range.end();
-		for (; b != e; ++b) {
-			VecsWriteLock lock(b.mutex());		///< Read lock
-			if (!b.has_value()) continue;
-			std::apply(f, *b);					///< Run the function on the references
-		}
 	}
 
 	//-------------------------------------------------------------------------
