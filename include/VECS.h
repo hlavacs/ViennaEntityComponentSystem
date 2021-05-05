@@ -707,7 +707,7 @@ namespace vecs {
 		static const uint32_t c_mutex{ 3 };		///< Index for accessing the lock mutex
 
 		static const size_t c_segment_size = VecsTableMaxSegExp::value;
-		static inline VecsTable<types, c_segment_size, VECS_LAYOUT_ROW::value> m_entity_table;	///< The main mapping table
+		static inline VecsTable<types, c_segment_size, VECS_LAYOUT_ROW::value> m_map_table;	///< The main mapping table
 		static inline std::mutex				m_mutex;		///< Mutex for syncing insert and erase
 		static inline table_index_t				m_first_free{};	///< First free entry to be reused
 		static inline std::atomic<uint32_t>		m_size{0};		///< Number of valid entities in the map
@@ -741,7 +741,7 @@ namespace vecs {
 
 		template<typename C>
 		requires is_component_type<C>
-		auto component(VecsHandle handle) noexcept		-> C&;			///< Get a component of type C
+		auto component(VecsHandle handle) noexcept -> C& { return *component_ptr<C>(handle); };	///< Get a component of type C
 
 		template<typename C>
 		requires is_component_type<C>
@@ -811,19 +811,6 @@ namespace vecs {
 		return m_dispatch[type(handle)]->has_componentE(handle, vtll::index_of<VecsComponentTypeList, std::decay_t<C>>::value);
 	}
 
-	/**
-	* \brief Get the data of a component of type C for a given handle.
-	*
-	* The first component of type C is retrieved. So component types should be unique if you want to
-	* use this function. Then the call is dispatched to the correct subclass for entity type E.
-	* \param[in] handle The handle of the entity to get the data from.
-	* \returns a component of type C holding the desired data.
-	*/
-	template<typename C>
-	requires is_component_type<C>
-	auto VecsRegistryBaseClass::component(VecsHandle handle) noexcept -> C& {
-		return *component_ptr<C>(handle);
-	}
 
 	/**
 	* \brief Get pointer to a component of type C for a given handle.
@@ -872,7 +859,7 @@ namespace vecs {
 	*/
 	auto VecsRegistryBaseClass::index(VecsHandle h) noexcept -> table_index_t {
 		if (!h.is_valid()) return {};
-		return *m_entity_table.component_ptr<VecsRegistryBaseClass::c_index>(h.m_map_index);
+		return *m_map_table.component_ptr<VecsRegistryBaseClass::c_index>(h.m_map_index);
 	}
 
 	/**
@@ -882,7 +869,7 @@ namespace vecs {
 	*/
 	auto VecsRegistryBaseClass::type(VecsHandle h) noexcept -> type_index_t {
 		if (!h.is_valid()) return {};
-		return *m_entity_table.component_ptr<VecsRegistryBaseClass::c_type>(h.m_map_index);
+		return *m_map_table.component_ptr<VecsRegistryBaseClass::c_type>(h.m_map_index);
 	}
 
 	/**
@@ -965,21 +952,13 @@ namespace vecs {
 			return is_component_of<E,C>;
 		}
 
-		template<size_t I, typename C = vtll::Nth_type<E, I>>
+		template<typename C>
 		requires is_component_of<E, C>
-		auto component(VecsHandle handle) noexcept		-> C&;		///< Get copy of a component given index of component
-
-		template<size_t I, typename C = vtll::Nth_type<E, I>>
-		requires is_component_of<E, C>
-		auto component_ptr(VecsHandle handle) noexcept	-> C*;	///< Get copy of a component given index of component
+		auto component(VecsHandle handle) noexcept -> C& { return *component_ptr<C>(handle); };	///< Get to a component
 
 		template<typename C>
 		requires is_component_of<E, C>
-		auto component(VecsHandle handle) noexcept		-> C&;		///< Get copy of a component given type of component
-
-		template<typename C>
-		requires is_component_of<E, C>
-		auto component_ptr(VecsHandle handle) noexcept	-> C*;		///< Get copy of a component given type of component
+		auto component_ptr(VecsHandle handle) noexcept	-> C*;	///< Get pointer to a component
 			
 		//-------------------------------------------------------------------------
 		//update data
@@ -1023,7 +1002,7 @@ namespace vecs {
 	template<typename E>
 	inline auto VecsRegistry<E>::updateC(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept -> bool {
 		if (!contains(handle)) return {};
-		return m_component_table.updateC(*m_entity_table.component_ptr<c_index>(handle.m_map_index), compidx, ptr, size);
+		return m_component_table.updateC(*m_map_table.component_ptr<c_index>(handle.m_map_index), compidx, ptr, size);
 	}
 
 	/**
@@ -1053,13 +1032,13 @@ namespace vecs {
 	template<typename E>
 	inline auto VecsRegistry<E>::componentE(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept -> bool {
 		if (!contains(handle)) return {};
-		return m_component_table.componentE(*m_entity_table.component_ptr<c_index>(handle.m_map_index), compidx, ptr, size);
+		return m_component_table.componentE(*m_map_table.component_ptr<c_index>(handle.m_map_index), compidx, ptr, size);
 	}
 
 	template<typename E>
 	inline auto VecsRegistry<E>::componentE_ptr(VecsHandle handle, size_t compidx) noexcept -> void* {
 		if (!contains(handle)) return {};	///< Return the empty component
-		auto* comp_table_idx = m_entity_table.component_ptr<c_index>(handle.m_map_index); ///< Get reference to component
+		auto* comp_table_idx = m_map_table.component_ptr<c_index>(handle.m_map_index); ///< Get reference to component
 		return m_component_table.componentE_ptr(*comp_table_idx, compidx);	///< Return the component
 	};
 
@@ -1080,22 +1059,22 @@ namespace vecs {
 
 		if (locked && m_first_free.has_value()) {	///< If we got the lock and there is a free slot -> reuse the free slot
 			map_idx = m_first_free;
-			m_first_free = *m_entity_table.component_ptr<c_index>(map_idx);
+			m_first_free = *m_map_table.component_ptr<c_index>(map_idx);
 			m_mutex.unlock();
 		}
 		else {										///< Either did not get the lock or no free slot -> create new map entry
 			if (locked) m_mutex.unlock();			///< If we got the lock, unlock again
-			map_idx = m_entity_table.push_back();
+			map_idx = m_map_table.push_back();
 			if (!map_idx.has_value()) return {};
-			*m_entity_table.component_ptr<c_counter>(map_idx) = counter_t{ 0 };		//start with counter 0
+			*m_map_table.component_ptr<c_counter>(map_idx) = counter_t{ 0 };		//start with counter 0
 		}
 
-		*m_entity_table.component_ptr<c_type>(map_idx) = table_index_t{ vtll::index_of<VecsEntityTypeList, E>::value }; ///< Entity type index
+		*m_map_table.component_ptr<c_type>(map_idx) = table_index_t{ vtll::index_of<VecsEntityTypeList, E>::value }; ///< Entity type index
 		
-		VecsHandle handle{ map_idx, *m_entity_table.component_ptr<c_counter>(map_idx) }; ///< The new handle
+		VecsHandle handle{ map_idx, *m_map_table.component_ptr<c_counter>(map_idx) }; ///< The new handle
 		
-		*m_entity_table.component_ptr<c_index>(map_idx) ///< Need new handle here so we can put it into the component table 
-			= m_component_table.insert(handle, m_entity_table.component_ptr<c_mutex>(map_idx), std::forward<Cs>(args)...);	///< add data into component table
+		*m_map_table.component_ptr<c_index>(map_idx) ///< Need new handle here so we can put it into the component table 
+			= m_component_table.insert(handle, m_map_table.component_ptr<c_mutex>(map_idx), std::forward<Cs>(args)...);	///< add data into component table
 
 		m_size++;
 		m_sizeE++;
@@ -1121,13 +1100,13 @@ namespace vecs {
 		//VecsRegistryBaseClass::print_type(handle);
 		//std::cout << " type " << VecsRegistry{}.type(handle) << std::endl;
 
-		auto& map_type = *m_entity_table.component_ptr<c_type>(handle.m_map_index);	///< Old type index
+		auto& map_type = *m_map_table.component_ptr<c_type>(handle.m_map_index);	///< Old type index
 
 		//std::cout << "Transform from " << map_type.value << " to " << typeid(E).name() << " " << vtll::index_of<VecsEntityTypeList, E>::value << std::endl << std::endl;
 
 		if (map_type == vtll::index_of<VecsEntityTypeList, E>::value) return true;	///< New type = old type -> do nothing
 
-		auto index = m_component_table.insert(handle, m_entity_table.component_ptr<c_mutex>(handle.table_index()));	///< add data into component table
+		auto index = m_component_table.insert(handle, m_map_table.component_ptr<c_mutex>(handle.table_index()));	///< add data into component table
 			
 		vtll::static_for<size_t, 0, vtll::size<E>::value >(	///< Move old components to new entity type
 			[&](auto i) {
@@ -1143,7 +1122,7 @@ namespace vecs {
 			m_component_table.update<Cs>(index, std::forward<Cs>(args)...);			///< Move the arguments to the new entity type
 		}
 
-		auto& map_index = *m_entity_table.component_ptr<c_index>(handle.m_map_index);	///< Index of old component table in the map
+		auto& map_index = *m_map_table.component_ptr<c_index>(handle.m_map_index);	///< Index of old component table in the map
 		m_dispatch[map_type]->eraseE(map_index);								///< Erase the entity from old component table
 
 		sizeE()++;
@@ -1164,7 +1143,7 @@ namespace vecs {
 	template<typename E>
 	inline auto VecsRegistry<E>::tuple_ptr(VecsHandle handle) noexcept -> vtll::to_ptr_tuple<E> {
 		if (!contains(handle)) return {};	///< Return the empty component
-		auto& comp_table_idx = *m_entity_table.component_ptr<c_index>(handle.m_map_index); ///< Get reference to component
+		auto& comp_table_idx = *m_map_table.component_ptr<c_index>(handle.m_map_index); ///< Get reference to component
 		return m_component_table.tuple_ptr( comp_table_idx );
 	}
 
@@ -1176,7 +1155,7 @@ namespace vecs {
 	*/
 	template<typename E>
 	inline auto VecsRegistry<E>::tuple(VecsHandle handle) noexcept -> vtll::to_ref_tuple<E> {
-		auto& comp_table_idx = *m_entity_table.component_ptr<c_index>(handle.m_map_index); ///< Get component copies
+		auto& comp_table_idx = *m_map_table.component_ptr<c_index>(handle.m_map_index); ///< Get component copies
 		return m_component_table.tuple(comp_table_idx);
 	}
 
@@ -1193,11 +1172,10 @@ namespace vecs {
 		if (h1 == h2) return false;
 		if (!h1.is_valid() || !h1.is_valid() || type(h1) != type(h2)) return false;
 		if (type(h1) != vtll::index_of<VecsEntityTypeList, E>::value) return false;
-		if (type(h2) != vtll::index_of<VecsEntityTypeList, E>::value) return false;
 		
-		table_index_t& i1 = *m_entity_table.component_ptr<c_index>(h1.m_map_index);
-		table_index_t& i2 = *m_entity_table.component_ptr<c_index>(h2.m_map_index);
-		std::swap(i1, i2);											///< Swap in map
+		table_index_t& i1 = *m_map_table.component_ptr<c_index>(h1.m_map_index);
+		table_index_t& i2 = *m_map_table.component_ptr<c_index>(h2.m_map_index);
+		std::swap(i1, i2);								///< Swap in map
 		auto res = m_component_table.swap(i1, i2);		///< Swap in component table
 		return res;
 	}
@@ -1211,23 +1189,8 @@ namespace vecs {
 	template<typename E>
 	inline auto VecsRegistry<E>::contains(VecsHandle handle) noexcept -> bool {
 		if (!handle.is_valid()) return false;
-		if ( handle.m_generation_counter != *m_entity_table.component_ptr<c_counter>(handle.m_map_index)) return false;
+		if ( handle.m_generation_counter != *m_map_table.component_ptr<c_counter>(handle.m_map_index)) return false;
 		return true;
-	}
-
-	/**
-	* \brief Retrieve a component of type C from an entity of type E.
-	*
-	* \param[in] handle The entity handle.
-	* \returns the component.
-	*/
-	template<typename E>
-	template<size_t I, typename C>
-	requires is_component_of<E, C>
-	auto VecsRegistry<E>::component(VecsHandle handle) noexcept							-> C& {
-		//if (!contains(handle)) return {};	///< Return the empty component
-		auto& comp_table_idx = *m_entity_table.component_ptr<c_index>(handle.m_map_index); ///< Get reference to component
-		return m_component_table.component_ref<C>(comp_table_idx);	///< Return the component
 	}
 
 	/**
@@ -1237,38 +1200,12 @@ namespace vecs {
 	* \returns the pointer to the component.
 	*/
 	template<typename E>
-	template<size_t I, typename C>
+	template<typename C>
 	requires is_component_of<E, C>
 	auto VecsRegistry<E>::component_ptr(VecsHandle handle) noexcept							-> C* {
 		if (!contains(handle)) return {};	///< Return the empty component
-		auto& comp_table_idx = *m_entity_table.component_ptr<c_index>(handle.m_map_index); ///< Get reference to component
+		auto& comp_table_idx = *m_map_table.component_ptr<c_index>(handle.m_map_index); ///< Get reference to component
 		return &m_component_table.component<C>(comp_table_idx);	///< Return the component
-	}
-
-	/**
-	* \brief Retrieve a component of type C from an entity of type E.
-	*
-	* \param[in] handle The entity handle.
-	* \returns the component.
-	*/
-	template<typename E>
-	template<typename C>
-	requires is_component_of<E, C>
-	inline auto VecsRegistry<E>::component(VecsHandle handle) noexcept -> C& {
-		return component<vtll::index_of<E,C>>();
-	}
-
-	/**
-	* \brief Retrieve pointer to a component of type C from an entity of type E.
-	*
-	* \param[in] handle The entity handle.
-	* \returns pointer to the component.
-	*/
-	template<typename E>
-	template<typename C>
-	requires is_component_of<E, C>
-	inline auto VecsRegistry<E>::component_ptr(VecsHandle handle) noexcept -> C* {
-		return component_ptr<vtll::index_of<E, C>>(handle);
 	}
 
 	/**
@@ -1312,14 +1249,14 @@ namespace vecs {
 	template<typename E>
 	inline auto VecsRegistry<E>::erase( VecsHandle handle) noexcept -> bool {
 		if (!contains(handle)) return false;
-		m_component_table.erase(*m_entity_table.component_ptr <c_index>(handle.m_map_index)); ///< Erase from comp table
-		(*m_entity_table.component_ptr<c_counter>(handle.m_map_index))++;			///< Invalidate the entity handle
+		m_component_table.erase(*m_map_table.component_ptr <c_index>(handle.m_map_index)); ///< Erase from comp table
+		(*m_map_table.component_ptr<c_counter>(handle.m_map_index))++;			///< Invalidate the entity handle
 
 		m_size--;	///< Decrease sizes
 		m_sizeE--;
 
 		std::lock_guard<std::mutex> mlock(m_mutex);										///< Protect free list
-		*m_entity_table.component_ptr<c_index>(handle.m_map_index) = m_first_free;		///< Put old entry into free list
+		*m_map_table.component_ptr<c_index>(handle.m_map_index) = m_first_free;		///< Put old entry into free list
 		m_first_free = handle.m_map_index;
 
 		return true; 
@@ -1346,7 +1283,7 @@ namespace vecs {
 			}
 		);
 
-		m_entity_table.capacity(sum_max);
+		m_map_table.capacity(sum_max);
 
 		return maxE;
 	}
@@ -1402,7 +1339,7 @@ namespace vecs {
 			if (index.value < m_data.size()) {								///< Is it inside the table still?		
 				m_data.move(index, table_index_t{ m_data.size() - 1 });		///< Yes, move last entity to this position
 				auto& handle = *m_data.component_ptr<c_handle>(index);		///< Handle of moved entity
-				*VecsRegistryBaseClass().m_entity_table.component_ptr<VecsRegistryBaseClass::c_index>(handle.m_map_index) = index; ///< Change map entry of moved last entity
+				*VecsRegistryBaseClass().m_map_table.component_ptr<VecsRegistryBaseClass::c_index>(handle.m_map_index) = index; ///< Change map entry of moved last entity
 			}
 		}
 		m_deleted.clear();
@@ -1631,7 +1568,7 @@ namespace vecs {
 	*/
 	inline std::atomic<uint32_t>* VecsHandle::mutex() {
 		if (!is_valid()) return nullptr;
-		return VecsRegistryBaseClass::m_entity_table.component_ptr<VecsRegistryBaseClass::c_mutex>(m_map_index);
+		return VecsRegistryBaseClass::m_map_table.component_ptr<VecsRegistryBaseClass::c_mutex>(m_map_index);
 	}
 
 }
