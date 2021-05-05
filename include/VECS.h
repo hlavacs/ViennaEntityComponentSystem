@@ -589,7 +589,12 @@ namespace vecs {
 		*/
 		auto updateC(table_index_t index, size_t compidx, void* ptr, size_t size, bool move ) noexcept -> bool {
 			if constexpr (is_component_of<E, C>) {
-				*VecsComponentTable<E>().m_data.component_ptr<VecsComponentTable<E>::c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(index) = *((C*)ptr);
+				if (move) {
+					*VecsComponentTable<E>().m_data.component_ptr<VecsComponentTable<E>::c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(index) = std::move(*((C*)ptr));
+				}
+				else {
+					*VecsComponentTable<E>().m_data.component_ptr<VecsComponentTable<E>::c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(index) = *((C*)ptr);
+				}
 				return true;
 			}
 			return false;
@@ -798,7 +803,7 @@ namespace vecs {
 		if (!handle.is_valid()) return false;
 
 		/// Dispatch the call to the correct subclass and return result
-		( m_dispatch[type(handle)]->updateC(handle, vtll::index_of<VecsComponentTypeList, std::decay_t<Cs>>::value, (void*)&args, sizeof(Cs)), ... );
+		( m_dispatch[type(handle)]->updateC(handle, vtll::index_of<VecsComponentTypeList, std::decay_t<Cs>>::value, (void*)&args, sizeof(Cs), std::is_rvalue_reference<Cs>::value), ... );
 		return true;
 	}
 
@@ -957,7 +962,7 @@ namespace vecs {
 	*/
 	template<typename E>
 	inline auto VecsRegistry<E>::updateC(VecsHandle handle, size_t compidx, void* ptr, size_t size, bool move ) noexcept -> bool {
-		if (!contains(handle)) return {};
+		if (!contains(handle)) return false;
 		return m_component_table.updateC(*m_map_table.component_ptr<c_index>(handle.m_map_index), compidx, ptr, size, move);
 	}
 
