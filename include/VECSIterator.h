@@ -349,7 +349,7 @@ namespace vecs {
 		size_t			m_sizeE{ 0 };				///< Number of valid and invalid entities of type E
 
 	public:
-		VecsIteratorEntityBaseClass(bool is_end = false) noexcept {};
+		VecsIteratorEntityBaseClass() noexcept {};
 		virtual auto handle() noexcept		-> VecsHandle = 0;
 		virtual auto mutex() noexcept		-> std::atomic<uint32_t>* = 0;
 		virtual auto has_value() noexcept	-> bool = 0;
