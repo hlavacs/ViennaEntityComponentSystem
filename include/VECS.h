@@ -79,8 +79,8 @@ namespace vecs {
 	* expand_tags takes a list of entity types, uses the tags from the tag map and creates all variants of each 
 	* entity type, holding zero to all tags for this entity type.
 	*/
-	template<typename TL>
-	using expand_tags = vtll::remove_duplicates< vtll::flatten< vtll::function< TL, expand_tags_for_one > > >;
+	template<typename ETL>
+	using expand_tags = vtll::remove_duplicates< vtll::flatten< vtll::function< ETL, expand_tags_for_one > > >;
 
 
 	/**
@@ -849,7 +849,8 @@ namespace vecs {
 	*/
 	auto VecsRegistryBaseClass::contains(VecsHandle handle) noexcept	-> bool {
 		if (!handle.is_valid()) return false;
-		return m_dispatch[type(handle)]->contains(handle); ///< Dispatch to the correct subclass for type E and return result
+		if (handle.m_generation_counter != *m_map_table.component_ptr<c_counter>(handle.m_map_index)) return false;
+		return true;
 	}
 
 
@@ -934,7 +935,6 @@ namespace vecs {
 		auto compress() noexcept -> void { compressE(); }					///< Remove erased rows from the component table
 		auto capacity(size_t) noexcept						-> size_t;		///< Set max number of entities of this type
 		auto swap(VecsHandle h1, VecsHandle h2) noexcept	-> bool;		///< Swap rows in component table
-		auto contains(VecsHandle handle) noexcept			-> bool;		///< Test if an entity is still in VECS
 		virtual void print_type(VecsHandle handle) { std::cout << "<" << typeid(E).name() << ">"; };
 	};
 
@@ -1121,19 +1121,6 @@ namespace vecs {
 		std::swap(i1, i2);								///< Swap in map
 		auto res = m_component_table.swap(i1, i2);		///< Swap in component table
 		return res;
-	}
-
-	/**
-	* \brief Check whether the ECS contains an entity. 
-	*
-	* \param[in] handle The entity handle.
-	* \return true if the entity is still contained in the ECS.
-	*/
-	template<typename E>
-	inline auto VecsRegistry<E>::contains(VecsHandle handle) noexcept -> bool {
-		if (!handle.is_valid()) return false;
-		if ( handle.m_generation_counter != *m_map_table.component_ptr<c_counter>(handle.m_map_index)) return false;
-		return true;
 	}
 
 	/**
@@ -1357,7 +1344,7 @@ namespace vecs {
 	* \returns true if the data in the handle is not null
 	*/
 	inline auto VecsHandle::is_valid() noexcept				-> bool {
-		return	m_map_index.has_value() && m_generation_counter.has_value();
+		return m_map_index.has_value() && m_generation_counter.has_value();
 	}
 
 	/**

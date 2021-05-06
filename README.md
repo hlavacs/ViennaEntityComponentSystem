@@ -33,7 +33,7 @@ VECS depends on two projects, the Vienna Type List Library (VTLL) and Vienna Gam
 
 ### Vienna Type List Library (VTLL)
 
-As stated, VECS is a compile time ECS. Compositions of entities are defined in source code only. VECS thus heavily relies on its partner project Vienna Type List Library (VTLL), a header-only meta-programming library that helps creating entity types, type lists, compositions of components, accessing list elements, mapping data, etc. Especially, entities are defined as *vtll::type_list<...>* and therefore are nothing more than a list of types. For more information goto https://github.com/hlavacs/ViennaTypeListLibrary.
+As stated, VECS is a compile time ECS. Compositions of entities are defined in source code only. VECS thus heavily relies on its partner project Vienna Type List Library (VTLL), a header-only meta-programming library that helps creating entity types, type lists, compositions of components, accessing list elements, mapping data, etc. Especially, entities are defined as *vtll::type_list<...>* (or its shorter version *vtll::tl<...>*) and therefore are nothing more than a list of types. For more information goto https://github.com/hlavacs/ViennaTypeListLibrary.
 
 
 ### Vienna Game Job System (VGJS)
@@ -342,12 +342,12 @@ Also consider the definition of *VeEntityTypeNode*
 
     using VeEntityTypeNode = vtll::type_list< VeComponentName, VeComponentPosition, VeComponentOrientation >;
 
-By defining this helper, we can easily create variants for *VeEntityTypeNode*:
+By defining this helper, we can easily create variants for *VeEntityTypeNode*
 
     template<typename... Ts>
     using VeEntityTypeNodeTagged = vtll::app< VeEntityTypeNode, Ts... >;
 
-For example, *VeEntityTypeNodeTagged\<TAG1\>* is the same as
+by using the VTLL function *vtll::app<>* (append). For example, *VeEntityTypeNodeTagged\<TAG1\>* is the same as
 
     vtll::type_list< VeComponentName, VeComponentPosition, VeComponentOrientation, TAG1 >
 
@@ -368,17 +368,17 @@ type *VeEntityTypeNode* can have the tags TAG1 and TAG2. There are again two tag
     vtll::type_list< VeComponentName, VeComponentPosition, VeComponentOrientation, TAG1, TAG2 >;
 
 Furthermore, all tags from the tag maps are also copied to the global tag list *VecsEntityTagList*, which for the above example will also contain *TAG1* and *TAG2*.
-Tags are useful for grouping entity types, since any of the above tagged entity type lands in its own table. You can create tagged entities by creating them:
+Tags are useful for grouping entity types, since any of the above tagged entity type lands in its own table. You can create tagged entities like any normal entity:
 
     auto h1 = VecsRegistry<VeEntityTypeNode>{}.insert(VeComponentName{ "Node" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentTransform{});
     auto h2 = VecsRegistry<VeEntityTypeNodeTagged<TAG1>>{}.insert(VeComponentName{ "Node T1" }, VeComponentPosition{}, VeComponentOrientation{}, VeComponentTransform{});
 
-In this example, two entities derived from the same basic entity type *VeEntityTypeNode*, one without a tag, and one with a tag. As you see, you do not have to specify any value for tags, nor will tag references be included when using iterators or ranges (this is true for any member of the list *VecsEntityTagList*).
-You can always add or remove tags, by calling the *transform()* function:
+In this example, two entities derived from the same basic entity type *VeEntityTypeNode* are created, one without a tag, and one with a tag. As you can see, you do not have to specify any value for tags, nor will tag references be included when using iterators or ranges (this is true for any member of the list *VecsEntityTagList*).
+You can always add or remove tags from existing entities by calling the *transform()* function on their handles:
 
     VecsRegistry<VeEntityTypeNode>{}.transform(h2);
 
-The above call turns an entity of type *VeEntityTypeNodeTagged<TAG1>* into an entity of type *VeEntityTypeNode*, thus effectively removing the tag. Internally, all components are moved from the *VeEntityTypeNodeTagged<TAG1>* table to the *VeEntityTypeNode* table. Thus note that references to the components for the previous type are no longer valid after this operation.
+The above call turns an entity of type *VeEntityTypeNodeTagged\<TAG1\>* into an entity of type *VeEntityTypeNode*, thus effectively removing the tag. Internally, all components are moved from the *VeEntityTypeNodeTagged\<TAG1\>* table to the *VeEntityTypeNode* table. Note that therefore references to the components for the previous type are no longer valid after this operation!
 
 In the next section, iterators and ranges are described, which enable you to efficiently loop over groups of entities.
 
@@ -387,160 +387,223 @@ In the next section, iterators and ranges are described, which enable you to eff
 
 The basic use case of any ECS is to loop over all or some of the entities. VECS allows this in various ways. The basic mechanism is given by iterators and ranges. These can then be used to compose loops.
 
-Iterators are generalized pointers, and are the main mechanism for looping over entities in VECS. Iterators are implemented in class *VecsIterator* and come in two basic forms, and can be used for two basic use cases.
+Iterators are generalized pointers, and are the main mechanism for looping over entities in VECS. Iterators are implemented in class
 
-The first form is a general iterator that can point to any entity and can be increased to jump ahead. The second one is an end-iterator, it is created by calling it with the boolean parameter *true*:
+    template<typename... Ts>
+    class VecsIterator;
+
+and come in two versions. The first form is a general iterator that can point to any entity and can be increased to jump ahead. The second one is an end-iterator, it is created by calling it with the boolean parameter *true*:
 
     VecsIterator<VeComponentName, VeUserComponentPosition> it;         //normal iterator
     VecsIterator<VeComponentName, VeUserComponentPosition> end(true);  //end iterator used as looping end point
 
-Iterators have template parameters, which define their starting position and the entity categories they cover. If the template parameter is a list of component types, then the covered entities are all entity types that contain *all* specified component types. In the previous example, these are all entity types that contain the components *VeComponentName* and *VeUserComponentPosition*. Since the components are given explicitly, accessing the value with * yields a *std::tuple* that starts with a handle, and as rest contains direct references to the components in VECS.
+Iterators have template parameters which determine which entity types their iterate over, and which components they can yield in a for-loop. This is implemented by deriving them from a common base class depending on exactly two template parameters ETL and CTL. ETL is a type list of entity types the iterator should iterate over, and CTL is a type list of components the iterator should yield references to through its dereferencing operator*():
 
-    auto [handle, name, pos] = *it; //name and pos are references to the components in VECS
+    template<typename ETL, typename CTL>
+    class VecsIteratorBaseClass {
+      protected:
+        using array_type = std::array<std::unique_ptr<VecsIteratorEntityBaseClass<ETL, CTL>>, vtll::size<ETL>::value>;
 
-If on the other hand the template parameters are entity types, then these are the entity types the iterator covers, accessing an entity with the * operator yields the components that are found in *both* entities.
+        array_type m_dispatch;				///< Subiterators for each entity type E
 
-    VecsIterator<VeEntityTypeNode, VeEntityTypeDraw> it2;   //normal iterator
-    auto [handle, name, pos] = *it2;                        //name and pos are references to the components
+        type_index_t	m_current_iterator{ 0 };	///< Current iterator of type E that is used
+        table_index_t	m_current_index{ 0 };		///< Current index in the VecsComponentTable<E>
+        bool			m_is_end{ false };			///< True if this is an end iterator (for stopping the loop)
+        size_t			m_size{ 0 };				///< Number of entities max covered by the iterator
 
-In this example, *it2* of course points to only one entity, but it can be of either type *VeEntityTypeNode* or *VeEntityTypeDraw*. Components *VeComponentName* and *VeComponentPosition* are found in both types, thus references to them are returned by the iterator. Iterators can exclusively either use lists of components or entities, but mixing is not allowed and results in a compilation error.
+        VecsIteratorBaseClass(std::nullopt_t n) noexcept {};		///< Needed for derived iterator to call
 
-Starting with a begin entity, a *VecsIterator* can be increased to point to the next entity in the component table, by calling the operator ++, either as pre-increment (preferred!) or post-increment (expensive, results in a copy!) Furthermore, you can add a positive integer number to skip ahead more than one entity. Finally, you can compare two iterators for equality or inequality. Combining these operators, you can already implement a simple loop over a set of entities:
+      public:
+        using value_type		= vtll::to_tuple< vtll::cat< vtll::tl<VecsHandle>, CTL > >;
+        using reference			= vtll::to_tuple< vtll::cat< vtll::tl<VecsHandle>, vtll::to_ref<CTL> > >;
+        using pointer			= vtll::to_tuple< vtll::cat< vtll::tl<VecsHandle>, vtll::to_ptr<CTL> > >;
+        using iterator_category = std::forward_iterator_tag;
+        using difference_type	= size_t;
+        using last_type			= vtll::back<ETL>;	///< last type for end iterator
 
-    VecsIterator<VeComponentName, VeUserComponentPosition> b;        //normal iterator
-    VecsIterator<VeComponentName, VeUserComponentPosition> e(true);  //end iterator used as looping end point
-    for (; b != e; ++b) {
-        if (!b.has_value()) continue;   ///< Could be an invalidated entity, so test for it!
-        auto [handle, name, pos] = *b;
+        static inline value_type			m_dummy;		///< Dummy values for returning references to if the handle is not valid
+        static inline std::atomic<uint32_t> m_dummy_mutex;	///< Dummy mutex for returning pointer to if the handle is not valid
+
+        VecsIteratorBaseClass(bool is_end = false) noexcept;				///< Constructor that should be called always from outside
+        VecsIteratorBaseClass(const VecsIteratorBaseClass<ETL,CTL>& v) noexcept;		///< Copy constructor
+
+        auto operator=(const VecsIteratorBaseClass<ETL,CTL>& v) noexcept	-> VecsIteratorBaseClass<ETL,CTL>;	///< Copy
+        auto operator+=(size_t N) noexcept									-> VecsIteratorBaseClass<ETL,CTL>;	///< Increase and set
+        auto operator+(size_t N) noexcept									-> VecsIteratorBaseClass<ETL,CTL>;	///< Increase
+        auto operator!=(const VecsIteratorBaseClass<ETL,CTL>& v) noexcept	-> bool;	///< Unqequal
+        auto operator==(const VecsIteratorBaseClass<ETL,CTL>& v) noexcept	-> bool;	///< Equal
+
+        virtual auto handle() noexcept			-> VecsHandle;				///< Return handle of the current entity
+        virtual auto mutex() noexcept			-> std::atomic<uint32_t>*;	///< Return poiter to the mutex of this entity
+        virtual auto has_value() noexcept		-> bool;					///< Is currently pointint to a valid entity
+        virtual	auto operator*() noexcept		-> reference;				///< Access the data
+        virtual auto operator++() noexcept		-> VecsIteratorBaseClass<ETL,CTL>&;	///< Increase by 1
+        virtual auto operator++(int) noexcept	-> VecsIteratorBaseClass<ETL,CTL>&;	///< Increase by 1
+        virtual auto is_vector_end() noexcept	-> bool;					///< Is currently at the end of any sub iterator
+        virtual auto size() noexcept			-> size_t;					///< Number of valid entities
+    };
+
+When specifying *VecsIterator<Ts...>* the lists *ETL* and *CTL* are created depending on the *Ts*, and the base class is determined. In the following the various ways to turn the parameters *Ts* into the base class *ETL* and *CTL* are explained.
+
+
+### Iterating over Specific Entity types
+
+You can specify a list *ETL* of entity types directly, which may also include entity types with tags. Then the iterator will loop over exactly this list of entity types. For instance
+
+    VecsIterator< vtll::type_list<VeEntityTypeNode, VeEntityTypeNodeTagged<TAG2>> > it;
+    VecsIterator< vtll::type_list<VeEntityTypeNode, VeEntityTypeNodeTagged<TAG2>> > end(true);
+
+    while( it!= end) {
+      auto [handle, pos, orient, trans] = *it; //get access to the first entity, might be invalid so you better check
+      //VecsWriteLock lock(handle.mutex()); //use this if you are using multi
+      if( handle.has_value() ) {
         //...
+      }
+      ++it; //use this operator if possible, the alternative it++ creates a costly copy!
     }
 
-Note that this way of looping does not synchronize accesses in case or multithreaded operations. By changing to
+lets you access the first possible entity in either tables for types *VeEntityTypeNode* and *VeEntityTypeNodeTagged<TAG2>*. Accessing the operator\*() yields a handle (by value), and references to those components that all the given entity types contain (their intersection). References to tags are never yielded. The whole definition for the specific *VecsIterator* is given as follows:
 
-    VecsIterator<VeComponentName, VeUserComponentPosition> b;        //normal iterator
-    VecsIterator<VeComponentName, VeUserComponentPosition> e(true);  //end iterator used as looping end point
-    for (; b != e; ++b) {
-        VecsWriteLock lock( b.mutex() );	///< Write lock
-			  if (!b.has_value()) continue;     ///< Could be an invalidated entity, so test for it!
-        auto [handle, name, pos] = *b;
-        //...
-    }
+    template<typename ETL>
+    using it_CTL_entity_list = vtll::remove_types< vtll::intersection< ETL >, VecsEntityTagList >;
 
-you add synchronization and can safely read and write. If you only read, then you can change the lock to a read lock (see below for more on parallel operations). Also you should always check whether the entity does hold a value, since entities that are erased are not automatically removed from VECS, only after calling *compress()*!
+    template<typename ETL>
+    requires (is_entity_type_list<ETL>::value)
+    class VecsIterator<ETL> : public VecsIteratorBaseClass< ETL, it_CTL_entity_list<ETL> > {
+    public:
+      using component_types = it_CTL_entity_list<ETL> ;
+      VecsIterator(bool end = false) noexcept : VecsIteratorBaseClass< ETL, it_CTL_entity_list<ETL> >(end) {};
+    };
 
-A *VecsRange* is now a combination of two iterators, one points to a starting entity, one points to an end position. The end position can be an end iterator, or any entity following the starting entity, which is no more included into the range.
+The first definition is the *CTL* for the case for a specific list of entity types, which is the intersection of all given types, and removing the tag types. Then the specfic *VecsIterator<ETL>* is defined, and the base class as well as the constructor for it are defined. This is all there is to this.
 
-    VecsRange<VeEntityTypeNode, VeEntityTypeDraw> range_entities;
-    VecsRange<VeComponentName, VeComponentPosition> range_components;
+### Iterating over Basic Entity Types and All their Tagged Versions
 
-    VecsIterator<VeEntityTypeNode, VeEntityTypeDraw> b = range_entities.begin();  ///< Get begin iterator
-    VecsIterator<VeEntityTypeNode, VeEntityTypeDraw> e = range_entities.end();    ///< Get end iterator
+Another use case is iterating over basic types and all their tagged version. For instance, iterating over all *VeEntityTypeNode* entities, but also over its tagged versions *VeEntityTypeNodeTagged<TAG1>*, *VeEntityTypeNodeTagged<TAG2>*, and *VeEntityTypeNodeTagged<TAG1, TAG2>* you can simply use them in as template parameters directly:
 
-Again, ranges can use exclusively either lists of components or entities, but not both. For parallelization a range can be split into *N* non-overlapping subranges, yielding a *std::pmr::vector* holding the subranges:
+    VecsIterator<VeEntityTypeNode> it;
 
-    std::pmr::vector<VecsRange<VeEntityTypeNode, VeEntityTypeDraw>> subranges = range_entities.split(16);
+This can be done for any list of basic entity types. If you specify any type for which no tags are specified in the tag map, then this type is used as is. Again, the components are those contained in all types, minus the tags. The implementation of this is similarly simple (see *VECSIterator.h*), using the metafunction *expand_tags<...>* (defined in *VECS.h*), that takes a list of entities and expands it with the tagged versions if there are any.
 
 
-The sole purpose of an ECS is to quickly loop over a subset of entities in a cache-optimal way. VECS allows for various modes of looping. An example for a simple manual loop has been already described in the previous section. Another way is to use *VecsRange* in a *range based for loop*:
+### Iterating over Entity Types That Contain given Tags
 
-    for (auto&& [handle, name, pos, orient] : VecsRange<VeEntityTypeNode, VeEntityTypeDraw>{}) {
-        VecsWriteLock lock(handle.mutex()); ///< Write lock
-        if (!handle.has_value()) continue;  ///< Could be an invalidated entity, so test for it!
+If you want to loop over all tagged versions of a basic type *E* (you can only use one entity type) that have a number of tags, then you can specify e.g.
 
+    VecsIterator<VeEntityTypeNode, TAG1> it;
+
+This iterator loops over all entities of the types VeEntityTypeNodeTagged\<TAG1\> and VeEntityTypeNodeTagged\<TAG1,TAG2\>. It is essentially the same as
+
+    VecsIterator< vtll::tl< VeEntityTypeNodeTagged<TAG1>, VeEntityTypeNodeTagged<TAG1, TAG2> > > it;
+
+which would specify the types explicitly. Again, expansion is done only if the entity type *E* does have tags specified in the tag map. The components are the components of the entity types minus the tags, so basically the components of the untagged basic entity type *E*.
+
+### Iterating over All Entity Types that Contain given Component Types
+
+The next method allows you to specify a number of component types. The iterator would then loop over all entity types that contain these types. The components yielded are exactly the components specified, e.g.
+
+    VecsIterator<VeComponentName> it;
+
+loops over all entity types having this component!
+
+### Iterating over All Entity Types
+
+Finally, you can loop over all entity types in VECS, simply by specifying nothing:
+
+    VecsIterator<> it;
+
+The yielded components are again those contained in all entity types (this might be e.g. a name, a GUID, etc.), or more likely, an empty list. In any case, the iterator operator\*() will always yield the entity handle.
+
+### Ranges and Range Based Loops
+
+In C++, a range is any class that offers *begin()* and *end()* functions yielding respective iterators. VECS offers a special range class
+
+    template<typename... Ts>
+    class VecsRange;
+
+which is derived from a base class
+
+    template<typename ETL, typename CTL>
+    class VecsRangeBaseClass {
+      VecsIteratorBaseClass<ETL,CTL> m_begin;
+      VecsIteratorBaseClass<ETL,CTL> m_end;
+
+      public:
+        VecsRangeBaseClass() noexcept : m_begin{ false }, m_end{ true } {
+
+      //...
+    };
+
+The meanings of the template parameters are exactly the same as for iterators, and so ranges are simply two iterators put together. A *VecsRange* can be used directly in a *C++ range based loop*:
+
+    for (auto [handle, name] : VecsRange<VeComponentName>{}) {
+      if( handle.has_value() ) {
         //....
+      }
     }
 
-This is just a nicer way of writing a loop, and is essentially the same as in the previous example. As can be seen the range based loop does not provide synchronization, and thus you can decide yourself whether to lock the entity or not. However you should always check whether the entity is still in VECS by calling *has_value()*! As range you can specify any range, also a subrange that was derived by calling *split()*.
+This version is the fastest version, but when obtaining the references does not lock the entities. Thus, when using multithreading, you should consider avoiding this version.
+Additionally, VECS ranges offer a thread save range based loop called *for_each*:
 
-Finally, the safest way for looping is to use the *for_each* member function of *VecsRegistry*:
-
-    VecsRegistry{}.for_each( VecsRange<VeEntityTypeNode, VeEntityTypeDraw>{}, [&](auto handle, auto& name) {
-        //...
+    VecsRange<VeEntityTypeNode, TAG1>{}.for_each([&](VecsHandle handle, auto& name, auto& pos, auto& orient, auto& transf) {
+      //...
     });
 
-    VecsRegistry{}.for_each<VeComponentName, VeComponentPosition>([&](auto handle, auto& name) {
-        //...
-    });
+This loop guarantees that any loop iteration contains only valid entities, which are also automatically write locked. Due to the write lock, this loop is slightly slower than the C++ version, but you do not have to worry about locking or using the references. The implementation looks like this:
 
-Both loop over all entities that have the components *VeComponentName* and *VeComponentPosition* and internally do all the synchronization and checking for you. In the first version you can provide any range or subrange, the second version loops over all suitable entities.
+    template<typename C>
+    struct Functor;
 
+    template<template<typename...> typename Seq, typename... Cs>
+    struct Functor<Seq<Cs...>> {
+      using type = void(VecsHandle, Cs&...);	///< Arguments for the functor
+    };
+
+    template<typename ETL, typename CTL>
+    inline auto class VecsRangeBaseClass<ETL,CTL>::for_each(std::function<typename Functor<CTL>::type> f) -> void {
+      auto b = begin();
+      auto e = end();
+      for (; b != e; ++b) {
+        VecsWriteLock lock(b.mutex());		///< Write lock
+        if (!b.has_value()) continue;
+        std::apply(f, *b);					 ///< Run the function on the references
+      }
+    }
+
+You see that the loop is actually quite simple, and you can easily come up with your own versions, which e.g. only read lock entities, etc.
 
 ## Parallel Operations and Performance
 
-In principle, VECS allows parallel operations if certain principles are upheld. First, only member functions of the class *VecsRegistry\<E\>* are actually internally synchronized. These synchronizations use *VecsWriteLock* or *VecsReadLock* on a per entity basis, and synchronization lasts only for the duration of the call. Such locks need the address a *std::atomic\<uint32_t\>*  (a VECS mutex) as input parameter, and every entity has its own such VECS mutex. You can get the VECS mutex of an entity by calling *mutex()* on a *handle* or an *iterator*. The call always returns a valid mutex, even if the entity has been erased and is no longer valid.
+In principle, VECS allows parallel operations on multiple threads if certain principles are upheld.
+First, VECS only locks some internal data structures, but it does not lock single entities (the only exception being the VecsRangeBaseClass::for_each loop). So any time you change the state of an entity by writing on it (through a reference of calling *update()*), erasing it, swapping it with another entity of the same type, transforming it, etc., you should create a *VecsWriteLock* for this entity.
+
+    {
+      VecsIterator<VeComponentName> it;
+      VecsWriteLock lock(it.mutex());		///< Write lock using an iterator
+      //... now the entity is completely locked
+    }
+
+A write lock excludes any other lock to the entity, be it writing or reading.
+If you only read components, then a read lock may be faster, since read locks do not prevent other read locks, but they prevent write locks.
+
+    for (auto [handle, name] : VecsRange<VeComponentName>{}) {
+      VecsReadLock handle.mutex() );
+      if( handle.has_value() ) {
+        //....
+      }
+    }
+
+
+
+
+are actually internally synchronized. These synchronizations use *VecsWriteLock* or *VecsReadLock* on a per entity basis, and synchronization lasts only for the duration of the call. Such locks need the address a *std::atomic\<uint32_t\>*  (a VECS mutex) as input parameter, and every entity has its own such VECS mutex. You can get the VECS mutex of an entity by calling *mutex()* on a *handle* or an *iterator*. The call always returns a valid mutex, even if the entity has been erased and is no longer valid.
 
 Note that calls to *VecsRegistry\<\>* and *VecsHandle* are eventually forwarded to their counterparts in class *VecsRegistry\<E\>* with the same name. Thus, these member functions are also implicitly internally synchronized.
 
 The following list shows the calls that are internally or externally synchronized in class *VecsRegistry\<E\>*:
 
-    template<typename E>
-    class VecsRegistry : public VecsRegistryBaseClass {
 
-      ...
 
-      auto updateC(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept	-> bool; ///< Dispatch from base class (externally synchronized)
-  		auto componentE(VecsHandle handle, size_t compidx, void* ptr, size_t size) noexcept	-> bool; ///< Dispatch from base class (externally synchronized)
-  		auto has_componentE(VecsHandle handle, size_t compidx) noexcept						-> bool; ///< Dispatch from base class (externally synchronized)
-  		auto eraseE(index_t index) noexcept	-> void { m_component_table.erase(index); };			 ///< Dispatch from base class (externally synchronized)
-  		auto compressE() noexcept	-> void { return m_component_table.compress(); };	///< Dispatch from base class (externally synchronized)
-  		auto clearE() noexcept		-> size_t { return m_component_table.clear(); };	///< Dispatch from base class (externally synchronized)
-
-    public:
-      VecsRegistry(size_t r = 1 << c_max_size) noexcept : VecsRegistryBaseClass() { 	///< Constructor of class VecsRegistry<E>
-        VecsComponentTable<E<Cs...>>{r};
-      };
-      VecsRegistry(std::nullopt_t u) noexcept : VecsRegistryBaseClass() { 			///< Constructor of class VecsRegistry<E>
-        m_sizeE = 0;
-      };
-
-      template<typename... Cs>
-      requires is_composed_of<E<Cs...>, Cs...> [[nodiscard]]
-      auto insert(CCs&&... args) noexcept			-> VecsHandle;			///< Insert new entity of type E into VECS (internally synchronized)
-
-      template<typename... Cs> [[nodiscard]]
-  		auto transform(VecsHandle handle, Cs&&... args) noexcept	-> VecsHandle;	///< transform entity into new type (internally synchronized)
-
-      auto values(VecsHandle handle) noexcept		-> vtll::to_tuple<E>;	///< Return a tuple with copies of the components (internally synchronized)
-  		auto pointers(VecsHandle handle) noexcept	-> vtll::to_ptr_tuple<E>;	///< Return a tuple with pointers to the components (externally synchronized)
-
-      template<typename C>
-      requires is_component_type<C>
-      auto has_component() noexcept				-> bool {	///< Return true if the entity type has a component C (internally synchronized)
-        return is_component_of<E<Cs...>,C>;
-      }
-
-      template<size_t I, typename C = vtll::Nth_type<E, I>>
-  		requires is_component_of<E, C>
-  		auto component(VecsHandle handle) noexcept	-> C;		///< Get copy of a component given index of component (internally synchronized)
-
-  		template<size_t I, typename C = vtll::Nth_type<E, I>>
-  		requires is_component_of<E, C>
-  		auto component_ptr(VecsHandle handle) noexcept	-> C*;	///< Get copy of a component given index of component (externally synchronized)
-
-  		template<typename C>
-  		requires is_component_of<E, C>
-  		auto component(VecsHandle handle) noexcept	-> C;		///< Get copy of a component given type of component (internally synchronized)
-
-  		template<typename C>
-  		requires is_component_of<E, C>
-  		auto component_ptr(VecsHandle handle) noexcept	-> C*;		///< Get copy of a component given type of component (externally synchronized)
-
-      template<typename ET>
-      requires is_tuple<ET, E<Cs...>>
-      auto update(VecsHandle handle, ET&& ent) noexcept	-> bool;		///< Update a whole entity with the given tuple (internally synchronized)
-
-      template<typename C>
-      requires is_component_of<E<Cs...>, C>
-      auto update(VecsHandle handle, C&& comp) noexcept	-> bool;		///< Update one component of an entity (internally synchronized)
-
-      auto erase(VecsHandle handle) noexcept				-> bool;		///< Erase an entity from VECS (internally synchronized)
-      auto clear() noexcept -> size_t { return clearE(); };				///< Clear entities of type E (externally synchronized)
-      auto compress() noexcept -> void { compressE(); }					///< Remove erased rows from the component table (externally synchronized)
-      auto max_capacity(size_t) noexcept					-> size_t;		///< Set max number of entities of this type (externally synchronized)
-      auto size() noexcept -> size_t { return m_sizeE.load(); };	///< \returns the number of valid entities of type E (internally synchronized)
-      auto swap(VecsHandle h1, VecsHandle h2) noexcept	-> bool;		///< Swap rows in component table (internally synchronized)
-      auto contains(VecsHandle handle) noexcept			-> bool;		///< Test if an entity is still in VECS (externally synchronized)
-    };
 
 Note that *VecsRegistry<E>{}.pointer(...)* is actually externally synchronized. That means before calling this function with multiple threads you should first create a read or write lock, and keep it until you no longer need the tuple.
 

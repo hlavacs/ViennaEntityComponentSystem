@@ -36,8 +36,9 @@ namespace vecs {
 			using difference_type	= size_t;
 			using last_type			= vtll::back<ETL>;	///< last type for end iterator
 
-			static inline value_type			m_dummy;		///< Dummy values for returning references to if the handle is not valid
-			static inline std::atomic<uint32_t> m_dummy_mutex;	///< Dummy mutex for returning pointer to if the handle is not valid
+			static inline VecsHandle			m_current_handle;
+			static inline value_type			m_dummy;				///< Dummy values for returning references to if the handle is not valid
+			static inline std::atomic<uint32_t> m_dummy_mutex;			///< Dummy mutex for returning pointer to if the handle is not valid
 
 			VecsIteratorBaseClass(bool is_end = false) noexcept;				///< Constructor that should be called always from outside
 			VecsIteratorBaseClass(const VecsIteratorBaseClass<ETL,CTL>& v) noexcept;		///< Copy constructor
@@ -264,14 +265,14 @@ namespace vecs {
 	* \brief Iterator for given list of entity types. Entity types are taken as is, and NOT extended by possible tags from the tags map.
 	*/
 	template<typename ETL>
-	using it_components_entity_list = vtll::remove_types< vtll::intersection< ETL >, VecsEntityTagList >;
+	using it_CTL_entity_list = vtll::remove_types< vtll::intersection< ETL >, VecsEntityTagList >;
 
 	template<typename ETL>
 	requires (is_entity_type_list<ETL>::value)
-	class VecsIterator<ETL> : public VecsIteratorBaseClass< ETL, it_components_entity_list<ETL> > {
+	class VecsIterator<ETL> : public VecsIteratorBaseClass< ETL, it_CTL_entity_list<ETL> > {
 	public:
-		using component_types = it_components_entity_list<ETL> ;
-		VecsIterator(bool end = false) noexcept : VecsIteratorBaseClass< ETL, it_components_entity_list<ETL> >(end) {};
+		using component_types = it_CTL_entity_list<ETL> ;
+		VecsIterator(bool end = false) noexcept : VecsIteratorBaseClass< ETL, it_CTL_entity_list<ETL> >(end) {};
 	};
 
 	/**
@@ -281,54 +282,54 @@ namespace vecs {
 	* Component types are the intersection of the entity types.
 	*/
 	template<typename... Es>
-	using it_components_entity_types = vtll::remove_types< vtll::intersection< vtll::tl<Es...> >, VecsEntityTagList >;
+	using it_CTL_entity_types = vtll::remove_types< vtll::intersection< vtll::tl<Es...> >, VecsEntityTagList >;
 
 	template<typename... Es>
 	requires (sizeof...(Es) > 0 && are_entity_types<Es...>)
-	class VecsIterator<Es...> : public VecsIteratorBaseClass< expand_tags< vtll::tl<Es...> >, it_components_entity_types<Es...> > {
+	class VecsIterator<Es...> : public VecsIteratorBaseClass< expand_tags< vtll::tl<Es...> >, it_CTL_entity_types<Es...> > {
 	public:
-		using component_types = it_components_entity_types<Es...>;
-		VecsIterator(bool end = false) noexcept : VecsIteratorBaseClass< expand_tags< vtll::tl<Es...> >, it_components_entity_types<Es...> >(end) {};
+		using component_types = it_CTL_entity_types<Es...>;
+		VecsIterator(bool end = false) noexcept : VecsIteratorBaseClass< expand_tags< vtll::tl<Es...> >, it_CTL_entity_types<Es...> >(end) {};
 	};
 
 	/**
 	* \brief Iterator for given component types.
 	*/
 	template<typename... Cs>
-	using it_components_types = vtll::remove_types< vtll::tl<Cs...>, VecsEntityTagList >;
+	using it_CTL_types = vtll::remove_types< vtll::tl<Cs...>, VecsEntityTagList >;
 
 	template<typename... Cs>
 	requires (sizeof...(Cs) > 0 && are_component_types<Cs...>)
-	class VecsIterator<Cs...> : public VecsIteratorBaseClass< vtll::filter_have_all_types< VecsEntityTypeList, vtll::tl<Cs...> >, it_components_types<Cs...> > {
+	class VecsIterator<Cs...> : public VecsIteratorBaseClass< vtll::filter_have_all_types< VecsEntityTypeList, vtll::tl<Cs...> >, it_CTL_types<Cs...> > {
 	public:
-		using component_types = it_components_types<Cs...>;
-		VecsIterator(bool end = false) noexcept : VecsIteratorBaseClass< vtll::filter_have_all_types< VecsEntityTypeList, vtll::tl<Cs...> >, it_components_types<Cs...> >(end) {};
+		using component_types = it_CTL_types<Cs...>;
+		VecsIterator(bool end = false) noexcept : VecsIteratorBaseClass< vtll::filter_have_all_types< VecsEntityTypeList, vtll::tl<Cs...> >, it_CTL_types<Cs...> >(end) {};
 	};
 
 	/**
-	* \brief Iterator for given entity tape that has all tags.
+	* \brief Iterator for given entity type that has all tags.
 	*/
 	template<typename E, typename... Ts>
-	using it_components_entity_tags = vtll::remove_types< E, VecsEntityTagList >;
+	using it_CTL_entity_tags = vtll::remove_types< E, VecsEntityTagList >;
 
 	template<typename E, typename... Ts>
 	requires (is_entity_type<E> && (sizeof...(Ts) > 0) && are_entity_tags<Ts...>)
-	class VecsIterator<E,Ts...> : public VecsIteratorBaseClass< vtll::filter_have_all_types< expand_tags<vtll::tl<E>>, vtll::tl<Ts...> >, it_components_entity_tags<E> > {
+	class VecsIterator<E,Ts...> : public VecsIteratorBaseClass< vtll::filter_have_all_types< expand_tags<vtll::tl<E>>, vtll::tl<Ts...> >, it_CTL_entity_tags<E> > {
 	public:
-		using component_types = it_components_entity_tags<E>;
-		VecsIterator(bool end = false) noexcept : VecsIteratorBaseClass< vtll::filter_have_all_types< expand_tags<vtll::tl<E>>, vtll::tl<Ts...> >, it_components_entity_tags<E> >(end) {};
+		using component_types = it_CTL_entity_tags<E>;
+		VecsIterator(bool end = false) noexcept : VecsIteratorBaseClass< vtll::filter_have_all_types< expand_tags<vtll::tl<E>>, vtll::tl<Ts...> >, it_CTL_entity_tags<E> >(end) {};
 	};
 
 	/**
 	* \brief Iterator for all entities.
 	*/
-	using it_components_all_entities = vtll::remove_types< vtll::intersection< VecsEntityTypeList >, VecsEntityTagList >;
+	using it_CTL_all_entities = vtll::remove_types< vtll::intersection< VecsEntityTypeList >, VecsEntityTagList >;
 
 	template<>
-	class VecsIterator<> : public VecsIteratorBaseClass < VecsEntityTypeList, it_components_all_entities > {
+	class VecsIterator<> : public VecsIteratorBaseClass < VecsEntityTypeList, it_CTL_all_entities > {
 	public:
-		using component_types = it_components_all_entities;
-		VecsIterator(bool end = false) noexcept :  VecsIteratorBaseClass < VecsEntityTypeList, it_components_all_entities >(end) {};
+		using component_types = it_CTL_all_entities;
+		VecsIterator(bool end = false) noexcept :  VecsIteratorBaseClass < VecsEntityTypeList, it_CTL_all_entities >(end) {};
 	};
 
 
@@ -555,8 +556,9 @@ namespace vecs {
 			inline auto for_each(std::function<typename Functor<CTL>::type> f) -> void {
 				auto b = begin();
 				auto e = end();
+				VecsRegistry reg{};
 				for (; b != e; ++b) {
-					VecsWriteLock lock(b.mutex());		///< Read lock
+					VecsWriteLock lock(b.mutex());		///< Write lock
 					if (!b.has_value()) continue;
 					std::apply(f, *b);					///< Run the function on the references
 				}
@@ -584,34 +586,34 @@ namespace vecs {
 	*/
 	template<typename ETL>
 	requires (is_entity_type_list<ETL>::value)
-	class VecsRange<ETL> : public VecsRangeBaseClass< ETL, it_components_entity_list<ETL> > {};
+	class VecsRange<ETL> : public VecsRangeBaseClass< ETL, it_CTL_entity_list<ETL> > {};
 
 	/**
 	* \brief Range over a set of entity types. Entity types are expanded using the tag map.
 	*/
 	template<typename... Es>
 	requires (sizeof...(Es) > 0 && are_entity_types<Es...>)
-	class VecsRange<Es...> : public VecsRangeBaseClass< expand_tags< vtll::tl<Es...> >, it_components_entity_types<Es...> > {};
+	class VecsRange<Es...> : public VecsRangeBaseClass< expand_tags< vtll::tl<Es...> >, it_CTL_entity_types<Es...> > {};
 
 	/**
 	* \brief Range over a set of entities that contain all given component types.
 	*/
 	template<typename... Cs>
 	requires (sizeof...(Cs) > 0 && are_component_types<Cs...>)
-	class VecsRange<Cs...> : public VecsRangeBaseClass< vtll::filter_have_all_types< VecsEntityTypeList, vtll::tl<Cs...> >, it_components_types<Cs...> > {};
+	class VecsRange<Cs...> : public VecsRangeBaseClass< vtll::filter_have_all_types< VecsEntityTypeList, vtll::tl<Cs...> >, it_CTL_types<Cs...> > {};
 
 	/**
 	* \brief Iterator for given entity tape that has all tags.
 	*/
 	template<typename E, typename... Ts>
 	requires (is_entity_type<E> && (sizeof...(Ts) > 0) && are_entity_tags<Ts...>)
-	class VecsRange<E, Ts...> : public VecsRangeBaseClass< vtll::filter_have_all_types< expand_tags<vtll::tl<E>>, vtll::tl<Ts...> >, it_components_entity_tags<E> > {};
+	class VecsRange<E, Ts...> : public VecsRangeBaseClass< vtll::filter_have_all_types< expand_tags<vtll::tl<E>>, vtll::tl<Ts...> >, it_CTL_entity_tags<E> > {};
 
 	/**
 	* \brief Range over all entity types in VECS. This includes all tag variants.
 	*/
 	template<>
-	class VecsRange<> : public VecsRangeBaseClass < VecsEntityTypeList, it_components_all_entities > {};
+	class VecsRange<> : public VecsRangeBaseClass < VecsEntityTypeList, it_CTL_all_entities > {};
 
 
 	//-------------------------------------------------------------------------

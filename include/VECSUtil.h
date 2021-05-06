@@ -91,11 +91,12 @@ namespace vecs {
 				val = mutex->fetch_sub(1);					//Yes - remove own value
 				size_t cnt = 0;
 				do {
-					if (++cnt > 1000) {						//sleep if too often in loop
-						cnt = 0;
-						std::this_thread::sleep_for(1ns); 
-					}
 					val = mutex->load();					//still a writer?
+					if (val >= WRITE && ++cnt > 100) {		//sleep if too often in loop
+						cnt = 0;
+						mutex->wait(val);
+						//std::this_thread::sleep_for(1ns); 
+					}
 				} while(val >= WRITE);						//if yes, stay in loop
 				val = mutex->fetch_add(1);					//if no, again try to add 1 to signal reader
 			}
@@ -145,11 +146,12 @@ namespace vecs {
 				val = mutex->fetch_sub(WRITE);			///< If yes, remove announcement
 				size_t cnt = 0;
 				do {
-					if (++cnt > 1000) {
-						cnt = 0;
-						std::this_thread::sleep_for(1ns);	///< If too long in the loop, then sleep
-					}
 					val = mutex->load();				///< Are there still others?
+					if (val != 0 && ++cnt > 100) {
+						cnt = 0;
+						mutex->wait(val);
+						//std::this_thread::sleep_for(1ns);	///< If too long in the loop, then sleep
+					}
 				} while (val != 0);						///< If yes stay in loop
 				val = mutex->fetch_add(WRITE);			///< Again get old value and add WRITE
 			}

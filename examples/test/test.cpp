@@ -41,14 +41,15 @@ int main() {
 		auto it = range.begin();
 		auto res = *it;
 
-		for (auto&& [handle, name] : VecsRange<VeComponentName>{}) {
+		for (auto [handle, name] : VecsRange<VeComponentName>{}) {
 		}
-		for (auto&& [handle, name] : VecsRange<>{}) {
+		for (auto [handle, name] : VecsRange<>{}) {
 		}
-		for (auto&& [handle, name, pos, orient, transf] : VecsRange<VeEntityTypeNode>{}) {
+		for (auto [handle, name, pos, orient, transf] : VecsRange<VeEntityTypeNode>{}) {
 		}
 
 	}
+
 
 	{
 		TESTRESULT(++number, "size", , (VecsRegistry().size() == 0 && VecsRegistry<VeEntityTypeNode>().size() == 0 && VecsRegistry<VeEntityTypeDraw>().size() == 0), );
@@ -142,7 +143,7 @@ int main() {
 		auto it = range.begin();
 		auto res = *it;
 
-		for (auto&& [handle, name] : VecsRange<VeComponentName>{}) {
+		for (auto [handle, name] : VecsRange<VeComponentName>{}) {
 			VecsReadLock lock( handle.mutex() );
 			if (!handle.has_value()) continue;
 			++i;
@@ -168,7 +169,7 @@ int main() {
 
 		int i = 0;
 		bool test = true;
-		for (auto&& [handle, name, pos, orient, trans] : VecsRange<VeEntityTypeNode>{}) {
+		for (auto [handle, name, pos, orient, trans] : VecsRange<VeEntityTypeNode>{}) {
 			VecsReadLock lock(handle.mutex());
 			if (!handle.has_value()) continue;
 			++i;
@@ -197,7 +198,7 @@ int main() {
 
 		i = 0;
 		test = true;
-		for (auto&& [handle, name] : VecsRange<VeComponentName>{}) {
+		for (auto [handle, name] : VecsRange<VeComponentName>{}) {
 			VecsReadLock lock(handle.mutex());
 			if (!handle.has_value()) continue;
 			++i;
@@ -371,8 +372,6 @@ int main() {
 			&& VecsRegistry<VeEntityTypeNodeTagged<TAG2>>().size() == num
 			&& VecsRegistry<VeEntityTypeNodeTagged<TAG1, TAG2>>().size() == 0
 			), );
-
-
 	}
 
 
