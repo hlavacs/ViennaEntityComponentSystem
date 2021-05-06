@@ -378,7 +378,7 @@ namespace vecs {
 	*/
 	template<typename ETL, typename CTL>
 	inline auto VecsIteratorEntityBaseClass<ETL,CTL>::operator++() noexcept		-> void {
-		if (!is_vector_end()) [[likely]] ++this->m_current_index;
+		if (!is_vector_end()) [[likely]] ++m_current_index;
 	};
 
 	/**
@@ -386,7 +386,7 @@ namespace vecs {
 	*/
 	template<typename ETL, typename CTL>
 	inline auto VecsIteratorEntityBaseClass<ETL,CTL>::operator++(int) noexcept	-> void {
-		if (!is_vector_end()) [[likely]] ++this->m_current_index;
+		if (!is_vector_end()) [[likely]] ++m_current_index;
 	};
 
 	/**
@@ -396,7 +396,7 @@ namespace vecs {
 	*/
 	template<typename ETL, typename CTL>
 	inline auto VecsIteratorEntityBaseClass<ETL,CTL>::is_vector_end() noexcept	-> bool {
-		return this->m_current_index >= this->m_sizeE;
+		return m_current_index >= m_sizeE;
 	};
 
 	/**
