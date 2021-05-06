@@ -23,8 +23,10 @@ namespace vecs {
 
 			type_index_t	m_current_iterator{ 0 };	///< Current iterator of type E that is used
 			table_index_t	m_current_index{ 0 };		///< Current index in the VecsComponentTable<E>
-			bool			m_is_end{ false };			///< True if this is an end iterator (for stopping the loop)
+			VecsHandle		m_current_handle{};
 			size_t			m_size{ 0 };				///< Number of entities max covered by the iterator
+			size_t			m_current_sizeE{ 0 };		///< Number of entities max covered by the current sub iterator
+			bool			m_is_end{ false };			///< True if this is an end iterator (for stopping the loop)
 
 			VecsIteratorBaseClass(std::nullopt_t n) noexcept {};		///< Needed for derived iterator to call
 
@@ -36,7 +38,6 @@ namespace vecs {
 			using difference_type	= size_t;
 			using last_type			= vtll::back<ETL>;	///< last type for end iterator
 
-			static inline VecsHandle			m_current_handle;
 			static inline value_type			m_dummy;				///< Dummy values for returning references to if the handle is not valid
 			static inline std::atomic<uint32_t> m_dummy_mutex;			///< Dummy mutex for returning pointer to if the handle is not valid
 
@@ -345,11 +346,10 @@ namespace vecs {
 
 	protected:
 		table_index_t	m_current_index{ 0 };		///< Current index in the VecsComponentTable<E>
-		bool			m_is_end{ false };			///< True if this is an end iterator (for stopping the loop)
 		size_t			m_sizeE{ 0 };				///< Number of valid and invalid entities of type E
 
 	public:
-		VecsIteratorEntityBaseClass(bool is_end = false) noexcept : m_is_end(is_end) {};
+		VecsIteratorEntityBaseClass(bool is_end = false) noexcept {};
 		virtual auto handle() noexcept		-> VecsHandle = 0;
 		virtual auto mutex() noexcept		-> std::atomic<uint32_t>* = 0;
 		virtual auto has_value() noexcept	-> bool = 0;
@@ -369,7 +369,6 @@ namespace vecs {
 	template<typename ETL, typename CTL>
 	inline auto VecsIteratorEntityBaseClass<ETL, CTL>::operator=(const VecsIteratorEntityBaseClass& rhs) noexcept -> void {
 		m_current_index = rhs.m_current_index;
-		m_is_end = rhs.m_is_end;
 		m_sizeE = rhs.m_sizeE;
 	};
 
