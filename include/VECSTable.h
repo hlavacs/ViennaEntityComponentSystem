@@ -32,6 +32,7 @@ namespace vecs {
 		template<typename E> friend class VecsRegistry;
 		template<typename E> friend class VecsComponentTable;
 		template<typename E, size_t I> friend class VecsComponentTableDerived;
+		template<typename E, typename ETL, typename CTL> friend class VecsIteratorEntity;
 
 		static const size_t N = vtll::smallest_pow2_leq_value< N0 >::value;								///< Force N to be power of 2
 		static const size_t L = vtll::index_largest_bit< std::integral_constant<size_t,N> >::value - 1;	///< Index of largest bit in N
