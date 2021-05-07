@@ -56,7 +56,6 @@ namespace vecs {
 			auto operator*() noexcept		-> reference;				///< Access the data
 			auto operator++() noexcept		-> VecsIteratorBaseClass<ETL,CTL>&;	///< Increase by 1
 			auto operator++(int) noexcept	-> VecsIteratorBaseClass<ETL,CTL>&;	///< Increase by 1
-			//auto is_vector_end() noexcept	-> bool;					///< Is currently at the end of any sub iterator
 			auto size() noexcept			-> size_t;					///< Number of valid entities
 	};
 
@@ -67,7 +66,8 @@ namespace vecs {
 	* \param[in] v Other Iterator that should be copied
 	*/
 	template<typename ETL, typename CTL>
-	inline VecsIteratorBaseClass<ETL,CTL>::VecsIteratorBaseClass(const VecsIteratorBaseClass<ETL,CTL>& v) noexcept : VecsIteratorBaseClass<ETL,CTL>(v.m_is_end) {
+	inline VecsIteratorBaseClass<ETL,CTL>::VecsIteratorBaseClass(const VecsIteratorBaseClass<ETL,CTL>& v) noexcept 
+		: VecsIteratorBaseClass<ETL,CTL>(v.m_is_end) {
 
 		//std::cout << "VecsIteratorBaseClass<ETL,CTL>(const VecsIteratorBaseClass<ETL,CTL>& v): " << typeid(ETL).name() << std::endl << std::endl;
 
@@ -76,13 +76,8 @@ namespace vecs {
 		m_current_sizeE_ptr = v.m_current_sizeE_ptr;
 		m_current_handle_ptr = v.m_current_handle_ptr;
 		m_current_mutex_ptr = v.m_current_mutex_ptr;
-
-		//m_current_table_end = v.m_current_table_end;
 		m_size = v.m_size;
 		if (m_is_end) return;
-		for (int i = 0; i < m_dispatch.size(); ++i) {
-			*m_dispatch[i] = *v.m_dispatch[i];
-		}
 	};
 
 	/**
@@ -94,7 +89,7 @@ namespace vecs {
 	template<typename ETL, typename CTL>
 	inline auto VecsIteratorBaseClass<ETL,CTL>::has_value() noexcept	-> bool {
 		if (m_is_end || m_current_handle_ptr == nullptr) return false;
-		return m_current_handle_ptr->has_value();
+		return VecsRegistry{}.contains(*m_current_handle_ptr);
 	}
 
 	/**
@@ -103,7 +98,7 @@ namespace vecs {
 	*/
 	template<typename ETL, typename CTL>
 	inline auto VecsIteratorBaseClass<ETL,CTL>::handle() noexcept	-> VecsHandle {
-		if (m_current_handle_ptr == nullptr) return {};
+		if (m_is_end || m_current_handle_ptr == nullptr) return {};
 		return *m_current_handle_ptr;
 	}
 
@@ -126,10 +121,10 @@ namespace vecs {
 	inline auto VecsIteratorBaseClass<ETL,CTL>::operator=(const VecsIteratorBaseClass<ETL, CTL>& v) noexcept	-> VecsIteratorBaseClass<ETL,CTL> {
 		m_current_iterator = v.m_current_iterator;
 		m_current_index = v.m_current_index;
+		m_current_sizeE_ptr = v.m_current_sizeE_ptr;
+		m_current_handle_ptr = v.m_current_handle_ptr;
+		m_current_mutex_ptr = v.m_current_mutex_ptr;
 		m_size = v.m_size;
-		for (int i = 0; i < m_dispatch.size(); ++i) {
-			*m_dispatch[i] = *v.m_dispatch[i];
-		}
 		return *this;
 	}
 
@@ -365,21 +360,9 @@ namespace vecs {
 		virtual auto init() noexcept		-> void = 0;
 		virtual auto data() noexcept		-> void = 0;
 		virtual auto operator*() noexcept	-> typename VecsIteratorBaseClass<ETL, CTL>::reference = 0;
-
-		auto operator=(const VecsIteratorEntityBaseClass& rhs) noexcept	-> void;
 		virtual auto size() noexcept		-> size_t;	///< Total number of valid and invalid entities in the component table for type E
 	};
 
-
-	/**
-	* \brief Copy operator
-	*/
-	template<typename ETL, typename CTL>
-	inline auto VecsIteratorEntityBaseClass<ETL, CTL>::operator=(const VecsIteratorEntityBaseClass& rhs) noexcept -> void {
-		m_current_sizeE_ptr		= rhs.m_current_sizeE_ptr;
-		m_current_handle_ptr	= rhs.m_current_handle_ptr;
-		m_current_mutex_ptr		= rhs.m_current_mutex_ptr;
-	};
 
 	/**
 	* \brief Return the total number of valid and invalid entities in the component table for type E.
