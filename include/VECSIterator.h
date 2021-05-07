@@ -80,6 +80,10 @@ namespace vecs {
 		m_current_mutex_ptr = v.m_current_mutex_ptr;
 		m_size = v.m_size;
 		if (m_is_end) return;
+		for (int i = 0; i < m_dispatch.size(); ++i) {
+			*m_dispatch[i] = *v.m_dispatch[i];
+		}
+
 	};
 
 	/**
@@ -128,6 +132,10 @@ namespace vecs {
 		m_current_handle_ptr = v.m_current_handle_ptr;
 		m_current_mutex_ptr = v.m_current_mutex_ptr;
 		m_size = v.m_size;
+		for (int i = 0; i < m_dispatch.size(); ++i) {
+			*m_dispatch[i] = *v.m_dispatch[i];
+		}
+
 		return *this;
 	}
 
@@ -366,7 +374,9 @@ namespace vecs {
 		virtual auto init() noexcept		-> void = 0;
 		virtual auto data() noexcept		-> void = 0;
 		virtual auto operator*() noexcept	-> typename VecsIteratorBaseClass<ETL, CTL>::reference = 0;
+		
 		virtual auto size() noexcept		-> size_t;	///< Total number of valid and invalid entities in the component table for type E
+		auto operator=(const VecsIteratorEntityBaseClass& rhs) noexcept	-> void;
 	};
 
 
@@ -378,6 +388,16 @@ namespace vecs {
 	inline auto VecsIteratorEntityBaseClass<ETL,CTL>::size() noexcept -> size_t {
 		return m_sizeE_ptr->load();
 	}
+
+	/**
+	* \brief Copy operator
+	*/
+	template<typename ETL, typename CTL>
+	inline auto VecsIteratorEntityBaseClass<ETL, CTL>::operator=(const VecsIteratorEntityBaseClass& v) noexcept -> void {
+		//m_current_index = v.m_current_index;
+		//m_sizeE = v.m_sizeE;
+	};
+
 
 
 	//-------------------------------------------------------------------------
