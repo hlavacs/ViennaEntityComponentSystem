@@ -39,7 +39,6 @@ int main() {
 	{
 		auto range = VecsRange<VeComponentName>{};
 		auto it = range.begin();
-		auto res = *it;
 
 		for (auto [handle, name] : VecsRange<VeComponentName>{}) {
 		}
@@ -141,7 +140,6 @@ int main() {
 
 		auto range = VecsRange<VeComponentName>{};
 		auto it = range.begin();
-		auto res = *it;
 
 		for (auto [handle, name] : VecsRange<VeComponentName>{}) {
 			VecsReadLock lock( handle.mutex() );

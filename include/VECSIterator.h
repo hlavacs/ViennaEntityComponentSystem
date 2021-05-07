@@ -40,9 +40,6 @@ namespace vecs {
 			using difference_type	= size_t;
 			using last_type			= vtll::back<ETL>;	///< last type for end iterator
 
-			static inline value_type			m_dummy;				///< Dummy values for returning references to if the handle is not valid
-			static inline std::atomic<uint32_t> m_dummy_mutex;			///< Dummy mutex for returning pointer to if the handle is not valid
-
 			VecsIteratorBaseClass(bool is_end = false) noexcept;				///< Constructor that should be called always from outside
 			VecsIteratorBaseClass(const VecsIteratorBaseClass<ETL,CTL>& v) noexcept;		///< Copy constructor
 
@@ -155,9 +152,13 @@ namespace vecs {
 		if (m_is_end) return *this;
 		(*m_dispatch[m_current_iterator])++;
 
-		if (m_dispatch[m_current_iterator]->is_vector_end() && m_current_iterator.value < m_dispatch.size() - 1) [[unlikely]] {
-			++m_current_iterator;
-			m_dispatch[m_current_iterator]->init();
+		if (m_dispatch[m_current_iterator]->is_vector_end() ) {
+			size_t left = 0;
+			while( left == 0 && m_current_iterator.value < m_dispatch.size() - 1) {
+				++m_current_iterator;
+				m_dispatch[m_current_iterator]->init();
+				left = m_current_sizeE_ptr->load();
+			 } 
 		}
 		else {
 			m_dispatch[m_current_iterator]->data();
@@ -516,9 +517,6 @@ namespace vecs {
 	*/
 	template<typename E, typename ETL, template<typename...> typename CTL, typename... Cs>
 	inline auto VecsIteratorEntity<E,ETL,CTL<Cs...>>::mutex_ptr() noexcept		-> std::atomic<uint32_t>* {
-		if (this->m_current_index.value >= this->size()) {
-			return &VecsIteratorBaseClass<ETL,CTL<Cs...>>::m_dummy_mutex;
-		}
 		return m_component_table.mutex_ptr(this->m_current_index);
 	}
 
@@ -528,9 +526,6 @@ namespace vecs {
 	*/
 	template<typename E, typename ETL, template<typename...> typename CTL, typename... Cs>
 	inline auto VecsIteratorEntity<E,ETL,CTL<Cs...>>::operator*() noexcept	-> reference {
-		if (this->m_current_index.value >= this->size()) {
-			return std::forward_as_tuple(VecsHandle{}, std::get<Cs>(VecsIteratorBaseClass<ETL, CTL<Cs...>>::m_dummy)...);
-		}
 		return std::forward_as_tuple(*m_component_table.handle_ptr(this->m_current_index), m_component_table.component<Cs>(this->m_current_index)...);
 	};
 
@@ -691,7 +686,7 @@ namespace vecs {
 
 		if (is_end) {
 			m_current_iterator = static_cast<decltype(m_current_iterator)>(m_dispatch.size() - 1);
-			m_current_index = static_cast<decltype(m_current_index)>(VecsRegistry<last_type>{}.size());
+			m_current_index = static_cast<decltype(m_current_index)>(m_dispatch[m_current_iterator]->size());
 		}
 		else {
 			m_dispatch[m_current_iterator]->init();
