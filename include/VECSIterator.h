@@ -21,15 +21,14 @@ namespace vecs {
 
 			array_type m_dispatch;								///< Subiterators for each entity type E
 
-			type_index_t			m_current_iterator{ 0 };	///< Current iterator of type E that is used
-			table_index_t			m_current_index{ 0 };		///< Current index in the VecsComponentTable<E>
-			std::atomic<size_t>*	m_current_sizeE_ptr{0};			///< Number of entities in the table of current subiterator
-			VecsHandle*				m_current_handle_ptr{};			///< Current handle the subiterator points to
-			std::atomic<uint32_t>*	m_current_mutex_ptr{};			///< Current mutex the subiterator points to
-			//bool					m_current_table_end{false};	///< Indicator that current table has ended and we have to go to the next subiterator
+			type_index_t			m_current_iterator{ 0 };			///< Current iterator of type E that is used
+			table_index_t			m_current_index{ 0 };				///< Current index in the VecsComponentTable<E>
+			std::atomic<size_t>*	m_current_sizeE_ptr{nullptr};		///< Number of entities in the table of current subiterator
+			VecsHandle*				m_current_handle_ptr{ nullptr };	///< Current handle the subiterator points to
+			std::atomic<uint32_t>*	m_current_mutex_ptr{ nullptr };		///< Current mutex the subiterator points to
 			
-			size_t					m_size{ 0 };				///< Number of entities covered by the iterator (can change due to multithreading)
-			bool					m_is_end{ false };			///< True if this is an end iterator (for stopping the loop)
+			size_t					m_size{ 0 };			///< Number of entities covered by the iterator (can change due to multithreading)
+			bool					m_is_end{ false };		///< True if this is an end iterator (for stopping the loop)
 
 			VecsIteratorBaseClass(std::nullopt_t n) noexcept {};		///< Needed for derived iterator to call
 
@@ -673,11 +672,6 @@ namespace vecs {
 
 		//std::cout << "VecsIteratorBaseClass<ETL,CTL>(): " << typeid(ETL).name() << std::endl << std::endl;
 
-		if (is_end) {
-			m_current_iterator = static_cast<decltype(m_current_iterator)>(m_dispatch.size() - 1);
-			m_current_index = static_cast<decltype(m_current_index)>(VecsRegistry<last_type>().size());
-		}
-
 		vtll::static_for<size_t, 0, vtll::size<ETL>::value >(
 			[&](auto i) {
 				using type = vtll::Nth_type<ETL, i>;
@@ -689,6 +683,14 @@ namespace vecs {
 				}
 			}
 		);
+
+		if (is_end) {
+			m_current_iterator = static_cast<decltype(m_current_iterator)>(m_dispatch.size() - 1);
+			m_current_index = static_cast<decltype(m_current_index)>(VecsRegistry<last_type>{}.size());
+		}
+		else {
+			m_dispatch[m_current_iterator]->init();
+		}
 	};
 
 }

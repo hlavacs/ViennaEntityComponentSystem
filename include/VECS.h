@@ -440,7 +440,7 @@ namespace vecs {
 	template<typename C>
 	requires is_component_of<E, C>
 		inline auto VecsComponentTable<E>::component_ptr(const table_index_t index) noexcept -> C* {
-		assert(index < m_data.size());
+		if(index >= m_data.size()) return nullptr;
 		return m_data.component_ptr<c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(index); ///< Get ref to the entity and return component
 	}
 
@@ -518,7 +518,7 @@ namespace vecs {
 	*/
 	template<typename E>
 	inline auto VecsComponentTable<E>::handle_ptr(const table_index_t index) noexcept -> VecsHandle* {
-		assert(index < m_data.size());
+		if (index >= m_data.size()) return nullptr;
 		return m_data.component_ptr<c_handle>(index);	///< Get ref to the handle and return it
 	}
 
@@ -528,7 +528,7 @@ namespace vecs {
 	*/
 	template<typename E>
 	inline auto VecsComponentTable<E>::mutex_ptr(const table_index_t index) noexcept -> std::atomic<uint32_t>* {
-		assert(index < m_data.size());
+		if (index >= m_data.size()) return nullptr;
 		return *m_data.component_ptr<c_mutex>(index);		///< Get ref to the mutex and return it
 	}
 
