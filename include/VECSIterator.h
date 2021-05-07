@@ -157,6 +157,10 @@ namespace vecs {
 
 		if (m_dispatch[m_current_iterator]->is_vector_end() && m_current_iterator.value < m_dispatch.size() - 1) [[unlikely]] {
 			++m_current_iterator;
+			m_dispatch[m_current_iterator]->init();
+		}
+		else {
+			m_dispatch[m_current_iterator]->data();
 		}
 		m_current_index = m_dispatch[m_current_iterator]->m_current_index;
 		return *this;
@@ -386,11 +390,11 @@ namespace vecs {
 	*/
 	template<typename ETL, typename CTL>
 	inline auto VecsIteratorEntityBaseClass<ETL, CTL>::operator=(const VecsIteratorEntityBaseClass& rhs) noexcept -> void {
-		m_current_index2 = rhs.m_current_index2;
-		m_current_sizeE_ptr = rhs.m_current_sizeE_ptr;
-		m_current_handle_ptr = rhs.m_current_handle_ptr;
-		m_current_mutex_ptr = rhs.m_current_mutex_ptr;
-		m_current_index = rhs.m_current_index;
+		m_current_index2		= rhs.m_current_index2;
+		m_current_sizeE_ptr		= rhs.m_current_sizeE_ptr;
+		m_current_handle_ptr	= rhs.m_current_handle_ptr;
+		m_current_mutex_ptr		= rhs.m_current_mutex_ptr;
+		m_current_index			= rhs.m_current_index;
 	};
 
 	/**
@@ -478,6 +482,7 @@ namespace vecs {
 
 	template<typename E, typename ETL, template<typename...> typename CTL, typename... Cs>
 	inline auto VecsIteratorEntity<E, ETL, CTL<Cs...>>::init() noexcept		-> void {
+		this->m_current_index2 = 0;
 		this->m_current_handle_ptr = m_component_table.handle_ptr(this->m_current_index);
 		this->m_current_mutex_ptr = m_component_table.mutex_ptr(this->m_current_index);
 		this->m_current_sizeE_ptr = this->m_sizeE_ptr;
