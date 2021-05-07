@@ -358,7 +358,6 @@ namespace vecs {
 		std::atomic<size_t>*&		m_current_sizeE_ptr;
 		VecsHandle*&				m_current_handle_ptr;
 		std::atomic<uint32_t>*&		m_current_mutex_ptr;
-		//bool&						m_current_table_end;
 
 		table_index_t	m_current_index{ 0 };	///< Current index in the VecsComponentTable<E>
 		std::atomic<size_t>* m_sizeE_ptr;
@@ -392,9 +391,6 @@ namespace vecs {
 		m_current_sizeE_ptr = rhs.m_current_sizeE_ptr;
 		m_current_handle_ptr = rhs.m_current_handle_ptr;
 		m_current_mutex_ptr = rhs.m_current_mutex_ptr;
-
-		//m_current_table_end = rhs.m_current_table_end;
-
 		m_current_index = rhs.m_current_index;
 	};
 
