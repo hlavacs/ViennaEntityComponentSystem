@@ -364,7 +364,7 @@ namespace vecs {
 		//-------------------------------------------------------------------------
 		//utilities
 
-		auto handle(const table_index_t index) noexcept			-> VecsHandle&;	///< \returns handle for an index in the table
+		auto handle_ptr(const table_index_t index) noexcept		-> VecsHandle*;			///< \returns ptr to handle for an index in the table
 		auto mutex_ptr(const table_index_t index) noexcept		-> std::atomic<uint32_t>*; ///< \returns pointer to the mutex for a given index
 		auto size() noexcept -> size_t { return m_data.size(); };	///< \returns the number of entries currently in the table, can also be invalid ones
 		auto compress() noexcept								-> void;	///< Compress the table
@@ -517,9 +517,9 @@ namespace vecs {
 	* \returns the handle of an entity from the component table.
 	*/
 	template<typename E>
-	inline auto VecsComponentTable<E>::handle(const table_index_t index) noexcept -> VecsHandle& {
+	inline auto VecsComponentTable<E>::handle_ptr(const table_index_t index) noexcept -> VecsHandle* {
 		assert(index < m_data.size());
-		return *m_data.component_ptr<c_handle>(index);	///< Get ref to the handle and return it
+		return m_data.component_ptr<c_handle>(index);	///< Get ref to the handle and return it
 	}
 
 	/**

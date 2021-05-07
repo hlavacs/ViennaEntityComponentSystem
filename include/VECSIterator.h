@@ -361,7 +361,7 @@ namespace vecs {
 		//bool&						m_current_table_end;
 
 		table_index_t	m_current_index{ 0 };	///< Current index in the VecsComponentTable<E>
-		std::atomic<size_t>* m_sizeE;
+		std::atomic<size_t>* m_sizeE_ptr;
 
 	public:
 		VecsIteratorEntityBaseClass(table_index_t& index, std::atomic<size_t>*& sizeE_ptr, VecsHandle*& handle_ptr, std::atomic<uint32_t>*& mutex_ptr, bool is_end = false) noexcept
@@ -433,7 +433,7 @@ namespace vecs {
 	*/
 	template<typename ETL, typename CTL>
 	inline auto VecsIteratorEntityBaseClass<ETL,CTL>::size() noexcept			-> size_t {
-		return m_sizeE->load();
+		return m_sizeE_ptr->load();
 	}
 
 
@@ -475,7 +475,7 @@ namespace vecs {
 	inline VecsIteratorEntity<E,ETL,CTL<Cs...>>::VecsIteratorEntity(table_index_t& index, std::atomic<size_t>*& sizeE_ptr, VecsHandle*& handle_ptr, std::atomic<uint32_t>*& mutex_ptr, bool is_end) noexcept
 		: VecsIteratorEntityBaseClass<ETL,CTL<Cs...>>( index, sizeE_ptr, handle_ptr, mutex_ptr, is_end) {
 
-		this->m_sizeE = &m_component_table.m_data.m_size; ///< iterate over ALL entries, also the invalid ones!
+		this->m_sizeE_ptr = &m_component_table.m_data.m_size; ///< iterate over ALL entries, also the invalid ones!
 		if (is_end) {
 			this->m_current_index = static_cast<decltype(this->m_current_index)>(this->size());
 		}
@@ -483,12 +483,15 @@ namespace vecs {
 
 	template<typename E, typename ETL, template<typename...> typename CTL, typename... Cs>
 	inline auto VecsIteratorEntity<E, ETL, CTL<Cs...>>::init() noexcept		-> void {
-		this->m_current_handle_ptr = &m_component_table.handle(this->m_current_index);
+		this->m_current_handle_ptr = m_component_table.handle_ptr(this->m_current_index);
 		this->m_current_mutex_ptr = m_component_table.mutex_ptr(this->m_current_index);
+		this->m_current_sizeE_ptr = this->m_sizeE_ptr;
 	}
 
 	template<typename E, typename ETL, template<typename...> typename CTL, typename... Cs>
 	inline auto VecsIteratorEntity<E, ETL, CTL<Cs...>>::data() noexcept		-> void {
+		this->m_current_handle_ptr = m_component_table.handle_ptr(this->m_current_index);
+		this->m_current_mutex_ptr = m_component_table.mutex_ptr(this->m_current_index);
 	}
 
 	/**
@@ -497,7 +500,7 @@ namespace vecs {
 	*/
 	template<typename E, typename ETL, template<typename...> typename CTL, typename... Cs>
 	inline auto VecsIteratorEntity<E,ETL,CTL<Cs...>>::has_value() noexcept		-> bool {
-		return m_component_table.handle(this->m_current_index).has_value();
+		return m_component_table.handle_ptr(this->m_current_index)->has_value();
 	}
 
 	/**
@@ -505,7 +508,7 @@ namespace vecs {
 	*/
 	template<typename E, typename ETL, template<typename...> typename CTL, typename... Cs>
 	inline auto VecsIteratorEntity<E,ETL,CTL<Cs...>>::handle() noexcept		-> VecsHandle {
-		return m_component_table.handle(this->m_current_index);
+		return *m_component_table.handle_ptr(this->m_current_index);
 	}
 
 	/**
@@ -528,7 +531,7 @@ namespace vecs {
 		if (this->m_current_index.value >= this->size()) {
 			return std::forward_as_tuple(VecsHandle{}, std::get<Cs>(VecsIteratorBaseClass<ETL, CTL<Cs...>>::m_dummy)...);
 		}
-		return std::forward_as_tuple(m_component_table.handle(this->m_current_index), m_component_table.component<Cs>(this->m_current_index)...);
+		return std::forward_as_tuple(*m_component_table.handle_ptr(this->m_current_index), m_component_table.component<Cs>(this->m_current_index)...);
 	};
 
 
