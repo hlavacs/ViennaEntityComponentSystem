@@ -364,8 +364,8 @@ namespace vecs {
 		//-------------------------------------------------------------------------
 		//utilities
 
-		auto handle(const table_index_t index) noexcept			-> VecsHandle;	///< \returns handle for an index in the table
-		auto mutex(const table_index_t index) noexcept			-> std::atomic<uint32_t>*; ///< \returns pointer to the mutex for a given index
+		auto handle(const table_index_t index) noexcept			-> VecsHandle&;	///< \returns handle for an index in the table
+		auto mutex_ptr(const table_index_t index) noexcept		-> std::atomic<uint32_t>*; ///< \returns pointer to the mutex for a given index
 		auto size() noexcept -> size_t { return m_data.size(); };	///< \returns the number of entries currently in the table, can also be invalid ones
 		auto compress() noexcept								-> void;	///< Compress the table
 		auto capacity(size_t) noexcept							-> size_t;	///< \returns the max number of entities that can be stored
@@ -517,7 +517,7 @@ namespace vecs {
 	* \returns the handle of an entity from the component table.
 	*/
 	template<typename E>
-	inline auto VecsComponentTable<E>::handle(const table_index_t index) noexcept -> VecsHandle {
+	inline auto VecsComponentTable<E>::handle(const table_index_t index) noexcept -> VecsHandle& {
 		assert(index < m_data.size());
 		return *m_data.component_ptr<c_handle>(index);	///< Get ref to the handle and return it
 	}
@@ -527,7 +527,7 @@ namespace vecs {
 	* \returns pointer to the sync mutex of the entity.
 	*/
 	template<typename E>
-	inline auto VecsComponentTable<E>::mutex(const table_index_t index) noexcept -> std::atomic<uint32_t>* {
+	inline auto VecsComponentTable<E>::mutex_ptr(const table_index_t index) noexcept -> std::atomic<uint32_t>* {
 		assert(index < m_data.size());
 		return *m_data.component_ptr<c_mutex>(index);		///< Get ref to the mutex and return it
 	}

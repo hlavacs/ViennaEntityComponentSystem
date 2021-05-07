@@ -54,7 +54,7 @@ namespace vecs {
 			auto operator==(const VecsIteratorBaseClass<ETL,CTL>& v) noexcept	-> bool;	///< Equal
 
 			auto handle() noexcept			-> VecsHandle;				///< Return handle of the current entity
-			auto mutex() noexcept			-> std::atomic<uint32_t>*;	///< Return poiter to the mutex of this entity
+			auto mutex_ptr() noexcept		-> std::atomic<uint32_t>*;	///< Return poiter to the mutex of this entity
 			auto has_value() noexcept		-> bool;					///< Is currently pointint to a valid entity
 			
 			auto operator*() noexcept		-> reference;				///< Access the data
@@ -115,8 +115,8 @@ namespace vecs {
 	* \returns the handle of the current entity.
 	*/
 	template<typename ETL, typename CTL>
-	inline auto VecsIteratorBaseClass<ETL,CTL>::mutex() noexcept	-> std::atomic<uint32_t>* {
-		return m_dispatch[m_current_iterator]->mutex();
+	inline auto VecsIteratorBaseClass<ETL,CTL>::mutex_ptr() noexcept	-> std::atomic<uint32_t>* {
+		return m_dispatch[m_current_iterator]->mutex_ptr();
 	}
 
 	/**
@@ -367,8 +367,11 @@ namespace vecs {
 		VecsIteratorEntityBaseClass(table_index_t& index, std::atomic<size_t>*& sizeE_ptr, VecsHandle*& handle_ptr, std::atomic<uint32_t>*& mutex_ptr, bool is_end = false) noexcept
 			: m_current_index2{ index }, m_current_sizeE_ptr{ sizeE_ptr }, m_current_handle_ptr{ handle_ptr }, m_current_mutex_ptr{ mutex_ptr } {};
 
+		virtual auto init() noexcept		-> void = 0;
+		virtual auto data() noexcept		-> void = 0;
+
 		virtual auto handle() noexcept		-> VecsHandle = 0;
-		virtual auto mutex() noexcept		-> std::atomic<uint32_t>* = 0;
+		virtual auto mutex_ptr() noexcept	-> std::atomic<uint32_t>* = 0;
 		virtual auto has_value() noexcept	-> bool = 0;
 		virtual auto operator*() noexcept	-> typename VecsIteratorBaseClass<ETL, CTL>::reference = 0;
 
@@ -453,8 +456,12 @@ namespace vecs {
 
 	public:
 		VecsIteratorEntity(table_index_t& index, std::atomic<size_t>*& sizeE_ptr, VecsHandle*& handle_ptr, std::atomic<uint32_t>*& mutex_ptr, bool is_end = false) noexcept;
+
+		auto init() noexcept		-> void;
+		auto data() noexcept		-> void;
+
 		auto handle() noexcept		-> VecsHandle;
-		auto mutex() noexcept		-> std::atomic<uint32_t>*;
+		auto mutex_ptr() noexcept	-> std::atomic<uint32_t>*;
 		auto has_value() noexcept	-> bool;
 		auto operator*() noexcept	-> reference;
 	};
@@ -473,6 +480,16 @@ namespace vecs {
 			this->m_current_index = static_cast<decltype(this->m_current_index)>(this->size());
 		}
 	};
+
+	template<typename E, typename ETL, template<typename...> typename CTL, typename... Cs>
+	inline auto VecsIteratorEntity<E, ETL, CTL<Cs...>>::init() noexcept		-> void {
+		this->m_current_handle_ptr = &m_component_table.handle(this->m_current_index);
+		this->m_current_mutex_ptr = m_component_table.mutex_ptr(this->m_current_index);
+	}
+
+	template<typename E, typename ETL, template<typename...> typename CTL, typename... Cs>
+	inline auto VecsIteratorEntity<E, ETL, CTL<Cs...>>::data() noexcept		-> void {
+	}
 
 	/**
 	* \brief Test whether the iterator points to a valid entity.
@@ -495,11 +512,11 @@ namespace vecs {
 	* \returns the mutex of the current entity.
 	*/
 	template<typename E, typename ETL, template<typename...> typename CTL, typename... Cs>
-	inline auto VecsIteratorEntity<E,ETL,CTL<Cs...>>::mutex() noexcept		-> std::atomic<uint32_t>* {
+	inline auto VecsIteratorEntity<E,ETL,CTL<Cs...>>::mutex_ptr() noexcept		-> std::atomic<uint32_t>* {
 		if (this->m_current_index.value >= this->size()) {
 			return &VecsIteratorBaseClass<ETL,CTL<Cs...>>::m_dummy_mutex;
 		}
-		return m_component_table.mutex(this->m_current_index);
+		return m_component_table.mutex_ptr(this->m_current_index);
 	}
 
 	/**
@@ -586,7 +603,7 @@ namespace vecs {
 				auto e = end();
 				VecsRegistry reg{};
 				for (; b != e; ++b) {
-					VecsWriteLock lock(b.mutex());		///< Write lock
+					VecsWriteLock lock(b.mutex_ptr());		///< Write lock
 					if (!b.has_value()) continue;
 					std::apply(f, *b);					///< Run the function on the references
 				}
