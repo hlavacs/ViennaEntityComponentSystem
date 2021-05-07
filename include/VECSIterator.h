@@ -56,7 +56,7 @@ namespace vecs {
 			auto operator*() noexcept		-> reference;				///< Access the data
 			auto operator++() noexcept		-> VecsIteratorBaseClass<ETL,CTL>&;	///< Increase by 1
 			auto operator++(int) noexcept	-> VecsIteratorBaseClass<ETL,CTL>&;	///< Increase by 1
-			auto is_vector_end() noexcept	-> bool;					///< Is currently at the end of any sub iterator
+			//auto is_vector_end() noexcept	-> bool;					///< Is currently at the end of any sub iterator
 			auto size() noexcept			-> size_t;					///< Number of valid entities
 	};
 
@@ -93,8 +93,8 @@ namespace vecs {
 	*/
 	template<typename ETL, typename CTL>
 	inline auto VecsIteratorBaseClass<ETL,CTL>::has_value() noexcept	-> bool {
-		if (m_is_end || is_vector_end()) return false;
-		return m_dispatch[m_current_iterator]->has_value();
+		if (m_is_end || m_current_handle_ptr == nullptr) return false;
+		return m_current_handle_ptr->has_value();
 	}
 
 	/**
@@ -103,7 +103,8 @@ namespace vecs {
 	*/
 	template<typename ETL, typename CTL>
 	inline auto VecsIteratorBaseClass<ETL,CTL>::handle() noexcept	-> VecsHandle {
-		return m_dispatch[m_current_iterator]->handle();
+		if (m_current_handle_ptr == nullptr) return {};
+		return *m_current_handle_ptr;
 	}
 
 	/**
@@ -112,7 +113,7 @@ namespace vecs {
 	*/
 	template<typename ETL, typename CTL>
 	inline auto VecsIteratorBaseClass<ETL,CTL>::mutex_ptr() noexcept	-> std::atomic<uint32_t>* {
-		return m_dispatch[m_current_iterator]->mutex_ptr();
+		return m_current_mutex_ptr;
 	}
 
 	/**
@@ -150,21 +151,19 @@ namespace vecs {
 	template<typename ETL, typename CTL>
 	inline auto VecsIteratorBaseClass<ETL,CTL>::operator++() noexcept		-> VecsIteratorBaseClass<ETL,CTL>& {
 		if (m_is_end) return *this;
-		(*m_dispatch[m_current_iterator])++;
-
+		++m_current_index;
 		if ( m_current_index >= m_current_sizeE_ptr->load() ) {
-			size_t left = 0;
-			while( left == 0 && m_current_iterator.value < m_dispatch.size() - 1) {
+			size_t size = 0;
+			while( size == 0 && m_current_iterator.value < m_dispatch.size() - 1) {
 				++m_current_iterator;
 				m_current_index = 0;
 				m_dispatch[m_current_iterator]->init();
-				left = m_current_sizeE_ptr->load();
+				size = m_current_sizeE_ptr->load();
 			 } 
 		}
 		else {
 			m_dispatch[m_current_iterator]->data();
 		}
-		//m_current_index = m_dispatch[m_current_iterator]->m_current_index;
 		return *this;
 	};
 
@@ -191,21 +190,26 @@ namespace vecs {
 		if (m_is_end) return *this;
 		size_t left = N;
 		while (left > 0) {
-			size_t num = std::max((size_t)(m_dispatch[m_current_iterator]->size() - m_current_index), (size_t)0);
-			num = std::min(num, left);
+			size_t num = std::max((size_t)(m_current_sizeE_ptr->load() - m_current_index), (size_t)0); ///< So much can we consume
+			num = std::min(num, left);	///< That is what we consume
 
-			left -= num;
-			m_dispatch[m_current_iterator]->m_current_index += static_cast<decltype(m_current_index.value)>(num);
-			m_current_index = m_dispatch[m_current_iterator]->m_current_index;
+			left -= num;	///< Consume these numbers
+			m_current_index += static_cast<decltype(m_current_index.value)>(num); ///< Increase index by this
 
-			if (m_dispatch[m_current_iterator]->is_vector_end()) {
-				if (m_current_iterator.value < m_dispatch.size() - 1) {
-					++m_current_iterator;
-					m_current_index = 0;
+			if (m_current_index >= m_current_sizeE_ptr->load()) { ///< Are we at the end of the subiterator?
+				size_t size = 0;
+				while (size == 0 && m_current_iterator.value < m_dispatch.size() - 1) { ///< Yes, find next with non zero numbers
+					++m_current_iterator;					///< Goto next
+					m_current_index = 0;					///< Start at beginning
+					m_dispatch[m_current_iterator]->init();	///< Get the data
+					size = m_current_sizeE_ptr->load();		///< Do we have entities?
 				}
-				else return *this;
+				if(m_current_sizeE_ptr->load() == 0) {	///< Nothing left to iterate over
+					left = 0;
+				}
 			}
 		}
+		m_dispatch[m_current_iterator]->data();
 		return *this;
 	}
 
@@ -240,17 +244,6 @@ namespace vecs {
 	template<typename ETL, typename CTL>
 	inline auto VecsIteratorBaseClass<ETL,CTL>::operator==(const VecsIteratorBaseClass<ETL,CTL>& v) noexcept	-> bool {
 		return	v.m_current_iterator == m_current_iterator && v.m_current_index == m_current_index;
-	}
-
-	/**
-	* \brief Test whether the curerntly used sub-iterator is at its end point.
-	* The call is dispatched to the current subiterator.
-	*
-	* \returns true if the current subiterator is at its end.
-	*/
-	template<typename ETL, typename CTL>
-	inline auto VecsIteratorBaseClass<ETL,CTL>::is_vector_end() noexcept		-> bool {
-		return m_dispatch[m_current_iterator]->is_vector_end();
 	}
 
 	/**
@@ -360,12 +353,10 @@ namespace vecs {
 
 	protected:
 		table_index_t&				m_current_index;		///< Current index in the VecsComponentTable<E>
-		std::atomic<size_t>*&		m_current_sizeE_ptr;
-		VecsHandle*&				m_current_handle_ptr;
-		std::atomic<uint32_t>*&		m_current_mutex_ptr;
-
-		//table_index_t	m_current_index{ 0 };	///< Current index in the VecsComponentTable<E>
-		std::atomic<size_t>* m_sizeE_ptr;
+		std::atomic<size_t>*&		m_current_sizeE_ptr;	///< Size of current sub iterator
+		VecsHandle*&				m_current_handle_ptr;	///< Current handle
+		std::atomic<uint32_t>*&		m_current_mutex_ptr;	///< Current mutex
+		std::atomic<size_t>*		m_sizeE_ptr;			///< Size of THIS subiterator
 
 	public:
 		VecsIteratorEntityBaseClass(table_index_t& index, std::atomic<size_t>*& sizeE_ptr, VecsHandle*& handle_ptr, std::atomic<uint32_t>*& mutex_ptr, bool is_end = false) noexcept
@@ -373,16 +364,9 @@ namespace vecs {
 
 		virtual auto init() noexcept		-> void = 0;
 		virtual auto data() noexcept		-> void = 0;
-
-		virtual auto handle() noexcept		-> VecsHandle = 0;
-		virtual auto mutex_ptr() noexcept	-> std::atomic<uint32_t>* = 0;
-		virtual auto has_value() noexcept	-> bool = 0;
 		virtual auto operator*() noexcept	-> typename VecsIteratorBaseClass<ETL, CTL>::reference = 0;
 
 		auto operator=(const VecsIteratorEntityBaseClass& rhs) noexcept	-> void;
-		auto operator++() noexcept			-> void;
-		auto operator++(int) noexcept		-> void;
-		auto is_vector_end() noexcept		-> bool;
 		virtual auto size() noexcept		-> size_t;	///< Total number of valid and invalid entities in the component table for type E
 	};
 
@@ -392,40 +376,9 @@ namespace vecs {
 	*/
 	template<typename ETL, typename CTL>
 	inline auto VecsIteratorEntityBaseClass<ETL, CTL>::operator=(const VecsIteratorEntityBaseClass& rhs) noexcept -> void {
-		//m_current_index			= rhs.m_current_index;
 		m_current_sizeE_ptr		= rhs.m_current_sizeE_ptr;
 		m_current_handle_ptr	= rhs.m_current_handle_ptr;
 		m_current_mutex_ptr		= rhs.m_current_mutex_ptr;
-		//m_current_index			= rhs.m_current_index;
-	};
-
-	/**
-	* \brief Point to the next entity.
-	*/
-	template<typename ETL, typename CTL>
-	inline auto VecsIteratorEntityBaseClass<ETL,CTL>::operator++() noexcept		-> void {
-		if (!is_vector_end()) [[likely]] ++m_current_index;
-		if (m_current_index == size()) {
-			//m_current_table_end = true;
-		}
-	};
-
-	/**
-	* \brief Point to the next entity.
-	*/
-	template<typename ETL, typename CTL>
-	inline auto VecsIteratorEntityBaseClass<ETL,CTL>::operator++(int) noexcept	-> void {
-		operator++();
-	};
-
-	/**
-	* \brief Determine whether the iterator points beyond the last entity of its type E.
-	* This means it has reached its end.
-	* \returns true if the iterator points beyond its last entity.
-	*/
-	template<typename ETL, typename CTL>
-	inline auto VecsIteratorEntityBaseClass<ETL,CTL>::is_vector_end() noexcept	-> bool {
-		return m_current_index >= size();
 	};
 
 	/**
@@ -433,7 +386,7 @@ namespace vecs {
 	* \returns the total number of valid and invalid entities in the component table for type E.
 	*/
 	template<typename ETL, typename CTL>
-	inline auto VecsIteratorEntityBaseClass<ETL,CTL>::size() noexcept			-> size_t {
+	inline auto VecsIteratorEntityBaseClass<ETL,CTL>::size() noexcept -> size_t {
 		return m_sizeE_ptr->load();
 	}
 
@@ -460,10 +413,6 @@ namespace vecs {
 
 		auto init() noexcept		-> void;
 		auto data() noexcept		-> void;
-
-		auto handle() noexcept		-> VecsHandle;
-		auto mutex_ptr() noexcept	-> std::atomic<uint32_t>*;
-		auto has_value() noexcept	-> bool;
 		auto operator*() noexcept	-> reference;
 	};
 
@@ -477,14 +426,10 @@ namespace vecs {
 		: VecsIteratorEntityBaseClass<ETL,CTL<Cs...>>( index, sizeE_ptr, handle_ptr, mutex_ptr, is_end) {
 
 		this->m_sizeE_ptr = &m_component_table.m_data.m_size; ///< iterate over ALL entries, also the invalid ones!
-		//if (is_end) {
-		//	this->m_current_index = this->size();
-		//}
 	};
 
 	template<typename E, typename ETL, template<typename...> typename CTL, typename... Cs>
 	inline auto VecsIteratorEntity<E, ETL, CTL<Cs...>>::init() noexcept		-> void {
-		//this->m_current_index2 = 0;
 		this->m_current_handle_ptr = m_component_table.handle_ptr(this->m_current_index);
 		this->m_current_mutex_ptr = m_component_table.mutex_ptr(this->m_current_index);
 		this->m_current_sizeE_ptr = this->m_sizeE_ptr;
@@ -497,37 +442,14 @@ namespace vecs {
 	}
 
 	/**
-	* \brief Test whether the iterator points to a valid entity.
-	* \returns true if the iterator points to a valid entity.
-	*/
-	template<typename E, typename ETL, template<typename...> typename CTL, typename... Cs>
-	inline auto VecsIteratorEntity<E,ETL,CTL<Cs...>>::has_value() noexcept		-> bool {
-		return m_component_table.handle_ptr(this->m_current_index)->has_value();
-	}
-
-	/**
-	* \returns the handle of the current entity.
-	*/
-	template<typename E, typename ETL, template<typename...> typename CTL, typename... Cs>
-	inline auto VecsIteratorEntity<E,ETL,CTL<Cs...>>::handle() noexcept		-> VecsHandle {
-		return *m_component_table.handle_ptr(this->m_current_index);
-	}
-
-	/**
-	* \returns the mutex of the current entity.
-	*/
-	template<typename E, typename ETL, template<typename...> typename CTL, typename... Cs>
-	inline auto VecsIteratorEntity<E,ETL,CTL<Cs...>>::mutex_ptr() noexcept		-> std::atomic<uint32_t>* {
-		return m_component_table.mutex_ptr(this->m_current_index);
-	}
-
-	/**
 	* \brief Access operator retrieves all relevant components Ts from the entity it points to.
 	* \returns all components Ts from the entity the iterator points to.
 	*/
 	template<typename E, typename ETL, template<typename...> typename CTL, typename... Cs>
 	inline auto VecsIteratorEntity<E,ETL,CTL<Cs...>>::operator*() noexcept	-> reference {
-		return std::forward_as_tuple(*m_component_table.handle_ptr(this->m_current_index), m_component_table.component<Cs>(this->m_current_index)...);
+		return std::forward_as_tuple(
+			this->m_current_handle_ptr == nullptr ? VecsHandle{} : *this->m_current_handle_ptr
+			, m_component_table.component<Cs>(this->m_current_index)...);
 	};
 
 
