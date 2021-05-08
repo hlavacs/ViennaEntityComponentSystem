@@ -47,10 +47,11 @@ void do_work(R<Cs...> range ) {
 		++i;
 	}*/
 
+	bool sync = true;
 	range.for_each([&](auto handle, auto& pos) {
 		pos.m_position = glm::vec3{ 7.0f + i, 8.0f + i, 9.0f + i };
 		++i;
-	});
+	}, sync);
 
 }
 

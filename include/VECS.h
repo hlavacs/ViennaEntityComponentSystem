@@ -849,8 +849,7 @@ namespace vecs {
 	*/
 	auto VecsRegistryBaseClass::contains(VecsHandle handle) noexcept	-> bool {
 		if (!handle.is_valid()) return false;
-		if (handle.m_generation_counter != *m_map_table.component_ptr<c_counter>(handle.m_map_index)) return false;
-		return true;
+		return (handle.m_generation_counter == *m_map_table.component_ptr<c_counter>(handle.m_map_index));
 	}
 
 
