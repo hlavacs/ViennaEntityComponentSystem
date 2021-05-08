@@ -397,50 +397,38 @@ and come in two versions. The first form is a general iterator that can point to
     VecsIterator<VeComponentName, VeUserComponentPosition> it;         //normal iterator
     VecsIterator<VeComponentName, VeUserComponentPosition> end(true);  //end iterator used as looping end point
 
-Iterators have template parameters which determine which entity types their iterate over, and which components they can yield in a for-loop. This is implemented by deriving them from a common base class depending on exactly two template parameters ETL and CTL. ETL is a type list of entity types the iterator should iterate over, and CTL is a type list of components the iterator should yield references to through its dereferencing operator*():
+Iterators have template parameters which determine which entity types their iterate over, and which components they can yield in a for-loop. This is implemented by deriving them from a common base class depending on exactly two template parameters ETL and CTL. ETL is a type list of entity types the iterator should iterate over, and CTL is a type list of components. The iterator offers a dereferencing operator*(), yielding a tuple that holds a handle and references to the components:
 
     template<typename ETL, typename CTL>
     class VecsIteratorBaseClass {
-      protected:
-        using array_type = std::array<std::unique_ptr<VecsIteratorEntityBaseClass<ETL, CTL>>, vtll::size<ETL>::value>;
 
-        array_type m_dispatch;				///< Subiterators for each entity type E
-
-        type_index_t	m_current_iterator{ 0 };	///< Current iterator of type E that is used
-        table_index_t	m_current_index{ 0 };		///< Current index in the VecsComponentTable<E>
-        bool			m_is_end{ false };			///< True if this is an end iterator (for stopping the loop)
-        size_t			m_size{ 0 };				///< Number of entities max covered by the iterator
-
-        VecsIteratorBaseClass(std::nullopt_t n) noexcept {};		///< Needed for derived iterator to call
+      //...
 
       public:
-        using value_type		= vtll::to_tuple< vtll::cat< vtll::tl<VecsHandle>, CTL > >;
-        using reference			= vtll::to_tuple< vtll::cat< vtll::tl<VecsHandle>, vtll::to_ref<CTL> > >;
-        using pointer			= vtll::to_tuple< vtll::cat< vtll::tl<VecsHandle>, vtll::to_ptr<CTL> > >;
+        using value_type = vtll::to_tuple< vtll::cat< vtll::tl<VecsHandle>, CTL > >;
+        using reference = vtll::to_tuple< vtll::cat< vtll::tl<VecsHandle>, vtll::to_ref<CTL> > >;
+        using pointer = vtll::to_tuple< vtll::cat< vtll::tl<VecsHandle>, vtll::to_ptr<CTL> > >;
         using iterator_category = std::forward_iterator_tag;
         using difference_type	= size_t;
-        using last_type			= vtll::back<ETL>;	///< last type for end iterator
-
-        static inline value_type			m_dummy;		///< Dummy values for returning references to if the handle is not valid
-        static inline std::atomic<uint32_t> m_dummy_mutex;	///< Dummy mutex for returning pointer to if the handle is not valid
+        using last_type = vtll::back<ETL>;	///< last type for end iterator
 
         VecsIteratorBaseClass(bool is_end = false) noexcept;				///< Constructor that should be called always from outside
         VecsIteratorBaseClass(const VecsIteratorBaseClass<ETL,CTL>& v) noexcept;		///< Copy constructor
 
         auto operator=(const VecsIteratorBaseClass<ETL,CTL>& v) noexcept	-> VecsIteratorBaseClass<ETL,CTL>;	///< Copy
-        auto operator+=(size_t N) noexcept									-> VecsIteratorBaseClass<ETL,CTL>;	///< Increase and set
-        auto operator+(size_t N) noexcept									-> VecsIteratorBaseClass<ETL,CTL>;	///< Increase
+        auto operator+=(size_t N) noexcept		-> VecsIteratorBaseClass<ETL,CTL>;	///< Increase and set
+        auto operator+(size_t N) noexcept			-> VecsIteratorBaseClass<ETL,CTL>;	///< Increase
         auto operator!=(const VecsIteratorBaseClass<ETL,CTL>& v) noexcept	-> bool;	///< Unqequal
         auto operator==(const VecsIteratorBaseClass<ETL,CTL>& v) noexcept	-> bool;	///< Equal
 
-        virtual auto handle() noexcept			-> VecsHandle;				///< Return handle of the current entity
-        virtual auto mutex() noexcept			-> std::atomic<uint32_t>*;	///< Return poiter to the mutex of this entity
-        virtual auto has_value() noexcept		-> bool;					///< Is currently pointint to a valid entity
-        virtual	auto operator*() noexcept		-> reference;				///< Access the data
-        virtual auto operator++() noexcept		-> VecsIteratorBaseClass<ETL,CTL>&;	///< Increase by 1
-        virtual auto operator++(int) noexcept	-> VecsIteratorBaseClass<ETL,CTL>&;	///< Increase by 1
-        virtual auto is_vector_end() noexcept	-> bool;					///< Is currently at the end of any sub iterator
-        virtual auto size() noexcept			-> size_t;					///< Number of valid entities
+        auto handle() noexcept			-> VecsHandle;				///< Return handle of the current entity
+        auto mutex_ptr() noexcept		-> std::atomic<uint32_t>*;	///< Return poiter to the mutex of this entity
+        auto has_value() noexcept		-> bool;					///< Is currently pointint to a valid entity
+
+        auto operator*() noexcept		-> reference;						///< Access the data
+        auto operator++() noexcept		-> VecsIteratorBaseClass<ETL,CTL>&;	///< Increase by 1
+        auto operator++(int) noexcept	-> VecsIteratorBaseClass<ETL,CTL>&;	///< Increase by 1
+        auto size() noexcept			-> size_t;							///< Number of valid entities
     };
 
 When specifying *VecsIterator<Ts...>* the lists *ETL* and *CTL* are created depending on the *Ts*, and the base class is determined. In the following the various ways to turn the parameters *Ts* into the base class *ETL* and *CTL* are explained.
