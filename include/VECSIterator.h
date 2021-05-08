@@ -23,8 +23,7 @@ namespace vecs {
 		protected:
 			using array_type = std::array<std::unique_ptr<VecsIteratorEntityBaseClass<ETL, CTL>>, vtll::size<ETL>::value>;
 
-			array_type				m_dispatch;								///< Subiterators for each entity type E
-			VecsRegistry<>			m_registry;
+			array_type				m_dispatch;							///< Subiterators for each entity type E
 			type_index_t			m_current_iterator{ 0 };			///< Current iterator of type E that is used
 			table_index_t			m_current_index{ 0 };				///< Current index in the VecsComponentTable<E>
 			std::atomic<size_t>*	m_current_sizeE_ptr{nullptr};		///< Number of entities in the table of current subiterator
@@ -95,7 +94,7 @@ namespace vecs {
 	template<typename ETL, typename CTL>
 	inline auto VecsIteratorBaseClass<ETL,CTL>::has_value() noexcept	-> bool {
 		if (m_is_end || m_current_handle_ptr == nullptr) return false;
-		return m_registry.contains(*m_current_handle_ptr);
+		return VecsRegistryBaseClass::m_registry.has_value(*m_current_handle_ptr);
 	}
 
 	/**
@@ -512,7 +511,6 @@ namespace vecs {
 			inline auto for_each(std::function<typename Functor<CTL>::type> f, bool sync = true) -> void {
 				auto b = begin();
 				auto e = end();
-				VecsRegistry reg{};
 				for (; b != e; ++b) {
 					if( sync ) VecsWriteLock lock(b.mutex_ptr());		///< Write lock
 					if (!b.has_value()) continue;

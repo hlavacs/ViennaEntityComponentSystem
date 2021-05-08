@@ -537,7 +537,7 @@ Additionally, VECS ranges offer a thread save range based loop called *for_each*
       //...
     });
 
-This loop guarantees that any loop iteration contains only valid entities, which are also automatically write locked. Due to the write lock, this loop is slightly slower than the C++ version, but you do not have to worry about locking or using the references. The implementation looks like this:
+This loop guarantees that any loop iteration contains only valid entities, which are also automatically write locked, depending on the parameter sync. Due to the write lock, this loop is slightly slower than the C++ range based version, but you do not have to worry about locking or using the references. The implementation looks like this:
 
     template<typename C>
     struct Functor;
@@ -547,14 +547,13 @@ This loop guarantees that any loop iteration contains only valid entities, which
       using type = void(VecsHandle, Cs&...);	///< Arguments for the functor
     };
 
-    template<typename ETL, typename CTL>
-    inline auto class VecsRangeBaseClass<ETL,CTL>::for_each(std::function<typename Functor<CTL>::type> f) -> void {
+    inline auto for_each(std::function<typename Functor<CTL>::type> f, bool sync = true) -> void {
       auto b = begin();
       auto e = end();
       for (; b != e; ++b) {
-        VecsWriteLock lock(b.mutex());		///< Write lock
+        if( sync ) VecsWriteLock lock(b.mutex_ptr());		///< Write lock
         if (!b.has_value()) continue;
-        std::apply(f, *b);					 ///< Run the function on the references
+        std::apply(f, *b);					///< Run the function on the references
       }
     }
 

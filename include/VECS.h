@@ -702,6 +702,8 @@ namespace vecs {
 		virtual auto sizeE() noexcept -> std::atomic<uint32_t>& { return m_size; };
 
 	public:
+		static VecsRegistryBaseClass m_registry;
+
 		VecsRegistryBaseClass() noexcept;
 
 		//-------------------------------------------------------------------------
@@ -746,13 +748,14 @@ namespace vecs {
 		auto table_index(VecsHandle h) noexcept	-> table_index_t;	///< \returns row index in component table
 		auto type(VecsHandle h) noexcept		-> type_index_t;	///< \returns type of entity
 		virtual auto swap( VecsHandle h1, VecsHandle h2 ) noexcept -> bool;	///< Swap places of two entities in the component table
-		virtual auto contains(VecsHandle handle) noexcept	-> bool;		///< \returns true if the ECS still holds this entity 
+		virtual auto has_value(VecsHandle handle) noexcept	-> bool;		///< \returns true if the ECS still holds this entity 
 		virtual void print_type(VecsHandle handle) { 
 			auto t = type(handle);
 			m_dispatch[t]->print_type(handle); 
 		};
 	};
 
+	inline VecsRegistryBaseClass VecsRegistryBaseClass::m_registry{};
 
 	/**
 	* \brief Test whether an entity (pointed to by the handle) of type E contains a component of type C
@@ -847,7 +850,7 @@ namespace vecs {
 	* \param[in] handle The handle to check.
 	* \returns true if the ECS contains this entity.
 	*/
-	auto VecsRegistryBaseClass::contains(VecsHandle handle) noexcept	-> bool {
+	auto VecsRegistryBaseClass::has_value(VecsHandle handle) noexcept	-> bool {
 		if (!handle.is_valid()) return false;
 		return (handle.m_generation_counter == *m_map_table.component_ptr<c_counter>(handle.m_map_index));
 	}
@@ -951,7 +954,7 @@ namespace vecs {
 	*/
 	template<typename E>
 	inline auto VecsRegistry<E>::updateC(VecsHandle handle, size_t compidx, void* ptr, size_t size, bool move ) noexcept -> bool {
-		if (!contains(handle)) return false;
+		if (!has_value(handle)) return false;
 		return m_component_table.updateC(*m_map_table.component_ptr<c_index>(handle.m_map_index), compidx, ptr, size, move);
 	}
 
@@ -965,7 +968,7 @@ namespace vecs {
 	*/
 	template<typename E>
 	inline auto VecsRegistry<E>::has_componentE(VecsHandle handle, size_t compidx) noexcept -> bool {
-		if (!contains(handle)) return false;
+		if (!has_value(handle)) return false;
 		return m_component_table.has_componentE(compidx);
 	}
 
@@ -979,7 +982,7 @@ namespace vecs {
 	*/
 	template<typename E>
 	inline auto VecsRegistry<E>::componentE_ptr(VecsHandle handle, size_t compidx) noexcept -> void* {
-		if (!contains(handle)) return {};	///< Return the empty component
+		if (!has_value(handle)) return {};	///< Return the empty component
 		auto* comp_table_idx = m_map_table.component_ptr<c_index>(handle.m_map_index); ///< Get reference to component
 		return m_component_table.componentE_ptr(*comp_table_idx, compidx);	///< Return the component
 	};
@@ -1037,7 +1040,7 @@ namespace vecs {
 	template<typename... Cs>
 	inline auto VecsRegistry<E>::transform(VecsHandle handle, Cs&&... args) noexcept	-> bool {
 
-		if (!contains(handle)) return false;	///< Return the empty component
+		if (!has_value(handle)) return false;	///< Return the empty component
 
 		//VecsRegistryBaseClass::print_type(handle);
 		//std::cout << " type " << VecsRegistry{}.type(handle) << std::endl;
@@ -1084,7 +1087,7 @@ namespace vecs {
 	*/
 	template<typename E>
 	inline auto VecsRegistry<E>::tuple_ptr(VecsHandle handle) noexcept -> vtll::to_ptr_tuple<E> {
-		if (!contains(handle)) return {};	///< Return the empty component
+		if (!has_value(handle)) return {};	///< Return the empty component
 		auto& comp_table_idx = *m_map_table.component_ptr<c_index>(handle.m_map_index); ///< Get reference to component
 		return m_component_table.tuple_ptr( comp_table_idx );
 	}
@@ -1132,7 +1135,7 @@ namespace vecs {
 	template<typename C>
 	requires is_component_of<E, C>
 	auto VecsRegistry<E>::component_ptr(VecsHandle handle) noexcept							-> C* {
-		if (!contains(handle)) return {};	///< Return the empty component
+		if (!has_value(handle)) return {};	///< Return the empty component
 		auto& comp_table_idx = *m_map_table.component_ptr<c_index>(handle.m_map_index); ///< Get reference to component
 		return &m_component_table.component<C>(comp_table_idx);	///< Return the component
 	}
@@ -1148,7 +1151,7 @@ namespace vecs {
 	template<typename... Cs>
 	requires are_components_of<E, Cs...>
 	inline auto VecsRegistry<E>::update( VecsHandle handle, Cs&&... args) noexcept -> bool {
-		if (!contains(handle)) return false;
+		if (!has_value(handle)) return false;
 		m_component_table.update(handle.m_map_index, std::forward<Cs>(args)...);
 		return true;
 	}
@@ -1161,7 +1164,7 @@ namespace vecs {
 	*/
 	template<typename E>
 	inline auto VecsRegistry<E>::erase( VecsHandle handle) noexcept -> bool {
-		if (!contains(handle)) return false;
+		if (!has_value(handle)) return false;
 		m_component_table.erase(*m_map_table.component_ptr <c_index>(handle.m_map_index)); ///< Erase from comp table
 		(*m_map_table.component_ptr<c_counter>(handle.m_map_index))++;			///< Invalidate the entity handle
 
@@ -1351,7 +1354,7 @@ namespace vecs {
 	* \returns true if the entity this handle belongs to is still in the ECS.
 	*/
 	inline auto VecsHandle::has_value() noexcept			-> bool {
-		return VecsRegistryBaseClass().contains(*this);
+		return VecsRegistryBaseClass::m_registry.has_value(*this);
 	}
 
 	/**
@@ -1361,7 +1364,7 @@ namespace vecs {
 	template<typename C>
 	requires is_component_type<C>
 	inline auto VecsHandle::has_component() noexcept		-> bool {
-		return VecsRegistryBaseClass().has_component<C>(*this);
+		return VecsRegistryBaseClass::m_registry.has_component<C>(*this);
 	}
 
 	/**
@@ -1371,7 +1374,7 @@ namespace vecs {
 	template<typename C>
 	requires is_component_type<C>
 	inline auto VecsHandle::component_ptr() noexcept		-> C* {
-		return VecsRegistryBaseClass().component_ptr<C>(*this);
+		return VecsRegistryBaseClass::m_registry.component_ptr<C>(*this);
 	}
 
 	/**
@@ -1383,7 +1386,7 @@ namespace vecs {
 	template<typename... Cs>
 	requires are_component_types<Cs...>
 	inline auto VecsHandle::update(Cs&&... args) noexcept	-> bool {
-		return VecsRegistryBaseClass().update(*this, std::forward<Cs>(args)...);
+		return VecsRegistryBaseClass::m_registry.update(*this, std::forward<Cs>(args)...);
 	}
 
 	/**
@@ -1392,7 +1395,7 @@ namespace vecs {
 	* \returns true if the operation was successful.
 	*/
 	inline auto VecsHandle::erase() noexcept				-> bool {
-		return VecsRegistryBaseClass().erase(*this);
+		return VecsRegistryBaseClass::m_registry.erase(*this);
 	}
 
 	/**
@@ -1401,7 +1404,7 @@ namespace vecs {
 	* \returns index of this entity in the component table.
 	*/
 	inline auto VecsHandle::table_index() noexcept			-> table_index_t {
-		return VecsRegistryBaseClass{}.table_index(*this);
+		return VecsRegistryBaseClass::m_registry.table_index(*this);
 	}
 
 	/**
@@ -1410,7 +1413,7 @@ namespace vecs {
 	* \returns index of this entity in the component table.
 	*/
 	inline auto VecsHandle::type() noexcept			-> type_index_t {
-		return VecsRegistryBaseClass{}.type(*this);
+		return VecsRegistryBaseClass::m_registry.type(*this);
 	}
 
 	/**
