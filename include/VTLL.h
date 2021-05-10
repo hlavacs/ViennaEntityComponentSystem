@@ -1064,6 +1064,33 @@ namespace vtll {
 		"The implementation of function is bad");
 
 	//-------------------------------------------------------------------------
+	//function2: compute function on list of std::integral_constant<size_t, I> which has one additional template parameter
+
+	namespace detail {
+		template<typename T, typename Seq, template<typename, typename> typename Fun>
+		struct function2_impl;
+
+		template<typename T, template <typename...> typename Seq, typename... Ts, template<typename, typename> typename Fun>
+		struct function2_impl<T, Seq<Ts...>, Fun> {
+			using type = Seq< typename Fun<T,Ts>::type... >;
+		};
+
+		template<typename Ty, typename T>
+		struct test_func_function2 {
+			using type = std::integral_constant<Ty, 2 * T::value>;
+		};
+	}
+	template <typename T, typename Seq, template<typename, typename> typename Fun>
+	using function2 = typename detail::function2_impl<T, Seq, Fun>::type;
+
+	static_assert(
+		std::is_same_v<
+			function2<size_t, type_list<std::integral_constant<size_t, 1>, std::integral_constant<size_t, 2>, std::integral_constant<size_t, 3> >
+				, detail::test_func_function2 >
+		, type_list<std::integral_constant<size_t, 2>, std::integral_constant<size_t, 4>, std::integral_constant<size_t, 6> > >,
+		"The implementation of function2 is bad");
+
+	//-------------------------------------------------------------------------
 	//map: find a type key in a map, i.e. a list of type key - type value pairs, and retrieve its type value, or a default type if not found
 
 	namespace detail {

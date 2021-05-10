@@ -3,10 +3,8 @@
 #include <utility>
 #include "glm.hpp"
 #include "gtc/quaternion.hpp"
-
-#include "basic_test.h"
-
 #include "VECS.h"
+#include "basic_test.h"
 
 using namespace vecs;
 
@@ -14,7 +12,7 @@ int main() {
     std::atomic_flag flag;
     
     std::cout << sizeof(VecsHandle) << " " << sizeof(flag) << std::endl;
-    std::cout << vtll::size<VecsEntityTypeList>::value << std::endl;
+    std::cout << vtll::size<VeUserEntityTypeList>::value << std::endl;
 
     //std::cout << typeid(vecs::VecsEntityTypeList).name() << std::endl << std::endl;
     //std::cout << typeid(vecs::expand_tags<VecsEntityTypeList>).name() << std::endl;
@@ -39,7 +37,7 @@ int main() {
     auto comp2_1 = h2.component<VeComponentMaterial>();
     auto comp2_2 = h2.component<VeComponentMaterial>();
 
-    using entity_types = vtll::filter_have_all_types< VecsEntityTypeList, vtll::type_list<VeComponentPosition> >;
+    using entity_types = vtll::filter_have_all_types< VeUserEntityTypeList, vtll::type_list<VeComponentPosition> >;
     std::cout << typeid(entity_types).name() << std::endl;
 
     VecsRange<VeComponentPosition, VeComponentOrientation>{}.for_each([&](auto handle, auto& pos, auto& orient) {

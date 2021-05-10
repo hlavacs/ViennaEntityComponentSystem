@@ -6,9 +6,8 @@
 #include "glm.hpp"
 #include "gtc/quaternion.hpp"
 
-#include "test.h"
-
 #include "VECS.h"
+#include "test.h"
 
 using namespace vecs;
 

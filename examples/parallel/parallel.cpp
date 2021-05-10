@@ -10,9 +10,8 @@
 #include "VGJS.h"
 #include "VGJSCoro.h"
 
-#include "parallel.h"	//define user components
-
 #include "VECS.h"
+#include "parallel.h"	//define user components
 
 
 using namespace vecs;
@@ -41,17 +40,17 @@ template<template<typename...> typename R, typename... Cs>
 void do_work(R<Cs...> range ) {
 	size_t i = 0;
 
-	/*for (auto [handle, pos] : range) {
+	for (auto [handle, pos] : range) {
 		if (!handle.is_valid()) continue;
 		pos.m_position = glm::vec3{ 7.0f + i, 8.0f + i, 9.0f + i };
 		++i;
-	}*/
+	}
 
-	bool sync = true;
+	/*bool sync = true;
 	range.for_each([&](auto handle, auto& pos) {
 		pos.m_position = glm::vec3{ 7.0f + i, 8.0f + i, 9.0f + i };
 		++i;
-	}, sync);
+	}, sync);*/
 
 }
 
@@ -117,7 +116,7 @@ vgjs::Coro<> start( size_t num ) {
 	double dt1 = d1.count() / 1.0;
 	double dt2 = d2.count() / 1.0;
 
-	size_t size = VecsRegistry().size();
+	size_t size = VecsRegistry{}.size();
 
 	std::cout << "Num " << 2 * num << " Size " << size << "\n";
 	std::cout << "Linear " << dt1        << " ns Parallel 1 " << dt2        << " ns Speedup " << dt1 / dt2 << "\n\n";

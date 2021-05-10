@@ -6,10 +6,6 @@
 #include <typeindex>
 #include "VECSUtil.h"
 
-#include "VECSCompSystem.h" //get basic type list
-
-#define VECS_USER_DATA		//define macro to prevent loading VECSCompUser.h
-
 namespace vecs {
 
 	//-------------------------------------------------------------------------
@@ -109,6 +105,9 @@ namespace vecs {
 		, vtll::type_list< VeEntityTypeAnimation, VECS_LAYOUT_COLUMN >
 		//, ...
 	>;
+
+	VECS_DECLARE_PARTITION(, VeUserEntityTypeList, VeUserEntityTagMap, VeUserTableSizeMap, VeUserTableLayoutMap);
+
 
 }
 

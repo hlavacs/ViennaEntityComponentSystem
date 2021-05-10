@@ -27,12 +27,14 @@ namespace vecs {
 	* the segment.
 	* 
 	*/
-	template<typename DATA, size_t N0 = 1<<10, bool ROW = true>
+	template<typename P, typename DATA, size_t N0 = 1<<10, bool ROW = true>
 	class VecsTable {
-		template<typename E> friend class VecsRegistry;
-		template<typename E> friend class VecsComponentTable;
-		template<typename E, size_t I> friend class VecsComponentTableDerived;
-		template<typename E, typename ETL, typename CTL> friend class VecsIteratorEntity;
+
+		//friends
+		template<typename P, typename E> friend class VecsRegistryTemplate;
+		template<typename P, typename E> friend class VecsComponentTable;
+		template<typename P, typename E, size_t I> friend class VecsComponentTableDerived;
+		template<typename P, typename E, typename ETL, typename CTL> friend class VecsIteratorEntity;
 
 		static const size_t N = vtll::smallest_pow2_leq_value< N0 >::value;								///< Force N to be power of 2
 		static const size_t L = vtll::index_largest_bit< std::integral_constant<size_t,N> >::value - 1;	///< Index of largest bit in N
@@ -94,7 +96,7 @@ namespace vecs {
 		//move and remove data
 
 		inline auto pop_back()	noexcept									-> void { m_size--; }	///< Remove the last row
-		inline void clear() noexcept { m_size = 0; };				///< Set the number if rows to zero - effectively clear the table
+		inline auto clear() noexcept -> void { m_size = 0; };	///< Set the number if rows to zero - effectively clear the table
 		inline auto move(table_index_t idst, table_index_t isrc) noexcept	-> bool;	///< Move contents of a row to another row
 		inline auto swap(table_index_t n1, table_index_t n2) noexcept		-> bool;	///< Swap contents of two rows
 
@@ -112,14 +114,14 @@ namespace vecs {
 	* \param[in] r Max number of rows that can be stored in the table.
 	* \param[in] mr Memory allocator.
 	*/
-	template<typename DATA, size_t N0, bool ROW>
-	inline VecsTable<DATA,N0,ROW>::VecsTable(size_t r, std::pmr::memory_resource* mr) noexcept : m_segment{ nullptr } {};
+	template<typename P, typename DATA, size_t N0, bool ROW>
+	inline VecsTable<P, DATA, N0, ROW>::VecsTable(size_t r, std::pmr::memory_resource* mr) noexcept : m_segment{ nullptr } {};
 
 	/**
 	* \brief Destructor of class VecsTable.
 	*/
-	template<typename DATA, size_t N0, bool ROW>
-	inline VecsTable<DATA, N0, ROW>::~VecsTable() noexcept {
+	template<typename P, typename DATA, size_t N0, bool ROW>
+	inline VecsTable<P, DATA, N0, ROW>::~VecsTable() noexcept {
 		if (m_segment.load()) delete m_segment.load();
 	};
 
@@ -128,9 +130,9 @@ namespace vecs {
 	* \param[in] n Index to the entry.
 	* \returns a reference to the Ith component of entry n.
 	*/
-	template<typename DATA, size_t N0, bool ROW>
+	template<typename P, typename DATA, size_t N0, bool ROW>
 	template<size_t I, typename C>
-	inline auto VecsTable<DATA, N0, ROW>::component_ref(table_index_t n) noexcept -> C& {
+	inline auto VecsTable<P, DATA, N0, ROW>::component_ref(table_index_t n) noexcept -> C& {
 		if constexpr (ROW) {
 			return std::get<I>( (* (*m_segment.load()) [n >> L] )[n & BIT_MASK]);
 		}
@@ -144,9 +146,9 @@ namespace vecs {
 	* \param[in] n Index to the entry.
 	* \returns a pointer to the Ith component of entry n.
 	*/
-	template<typename DATA, size_t N0, bool ROW>
+	template<typename P, typename DATA, size_t N0, bool ROW>
 	template<size_t I, typename C>
-	inline auto VecsTable<DATA, N0, ROW>::component_ptr(table_index_t n) noexcept -> C* {
+	inline auto VecsTable<P, DATA, N0, ROW>::component_ptr(table_index_t n) noexcept -> C* {
 		if constexpr (ROW) {
 			return &std::get<I>((*(*m_segment.load())[n >> L])[n & BIT_MASK]);
 		}
@@ -160,8 +162,8 @@ namespace vecs {
 	* \param[in] n Index to the entry.
 	* \returns a tuple with values of all components of entry n.
 	*/
-	template<typename DATA, size_t N0, bool ROW>
-	inline auto VecsTable<DATA, N0, ROW>::tuple_ref(table_index_t n) noexcept -> tuple_ref_t {
+	template<typename P, typename DATA, size_t N0, bool ROW>
+	inline auto VecsTable<P, DATA, N0, ROW>::tuple_ref(table_index_t n) noexcept -> tuple_ref_t {
 		auto f = [&]<size_t... Is>(std::index_sequence<Is...>) {
 			if constexpr (ROW) {
 				return std::tie(std::get<Is>((* (*m_segment.load()) [n >> L])[n & BIT_MASK])...);
@@ -178,8 +180,8 @@ namespace vecs {
 	* \param[in] n Index to the entry.
 	* \returns a tuple with references to all components of entry n.
 	*/
-	template<typename DATA, size_t N0, bool ROW>
-	inline auto VecsTable<DATA, N0, ROW>::tuple_ptr(table_index_t n) noexcept -> tuple_ptr_t {
+	template<typename P, typename DATA, size_t N0, bool ROW>
+	inline auto VecsTable<P, DATA, N0, ROW>::tuple_ptr(table_index_t n) noexcept -> tuple_ptr_t {
 		auto f = [&]<size_t... Is>(std::index_sequence<Is...>) {
 			if constexpr (ROW) {
 				return std::make_tuple(&std::get<Is>((* (*m_segment.load()) [n >> L])[n & BIT_MASK])...);
@@ -196,8 +198,8 @@ namespace vecs {
 	* Must be externally synchronized!
 	* \returns the index of the new entry.
 	*/
-	template<typename DATA, size_t N0, bool ROW>
-	inline auto VecsTable<DATA, N0, ROW>::push_back() noexcept -> table_index_t {
+	template<typename P, typename DATA, size_t N0, bool ROW>
+	inline auto VecsTable<P, DATA, N0, ROW>::push_back() noexcept -> table_index_t {
 		auto idx = m_size.fetch_add(1);		///< Increase table size and get old size.
 		if (!reserve(idx + 1)) {				///< Make sure there is enough space in the table
 			m_size--;
@@ -212,10 +214,10 @@ namespace vecs {
 	* \param[in] data Universal references to the new data.
 	* \returns index of new entry.
 	*/
-	template<typename DATA, size_t N0, bool ROW>
+	template<typename P, typename DATA, size_t N0, bool ROW>
 	template<template<typename... Cs> typename T, typename... Cs>
 	requires std::is_same_v<vtll::to_tuple<DATA>, std::tuple<std::decay_t<Cs>...>>
-	inline auto VecsTable<DATA, N0, ROW>::push_back(T<Cs...>&& data) noexcept -> table_index_t {
+	inline auto VecsTable<P, DATA, N0, ROW>::push_back(T<Cs...>&& data) noexcept -> table_index_t {
 		auto idx = m_size.fetch_add(1);		///< Increase table size and get old size.
 		if (!reserve(idx + 1)) {			///< Make sure there is enough space in the table
 			m_size--;
@@ -234,9 +236,9 @@ namespace vecs {
 	* \param[in] C Universal reference to the component holding the data.
 	* \returns true if the operation was successful.
 	*/
-	template<typename DATA, size_t N0, bool ROW>
+	template<typename P, typename DATA, size_t N0, bool ROW>
 	template<size_t I, typename C>
-	inline auto VecsTable<DATA, N0, ROW>::update(table_index_t n, C&& data) noexcept -> bool {
+	inline auto VecsTable<P, DATA, N0, ROW>::update(table_index_t n, C&& data) noexcept -> bool {
 		if (n >= m_size) return false;
 		*component_ptr<I>(n) = std::forward<C>(data);
 		return true;
@@ -248,10 +250,10 @@ namespace vecs {
 	* \param[in] C Universal reference to tuple holding the components with the data.
 	* \returns true if the operation was successful.
 	*/
-	template<typename DATA, size_t N0, bool ROW>
+	template<typename P, typename DATA, size_t N0, bool ROW>
 	template<template<typename... Cs> typename T, typename... Cs>
 	requires std::is_same_v<vtll::to_tuple<DATA>, std::tuple<std::decay_t<Cs>...>>
-	inline auto VecsTable<DATA, N0, ROW>::update(table_index_t n, T<Cs...>&& data) noexcept -> bool {
+	inline auto VecsTable<P, DATA, N0, ROW>::update(table_index_t n, T<Cs...>&& data) noexcept -> bool {
 		if (n >= m_size) return false;
 		auto ptr = tuple_ptr(n);
 		vtll::static_for<size_t, 0, vtll::size<DATA>::value >([&](auto i) {
@@ -266,8 +268,8 @@ namespace vecs {
 	* \param[in] isrc Index of source row.
 	* \returns true if the operation was successful.
 	*/
-	template<typename DATA, size_t N0, bool ROW>
-	inline auto VecsTable<DATA, N0, ROW>::move(table_index_t idst, table_index_t isrc) noexcept -> bool {
+	template<typename P, typename DATA, size_t N0, bool ROW>
+	inline auto VecsTable<P, DATA, N0, ROW>::move(table_index_t idst, table_index_t isrc) noexcept -> bool {
 		if (idst >= m_size || isrc >= m_size) return false;
 		auto src = tuple_ptr(isrc);
 		auto dst = tuple_ptr(idst);
@@ -283,8 +285,8 @@ namespace vecs {
 	* \param[in] n2 Index of second row.
 	* \returns true if the operation was successful.
 	*/
-	template<typename DATA, size_t N0, bool ROW>
-	inline auto VecsTable<DATA, N0, ROW>::swap(table_index_t idst, table_index_t isrc) noexcept -> bool {
+	template<typename P, typename DATA, size_t N0, bool ROW>
+	inline auto VecsTable<P, DATA, N0, ROW>::swap(table_index_t idst, table_index_t isrc) noexcept -> bool {
 		if (idst >= m_size || isrc >= m_size) return false;
 		auto src = tuple_ptr(isrc);
 		auto dst = tuple_ptr(idst);
@@ -299,8 +301,8 @@ namespace vecs {
 	* \param[in] r Number of entries to be stored in the table.
 	* \returns true if the operation was successful.
 	*/
-	template<typename DATA, size_t N0, bool ROW>
-	inline auto VecsTable<DATA, N0, ROW>::reserve(size_t r) noexcept -> bool {
+	template<typename P, typename DATA, size_t N0, bool ROW>
+	inline auto VecsTable<P, DATA, N0, ROW>::reserve(size_t r) noexcept -> bool {
 		seg_vector_t* segment_ptr{ m_segment.load() };
 		if (segment_ptr && r <= segment_ptr->size() * N) return true;	///< is there enough space in the table?
 
@@ -333,8 +335,8 @@ namespace vecs {
 	* No parallel processing is allowed when calling this function!
 	* \param[in] r Max number of entities to be allowed in the table.
 	*/
-	template<typename DATA, size_t N0, bool ROW>
-	inline auto VecsTable<DATA, N0, ROW>::capacity(size_t r) noexcept -> size_t {
+	template<typename P, typename DATA, size_t N0, bool ROW>
+	inline auto VecsTable<P, DATA, N0, ROW>::capacity(size_t r) noexcept -> size_t {
 		seg_vector_t* segment_ptr{ m_segment.load() };
 
 		if (!segment_ptr || r > segment_ptr->capacity() * N) {	///< is there enough space in the table?
@@ -361,8 +363,8 @@ namespace vecs {
 	* \brief Deallocate segments that are currently not used.
 	* No parallel processing allowed when calling this function.
 	*/
-	template<typename DATA, size_t N0, bool ROW>
-	inline auto VecsTable<DATA, N0, ROW>::compress() noexcept -> void {
+	template<typename P, typename DATA, size_t N0, bool ROW>
+	inline auto VecsTable<P, DATA, N0, ROW>::compress() noexcept -> void {
 		if (!m_segment.load()) return;
 		while (m_segment.load()->size() > 1 && m_size + N <= m_segment.load()->size() * N) {
 			m_segment.load()->pop_back();
