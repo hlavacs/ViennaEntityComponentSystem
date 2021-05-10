@@ -143,10 +143,10 @@ namespace vecs {
 	* \brief Table constants retrieves mappings for all entity types from the VecsTableSizeMap (which have the format vtll::value_list<A,B>).
 	* Then it turns the value lists to type lists, each value is stored in a std::integral_constant<size_t, V> type.
 	*/
-	using VeTableSizeDefault = vtll::value_list< 1 << 10 >;
+	using VecsTableSizeDefault = vtll::value_list< 1 << 10 >;
 
 	template<typename P>
-	using VecsTableConstants = vtll::transform < vtll::apply_map<VecsTableSizeMap<P>, VecsEntityTypeList<P>, VeTableSizeDefault>, vtll::value_to_type>;
+	using VecsTableConstants = vtll::transform < vtll::apply_map<VecsTableSizeMap<P>, VecsEntityTypeList<P>, VecsTableSizeDefault>, vtll::value_to_type>;
 
 	/**
 	* \brief Get the maximal exponent from the list of segment size exponents.
@@ -354,7 +354,7 @@ namespace vecs {
 		using types = vtll::cat< info, E >;						///< List with management (info) and component (data) types
 		using types_deleted = vtll::type_list< table_index_t >;	///< List with types for holding info about erased entities 
 
-		static const size_t c_segment_size = vtll::front_value< vtll::map< VecsTableSizeMap<P>, E, VeTableSizeDefault > >::value;
+		static const size_t c_segment_size = vtll::front_value< vtll::map< VecsTableSizeMap<P>, E, VecsTableSizeDefault > >::value;
 		static inline VecsTable<P, types, c_segment_size, layout_type_t::value>	m_data;		///< Data per entity
 		static inline VecsTable<P, types_deleted, c_segment_size, VECS_LAYOUT_ROW::value>	m_deleted;	///< Table holding the indices of erased entities
 
