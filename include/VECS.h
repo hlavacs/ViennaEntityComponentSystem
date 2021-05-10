@@ -279,19 +279,19 @@ namespace vecs {
 
 		template<typename C>
 		requires is_component_type<P, C>
-			auto has_component() noexcept	-> bool;	///< Return true if the entity type has a component C
+		auto has_component() noexcept	-> bool;	///< Return true if the entity type has a component C
 
 		template<typename C>
 		requires is_component_type<P, C>
-			auto component() noexcept		-> C& { return *component_ptr<C>(); };	///< Get a component of type C of the entity (first found is copied) 
+		auto component() noexcept		-> C& { return *component_ptr<C>(); };	///< Get a component of type C of the entity (first found is copied) 
 
 		template<typename C>
 		requires is_component_type<P, C>
-			auto component_ptr() noexcept	-> C*;		///< Get a pointer to component of type C of the entity (first found is copied) 
+		auto component_ptr() noexcept	-> C*;		///< Get a pointer to component of type C of the entity (first found is copied) 
 
 		template<typename... Cs>
 		requires are_component_types<P, Cs...>
-			auto update(Cs&&... args) noexcept -> bool;	///< Update components of type C
+		auto update(Cs&&... args) noexcept -> bool;	///< Update components of type C
 
 		auto erase() noexcept -> bool;				///< Erase the entity 
 
@@ -755,38 +755,38 @@ namespace vecs {
 
 		template<typename C>
 		requires is_component_type<P, C>
-			auto has_component(VecsHandleTemplate<P> handle) noexcept	-> bool;	///< \returns true if the entity of type E has a component of type C
+		auto has_component(VecsHandleTemplate<P> handle) noexcept	-> bool;	///< \returns true if the entity of type E has a component of type C
 
 		template<typename C>
 		requires is_component_type<P, C>
-			auto component(VecsHandleTemplate<P> handle) noexcept -> C& { return *component_ptr<C>(handle); };	///< Get a component of type C
+		auto component(VecsHandleTemplate<P> handle) noexcept -> C& { return *component_ptr<C>(handle); };	///< Get a component of type C
 
 		template<typename C>
 		requires is_component_type<P, C>
-			auto component_ptr(VecsHandleTemplate<P> handle) noexcept -> C*;		///< Get a component of type C
+		auto component_ptr(VecsHandleTemplate<P> handle) noexcept -> C*;		///< Get a component of type C
 
-			//-------------------------------------------------------------------------
-			//update data
+		//-------------------------------------------------------------------------
+		//update data
 
 		template<typename... Cs>
 		requires are_component_types<P, Cs...>
-			auto update(VecsHandleTemplate<P> handle, Cs&&... args) noexcept -> bool;	///< Update component of type C of an entity
+		auto update(VecsHandleTemplate<P> handle, Cs&&... args) noexcept -> bool;	///< Update component of type C of an entity
 
-			//-------------------------------------------------------------------------
-			//erase data
+		//-------------------------------------------------------------------------
+		//erase data
 
 		virtual auto erase(VecsHandleTemplate<P> handle) noexcept -> bool;		///< Erase a specific entity
 
 		template<typename... Es>
 		requires (are_entity_types<P, Es...>)
-			auto clear() noexcept				-> size_t;		///< Clear the whole ECS
+		auto clear() noexcept				-> size_t;		///< Clear the whole ECS
 
-			//-------------------------------------------------------------------------
-			//utility
+		//-------------------------------------------------------------------------
+		//utility
 
 		template<typename... Es>
 		requires (are_entity_types<P, Es...>)
-			auto size() noexcept -> size_t;		///< \returns the total number of valid entities of types Es
+		auto size() noexcept -> size_t;		///< \returns the total number of valid entities of types Es
 
 		auto compress() noexcept -> void;							///< Compress all component tables
 		auto table_index(VecsHandleTemplate<P> h) noexcept	-> table_index_t;	///< \returns row index in component table
@@ -959,7 +959,7 @@ namespace vecs {
 		template<typename C>
 		requires is_component_type<P, C>
 		auto has_component() noexcept				-> bool {	///< Return true if the entity type has a component C
-			return is_component_of<P, E,C>;
+			return is_component_of<P, E, C>;
 		}
 
 		template<typename C>

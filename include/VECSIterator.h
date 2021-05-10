@@ -54,9 +54,9 @@ namespace vecs {
 			auto operator!=(const VecsIteratorBaseClass<P, ETL, CTL>& v) noexcept	-> bool;	///< Unqequal
 			auto operator==(const VecsIteratorBaseClass<P, ETL, CTL>& v) noexcept	-> bool;	///< Equal
 
-			auto handle() noexcept			-> VecsHandleTemplate<P>;			///< Return handle of the current entity
-			auto mutex_ptr() noexcept		-> std::atomic<uint32_t>*;	///< Return poiter to the mutex of this entity
-			auto has_value() noexcept		-> bool;					///< Is currently pointint to a valid entity
+			auto handle() noexcept			-> VecsHandleTemplate<P>;	///< Return handle of the current entity
+			auto mutex_ptr() noexcept		-> std::atomic<uint32_t>*;	///< Return pointer to the mutex of this entity
+			auto has_value() noexcept		-> bool;					///< Is currently pointing to a valid entity
 			
 			auto operator*() noexcept		-> reference;							///< Access the data
 			auto operator++() noexcept		-> VecsIteratorBaseClass<P, ETL,CTL>&;	///< Increase by 1
