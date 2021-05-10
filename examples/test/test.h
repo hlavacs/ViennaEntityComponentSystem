@@ -66,6 +66,9 @@ namespace vecs {
 	using MyEntityTypeDraw = vtll::type_list<MyComponentName, MyComponentPosition, MyComponentOrientation, MyComponentTransform, MyComponentMaterial, MyComponentGeometry>;
 	using MyEntityTypeAnimation = vtll::type_list<MyComponentName, MyComponentAnimation>;
 
+	template<typename... Ts>
+	using MyEntityTypeNodeTagged = vtll::app< MyEntityTypeNode, Ts... >;
+
 	using MyEntityTypeList = vtll::type_list<
 		MyEntityTypeNode
 		, MyEntityTypeDraw
