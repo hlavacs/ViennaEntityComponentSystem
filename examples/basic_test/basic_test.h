@@ -10,49 +10,49 @@ namespace vecs {
 
 	//-------------------------------------------------------------------------
 	//define user components here
-
+	
 	/// \brief Example for a user component
-	struct VeComponentName {
+	struct MyComponentName {
 		std::string m_name;
 	};
 
 	/// \brief Example for a user component
-	struct VeComponentPosition {
+	struct MyComponentPosition {
 		glm::vec3 m_position;
 	};
 
 	/// \brief Example for a user component
-	struct VeComponentOrientation {
+	struct MyComponentOrientation {
 		glm::quat m_orientation;
 	};
 
 	/// \brief Example for a user component
-	struct VeComponentTransform {
+	struct MyComponentTransform {
 		glm::mat4 m_transform;
 	};
 
 	/// \brief Example for a user component
-	struct VeComponentMaterial {
+	struct MyComponentMaterial {
 		int i;
 	};
 
 	/// \brief Example for a user component
-	struct VeComponentGeometry {
+	struct MyComponentGeometry {
 		int i;
 	};
 
 	/// \brief Example for a user component
-	struct VeComponentAnimation {
+	struct MyComponentAnimation {
 		int i;
 	};
 
 	/// \brief Example for a user component
-	struct VeComponentCollisionShape {
+	struct MyComponentCollisionShape {
 		int i;
 	};
 
 	/// \brief Example for a user component
-	struct VeComponentRigidBody {
+	struct MyComponentRigidBody {
 		int i;
 	};
 
@@ -62,46 +62,46 @@ namespace vecs {
 	//-------------------------------------------------------------------------
 	//define user entity types here
 
-	using VeEntityTypeNode = vtll::type_list<VeComponentName, VeComponentPosition, VeComponentOrientation, VeComponentTransform>;
-	using VeEntityTypeDraw = vtll::type_list<VeComponentName, VeComponentPosition, VeComponentOrientation, VeComponentTransform, VeComponentMaterial, VeComponentGeometry>;
-	using VeEntityTypeAnimation = vtll::type_list<VeComponentName, VeComponentAnimation>;
+	using MyEntityTypeNode = vtll::type_list<MyComponentName, MyComponentPosition, MyComponentOrientation, MyComponentTransform>;
+	using MyEntityTypeDraw = vtll::type_list<MyComponentName, MyComponentPosition, MyComponentOrientation, MyComponentTransform, MyComponentMaterial, MyComponentGeometry>;
+	using MyEntityTypeAnimation = vtll::type_list<MyComponentName, MyComponentAnimation>;
 
-	using VeUserEntityTypeList = vtll::type_list<
-		  VeEntityTypeNode
-		, VeEntityTypeDraw
-		, VeEntityTypeAnimation
+	using MyEntityTypeList = vtll::type_list<
+		  MyEntityTypeNode
+		, MyEntityTypeDraw
+		, MyEntityTypeAnimation
 		// ,... 
 	>;
 
 	//-------------------------------------------------------------------------
 	//tag maps
 
-	using VeUserEntityTagMap = vtll::type_list<
-		vtll::type_list< VeEntityTypeNode, vtll::type_list< TAG1, TAG2 > >
+	using MyEntityTagMap = vtll::type_list<
+		vtll::type_list< MyEntityTypeNode, vtll::type_list< TAG1, TAG2 > >
 		//, ...
 	>;
 
 	//-------------------------------------------------------------------------
 	//user size maps
 
-	using VeUserTableSizeMap = vtll::type_list<
-		  //vtll::type_list< VeEntityTypeNode, vtll::value_list< 1<<15 > >
-		//, vtll::type_list< VeEntityTypeDraw, vtll::value_list< 1<<15 > >
-		//, vtll::type_list< VeEntityTypeAnimation, vtll::value_list< 1<<15 > >
+	using VeTableSizeMap = vtll::type_list<
+		  //vtll::type_list< MyEntityTypeNode, vtll::value_list< 1<<15 > >
+		//, vtll::type_list< MyEntityTypeDraw, vtll::value_list< 1<<15 > >
+		//, vtll::type_list< MyEntityTypeAnimation, vtll::value_list< 1<<15 > >
 		//, ...
 	>;
 
 	//-------------------------------------------------------------------------
 	//user table layouts
 
-	using VeUserTableLayoutMap = vtll::type_list<
-		  vtll::type_list< VeEntityTypeNode, VECS_LAYOUT_COLUMN >
-		, vtll::type_list< VeEntityTypeDraw, VECS_LAYOUT_COLUMN >
-		, vtll::type_list< VeEntityTypeAnimation, VECS_LAYOUT_COLUMN >
+	using VeTableLayoutMap = vtll::type_list<
+		  vtll::type_list< MyEntityTypeNode, VECS_LAYOUT_COLUMN >
+		, vtll::type_list< MyEntityTypeDraw, VECS_LAYOUT_COLUMN >
+		, vtll::type_list< MyEntityTypeAnimation, VECS_LAYOUT_COLUMN >
 		//, ...
 	>;
 
-	VECS_DECLARE_PARTITION(, VeUserEntityTypeList, VeUserEntityTagMap, VeUserTableSizeMap, VeUserTableLayoutMap);
+	VECS_DECLARE_PARTITION(, MyEntityTypeList, MyEntityTagMap, VeTableSizeMap, VeTableLayoutMap);
 
 
 }

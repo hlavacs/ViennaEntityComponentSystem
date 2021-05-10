@@ -10,6 +10,7 @@ Systems do not have to be specially defined, anything that specifies a number of
 Important features of VECS are:
 * C++20
 * Header only, simply include the headers to your project
+* Make one or several partitions of your data.
 * Compile time definition of components and entities. VECS creates a rigorous compile time frame around your data, minimizing runtime overhead.
 * Can use tags to define subsets of entities dynamically.
 * Designed to be used by multiple threads in parallel, low overhead locking.
@@ -22,12 +23,10 @@ Important features of VECS are:
 VECS is a header only library, consisting of the following header files:
 * *IntType.h*: Template for strong integral types like *table_index_t* or *counter_t*. Such types enforce to use them explicitly as function parameters and prevent users from mixing them up with *size_t, int* or *unsigned long*. Also such a type can store a NULL value, and can be tested with *has_value()*.
 * *VECSUtil.h*: Contains utility classes such as a class for implementing CRTP, mono state, and simple low-overhead read and write locks.
-* *VECS.h*: The main include file containing most of VECS functionality.
 * *VECSTable.h*: Defines a table data structure that can grow with minimal synchronization overhead, even when accessed by multiple threads.
 * *VECSIterator.h*: Functionality for iterating over entities in VECS.
-* *VECSCompSystem.h*: Examples for component types and entity types used in a game engine itself.
-* *VECSCompUser.h*: Examples for components and entities that could be defined by the engine users to store their own entities.
 * *VTLL.h*: The Vienna Type List Library is a collection of meta-algorithms for treating type lists and value lists.
+* *VECS.h*: The main include file containing most of VECS functionality, loading all other include files. Include this file into your source code.
 
 VECS depends on two projects, the Vienna Type List Library (VTLL) and Vienna Game Job System (VGJS).
 
@@ -48,169 +47,65 @@ An *Entity Component System* is a data structure that stores data components in 
 This can be plain old data types, structs, classes, (smart) pointers etc.
 but not references since they must be bound to something when created. An example is given by
 
-    struct VeUserComponentName {
+    #include "VECS.h"                 //include this file, then define components, entities, maps and partitions
+
+    struct MyComponentName {
       std::string m_name;
     };
 
-    struct VeUserComponentPosition {
+    struct MyComponentPosition {
       float x;
       float y;
       float z;
     };
 
-    struct VeUserComponentResource {
+    struct MyComponentResource {
       std::unique_ptr<my_resource_t> my_resource;
     };
 
-As can be seen, these components consist of a std::string, floats and a unique pointer (which is movable but NOT copyable), and thus satisfy the conditions on components. Components are then used to define *entities*. Entities are composed of one or more components. This composition is defined using type lists, like
+As can be seen, these components consist of a std::string, floats and a unique pointer (which is movable but NOT copyable), and thus satisfy the conditions on components. Components are then used to define *entities*. Entities are composed of one or more components. This composition is defined using type lists, like this
 
-    using VeSystemEntityTypeNode
-      = vtll::type_list<VeSystemComponentName, VeSystemComponentPosition>;
+    using MyEntityTypeNode = vtll::type_list<MyComponentName, MyComponentPosition>;
 
-which defines the entity type *VeSystemEntityTypeNode* to be composed of the two components.
+which defines the entity type *MySystemEntityTypeNode* to be composed of the two components. Likewise, you can define an arbitrary number of other entity types. A list of such entities then defines a *VECS partition*, meaning that the particular partition can store all entities as given in this list, and no others. You can declare a list of entity types like so:
 
-For defining components and entities, there are two major use cases. If you *create a game engine* yourself, you should define components and entities as belonging to the *system* in file *VECSCompSystem.h*.
-
-If you are a *user of a VECS based engine*, then you can define your own types either in *VECSCompUser.h*, or in your own include files and by defining the macro
-
-    #define VECS_USER_DATA
-
-prevent *VECSCompUser.h* from being loaded (see e.g. *test.h*). Both cases are internally treated the same way and are discussed in the following.
-
-### Option 1 - Using VECS in the Core of your Game engine
-
-If you create your own game engine and use VECS as its core ECS, simply include *VECS.h* in your CPP files. Also edit *VECSCompSystem.h* to define the components you use, and how entity types are composed of them. Initially, VECS comes with an empty list of system components, and you are free to define them as you like. Components should be structs or other data types that are *movable* and *default constructible*.
-
-    struct VeSystemComponentName {
-      std::string m_name;
-    };
-
-    struct VeSystemComponentPosition {
-      float x;
-      float y;
-      float z;
-    };
-
-    //...
-
-Once you have defined your component types, you can compose entities with them:
-
-    using VeSystemEntityTypeNode = vtll::type_list<VeSystemComponentName, VeSystemComponentPosition>;
-
-In this example, an entity type VeSystemEntityTypeNode is composed of the components VeSystemComponentName and VeSystemComponentPosition.
-You can define arbitrarily many entities like this. However, component types must be *unique* within each entity type. Thus, an entity type is *not allowed* to contain the same component type twice! If you need the same data twice, pack it into different structs.
-
-All system entity types must be put into this list:
-
-    using VeSystemEntityTypeList = vtll::type_list<
-      VeSystemEntityTypeNode
+    using MyEntityTypeList = vtll::type_list<
+      MyEntityTypeNode
       // ,...
     >;
 
-Components of entities are stored in tables, one table for each entity type *E*. Tables are organized in segments, each segment is able to store *N = 2^L* rows of component data. For each entity type you can define *N* in a map:
+In order to declare a VECS partition, besides the *entity list*, you need a *tag map*, a *size map*, and a *layout map*. All maps can be empty lists, in which case default values are used. Tags are simply empty structs (only their types are needed), and you can specify those entities that can be annotated by them with a tag map:
 
-    using VeSystemTableSizeMap = vtll::type_list<
-      vtll::type_list< VeSystemEntityTypeNode, vtll::value_list< 1<<15 > >
+    struct TAG1{};
+    struct TAG2{};
+
+    using MyEntityTagMap = vtll::type_list<
+      vtll::type_list< MyEntityTypeNode, vtll::type_list< TAG1, TAG2 > > //entities of type MyEntityTypeNode can have TAG1, TAG2, both or none tags
+      //, ...
+    >;
+
+Furthermore, components of entities are stored in tables, one table for each entity type *E*. Tables are organized in segments, each segment is able to store *N = 2^L* rows of component data. For each entity type you can define *N* in a map:
+
+    using MyTableSizeMap = vtll::type_list<
+      vtll::type_list< MyEntityTypeNode, vtll::value_list< 1<<15 > >
       //, ...
     >;
 
 In this example, *N = 1<<15*, and this is fixed at compile time. Note that *N* eventually must be a power of 2. If you specify any other number *N0*, VECS at compile time for *N* uses the smallest power of 2 that is larger or equal to *N0*. If nothing is specified, the default value for *N* is
 
-    using VeTableSizeDefault = vtll::value_list< 1<<10 >;
+    using MyTableSizeDefault = vtll::value_list< 1<<10 >;
 
-Another choice relates to the layout of segments. Layouts of segments can be row wise or column wise. In row wise, the components of each entity are stored next to each other. Thus when accessing all components at once, cache efficiency is best. In column wise, components are stored in separate arrays, and cache performance is optimal if only single components are accessed in for-loops. You can choose the layout for a specific entity type *E* like so:
+Another choice relates to the layout of segments. Layouts of segments can be row wise or column wise (the default if no map entry is given). In row wise, the components of each entity are stored next to each other. Thus when accessing all components at once, cache efficiency is best. In column wise, components are stored in separate arrays, and cache performance is optimal if only single components are accessed in for-loops. You can choose the layout for a specific entity type *E* like so:
 
-    using VeSystemTableLayoutMap = vtll::type_list<
-      vtll::type_list< VeSystemEntityTypeNode, VECS_LAYOUT_COLUMN >
+    using MySystemTableLayoutMap = vtll::type_list<
+      vtll::type_list< MySystemEntityTypeNode, VECS_LAYOUT_COLUMN >
       //, ...
     >;
 
-Possible values are VECS_LAYOUT_COLUMN or VECS_LAYOUT_ROW, the default is VECS_LAYOUT_COLUMN.
+Now we have all necessary data to define a VECS partition:
 
-### Option 2 - Being User of a Game Engine that is based on VECS
+    VECS_DECLARE_PARTITION(, MyEntityTypeList, MyEntityTagMap, VeTableSizeMap, VeTableLayoutMap);
 
-If you are a user of a given game engine using VECS, you can edit the file *VECSCompUser.h* for defining user based components and entity types. Like with system related types, there are lists holding user related types:
-
-    struct VeComponentName {
-      std::string m_name;
-    };
-
-    struct VeComponentPosition {
-      glm::vec3 m_position;
-    };
-
-    struct VeComponentOrientation {
-      glm::quat m_orientation;
-    };
-
-    using VeEntityTypeNode = vtll::type_list< VeComponentName, VeComponentPosition, VeComponentOrientation >;
-
-    using VeUserEntityTypeList = vtll::type_list<
-      VeEntityTypeNode
-      , VeEntityTypeDraw
-      , VeEntityTypeAnimation
-      // ,...
-    >;
-
-    using VeUserTableSizeMap = vtll::type_list<
-      vtll::type_list< VeEntityTypeNode, vtll::value_list< 15, 20 > >
-      //, ...
-    >;
-
-    using VeUserTableLayoutMap = vtll::type_list<
-      vtll::type_list< VeEntityTypeNode, VECS_LAYOUT_COLUMN >
-      //, ...
-    >;
-
-The names for component types and entity types can be arbitrarily chosen, but must be unique amongst all components and entity types.
-
-Alternatively, you can define this in your own include file, and define the macro *VECS_USER_DATA* in order to prevent later on using the definitions from *VECSCompUser.h*. The example projects use this approach, for example in *test.h*:
-
-    #ifndef TEST_H
-    #define TEST_H
-
-    #include <limits>
-    #include <typeinfo>
-    #include <typeindex>
-    #include "VECSUtil.h"
-
-    #include "VECSCompSystem.h" //get basic type list
-
-    #define VECS_USER_DATA      //define macro to prevent loading VECSCompUser.h
-
-    namespace vecs {
-
-      //-------------------------------------------------------------------------
-    	//define user components here
-
-      /// \brief Example for a user component
-    	struct VeComponentName {
-    		std::string m_name;
-    	};
-
-      //define the rest of the user components and entities
-      //...
-
-    };
-
-    #endif
-
-In your CPP file, make sure to include first your own include file, then afterwards *VECS.h*:
-
-    #include <iostream>
-    #include <utility>
-    #include "glm.hpp"
-    #include "gtc/quaternion.hpp"
-
-    #include "basic_test.h" //your own definitions, also #define VECS_USER_DATA
-
-    #include "VECS.h"       //VECS does not load VECSCompUser.h since you defined VECS_USER_DATA
-
-    using namespace vecs;
-
-    int main() {
-        //...
-    }
 
 
 ### The VECS Registry

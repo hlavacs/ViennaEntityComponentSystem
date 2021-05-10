@@ -58,15 +58,15 @@ void do_work(R<Cs...> range ) {
 void init(size_t num) {
 
 	for (int i = 0; i < num; ++i) {
-		VeComponentName name;
-		VeComponentPosition pos{ glm::vec3{1.0f + i, 2.0f + i, 3.0f + i} };
-		VeComponentOrientation orient{ glm::quat{glm::vec3{90.0f, 45.0f, 0.0f + i}} };
-		VeComponentTransform trans{ glm::mat4{ 1.0f } };
-		VeComponentMaterial mat{ 99 };
-		VeComponentGeometry geo{ 11 };
+		MyComponentName name;
+		MyComponentPosition pos{ glm::vec3{1.0f + i, 2.0f + i, 3.0f + i} };
+		MyComponentOrientation orient{ glm::quat{glm::vec3{90.0f, 45.0f, 0.0f + i}} };
+		MyComponentTransform trans{ glm::mat4{ 1.0f } };
+		MyComponentMaterial mat{ 99 };
+		MyComponentGeometry geo{ 11 };
 
-		auto h1 = VecsRegistry<VeEntityTypeNode>().insert(name, pos, orient, trans);
-		auto h2 = VecsRegistry<VeEntityTypeDraw>().insert(name, pos, orient, trans, mat, geo);
+		auto h1 = VecsRegistry<MyEntityTypeNode>().insert(name, pos, orient, trans);
+		auto h2 = VecsRegistry<MyEntityTypeDraw>().insert(name, pos, orient, trans, mat, geo);
 	}
 
 	for (int i = 0; i < 100; i++) {
@@ -84,14 +84,14 @@ vgjs::Coro<> start( size_t num ) {
 	int thr = 12;
 	std::pmr::vector<vgjs::Function> vec;
 
-	auto ranges = VecsRange<VeComponentPosition>{}.split(thr);
+	auto ranges = VecsRange<MyComponentPosition>{}.split(thr);
 	for (int i = 0; i < ranges.size(); ++i) {
 		vec.push_back(vgjs::Function([=]() { do_work(ranges[i]); }, vgjs::thread_index_t{}, vgjs::thread_type_t{ 1 }, vgjs::thread_id_t{ i }));
 	}
 
 	auto lin =
 		vgjs::Function([&]() {
-				do_work(VecsRange<VeComponentPosition>{});
+				do_work(VecsRange<MyComponentPosition>{});
 			}
 			, vgjs::thread_index_t{}, vgjs::thread_type_t{1}, vgjs::thread_id_t{100});
 
@@ -138,9 +138,9 @@ void func1(size_t num) {
 	std::cout << "Start \n";
 
 	VecsRegistry{};
-	VecsRegistry<VeEntityTypeNode>{};
-	VecsRegistry<VeEntityTypeDraw>{};
-	VecsRegistry<VeEntityTypeAnimation>{};
+	VecsRegistry<MyEntityTypeNode>{};
+	VecsRegistry<MyEntityTypeDraw>{};
+	VecsRegistry<MyEntityTypeAnimation>{};
 
 	vgjs::schedule( [=]() { init(num); });
 	vgjs::continuation( vgjs::Function( [=]() {func2(num); }, vgjs::thread_index_t{}, vgjs::thread_type_t{ 1 }, vgjs::thread_id_t{ 52 }) );
@@ -150,7 +150,7 @@ void func1(size_t num) {
 void func2(size_t num) {
 	auto lin =
 		vgjs::Function([&]() {
-		do_work(VecsRange<VeComponentPosition>{});
+		do_work(VecsRange<MyComponentPosition>{});
 			}, vgjs::thread_index_t{}, vgjs::thread_type_t{ 1 }, vgjs::thread_id_t{ 100 });
 
 	t0 = high_resolution_clock::now();
@@ -169,7 +169,7 @@ void func3(size_t num) {
 
 	std::pmr::vector<vgjs::Function> vec;
 
-	auto ranges = VecsRange<VeComponentPosition>{}.split(thr);
+	auto ranges = VecsRange<MyComponentPosition>{}.split(thr);
 	for (int i = 0; i < ranges.size(); ++i) {
 		vec.push_back(vgjs::Function([=]() { do_work(ranges[i]); }, vgjs::thread_index_t{}, vgjs::thread_type_t{ 1 }, vgjs::thread_id_t{ i }));
 	}
