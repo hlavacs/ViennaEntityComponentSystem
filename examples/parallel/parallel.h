@@ -84,7 +84,7 @@ namespace vecs {
 	//-------------------------------------------------------------------------
 	//user size maps
 
-	using VeTableSizeMap = vtll::type_list<
+	using MyTableSizeMap = vtll::type_list<
 		//vtll::type_list< MyEntityTypeNode, vtll::value_list< 1<<15 > >
 	  //, vtll::type_list< MyEntityTypeDraw, vtll::value_list< 1<<15 > >
 	  //, vtll::type_list< MyEntityTypeAnimation, vtll::value_list< 1<<15 > >
@@ -94,14 +94,14 @@ namespace vecs {
 	//-------------------------------------------------------------------------
 	//user table layouts
 
-	using VeTableLayoutMap = vtll::type_list<
+	using MyTableLayoutMap = vtll::type_list<
 		vtll::type_list< MyEntityTypeNode, VECS_LAYOUT_COLUMN >
 		, vtll::type_list< MyEntityTypeDraw, VECS_LAYOUT_COLUMN >
 		, vtll::type_list< MyEntityTypeAnimation, VECS_LAYOUT_COLUMN >
 		//, ...
 	>;
 
-	VECS_DECLARE_PARTITION(, MyEntityTypeList, MyEntityTagMap, VeTableSizeMap, VeTableLayoutMap);
+	VECS_DECLARE_PARTITION(, MyEntityTypeList, MyEntityTagMap, MyTableSizeMap, MyTableLayoutMap);
 
 
 }
