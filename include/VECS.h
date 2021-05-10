@@ -1042,12 +1042,7 @@ namespace vecs {
 
 		if (!has_value(handle)) return false;	///< Return the empty component
 
-		//VecsRegistryBaseClass::print_type(handle);
-		//std::cout << " type " << VecsRegistry{}.type(handle) << std::endl;
-
 		auto& map_type = *m_map_table.component_ptr<c_type>(handle.m_map_index);	///< Old type index
-
-		//std::cout << "Transform from " << map_type.value << " to " << typeid(E).name() << " " << vtll::index_of<VecsEntityTypeList, E>::value << std::endl << std::endl;
 
 		if (map_type == vtll::index_of<VecsEntityTypeList, E>::value) return true;	///< New type = old type -> do nothing
 
@@ -1188,17 +1183,15 @@ namespace vecs {
 	*/
 	template<typename E>
 	inline auto VecsRegistry<E>::capacity(size_t r) noexcept -> size_t {
-		auto maxE = m_component_table.capacity(r);
-		size_t sum_max = 0;
-		vtll::static_for<size_t, 0, vtll::size<VecsEntityTypeList>::value >(
-			[&](auto i) {
-				using type = vtll::Nth_type<VecsEntityTypeList, i>;
-				sum_max += VecsRegistry<type>.capacity(0);
-			}
-		);
+		if( r == 0) return m_component_table.capacity(0);
 
-		m_map_table.capacity(sum_max);
-		return maxE;
+		auto old_maxE = m_component_table.capacity(0);
+		auto new_maxE = m_component_table.capacity(r);
+		auto diff = new_maxE > old_maxE ? new_maxE - old_maxE : 0;
+		if (diff > 0) {
+			m_map_table.capacity(m_map_table.capacity(0) + diff);
+		}
+		return new_maxE;
 	}
 
 
