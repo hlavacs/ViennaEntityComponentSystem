@@ -18,20 +18,18 @@
 using namespace std::chrono_literals;
 
 
-/*template<typename P>\
-class Vecs##NAME##Registry<P, vtll::type_list<>> : public VecsRegistryBaseClass<P> {\
-public:\
-	Vecs##NAME##Registry() noexcept : VecsRegistryBaseClass<P>() {};\
-	Vecs##NAME##Registry(std::nullopt_t u) noexcept : VecsRegistryBaseClass<P>() {};\
-};*/
-
-
+/** 
+* This macro declares a VECS partition.
+* 
+*/ 
 #define VECS_DECLARE_PARTITION( NAME, PARTITION, TAGMAP, SIZEMAP, LAYOUTMAP ) \
 static_assert(vtll::are_unique<PARTITION>::value, "The elements of" #PARTITION " are not unique!");\
 template<> struct VecsEntityTagMapTemplate<PARTITION> { using type = TAGMAP; };\
 template<> struct VecsTableSizeMapTemplate<PARTITION> { using type = SIZEMAP; };\
 template<> struct VecsTableLayoutMapTemplate<PARTITION> { using type = LAYOUTMAP; };\
 using Vecs##NAME##Handle = VecsHandleTemplate<PARTITION>;\
+template<typename... Ts> using Vecs##NAME##Iterator = VecsIteratorTemplate<PARTITION, Ts...>;\
+template<typename... Ts> using Vecs##NAME##Range = VecsRangeTemplate<PARTITION, Ts...>;\
 \
 template<typename E = vtll::tl<>>\
 class Vecs##NAME##Registry : public VecsRegistryTemplate<PARTITION,E> {\
@@ -45,10 +43,7 @@ class Vecs##NAME##Registry<vtll::tl<>> : public VecsRegistryTemplate<PARTITION, 
 public:\
 	Vecs##NAME##Registry() noexcept : VecsRegistryTemplate<PARTITION>() {}; \
 	Vecs##NAME##Registry(std::nullopt_t u) noexcept : VecsRegistryTemplate<PARTITION>(u) {};\
-};\
-\
-template<typename... Ts> using Vecs##NAME##Iterator = VecsIteratorTemplate<PARTITION, Ts...>;\
-template<typename... Ts> using Vecs##NAME##Range = VecsRangeTemplate<PARTITION, Ts...>;
+};
 
 
 namespace vecs {
