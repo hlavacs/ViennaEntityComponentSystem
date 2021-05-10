@@ -192,11 +192,18 @@ namespace vecs {
 	class VecsReadLock;
 	class VecsWriteLock;
 	class VecsHandle;
+	
+	//component table
 	template<typename E> class VecsComponentAccessor;
 	template<typename E, size_t I> class VecsComponentAccessorDerived;
 	template<typename E> class VecsComponentTable;
+
+	//registry
 	class VecsRegistryBaseClass;
 	template<typename E> class VecsRegistry;
+
+	//iterators and ranges
+	template<typename ETL, typename CTL> class VecsIteratorBaseClass;
 	template<typename... Ts> class VecsIterator;
 	template<typename ETL, typename CTL> class VecsIteratorEntityBaseClass;
 	template<typename E, typename ETL, typename CTL> class VecsIteratorEntity;
