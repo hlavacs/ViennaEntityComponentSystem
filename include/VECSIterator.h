@@ -247,7 +247,7 @@ namespace vecs {
 	*/
 	template<typename P, typename ETL, typename CTL>
 	inline auto VecsIteratorBaseClass<P, ETL,CTL>::operator==(const VecsIteratorBaseClass<P, ETL, CTL>& v) noexcept	-> bool {
-		return	v.m_current_iterator == m_current_iterator && v.m_current_index == m_current_index;
+		return	m_current_iterator == v.m_current_iterator && m_current_index == v.m_current_index;
 	}
 
 	/**

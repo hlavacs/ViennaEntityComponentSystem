@@ -19,6 +19,7 @@ using namespace std::chrono_literals;
 
 
 /** 
+* 
 * This macro declares a VECS partition.
 * 
 */ 
@@ -35,14 +36,14 @@ template<typename E = vtll::tl<>>\
 class Vecs##NAME##Registry : public VecsRegistryTemplate<PARTITION,E> {\
 public:\
 	Vecs##NAME##Registry() noexcept : VecsRegistryTemplate<PARTITION,E>() {};\
-	Vecs##NAME##Registry(std::nullopt_t u) noexcept : VecsRegistryTemplate<PARTITION,E>(u) {};\
+	Vecs##NAME##Registry(std::nullopt_t u) noexcept : VecsRegistryTemplate<PARTITION,E>() {};\
 };\
 \
 template<>\
-class Vecs##NAME##Registry<vtll::tl<>> : public VecsRegistryTemplate<PARTITION, vtll::tl<>> {\
+class Vecs##NAME##Registry<vtll::tl<>> : public VecsRegistryBaseClass<PARTITION> {\
 public:\
-	Vecs##NAME##Registry() noexcept : VecsRegistryTemplate<PARTITION>() {}; \
-	Vecs##NAME##Registry(std::nullopt_t u) noexcept : VecsRegistryTemplate<PARTITION>(u) {};\
+	Vecs##NAME##Registry() noexcept : VecsRegistryBaseClass<PARTITION>() {}; \
+	Vecs##NAME##Registry(std::nullopt_t u) noexcept : VecsRegistryBaseClass<PARTITION>() {};\
 };
 
 
@@ -278,7 +279,7 @@ namespace vecs {
 		auto table_index() noexcept -> table_index_t;	///< Get index of this entity in the component table
 		auto type() noexcept		-> type_index_t;	///< Get type of this entity
 
-		auto mutex() noexcept		-> std::atomic<uint32_t>*;				///< \returns address of the VECS mutex for this entity
+		auto mutex() noexcept		-> std::atomic<uint32_t>*;	///< \returns address of the VECS mutex for this entity
 
 		bool operator==(const VecsHandleTemplate<P>& rhs) {	///< Equality operator
 			return m_map_index == rhs.m_map_index && m_generation_counter == rhs.m_generation_counter;
@@ -291,19 +292,22 @@ namespace vecs {
 
 	/**
 	* \brief Base class for dispatching accesses to entity components if the entity type is not known.
+	* 
+	* This is used by component tables to access components of any type. See dispatch table of class VecsComponentTable
+	* 
 	*/
 	template<typename P, typename E>
 	class VecsComponentAccessor {
 	public:
 		VecsComponentAccessor() noexcept {};	///<Constructor
 		virtual auto updateC(table_index_t index, size_t compidx, void* ptr, size_t size, bool move = false) noexcept	-> bool = 0;	///< Empty update
-		virtual auto componentE_ptr(table_index_t entidx, size_t compidx) noexcept						-> void* = 0;	///< Empty component read
-		virtual auto has_componentE()  noexcept															-> bool = 0;	///< Test for component
+		virtual auto componentE_ptr(table_index_t entidx, size_t compidx) noexcept	-> void* = 0;	///< Empty component read
+		virtual auto has_componentE()  noexcept										-> bool = 0;	///< Test for component
 	};
 
 
 	/**
-	* \brief This class stores all components of entities of type E.
+	* \brief This class stores all components of entities of type E. It as basically an adaptor for class VecsTable.
 	*
 	* Since templated functions cannot be virtual, the class emulates virtual functions to access components
 	* by creating a dispatch table. Each component from the component table gets its own entry, even if the
@@ -334,7 +338,7 @@ namespace vecs {
 		using types_deleted = vtll::type_list< table_index_t >;	///< List with types for holding info about erased entities 
 
 		static const size_t c_segment_size = vtll::front_value< vtll::map< typename VecsTableSizeMap<P>::type, E, VecsTableSizeDefault > >::value;
-		static inline VecsTable<P, types, c_segment_size, layout_type_t::value>	m_data;		///< Data per entity
+		static inline VecsTable<P, types, c_segment_size, layout_type_t::value>				m_data;		///< Data per entity
 		static inline VecsTable<P, types_deleted, c_segment_size, VECS_LAYOUT_ROW::value>	m_deleted;	///< Table holding the indices of erased entities
 
 		using array_type = std::array<std::unique_ptr<VecsComponentAccessor<P, E>>, vtll::size<VecsComponentTypeList<P>>::value>;
@@ -342,7 +346,7 @@ namespace vecs {
 
 		//-------------------------------------------------------------------------
 
-		auto updateC(table_index_t entidx, size_t compidx, void* ptr, size_t size, bool move = false) noexcept		-> bool;	///< For dispatching
+		auto updateC(table_index_t entidx, size_t compidx, void* ptr, size_t size, bool move = false) noexcept	-> bool;	///< For dispatching
 		auto componentE_ptr(table_index_t entidx, size_t compidx) noexcept						-> void*;	///< For dispatching
 		auto has_componentE(size_t compidx)  noexcept											-> bool;	///< Test for component
 		auto remove_deleted_tail() noexcept														-> void;	///< Remove empty slots at the end of the table
@@ -375,7 +379,7 @@ namespace vecs {
 
 		template<typename... Cs>
 		requires are_components_of<P, E, Cs...>
-		auto update(const table_index_t index, Cs&&... args) noexcept	-> bool;	///< Update a component
+		auto update(const table_index_t index, Cs&&... args) noexcept -> bool;	///< Update a component
 
 		//-------------------------------------------------------------------------
 		//erase data
@@ -386,8 +390,8 @@ namespace vecs {
 		//-------------------------------------------------------------------------
 		//utilities
 
-		auto handle_ptr(const table_index_t index) noexcept		-> VecsHandleTemplate<P>*;			///< \returns ptr to handle for an index in the table
-		auto mutex_ptr(const table_index_t index) noexcept		-> std::atomic<uint32_t>*; ///< \returns pointer to the mutex for a given index
+		auto handle_ptr(const table_index_t index) noexcept		-> VecsHandleTemplate<P>*;	///< \returns ptr to handle for an index in the table
+		auto mutex_ptr(const table_index_t index) noexcept		-> std::atomic<uint32_t>*;	///< \returns pointer to the mutex for a given index
 		auto size() noexcept -> size_t { return m_data.size(); };	///< \returns the number of entries currently in the table, can also be invalid ones
 		auto compress() noexcept								-> void;	///< Compress the table
 		auto capacity(size_t) noexcept							-> size_t;	///< \returns the max number of entities that can be stored
@@ -412,7 +416,6 @@ namespace vecs {
 	/**
 	* \brief Test whether an entity has a component with an index
 	*
-	* \param[in] entidx Entity index in the component table.
 	* \param[in] compidx Index of the component of the entity.
 	* \returns true if the entity contains the component
 	*/
@@ -437,7 +440,8 @@ namespace vecs {
 	* \brief Insert data for a new entity into the component table.
 	*
 	* \param[in] handle The handle of the new entity.
-	* \param[in] args The entity components to be stored
+	* \param[in] mutex Pointer to the mutex used by this entity.
+	* \param[in] args The entity components to be stored.
 	* \returns the index of the new entry in the component table.
 	*/
 	template<typename P, typename E>
@@ -455,6 +459,8 @@ namespace vecs {
 
 
 	/**
+	* \brief Get pointer to a component type C given as template parameter
+	* 
 	* \param[in] index Index of the entity in the component table.
 	* \returns the component of type C for an entity.
 	*/
@@ -467,6 +473,8 @@ namespace vecs {
 	}
 
 	/**
+	* \brief Get a tuple containing pointers to the components of an entity.
+	* 
 	* \param[in] index The index of the data in the component table.
 	* \returns a tuple holding the components of an entity.
 	*/
@@ -478,6 +486,8 @@ namespace vecs {
 	}
 
 	/**
+	* \brief Get a tuple containing references to the components of an entity.
+	* 
 	* \param[in] index The index of the data in the component table.
 	* \returns a tuple holding the components of an entity.
 	*/
@@ -489,10 +499,10 @@ namespace vecs {
 	}
 
 	/**
-	* \brief Update a component of type C for an entity of type E.
+	* \brief Update a component of types Cs... for an entity of type E.
 	*
-	* \param[in] handle The entity handle.
-	* \param[in] comp The component data.
+	* \param[in] index The index of the data in the component table.
+	* \param[in] args The compnent data.
 	* \returns true if the operation was successful.
 	*/
 	template<typename P, typename E>
@@ -501,10 +511,11 @@ namespace vecs {
 		inline auto VecsComponentTable<P, E>::update(const table_index_t index, Cs&&... args) noexcept -> bool {
 		using types = vtll::tl<Cs...>;
 		auto tuple = std::forward_as_tuple(args...);
+
 		vtll::static_for<size_t, 0, sizeof...(Cs) >([&](auto i) {
 			using type = vtll::Nth_type<types, i>;
 			m_data.update<c_info_size + vtll::index_of<E, type>::value>(index, std::forward<type>(std::get<i>(tuple)));
-			});
+		});
 
 		return true;
 	}
@@ -898,7 +909,7 @@ namespace vecs {
 	/**
 	* \brief VecsRegistryTemplate<E> is used as access interface for all entities of type E.
 	*/
-	template<typename P, typename E = vtll::type_list<>>
+	template<typename P, typename E>
 	class VecsRegistryTemplate : public VecsRegistryBaseClass<P> {
 
 		friend class VecsRegistryBaseClass<P>;
@@ -1237,20 +1248,6 @@ namespace vecs {
 		}
 		return new_maxE;
 	}
-
-
-	//-------------------------------------------------------------------------
-	//VecsRegistryTemplate<vtll::type_list<>> specialization for vtll::type_list<>, represents the base class!
-
-	/**
-	* \brief A specialized VecsRegistryTemplate<E> to act as convenient access interface instead of the base class.
-	*/
-	template<typename P>
-	class VecsRegistryTemplate<P, vtll::type_list<>> : public VecsRegistryBaseClass<P> {
-	public:
-		VecsRegistryTemplate() noexcept : VecsRegistryBaseClass<P>() {};					///< Constructor of class VecsRegistryTemplate<vtll::type_list<>>
-		VecsRegistryTemplate(std::nullopt_t u) noexcept : VecsRegistryBaseClass<P>() {};	///< Constructor of class VecsRegistryTemplate<vtll::type_list<>>
-	};
 
 
 	//-------------------------------------------------------------------------
