@@ -136,6 +136,7 @@ namespace vecs {
 
 	/**
 	* \brief Table constants retrieves mappings for all entity types from the VecsTableSizeMap (which have the format vtll::value_list<A,B>).
+	* 
 	* Then it turns the value lists to type lists, each value is stored in a std::integral_constant<size_t, V> type.
 	*/
 	using VecsTableSizeDefault = vtll::value_list< 1 << 10 >;
@@ -248,6 +249,7 @@ namespace vecs {
 
 		/**
 		* \brief Constructor of class VecsHandle.
+		* 
 		* \param[in] idx The index of the handle in the aggregate slot map of class VecsRegistryBaseClass
 		* \param[in] cnt Current generation counter identifying this entity on in the slot.
 		* \param[in] type Type index for the entity type E.
@@ -546,6 +548,8 @@ namespace vecs {
 	}
 
 	/**
+	* \brief Get pointer to a handle.
+	* 
 	* \param[in] index The index of the entity in the component table.
 	* \returns the handle of an entity from the component table.
 	*/
@@ -556,6 +560,8 @@ namespace vecs {
 	}
 
 	/**
+	* \brief Get a pointer to a mutex.
+	* 
 	* \param[in] index The index of the entity in the component table.
 	* \returns pointer to the sync mutex of the entity.
 	*/
@@ -586,7 +592,7 @@ namespace vecs {
 	inline auto VecsComponentTable<P, E>::remove_deleted_tail() noexcept -> void {
 		while (m_data.size() > 0) {
 			auto& handle = *m_data.component_ptr<c_handle>(table_index_t{ m_data.size() - 1 });
-			if (handle.is_valid()) return; ///< is last entity is valid, then return
+			if (handle.is_valid()) return;	///< is last entity is valid, then return
 			m_data.pop_back();				///< Else remove it and continue the loop
 		}
 	}
@@ -612,6 +618,7 @@ namespace vecs {
 
 		/**
 		* \brief Update the component C of entity E.
+		* 
 		* \param[in] index Index of the entity in the component table.
 		* \param[in] compidx Component index incomponent type list.
 		* \param[in] ptr Pointer to where the data comes from.
@@ -650,6 +657,7 @@ namespace vecs {
 
 		/**
 		* \brief Get pointer to component data.
+		* 
 		* \param[in] index Index of the entity in the component table.
 		* \param[in] compidx Component index incomponent type list.
 		* \returns pointer to the component.
@@ -772,7 +780,7 @@ namespace vecs {
 
 		template<typename... Es>
 		requires (are_entity_types<P, Es...>)
-		auto clear() noexcept				-> size_t;		///< Clear the whole ECS
+		auto clear() noexcept	-> size_t;		///< Clear the whole ECS
 
 		//-------------------------------------------------------------------------
 		//utility
@@ -794,12 +802,12 @@ namespace vecs {
 	};
 
 	template<typename P>
-	inline VecsRegistryBaseClass<P> VecsRegistryBaseClass<P>::m_registry{};
+	inline VecsRegistryBaseClass<P> VecsRegistryBaseClass<P>::m_registry{};	///< Create instance for the VecsRegistryBaseClass class
 
 	/**
-	* \brief Test whether an entity (pointed to by the handle) of type E contains a component of type C
-	*
+	* \brief Test whether an entity (pointed to by the handle) of type E contains a component of type C.
 	* The call is dispatched to the correct subclass for entity type E.
+	* 
 	* \param[in] handle The handle of the entity to get the data from.
 	* \returns true if entity type E contains component type C
 	*/
@@ -813,7 +821,7 @@ namespace vecs {
 
 	/**
 	* \brief Get pointer to a component of type C for a given handle.
-	*
+	* 
 	* \param[in] handle The handle of the entity to get the data from.
 	* \returns pointer to a component of type C.
 	*/
@@ -828,6 +836,7 @@ namespace vecs {
 
 	/**
 	* \brief Update a component of an entity. The call is dispatched to the correct subclass for entity type E.
+	* 
 	* \param[in] handle The entity handle.
 	* \param[in] comp The component data.
 	* \returns true if the update was successful.
@@ -844,6 +853,7 @@ namespace vecs {
 
 	/**
 	* \brief Erase an entity from the ECS. The call is dispatched to the correct subclass for entity type E.
+	* 
 	* \param[in] handle The entity handle.
 	* \returns true if the operation was successful.
 	*/
@@ -855,6 +865,7 @@ namespace vecs {
 
 	/**
 	* \brief Return index of an entity in the component table.
+	* 
 	* \param[in] handle The entity handle.
 	* \returns the index of the entity in the component table.
 	*/
@@ -866,6 +877,7 @@ namespace vecs {
 
 	/**
 	* \brief Return index of an entity in the component table.
+	* 
 	* \param[in] handle The entity handle.
 	* \returns the index of the entity in the component table.
 	*/
@@ -1170,6 +1182,12 @@ namespace vecs {
 	}
 
 
+	/**
+	* \brief Test whether VECS contains an entity.
+	*
+	* \param[in] handle The entity handle.
+	* \returns true if VECS contains the entity AND the type is E.
+	*/
 	template<typename P, typename E>
 	inline auto VecsRegistryTemplate<P, E>::has_value(VecsHandleTemplate<P> handle) noexcept -> bool {
 		return VecsRegistryBaseClass<P>::has_value(handle) && handle.type() == vtll::index_of<VecsEntityTypeList<P>, E>::value;
@@ -1184,7 +1202,7 @@ namespace vecs {
 	template<typename P, typename E>
 	template<typename C>
 	requires is_component_of<P, E, C>
-	auto VecsRegistryTemplate<P, E>::component_ptr(VecsHandleTemplate<P> handle) noexcept	-> C* {
+	auto VecsRegistryTemplate<P, E>::component_ptr(VecsHandleTemplate<P> handle) noexcept -> C* {
 		if (!has_value(handle)) return nullptr;	///< Return the empty component
 		auto& comp_table_idx = *this->m_map_table.component_ptr<this->c_index>(handle.m_map_index); ///< Get reference to component
 		return &m_component_table.component<C>(comp_table_idx);	///< Return the component
