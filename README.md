@@ -466,15 +466,6 @@ If you only read components, then a read lock may be faster, since read locks do
       }
     }
 
-are actually internally synchronized. These synchronizations use *VecsWriteLock* or *VecsReadLock* on a per entity basis, and synchronization lasts only for the duration of the call. Such locks need the address a *std::atomic\<uint32_t\>*  (a VECS mutex) as input parameter, and every entity has its own such VECS mutex. You can get the VECS mutex of an entity by calling *mutex()* on a *handle* or an *iterator*. The call always returns a valid mutex, even if the entity has been erased and is no longer valid.
-
-Note that calls to *VecsRegistry\<\>* and *VecsHandle* are eventually forwarded to their counterparts in class *VecsRegistry\<E\>* with the same name. Thus, these member functions are also implicitly internally synchronized.
-
-The following list shows the calls that are internally or externally synchronized in class *VecsRegistry\<E\>*:
-
-
-Note that *VecsRegistry<E>{}.pointer(...)* is actually externally synchronized. That means before calling this function with multiple threads you should first create a read or write lock, and keep it until you no longer need the tuple.
-
 An example for looping over entities in parallel on several threads is given in example program parallel.cpp. For parallelization, the example uses the Vienna Game Job System (VGJS, https://github.com/hlavacs/ViennaGameJobSystem), a sibling project of VECS. VGJS is a header-only C++20 library enabling using function pointers, std::function, lambdas, or coroutines to be run in the job system.
 
     template<template<typename...> typename R, typename... Cs>
@@ -487,27 +478,57 @@ An example for looping over entities in parallel on several threads is given in 
             ++i;
         }
 
-    	  /*VecsRegistry{}.for_each( std::move(range), [&](auto handle, auto& pos) {
-    		    pos.m_position = glm::vec3{ 7.0f + i, 8.0f + i, 9.0f + i };
-    		    ++i;
-    	  });*/
+        /*bool sync = true;
+      	range.for_each([&](auto handle, auto& pos) {
+      		pos.m_position = glm::vec3{ 7.0f + i, 8.0f + i, 9.0f + i };
+      		++i;
+      	}, sync);*/
     }
 
-    auto ranges = VecsRange<MyComponentPosition>{}.split(16); // split set of entities holding MyComponentPosition into 12 subranges
+    vgjs::Coro<> start( size_t num ) {
+        std::cout << "Start \n";
 
-    std::pmr::vector<vgjs::Function> vec; //store functions that should be run in parallel
+    	co_await [&]() { init(num); };
 
-    for (int i = 0; i < ranges.size(); ++i) { //create an vector of functions, one function for each subrange
-        vec.push_back(
-            vgjs::Function([=]() { do_work( ranges[i] ); } //Function class can store meta information
-            , vgjs::thread_index_t{}    //use any thread that is available
-            , vgjs::thread_type_t{ 1 }  //log with type 1
-            , vgjs::thread_id_t{ i })); //log with ID i
+    	int thr = 12;
+    	std::pmr::vector<vgjs::Function> vec;
+
+    	auto ranges = VecsRange<MyComponentPosition>{}.split(thr);
+    	for (int i = 0; i < ranges.size(); ++i) {
+    		vec.push_back(vgjs::Function([=]() { do_work(ranges[i]); }, vgjs::thread_index_t{}, vgjs::thread_type_t{ 1 }, vgjs::thread_id_t{ i }));
+    	}
+
+    	auto lin =
+    		vgjs::Function([&]() {
+    				do_work(VecsRange<MyComponentPosition>{});
+    			}
+    			, vgjs::thread_index_t{}, vgjs::thread_type_t{1}, vgjs::thread_id_t{100});
+
+    	auto t0 = high_resolution_clock::now();
+
+    	co_await lin;
+
+    	auto t1 = high_resolution_clock::now();
+
+    	co_await vec;
+
+    	auto t2 = high_resolution_clock::now();
+
+    	auto d1 = duration_cast<nanoseconds>(t1 - t0);
+    	auto d2 = duration_cast<nanoseconds>(t2 - t1);
+
+    	double dt1 = d1.count() / 1.0;
+    	double dt2 = d2.count() / 1.0;
+
+    	size_t size = VecsRegistry{}.size();
+
+    	std::cout << "Num " << 2 * num << " Size " << size << "\n";
+    	std::cout << "Linear " << dt1        << " ns Parallel 1 " << dt2        << " ns Speedup " << dt1 / dt2 << "\n\n";
+    	std::cout << "Linear " << dt1 / size << " ns Parallel 1 " << dt2 / size << " ns \n";
+
+      vgjs::terminate();
+      co_return;
     }
-
-    co_await vec;   //run the functions in parallel and wait for completion
-
-    //...
 
 Note that since the ranges do not overlap, there is actually no need for synchronization of no other thread accesses the entities. Thus there is no lock in the range based for loop.
 If there are other threads accessing the entities, then you can either introduce locks, or switch to the *for_each* version. Not that this version will take longer time on average, due to locking every entity before accessing it.
