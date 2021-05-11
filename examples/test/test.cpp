@@ -35,6 +35,8 @@ int main() {
 	MyComponentMaterial mat{ 99 };
 	MyComponentGeometry geo{ 11 };
 
+	std::cout << vtll::size<MyEntityTypeList>::value << std::endl;
+
 	{
 		auto range = VecsRange<MyComponentName>{};
 		auto it = range.begin();
@@ -45,9 +47,7 @@ int main() {
 		}
 		for (auto [handle, name, pos, orient, transf] : VecsRange<MyEntityTypeNode>{}) {
 		}
-
 	}
-
 
 	{
 		TESTRESULT(++number, "size", , (VecsRegistry().size() == 0 && VecsRegistry<MyEntityTypeNode>().size() == 0 && VecsRegistry<MyEntityTypeDraw>().size() == 0), );

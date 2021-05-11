@@ -17,6 +17,7 @@ Important features of VECS are:
 * Easy to use, various ways to access the entities and their components.
 * High performance by default, components are ordered sequentially in memory (row or column wise) for cache friendly  access.
 
+VECS is currently in BETA.
 
 ## The VECS Include Files
 
@@ -67,7 +68,7 @@ As can be seen, these components consist of a std::string, floats and a unique p
 
     using MyEntityTypeNode = vtll::type_list<MyComponentName, MyComponentPosition>;
 
-which defines the entity type *MySystemEntityTypeNode* to be composed of the two components. Likewise, you can define an arbitrary number of other entity types. A list of such entities is necessary for *declaring* a *VECS partition*, meaning that the particular partition can store all entities as given in this list, and none other. You can declare a list of entity types like so:
+which defines the entity type *MyEntityTypeNode* to be composed of the two components. Likewise, you can define an arbitrary number of other entity types. A list of such entities is necessary for *declaring* a *VECS partition*, meaning that the particular partition can store all entities as given in this list, and none other. You can declare a list of entity types like so:
 
     using MyEntityTypeList = vtll::type_list<
       MyEntityTypeNode
@@ -97,8 +98,8 @@ In this example, *N = 1<<15*, and this is fixed at compile time. Note that *N* e
 
 Another choice relates to the layout of segments. Layouts of segments can be row wise or column wise (default). In row wise, the components of each entity are stored next to each other. Thus when accessing all components at once, cache efficiency is best. In column wise, components are stored in separate arrays, and cache performance is optimal if only single components are accessed in for-loops. You can choose the layout for a specific entity type *E* like so:
 
-    using MySystemTableLayoutMap = vtll::type_list<
-      vtll::type_list< MySystemEntityTypeNode, VECS_LAYOUT_COLUMN >  // or VECS_LAYOUT_ROW
+    using MyTableLayoutMap = vtll::type_list<
+      vtll::type_list< MyEntityTypeNode, VECS_LAYOUT_COLUMN >  // or VECS_LAYOUT_ROW
       //, ...
     >;
 
@@ -137,9 +138,9 @@ of create a temp object and directly use it
 
 There is only one registry state, and you can instantiate it any number of times, the result is always the same.
 
-Using *VecsRegistry* is not bound to a specific entity type *E*, but commands eventually need this information. All calls are then passed on to *VecsRegistry<E>*, where *E* is an entity type and must be registered in the partition's entity type list.
+Using *VecsRegistry* is not bound to a specific entity type *E*, but commands eventually need this information. All calls are then passed on to *VecsRegistry\<E\>*, where *E* is an entity type and must be registered in the partition's entity type list.
 
-*VecsRegistry<E>* is a specialized version of the registry made only for entity type *E*. It is recommended to always use this specialized version, if possible. For instance, if you want to create an entity of type *E*, you have at some point to specify the entity type. In the following, we define an *example* entity type *MyEntityTypeNode* like so:
+*VecsRegistry\<E\>* is a specialized version of the registry made only for entity type *E*. It is recommended to always use this specialized version, if possible. For instance, if you want to create an entity of type *E*, you have at some point to specify the entity type. In the following, we define example entity types
 
     using MyEntityTypeNode = vtll::type_list< MyComponentName, MyComponentPosition, MyComponentOrientation >;
     using MyEntityTypeDraw = vtll::type_list< MyComponentName, MyComponentPosition, MyComponentMaterial, MyComponentGeometry>;
@@ -154,9 +155,9 @@ Note that the parameters for this call must match the list of components that th
 
 If the handle is valid, then it IDs an entity in VECS. However, the entity might have been erased from VECS previously, e.g. by some other thread. You can test whether the entity that the handle represents is still in VECS by calling either of these:
 
-    handle.has_value();
-    VecsRegistry{}.has_value(handle); //any type
-    VecsRegistry<MyEntityTypeNode>{}.has_value(handle); //call only if entity is of type MyEntityTypeNode
+    handle.has_value();               //true if VECS contains the entity
+    VecsRegistry{}.has_value(handle); //true if VECS contains the entity
+    VecsRegistry<MyEntityTypeNode>{}.has_value(handle); //true if VECS contains the entity AND entity is of type MyEntityTypeNode
 
 A part of a handle contains a type ID for the entity type. You can get the type index by calling
 
@@ -177,7 +178,7 @@ The type ID is the index of the entity type in the entity type partition list, s
     auto& pos8 = VecsRegistry<MyEntityTypeNode>{}.component<MyComponentPosition>(handle); //if handle of type MyEntityTypeNode
     auto* pos9 = VecsRegistry<MyEntityTypeNode>{}.component_ptr<MyComponentPosition>(handle); //if handle of type MyEntityTypeNode
 
-Again, all calls are finally handed to the last version, which then resolves the data. Only the last version is actually checked by the compiler at compile time, and the first two version thus could result in an empty component being returned. You can call *has_component\<C\>()* to check whether an entity represented by a handle does contain a specific component of type *C* using any of these methods:
+Only the last version is actually checked by the compiler at compile time, and the first two version thus could result in an empty component being returned. You can call *has_component\<C\>()* to check whether an entity represented by a handle does contain a specific component of type *C* using any of these methods:
 
     bool b1 = handle.has_component<MyComponentPosition>();
     bool b2 = VecsRegistry{}.has_component<MyComponentPosition>(handle);
