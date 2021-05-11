@@ -11,8 +11,6 @@ set(HEADERS
   ${INCLUDE}/VTLL.h
   ${INCLUDE}/VECSUtil.h
   ${INCLUDE}/VECSTable.h
-  ${INCLUDE}/VECSCompSystem.h
-  ${INCLUDE}/VECSCompUser.h
   ${INCLUDE}/VECS.h
   ${INCLUDE}/VECSIterator.h
 )
