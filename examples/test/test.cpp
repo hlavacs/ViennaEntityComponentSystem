@@ -9,13 +9,14 @@
 #include <numeric>
 #include <mutex>
 
-//#include <future>
 
 #include "glm.hpp"
 #include "gtc/quaternion.hpp"
 
 #include "VECS.h"
 #include "test.h"
+
+#include <future>
 
 using namespace vecs;
 
@@ -413,9 +414,9 @@ int main() {
 	}
 
 	{
-		/*auto a1 = std::async([&]() {
+		auto a1 = std::async([&]() {
 			
-		});*/
+		});
 	
 	}
 

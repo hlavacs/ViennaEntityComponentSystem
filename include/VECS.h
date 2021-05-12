@@ -33,16 +33,10 @@ template<typename... Ts> using Vecs##NAME##Iterator = VecsIteratorTemplate<PARTI
 template<typename... Ts> using Vecs##NAME##Range = VecsRangeTemplate<PARTITION, Ts...>;\
 \
 template<typename E = vtll::tl<>>\
-class Vecs##NAME##Registry : public VecsRegistryTemplate<PARTITION,E> {\
-public:\
-	Vecs##NAME##Registry() noexcept : VecsRegistryTemplate<PARTITION,E>() {};\
-};\
+class Vecs##NAME##Registry : public VecsRegistryTemplate<PARTITION,E> {};\
 \
 template<>\
-class Vecs##NAME##Registry<vtll::tl<>> : public VecsRegistryBaseClass<PARTITION> {\
-public:\
-	Vecs##NAME##Registry() noexcept : VecsRegistryBaseClass<PARTITION>() {}; \
-};
+class Vecs##NAME##Registry<vtll::tl<>> : public VecsRegistryBaseClass<PARTITION> {};
 
 
 namespace vecs {
