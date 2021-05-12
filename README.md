@@ -106,25 +106,33 @@ Another choice relates to the layout of segments. Layouts of segments can be row
       //, ...
     >;
 
-Now we have all necessary data to define a VECS partition:
+Now we have all necessary data to define a VECS partition, represented by *MyEntityTypeList*:
 
     VECS_DECLARE_PARTITION(, MyEntityTypeList, MyEntityTagMap, MyTableSizeMap, MyTableLayoutMap);
 
 This defines the following classes (will be explained later):
 * VecsHandle
-* VecsRegistry
-* VecsIterator
-* VecsRange
+* VecsRegistry<...>
+* VecsIterator<...>
+* VecsRange<...>
 
-The first parameter in the macro that was left out in the example is a partition name, which would be inserted between "Vecs" and the class type. By using names and different entity lists, you can declare different partitions for VECS. For instance, if you want to use VECS in your core game engine, you could set
+The first parameter in the macro VECS_DECLARE_PARTITION that was left out in the example is a partition name, which would be inserted between "Vecs" and the class type. By using names and different entity lists, you can declare different partitions for VECS. For instance, if you want to use VECS in your core game engine, for some other partition *MySystemEntityTypeList* you could set
 
     VECS_DECLARE_PARTITION(System, MySystemEntityTypeList, MySystemEntityTagMap, MySystemTableSizeMap, MySystemTableLayoutMap);
 
 This defines the following classes by adding the partition name "System":
 * VecsSystemHandle
-* VecsSystemRegistry
-* VecsSystemIterator
-* VecsSystemRange
+* VecsSystemRegistry\<...\>
+* VecsSystemIterator\<...\>
+* VecsSystemRange\<...\>
+
+However, the above classes are only aliases of the following basic templates:
+* VecsHandleT\<P\>
+* VecsRegistryT\<P, ...\>
+* VecsIteratorT\<P, ...\>
+* VecsRangeT\<P, ...\>
+
+You can use the templates directly by simply adding your partition *P* as first template parameter. This way, you can use the same API names for different partitions, and differentiate between the partitions by using different *P* s. For example, you can use *VecsHandleT\<MyEntityTypeList\>* and *VecsHandleT\<MySystemEntityTypeList\>* instead of the above defintions.
 
 In the following examples it is assumed that there was no name given. If you use partition names, then change the examples accordingly by inserting the partition names into the VECS type names.
 

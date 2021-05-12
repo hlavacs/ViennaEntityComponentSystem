@@ -135,6 +135,7 @@ namespace vecs {
 	template<typename P, typename DATA, size_t N0, bool ROW>
 	template<size_t I, typename C>
 	inline auto VecsTable<P, DATA, N0, ROW>::component_ref(table_index_t n) noexcept -> C& {
+		assert(n.value < size());
 		if constexpr (ROW) {
 			return std::get<I>( (* (*m_segment.load()) [n >> L] )[n & BIT_MASK]);
 		}
@@ -151,6 +152,7 @@ namespace vecs {
 	template<typename P, typename DATA, size_t N0, bool ROW>
 	template<size_t I, typename C>
 	inline auto VecsTable<P, DATA, N0, ROW>::component_ptr(table_index_t n) noexcept -> C* {
+		assert(n.value < size());
 		if constexpr (ROW) {
 			return &std::get<I>((*(*m_segment.load())[n >> L])[n & BIT_MASK]);
 		}
@@ -166,6 +168,7 @@ namespace vecs {
 	*/
 	template<typename P, typename DATA, size_t N0, bool ROW>
 	inline auto VecsTable<P, DATA, N0, ROW>::tuple_ref(table_index_t n) noexcept -> tuple_ref_t {
+		assert(n.value < size());
 		auto f = [&]<size_t... Is>(std::index_sequence<Is...>) {
 			if constexpr (ROW) {
 				return std::tie(std::get<Is>((* (*m_segment.load()) [n >> L])[n & BIT_MASK])...);
@@ -184,6 +187,7 @@ namespace vecs {
 	*/
 	template<typename P, typename DATA, size_t N0, bool ROW>
 	inline auto VecsTable<P, DATA, N0, ROW>::tuple_ptr(table_index_t n) noexcept -> tuple_ptr_t {
+		assert(n.value < size());
 		auto f = [&]<size_t... Is>(std::index_sequence<Is...>) {
 			if constexpr (ROW) {
 				return std::make_tuple(&std::get<Is>((* (*m_segment.load()) [n >> L])[n & BIT_MASK])...);
