@@ -240,7 +240,13 @@ namespace vecs {
 	template<size_t I, typename C>
 	inline auto VecsTable<P, DATA, N0, ROW>::update(table_index_t n, C&& data) noexcept -> bool {
 		if (n >= m_size) return false;
-		*component_ptr<I>(n) = std::forward<C>(data);
+		if constexpr (std::is_copy_assignable_v<C>) {
+			*component_ptr<I>(n) = data;
+		}
+		else if constexpr (std::is_move_assignable_v<C>) {
+			*component_ptr<I>(n) = std::move(data);
+		}
+
 		return true;
 	}
 
@@ -274,7 +280,10 @@ namespace vecs {
 		auto src = tuple_ptr(isrc);
 		auto dst = tuple_ptr(idst);
 		vtll::static_for<size_t, 0, vtll::size<DATA>::value >([&](auto i) {
-			*std::get<i>(dst) = std::move(*std::get<i>(src));
+			using type = vtll::Nth_type<DATA,i>;
+			if constexpr (std::is_move_assignable_v<type>) {
+				*std::get<i>(dst) = std::move(*std::get<i>(src));
+			}
 		});
 		return true;
 	}
@@ -291,7 +300,10 @@ namespace vecs {
 		auto src = tuple_ptr(isrc);
 		auto dst = tuple_ptr(idst);
 		vtll::static_for<size_t, 0, vtll::size<DATA>::value >([&](auto i) {
-			std::swap( *std::get<i>(dst), *std::get<i>(src) );
+			using type = vtll::Nth_type<DATA,i>;
+			if constexpr (std::is_move_assignable_v<type>) {
+				std::swap(*std::get<i>(dst), *std::get<i>(src));
+			}
 		});
 		return true;
 	}

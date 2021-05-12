@@ -297,7 +297,7 @@ int main() {
 	{
 		int i = 0;
 		bool test = true;
-		VecsRange<MyEntityTypeNode, MyEntityTypeDraw>{}.for_each([&](auto handle, auto name, auto pos, auto orient) {
+		VecsRange<MyEntityTypeNode, MyEntityTypeDraw>{}.for_each([&](auto handle, auto name, auto pos, auto& orient) {
 			++i;
 			if (name.m_name != ("Name Holder 4 " + std::to_string(i))) { test = false; }
 			//std::cout << "Entity " << name.m_name << " " << i << "\n";
@@ -474,6 +474,12 @@ int main() {
 		}
 
 		TESTRESULT(++number, "parallel update", , (flag), );
+
+	}
+
+
+	{
+
 
 	}
 

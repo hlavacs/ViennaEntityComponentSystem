@@ -45,6 +45,9 @@ VGJS is not necessary to run VECS, and as stated it is only used as an example f
 ## The VECS API
 
 An *Entity Component System* is a data structure that stores data components in some flat way, meaning that data is stored linearly in memory as a vector or table. The stored data are called *components*. Components can in principle be any type that in this case is *movable* and *default constructible*.
+
+**Note**: You *can* actually choose component types that are not movable, e.g., atomics, but obviously they cannot be moved, e.g., by calling swap, or compressing the table. So if you do either be aware that they can have any value afterwards, and must be reinitialized.
+
 This can be plain old data types, structs, classes, (smart) pointers etc.
 but not references since they must be bound to something when created. An example is given by
 

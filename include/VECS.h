@@ -621,14 +621,18 @@ namespace vecs {
 		auto updateC(table_index_t index, size_t compidx, void* ptr, size_t size, bool move) noexcept -> bool {
 			if constexpr (is_component_of<P, E, C>) {
 				if (move) {
-					*VecsComponentTable<P, E>().m_data.component_ptr<VecsComponentTable<P, E>::c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(index) = std::move(*((C*)ptr));
+					if constexpr (std::is_move_assignable_v<C>) {
+						*VecsComponentTable<P, E>().m_data.component_ptr<VecsComponentTable<P, E>::c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(index) = std::move(*((C*)ptr));
+					}
 				}
 				else {
 					if constexpr (std::is_copy_assignable_v<C>) {
 						*VecsComponentTable<P, E>().m_data.component_ptr<VecsComponentTable<P, E>::c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(index) = *((C*)ptr);
 					}
 					else {
-						*VecsComponentTable<P, E>().m_data.component_ptr<VecsComponentTable<P, E>::c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(index) = std::move(*((C*)ptr));
+						if constexpr (std::is_move_assignable_v<C>) {
+							*VecsComponentTable<P, E>().m_data.component_ptr<VecsComponentTable<P, E>::c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(index) = std::move(*((C*)ptr));
+						}
 					}
 				}
 				return true;
