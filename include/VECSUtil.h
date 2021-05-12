@@ -92,9 +92,9 @@ namespace vecs {
 				size_t cnt = 0;
 				do {
 					val = mutex->load();					//still a writer?
-					if (val >= WRITE && ++cnt > 100) {		//sleep if too often in loop
+					if (val >= WRITE && ++cnt > 10) {		//sleep if too often in loop
 						cnt = 0;
-						mutex->wait(val);					//for for another value
+						std::this_thread::yield();
 					}
 				} while(val >= WRITE);						//if yes, stay in loop
 				val = mutex->fetch_add(1);					//if no, again try to add 1 to signal reader
@@ -146,9 +146,9 @@ namespace vecs {
 				size_t cnt = 0;
 				do {
 					val = mutex->load();				///< Are there still others?
-					if (val != 0 && ++cnt > 100) {
+					if (val != 0 && ++cnt > 10) {
 						cnt = 0;
-						mutex->wait(val);				///< Wait for another value
+						std::this_thread::yield();
 					}
 				} while (val != 0);						///< If yes stay in loop
 				val = mutex->fetch_add(WRITE);			///< Again get old value and add WRITE

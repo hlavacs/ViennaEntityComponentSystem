@@ -411,14 +411,72 @@ int main() {
 		TESTRESULT(++number, "summing", , (sum = num && i == num), );
 
 		TESTRESULT(++number, "clear", VecsRegistry{}.clear(), (VecsRegistry().size() == 0 && VecsRegistry<MyEntityTypeNode>().size() == 0 && VecsRegistry<MyEntityTypeDraw>().size() == 0), );
+
+		VecsRegistry{}.compress();
 	}
 
 	{
+		const int num = 100000;
 		auto a1 = std::async([&]() {
-			
+			for (int i = 0; i < num; i++) {
+				auto h1 = VecsRegistry<MyEntityTypeNode>{}.insert(MyComponentName{ "Node" }, MyComponentPosition{}, MyComponentOrientation{}, MyComponentTransform{});
+				auto h2 = VecsRegistry<MyEntityTypeDraw>{}.insert(MyComponentName{ "Draw" }, MyComponentPosition{}, MyComponentOrientation{}, MyComponentMaterial{ 1 }, MyComponentGeometry{ 1 });
+			}
 		});
-	
+
+		auto a2 = std::async([&]() {
+			for (int i = 0; i < num; i++) {
+				auto h1 = VecsRegistry<MyEntityTypeNode>{}.insert(MyComponentName{ "Node" }, MyComponentPosition{}, MyComponentOrientation{}, MyComponentTransform{});
+				auto h2 = VecsRegistry<MyEntityTypeDraw>{}.insert(MyComponentName{ "Draw" }, MyComponentPosition{}, MyComponentOrientation{}, MyComponentMaterial{ 1 }, MyComponentGeometry{ 1 });
+			}
+		});
+
+		a1.wait();
+		a2.wait();
+
+		TESTRESULT(++number, "system create parallel", , (VecsRegistry().size() == 4 * num && VecsRegistry<MyEntityTypeNode>().size() == 2*num && VecsRegistry<MyEntityTypeNode>().size() == 2*num), );
 	}
+
+	{
+		auto a1 = std::async([]() {
+			VecsRange<MyComponentOrientation>{}.for_each([&](VecsHandle handle, auto& orient) {
+				orient.i = 11;
+			});
+		});
+
+		auto a2 = std::async([]() {
+			VecsRange<MyComponentOrientation>{}.for_each([&](VecsHandle handle, auto& orient) {
+				orient.i = 22;
+			});
+		});
+
+		auto a3 = std::async([]() {
+			VecsRange<MyComponentOrientation>{}.for_each([&](VecsHandle handle, auto& orient) {
+				orient.i = 33;
+				});
+			});
+
+		auto a4 = std::async([]() {
+			VecsRange<MyComponentOrientation>{}.for_each([&](VecsHandle handle, auto& orient) {
+				orient.i = 44;
+				});
+			});
+
+		a1.wait();
+		a2.wait();
+		a3.wait();
+		a4.wait();
+
+		bool flag = true;
+		for (auto [handle, orient] : VecsRange<MyComponentOrientation>{}) {
+			if (!handle.has_value()) continue;
+			if (orient.i != 11 && orient.i != 22 && orient.i != 33 && orient.i != 44) flag = false;
+		}
+
+		TESTRESULT(++number, "parallel update", , (flag), );
+
+	}
+
 
     return 0;
 }
