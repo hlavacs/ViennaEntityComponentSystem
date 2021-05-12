@@ -36,14 +36,12 @@ template<typename E = vtll::tl<>>\
 class Vecs##NAME##Registry : public VecsRegistryTemplate<PARTITION,E> {\
 public:\
 	Vecs##NAME##Registry() noexcept : VecsRegistryTemplate<PARTITION,E>() {};\
-	Vecs##NAME##Registry(std::nullopt_t u) noexcept : VecsRegistryTemplate<PARTITION,E>() {};\
 };\
 \
 template<>\
 class Vecs##NAME##Registry<vtll::tl<>> : public VecsRegistryBaseClass<PARTITION> {\
 public:\
 	Vecs##NAME##Registry() noexcept : VecsRegistryBaseClass<PARTITION>() {}; \
-	Vecs##NAME##Registry(std::nullopt_t u) noexcept : VecsRegistryBaseClass<PARTITION>() {};\
 };
 
 
@@ -941,9 +939,6 @@ namespace vecs {
 
 	public:
 		VecsRegistryTemplate() noexcept : VecsRegistryBaseClass<P>() {};					///< Constructor of class VecsRegistryTemplate<E>
-		VecsRegistryTemplate(std::nullopt_t u) noexcept : VecsRegistryBaseClass<P>() { 	///< Constructor of class VecsRegistryTemplate<E>
-			m_sizeE = 0; 
-		};
 
 		//-------------------------------------------------------------------------
 		//insert data
@@ -1333,7 +1328,7 @@ namespace vecs {
 		vtll::static_for<size_t, 0, vtll::size<VecsEntityTypeList<P>>::value >(
 			[&](auto i) {
 				using type = vtll::Nth_type<VecsEntityTypeList<P>, i>;
-				m_dispatch[i] = std::make_unique<VecsRegistryTemplate<P, type>>(std::nullopt);
+				m_dispatch[i] = std::make_unique<VecsRegistryTemplate<P, type>>();
 			}
 		);
 	}

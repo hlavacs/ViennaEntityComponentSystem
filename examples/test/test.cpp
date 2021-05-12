@@ -3,6 +3,14 @@
 #include <iomanip>
 #include <utility>
 #include <string>
+#include <vector>
+
+#include <algorithm>
+#include <numeric>
+#include <mutex>
+
+//#include <future>
+
 #include "glm.hpp"
 #include "gtc/quaternion.hpp"
 
@@ -150,7 +158,6 @@ int main() {
 		TESTRESULT(++number, "system create", , (test && i == 0), );
 	}
 
-
 	{
 		const int num = 100000;
 
@@ -248,7 +255,6 @@ int main() {
 
 		TESTRESULT(++number, "system run 3", , test, );
 
-
 		i = 0;
 		VecsRange<MyComponentName>{}.for_each([&](auto handle, auto& name) {
 			++i;
@@ -261,7 +267,6 @@ int main() {
 		TESTRESULT(++number, "clear", VecsRegistry().clear(), (VecsRegistry().size() == 0 && VecsRegistry<MyEntityTypeNode>().size() == 0), );
 
 		TESTRESULT(++number, "compress", VecsRegistry().compress(), true, );
-
 	}
 
 
@@ -298,15 +303,12 @@ int main() {
 			});
 		
 		TESTRESULT(++number, "system run 6", , test, );
+
+		TESTRESULT(++number, "clear", VecsRegistry{}.clear(), (VecsRegistry().size() == 0 && VecsRegistry<MyEntityTypeNode>().size() == 0 && VecsRegistry<MyEntityTypeDraw>().size() == 0), );
 	}
 	
 	{
-		TESTRESULT(++number, "clear", VecsRegistry{}.clear(), VecsRegistry{}.size() == 0, );
-		//VecsRegistry{}.compress();
-
-		//std::cout << typeid(vecs::VecsEntityTypeList).name() << std::endl << std::endl;
-
-		const int num = 2;
+		const int num = 20000;
 		bool flag = true;
 		for (int i = 0; i < num; i++) {
 			auto h1 = VecsRegistry<MyEntityTypeNode>{}.insert(MyComponentName{ "Node" }, MyComponentPosition{}, MyComponentOrientation{}, MyComponentTransform{});
@@ -328,7 +330,6 @@ int main() {
 			&& VecsRegistry<MyEntityTypeNodeTagged<TAG1,TAG2>>().size() == num
 			&& flag
 			), );
-
 
 		VecsIterator<MyEntityTypeNode> b;
 		VecsIterator<MyEntityTypeNode> e( true );
@@ -357,7 +358,6 @@ int main() {
 			VecsRegistry<MyEntityTypeNode>{}.transform(handle);
 			});
 
-
 		VecsRange<MyEntityTypeNode, TAG1>{}.for_each([&](VecsHandle handle, auto& name, auto& pos, auto& orient, auto& transf) {
 			VecsRegistry<MyEntityTypeNode>{}.transform(handle);
 		});
@@ -369,8 +369,55 @@ int main() {
 			&& VecsRegistry<MyEntityTypeNodeTagged<TAG2>>().size() == num
 			&& VecsRegistry<MyEntityTypeNodeTagged<TAG1, TAG2>>().size() == 0
 			), );
+
+		TESTRESULT(++number, "clear", VecsRegistry{}.clear(), (VecsRegistry().size() == 0 && VecsRegistry<MyEntityTypeNode>().size() == 0 && VecsRegistry<MyEntityTypeDraw>().size() == 0), );
 	}
 
+	{
+		const int num = 1000;
+
+		for (int i = 0; i < num; i++) {
+			auto h1 = VecsRegistry<MyEntityTypeNode>{}.insert(MyComponentName{ "Node" }, MyComponentPosition{}, MyComponentOrientation{}, MyComponentTransform{});
+			auto h2 = VecsRegistry<MyEntityTypeDraw>{}.insert(MyComponentName{ "Draw" }, MyComponentPosition{}, MyComponentOrientation{}, MyComponentMaterial{ 1 }, MyComponentGeometry{ 1 });
+		}
+		TESTRESULT(++number, "system create", , (VecsRegistry().size() == 2 * num && VecsRegistry<MyEntityTypeNode>().size() == num && VecsRegistry<MyEntityTypeNode>().size() == num), );
+
+		int i = 0;
+		VecsRange<MyEntityTypeNode, MyEntityTypeDraw>{}.for_each([&](VecsHandle handle, auto& name, auto& pos, auto& orient) {
+			orient.i = 1;
+			++i;
+		});
+		TESTRESULT(++number, "summing", , (i == 2 * num), );
+
+		int sum = 0;
+		i = 0;
+		for (auto [handle, orient] : VecsRange<MyComponentOrientation>{}) {
+			if (!handle.has_value()) continue;
+			sum += orient.i;
+			orient.i = orient.i * 2;
+			++i;
+		}
+		TESTRESULT(++number, "summing", , (sum = 2*num && i == 2*num), );
+
+		sum = 0;
+		i = 0;
+		for (auto [handle, name, pos, orient, transf] : VecsRange<MyEntityTypeNode>{}) {
+			if (!handle.has_value()) continue;
+			sum += orient.i;
+			handle.erase();
+			++i;
+		}
+		TESTRESULT(++number, "summing", , (sum = num && i == num), );
+
+		TESTRESULT(++number, "clear", VecsRegistry{}.clear(), (VecsRegistry().size() == 0 && VecsRegistry<MyEntityTypeNode>().size() == 0 && VecsRegistry<MyEntityTypeDraw>().size() == 0), );
+	}
+
+	{
+		/*auto a1 = std::async([&]() {
+			
+		});*/
+	
+	}
 
     return 0;
 }

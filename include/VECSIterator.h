@@ -35,8 +35,6 @@ namespace vecs {
 			size_t					m_size{ 0 };			///< Number of entities covered by the iterator (can change due to multithreading)
 			bool					m_is_end{ false };		///< True if this is an end iterator (for stopping the loop)
 
-			VecsIteratorBaseClass(std::nullopt_t n) noexcept {};		///< Needed for derived iterator to call
-
 		public:
 			using value_type		= vtll::to_tuple< vtll::cat< vtll::tl<VecsHandleTemplate<P>>, CTL > >;
 			using reference			= vtll::to_tuple< vtll::cat< vtll::tl<VecsHandleTemplate<P>>, vtll::to_ref<CTL> > >;

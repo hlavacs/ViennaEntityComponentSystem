@@ -24,6 +24,7 @@ namespace vecs {
 	/// \brief Example for a user component
 	struct MyComponentOrientation {
 		glm::quat m_orientation;
+		int i = 0;
 	};
 
 	/// \brief Example for a user component
@@ -34,27 +35,27 @@ namespace vecs {
 
 	/// \brief Example for a user component
 	struct MyComponentMaterial {
-		int i;
+		int i = 0;
 	};
 
 	/// \brief Example for a user component
 	struct MyComponentGeometry {
-		int i;
+		int i = 0;
 	};
 
 	/// \brief Example for a user component
 	struct MyComponentAnimation {
-		int i;
+		int i = 0;
 	};
 
 	/// \brief Example for a user component
 	struct MyComponentCollisionShape {
-		int i;
+		int i = 0;
 	};
 
 	/// \brief Example for a user component
 	struct MyComponentRigidBody {
-		int i;
+		int i = 0;
 	};
 
 	struct TAG1 {};
