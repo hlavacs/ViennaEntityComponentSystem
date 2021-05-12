@@ -36,6 +36,8 @@ namespace vecs {
 		template<typename P, typename E, size_t I> friend class VecsComponentTableDerived;
 		template<typename P, typename E, typename ETL, typename CTL> friend class VecsIteratorEntity;
 
+		static_assert(std::is_default_constructible_v<DATA>, "Your components are not default constructible!");
+
 		static const size_t N = vtll::smallest_pow2_leq_value< N0 >::value;								///< Force N to be power of 2
 		static const size_t L = vtll::index_largest_bit< std::integral_constant<size_t,N> >::value - 1;	///< Index of largest bit in N
 		static const uint64_t BIT_MASK = N - 1;		///< Bit mask to mask off lower bits to get index inside segment
@@ -331,7 +333,7 @@ namespace vecs {
 		}
 
 		while (segment_ptr->size() * N < r) {							///< Allocate enough segments
-			segment_ptr->push_back(std::make_shared<array_tuple_t>());	///< Create new segment
+			segment_ptr->emplace_back(std::make_shared<array_tuple_t>());	///< Create new segment
 		}
 		if (segment_ptr != old) {				///< If the vector was reallocated
 			m_segment.store(segment_ptr);		///< Copy new to old -> now all threads use the new vector
@@ -381,6 +383,7 @@ namespace vecs {
 		while (m_segment.load()->size() > 1 && m_size + N <= m_segment.load()->size() * N) {
 			m_segment.load()->pop_back();
 		}
+		m_old_segment.reset();
 	}
 
 }

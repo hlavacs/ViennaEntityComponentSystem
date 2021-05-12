@@ -19,6 +19,7 @@ namespace vecs {
 	/// \brief Example for a user component
 	struct MyComponentPosition {
 		glm::vec3 m_position;
+		int i = 0;
 	};
 
 	/// \brief Example for a user component
@@ -31,6 +32,7 @@ namespace vecs {
 	struct MyComponentTransform {
 		glm::mat4 m_transform;
 		std::unique_ptr<int> ptr;
+		std::atomic<int> i = 0;
 	};
 
 	/// \brief Example for a user component

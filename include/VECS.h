@@ -1056,7 +1056,10 @@ namespace vecs {
 
 		bool locked = this->m_mutex.try_lock();			///< Try to acquire the lock on m_first_free
 
+		//std::lock_guard<std::mutex> lock(this->m_mutex);
+
 		if (locked && this->m_first_free.has_value()) {	///< If we got the lock and there is a free slot -> reuse the free slot
+		//if ( this->m_first_free.has_value()) {	///< If we got the lock and there is a free slot -> reuse the free slot
 			map_idx = this->m_first_free;
 			this->m_first_free = *this->m_map_table.component_ptr<this->c_index>(map_idx);
 			this->m_mutex.unlock();
@@ -1071,7 +1074,14 @@ namespace vecs {
 		*this->m_map_table.component_ptr<this->c_type>(map_idx) = table_index_t{ vtll::index_of<VecsEntityTypeList<P>, E>::value }; ///< Entity type index
 		
 		VecsHandleTemplate<P> handle{ map_idx, *this->m_map_table.component_ptr<this->c_counter>(map_idx) }; ///< The new handle
-		
+
+		//if (map_idx.value >= this->m_map_table.size()) {
+		//	std::cout << "Error \n";
+		//}
+		//auto* idx_ptr = this->m_map_table.component_ptr<this->c_index>(map_idx);
+		//auto* mut_ptr = this->m_map_table.component_ptr<this->c_mutex>(map_idx);
+		//*idx_ptr = m_component_table.insert(handle, mut_ptr, std::forward<Cs>(args)...);
+
 		*this->m_map_table.component_ptr<this->c_index>(map_idx) ///< Need new handle here so we can put it into the component table 
 			= m_component_table.insert(handle, this->m_map_table.component_ptr<this->c_mutex>(map_idx), std::forward<Cs>(args)...);	///< add data into component table
 
@@ -1289,6 +1299,8 @@ namespace vecs {
 			}
 		}
 		m_deleted.clear();
+		m_data.compress();
+		m_deleted.compress();
 	}
 
 	/**

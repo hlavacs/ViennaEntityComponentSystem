@@ -26,6 +26,7 @@ using namespace vecs;
 		C;
 
 
+
 int main() {
 	int number = 0;
 	std::atomic<int> counter = 0;
@@ -45,7 +46,7 @@ int main() {
 	MyComponentGeometry geo{ 11 };
 
 	std::cout << vtll::size<MyEntityTypeList>::value << std::endl;
-
+	/*
 	{
 		auto range = VecsRange<MyComponentName>{};
 		auto it = range.begin();
@@ -56,6 +57,68 @@ int main() {
 		}
 		for (auto [handle, name, pos, orient, transf] : VecsRange<MyEntityTypeNode>{}) {
 		}
+	}
+
+	{
+		const int num = 1000000;
+
+		struct data_t {
+			std::atomic<int> i;
+			std::atomic<int> j;
+			std::atomic<int> k;
+			std::atomic<uint32_t> mutex = 0;
+		};
+
+		std::vector<data_t> data{num};
+
+		auto a1 = std::async([&]() {
+			for (int n = 0; n < num; ++n) {
+				VecsWriteLock lock{ &data[n].mutex };
+				data[n].i = 1;
+				data[n].j = 1;
+				data[n].k = 1;
+			}
+		});
+
+		auto a2 = std::async([&]() {
+			for (int n = 0; n < num; ++n) {
+				VecsWriteLock lock{ &data[n].mutex };
+				data[n].i = 2;
+				data[n].j = 2;
+				data[n].k = 2;
+			}
+		});
+
+		auto a3 = std::async([&]() {
+			for (int n = 0; n < num; ++n) {
+				VecsWriteLock lock{ &data[n].mutex };
+				data[n].i = 3;
+				data[n].j = 3;
+				data[n].k = 3;
+			}
+		});
+
+		auto a4 = std::async([&]() {
+			for (int n = 0; n < num; ++n) {
+				VecsWriteLock lock{ &data[n].mutex };
+				data[n].i = 4;
+				data[n].j = 4;
+				data[n].k = 4;
+			}
+		});
+
+		a1.wait();
+		a2.wait();
+		a3.wait();
+		a4.wait();
+
+		bool flag = true;
+		for (int n = 0; n < num; ++n) {
+			if (data[n].i != data[n].j || data[n].i != data[n].k || data[n].j != data[n].k) {
+				flag = false;
+			}
+		}
+		TESTRESULT(++number, "locking", , (flag), );
 	}
 
 	{
@@ -79,7 +142,7 @@ int main() {
 
 		//--------------------------------------------------------------------------------------------------------------------------
 
-		TESTRESULT(++number, "component handle", auto comp1 = h1.component<MyComponentPosition>(),
+		TESTRESULT(++number, "component handle", auto& comp1 = h1.component<MyComponentPosition>(),
 			(comp1.m_position == glm::vec3{ 9.0f, 2.0f, 3.0f }), );
 
 		TESTRESULT(++number, "component handle", auto bb1 = h1.has_component<MyComponentMaterial>(), (!bb1), );
@@ -297,7 +360,7 @@ int main() {
 	{
 		int i = 0;
 		bool test = true;
-		VecsRange<MyEntityTypeNode, MyEntityTypeDraw>{}.for_each([&](auto handle, auto name, auto pos, auto& orient) {
+		VecsRange<MyEntityTypeNode, MyEntityTypeDraw>{}.for_each([&](auto handle, auto name, auto& pos, auto& orient) {
 			++i;
 			if (name.m_name != ("Name Holder 4 " + std::to_string(i))) { test = false; }
 			//std::cout << "Entity " << name.m_name << " " << i << "\n";
@@ -415,66 +478,95 @@ int main() {
 		VecsRegistry{}.compress();
 	}
 
+	*/
 	{
-		const int num = 100000;
-		auto a1 = std::async([&]() {
-			for (int i = 0; i < num; i++) {
-				auto h1 = VecsRegistry<MyEntityTypeNode>{}.insert(MyComponentName{ "Node" }, MyComponentPosition{}, MyComponentOrientation{}, MyComponentTransform{});
-				auto h2 = VecsRegistry<MyEntityTypeDraw>{}.insert(MyComponentName{ "Draw" }, MyComponentPosition{}, MyComponentOrientation{}, MyComponentMaterial{ 1 }, MyComponentGeometry{ 1 });
-			}
-		});
+		for (int i = 0; i < 5; ++i) {
+			const int num = 100000;
+			auto a1 = std::async([&]() {
+				for (int i = 0; i < num; i++) {
+					auto h1 = VecsRegistry<MyEntityTypeNode>{}.insert(MyComponentName{ "Node" }, MyComponentPosition{}, MyComponentOrientation{}, MyComponentTransform{});
+					auto h2 = VecsRegistry<MyEntityTypeDraw>{}.insert(MyComponentName{ "Draw" }, MyComponentPosition{}, MyComponentOrientation{}, MyComponentMaterial{ 1 }, MyComponentGeometry{ 1 });
+				}
+				});
 
-		auto a2 = std::async([&]() {
-			for (int i = 0; i < num; i++) {
-				auto h1 = VecsRegistry<MyEntityTypeNode>{}.insert(MyComponentName{ "Node" }, MyComponentPosition{}, MyComponentOrientation{}, MyComponentTransform{});
-				auto h2 = VecsRegistry<MyEntityTypeDraw>{}.insert(MyComponentName{ "Draw" }, MyComponentPosition{}, MyComponentOrientation{}, MyComponentMaterial{ 1 }, MyComponentGeometry{ 1 });
-			}
-		});
+			auto a2 = std::async([&]() {
+				for (int i = 0; i < num; i++) {
+					auto h1 = VecsRegistry<MyEntityTypeNode>{}.insert(MyComponentName{ "Node" }, MyComponentPosition{}, MyComponentOrientation{}, MyComponentTransform{});
+					auto h2 = VecsRegistry<MyEntityTypeDraw>{}.insert(MyComponentName{ "Draw" }, MyComponentPosition{}, MyComponentOrientation{}, MyComponentMaterial{ 1 }, MyComponentGeometry{ 1 });
+				}
+			});
 
-		a1.wait();
-		a2.wait();
+			auto a3 = std::async([&]() {
+				for (int i = 0; i < num; i++) {
+					auto h1 = VecsRegistry<MyEntityTypeNode>{}.insert(MyComponentName{ "Node" }, MyComponentPosition{}, MyComponentOrientation{}, MyComponentTransform{});
+					auto h2 = VecsRegistry<MyEntityTypeDraw>{}.insert(MyComponentName{ "Draw" }, MyComponentPosition{}, MyComponentOrientation{}, MyComponentMaterial{ 1 }, MyComponentGeometry{ 1 });
+				}
+				});
 
-		TESTRESULT(++number, "system create parallel", , (VecsRegistry().size() == 4 * num && VecsRegistry<MyEntityTypeNode>().size() == 2*num && VecsRegistry<MyEntityTypeNode>().size() == 2*num), );
+			auto a4 = std::async([&]() {
+				for (int i = 0; i < num; i++) {
+					auto h1 = VecsRegistry<MyEntityTypeNode>{}.insert(MyComponentName{ "Node" }, MyComponentPosition{}, MyComponentOrientation{}, MyComponentTransform{});
+					auto h2 = VecsRegistry<MyEntityTypeDraw>{}.insert(MyComponentName{ "Draw" }, MyComponentPosition{}, MyComponentOrientation{}, MyComponentMaterial{ 1 }, MyComponentGeometry{ 1 });
+				}
+				});
+
+			a1.wait();
+			a2.wait();
+			a3.wait();
+			a4.wait();
+
+			TESTRESULT(++number, "system create parallel", , (VecsRegistry().size() == 8 * num && VecsRegistry<MyEntityTypeNode>().size() == 4 * num && VecsRegistry<MyEntityTypeNode>().size() == 4 * num), );
+			TESTRESULT(++number, "clear", VecsRegistry{}.clear(), (VecsRegistry().size() == 0 && VecsRegistry<MyEntityTypeNode>().size() == 0 && VecsRegistry<MyEntityTypeDraw>().size() == 0), );
+			VecsRegistry{}.compress();
+		}
 	}
 
 	{
 		auto a1 = std::async([]() {
-			VecsRange<MyComponentOrientation>{}.for_each([&](VecsHandle handle, auto& orient) {
+			VecsRange<MyComponentOrientation, MyComponentTransform>{}.for_each([&](VecsHandle handle, auto& orient, auto& transf) {
 				orient.i = 11;
-			});
+				transf.i = 11;
+				});
 		});
 
 		auto a2 = std::async([]() {
-			VecsRange<MyComponentOrientation>{}.for_each([&](VecsHandle handle, auto& orient) {
+			VecsRange<MyComponentOrientation, MyComponentTransform>{}.for_each([&](VecsHandle handle, auto& orient, auto& transf) {
 				orient.i = 22;
-			});
+				transf.i = 22;
+				});
 		});
 
-		auto a3 = std::async([]() {
-			VecsRange<MyComponentOrientation>{}.for_each([&](VecsHandle handle, auto& orient) {
+		/*auto a3 = std::async([]() {
+			VecsRange<MyComponentOrientation, MyComponentTransform>{}.for_each([&](VecsHandle handle, auto& orient, auto& transf) {
 				orient.i = 33;
+				transf.i = 33;
 				});
 			});
 
 		auto a4 = std::async([]() {
-			VecsRange<MyComponentOrientation>{}.for_each([&](VecsHandle handle, auto& orient) {
+			VecsRange<MyComponentOrientation, MyComponentTransform>{}.for_each([&](VecsHandle handle, auto& orient, auto& transf) {
 				orient.i = 44;
+				transf.i = 44;
 				});
-			});
+			});*/
 
 		a1.wait();
 		a2.wait();
-		a3.wait();
-		a4.wait();
+		//a3.wait();
+		//a4.wait();
 
 		bool flag = true;
-		for (auto [handle, orient] : VecsRange<MyComponentOrientation>{}) {
+		for (auto [handle, orient, transf] : VecsRange<MyComponentOrientation, MyComponentTransform>{}) {
 			if (!handle.has_value()) continue;
-			if (orient.i != 11 && orient.i != 22 && orient.i != 33 && orient.i != 44) flag = false;
+			if (orient.i != transf.i) {
+				flag = false;
+			}
+			if (orient.i != 11 && orient.i != 22 && orient.i != 33 && orient.i != 44) {
+				flag = false;
+			}
 		}
 
 		TESTRESULT(++number, "parallel update", , (flag), );
-
 	}
 
 
