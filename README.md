@@ -132,7 +132,7 @@ However, the above classes are only aliases of the following basic templates:
 * VecsIteratorT\<P, ...\>
 * VecsRangeT\<P, ...\>
 
-You can use the templates directly by simply adding your partition *P* as first template parameter. This way, you can use the same API names for different partitions, and differentiate between the partitions by using different *P* s. For example, you can use *VecsHandleT\<MyEntityTypeList\>* and *VecsHandleT\<MySystemEntityTypeList\>* instead of the above defintions.
+You can use the templates directly by simply adding your partition *P* as first template parameter. This way, you can use the same API names for different partitions, and differentiate between the partitions by using different *P* s. For example, you can use *VecsHandleT\<MyEntityTypeList\>* and *VecsHandleT\<MySystemEntityTypeList\>* instead of *VecsHandle* or *VecsSystemHandle* respectively.
 
 In the following examples it is assumed that there was no name given. If you use partition names, then change the examples accordingly by inserting the partition names into the VECS type names.
 
