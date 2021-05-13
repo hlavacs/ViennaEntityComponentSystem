@@ -41,7 +41,7 @@ void do_work(R<Cs...> range ) {
 	size_t i = 0;
 
 	for (auto [handle, pos] : range) {
-		if (!handle.is_valid()) continue;
+		if (!handle.has_value()) continue;
 		pos.m_position = glm::vec3{ 7.0f + i, 8.0f + i, 9.0f + i };
 		++i;
 	}
