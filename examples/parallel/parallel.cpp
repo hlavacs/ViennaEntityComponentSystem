@@ -46,7 +46,7 @@ void do_work(R<Cs...> range ) {
 		++i;
 	}
 
-	/*bool sync = true;
+	/*bool sync = false;
 	range.for_each([&](auto handle, auto& pos) {
 		pos.m_position = glm::vec3{ 7.0f + i, 8.0f + i, 9.0f + i };
 		++i;
@@ -69,9 +69,9 @@ void init(size_t num) {
 		auto h2 = VecsRegistry<MyEntityTypeDraw>().insert(name, pos, orient, trans, mat, geo);
 	}
 
-	for (int i = 0; i < 100; i++) {
+	/*for (int i = 0; i < 100; i++) {
 		vgjs::schedule( [=]() { work(num); });
-	}
+	}*/
 
 }
 

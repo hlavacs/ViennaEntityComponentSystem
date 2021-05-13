@@ -461,8 +461,7 @@ namespace vecs {
 	template<typename P, typename E>
 	template<typename C>
 	requires is_component_of<P, E, C>
-		inline auto VecsComponentTable<P, E>::component_ptr(const table_index_t index) noexcept -> C* {
-		if (index >= m_data.size()) return nullptr;
+	inline auto VecsComponentTable<P, E>::component_ptr(const table_index_t index) noexcept -> C* {
 		return m_data.component_ptr<c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(index); ///< Get ref to the entity and return component
 	}
 
