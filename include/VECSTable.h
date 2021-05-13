@@ -326,7 +326,7 @@ namespace vecs {
 		if (segment_ptr && r <= segment_ptr->size() * N) return true;	///< is there enough space in the table?
 
 		std::lock_guard<std::mutex> lock(m_mutex);
-		segment_ptr = m_segment.load();
+		segment_ptr = m_segment.load();									///< Current seg pointer
 		if (segment_ptr && r <= segment_ptr->size() * N) return true;	///< Retest, since another thread could have beaten us to here
 
 		auto old{ segment_ptr };									///< Remember old vector
@@ -366,15 +366,15 @@ namespace vecs {
 			segment_ptr = m_segment.load();				///< Reaload, since another thread could have beaten us to here
 
 			if (!segment_ptr || r > segment_ptr->capacity() * N) {	///< Retest 
-				auto old = segment_ptr;					///< Remember old vector
-				auto num_segs = (r - 1) / N + 1;		///< Number of segments necessary, at least one
-				segment_ptr = new seg_vector_t;			///< Create new segment ptr
-				segment_ptr->reserve(num_segs);			///< Make vector large enough
+				auto old = segment_ptr;								///< Remember old vector
+				auto num_segs = std::max((r - 1) / N + 1, 128);		///< Number of segments necessary, at least 128
+				segment_ptr = new seg_vector_t;						///< Create new segment ptr
+				segment_ptr->reserve(num_segs);						///< Make vector large enough
 				if (old) {
-					*segment_ptr = *old;				///< Copy old shared pointers to the new vector
+					*segment_ptr = *old;			///< Copy old shared pointers to the new vector
 					m_old_segment = std::unique_ptr<seg_vector_t>(old);	///< Remember the old vector, deallocate the previous segment
 				}
-				m_segment.store(segment_ptr);			///< Copy new to old -> now all threads use the new vector
+				m_segment.store(segment_ptr);		///< Copy new to old -> now all threads use the new vector
 			}
 		}
 		return segment_ptr->capacity() * N;
