@@ -29,7 +29,7 @@ namespace vecs {
 			table_index_t			m_current_index{ 0 };				///< Current index in the VecsComponentTable<E>
 			std::atomic<size_t>*	m_current_sizeE_ptr{nullptr};		///< Number of entities in the table of current subiterator
 			size_t					m_current_sizeE{0};					///< Local copy of sizeE
-			VecsHandleT<P>*	m_current_handle_ptr{ nullptr };	///< Current handle the subiterator points to
+			VecsHandleT<P>*	m_current_handle_ptr{ nullptr };			///< Current handle the subiterator points to
 			std::atomic<uint32_t>*	m_current_mutex_ptr{ nullptr };		///< Current mutex the subiterator points to
 			
 			size_t					m_size{ 0 };			///< Number of entities covered by the iterator (can change due to multithreading)
