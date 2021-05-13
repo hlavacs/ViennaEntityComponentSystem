@@ -6,6 +6,7 @@
 #include <shared_mutex>
 #include <optional>
 #include <array>
+#include <algorithm>
 #include "VTLL.h"
 #include "VECSUtil.h"
 
@@ -329,9 +330,11 @@ namespace vecs {
 		if (segment_ptr && r <= segment_ptr->size() * N) return true;	///< Retest, since another thread could have beaten us to here
 
 		auto old{ segment_ptr };									///< Remember old vector
-		auto num_segs = (r - 1) / N + 1;							///< Number of segments necessary
-		if (!segment_ptr || num_segs > segment_ptr->capacity()) {	///< Is it larger than what we have?
+		auto old_segs = segment_ptr ? segment_ptr->capacity() : 0;	///< Old seg capacity
+		auto num_segs = std::max((r - 1) / N + 1, 128ULL);			///< Number of segments necessary, min 128
+		if (!segment_ptr || num_segs > old_segs) {					///< Is it larger than what we have?
 			segment_ptr = new seg_vector_t;		///< Create new segment ptr vector
+			num_segs = std::max(num_segs, old_segs << 1);			/// Grow at least 100%
 			segment_ptr->reserve(num_segs);		///< Make vector large enough
 			if (old) { *segment_ptr = *old; }	///< Copy old shared pointers to the new vector
 		}
