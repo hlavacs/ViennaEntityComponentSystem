@@ -349,7 +349,7 @@ namespace vecs {
 		virtual auto sizeE_ptr() noexcept	-> std::atomic<size_t>* = 0;	///< Total number of valid and invalid entities in the component table for type E
 		virtual auto handle_ptr() noexcept	-> VecsHandleT<P>* = 0;
 		virtual auto mutex_ptr() noexcept	-> std::atomic<uint32_t>* = 0;
-		virtual auto operator++() noexcept	-> table_index_t = 0;
+		virtual auto operator++() noexcept	-> void = 0;
 		virtual auto operator*() noexcept	-> typename VecsIteratorBaseClass<P, ETL, CTL>::reference = 0;
 	};
 
@@ -377,7 +377,7 @@ namespace vecs {
 		auto sizeE_ptr() noexcept	-> std::atomic<size_t>*;	///< Total number of valid and invalid entities in the component table for type E
 		auto handle_ptr() noexcept	-> VecsHandleT<P>*;
 		auto mutex_ptr() noexcept	-> std::atomic<uint32_t>*;
-		auto operator++() noexcept	-> table_index_t;
+		auto operator++() noexcept	-> void;
 		auto operator*() noexcept	-> reference;
 	};
 
@@ -411,10 +411,10 @@ namespace vecs {
 	}
 
 	template<typename P, typename E, typename ETL, template<typename...> typename CTL, typename... Cs>
-	inline auto VecsIteratorEntity<P, E, ETL, CTL<Cs...>>::operator++() noexcept	-> table_index_t {
+	inline auto VecsIteratorEntity<P, E, ETL, CTL<Cs...>>::operator++() noexcept	-> void {
 		this->m_current_handle_ptr = nullptr;
 		this->m_current_mutex_ptr = nullptr;
-		return ++(this->m_current_index);
+		++(this->m_current_index);
 	}
 
 	/**
