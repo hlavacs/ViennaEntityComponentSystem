@@ -657,11 +657,11 @@ namespace vecs {
 		template<typename P, typename E> friend class VecsRegistryT;
 
 	public:
-		using entity_type_list_wo_tags	= vtll::Nth_type<P, 0>;
+		using etl_wo_tags		= vtll::Nth_type<P, 0>;
 		using entity_tag_map	= vtll::Nth_type<P, 1>;
 		using table_size_map	= vtll::Nth_type<P, 2>;
 		using table_layout_map	= vtll::Nth_type<P, 3>;
-		using entity_type_list = expand_tags< entity_tag_map, entity_type_list_wo_tags >;
+		using entity_type_list = expand_tags< entity_tag_map, etl_wo_tags >;
 
 		using entity_tag_list = vtll::flatten< vtll::transform< entity_tag_map, vtll::back > >;
 		using component_type_list_wo_tags = vtll::remove_types< vtll::remove_duplicates< vtll::flatten<entity_type_list> >, entity_tag_list>;
