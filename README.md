@@ -116,7 +116,9 @@ This defines the following classes (will be explained later):
 * VecsIterator<...>
 * VecsRange<...>
 
-The first parameter in the macro VECS_DECLARE_PARTITION that was left out in the example is a partition name, which would be inserted between "Vecs" and the class type. By using names and different entity lists, you can declare different partitions for VECS. For instance, if you want to use VECS in your core game engine, for some other partition *MySystemEntityTypeList* you could set
+The first parameter in the macro VECS_DECLARE_PARTITION that was left out in the example is a partition name, which would be inserted between "Vecs" and the class type.
+
+By using names and different entity lists, you can declare different partitions for VECS. For instance, if you want to use VECS in your core game engine, for some other partition *MySystemEntityTypeList* you could set
 
     VECS_DECLARE_PARTITION(System, MySystemEntityTypeList, MySystemEntityTagMap, MySystemTableSizeMap, MySystemTableLayoutMap);
 
