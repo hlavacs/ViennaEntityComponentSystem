@@ -52,9 +52,9 @@ namespace vecs {
 			inline auto mutex_ptr() noexcept	-> std::atomic<uint32_t>*;	///< Return pointer to the mutex of this entity
 			inline auto is_valid() noexcept		-> bool;					///< Is currently pointing to a valid entity
 			
-			auto operator*() noexcept		-> reference;							///< Access the data
-			auto operator++() noexcept		-> VecsIteratorBaseClass<P, ETL,CTL>&;	///< Increase by 1
-			auto operator++(int) noexcept	-> VecsIteratorBaseClass<P, ETL,CTL>&;	///< Increase by 1
+			inline auto operator*() noexcept		-> reference;							///< Access the data
+			inline auto operator++() noexcept		-> VecsIteratorBaseClass<P, ETL,CTL>&;	///< Increase by 1
+			inline auto operator++(int) noexcept	-> VecsIteratorBaseClass<P, ETL,CTL>&;	///< Increase by 1
 			inline auto size() noexcept				-> size_t;								///< Number of valid entities
 			inline auto sizeE() noexcept			-> size_t;
 	};
@@ -95,7 +95,7 @@ namespace vecs {
 	template<typename P, typename ETL, typename CTL>
 	inline auto VecsIteratorBaseClass<P, ETL, CTL>::handle() noexcept	-> VecsHandleT<P>& {
 		assert(!m_is_end);
-		return *m_dispatch[m_current_iterator]->handle_ptr();
+		return m_dispatch[m_current_iterator]->handle();
 	}
 
 	/**
@@ -349,11 +349,18 @@ namespace vecs {
 
 		virtual auto sizeE_ptr() noexcept	-> std::atomic<size_t>* { return m_sizeE_ptr; };	///< Total number of valid and invalid entities in the component table for type E
 		virtual auto sizeE() noexcept		-> size_t { return m_sizeE; };						///< Total number of valid and invalid entities in the component table for type E
+		auto handle() noexcept				-> VecsHandleT<P>&;
 		virtual auto handle_ptr() noexcept	-> VecsHandleT<P>* = 0;
 		virtual auto mutex_ptr() noexcept	-> std::atomic<uint32_t>* = 0;
 		virtual auto operator++() noexcept	-> void = 0;
 		virtual auto operator*() noexcept	-> typename VecsIteratorBaseClass<P, ETL, CTL>::reference = 0;
 	};
+
+	template<typename P, typename ETL, typename CTL>
+	inline auto VecsIteratorEntityBaseClass<P, ETL, CTL>::handle() noexcept -> VecsHandleT<P>& {
+		if (this->m_current_handle_ptr != nullptr) return *m_current_handle_ptr;
+		return *handle_ptr();
+	}
 
 
 	//-------------------------------------------------------------------------
