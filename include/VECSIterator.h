@@ -258,7 +258,7 @@ namespace vecs {
 	* \brief Iterator for given list of entity types. Entity types are taken as is, and NOT extended by possible tags from the tags map.
 	*/
 	template<typename P, typename ETL>
-	using it_CTL_entity_list = vtll::remove_types< vtll::intersection< ETL >, VecsEntityTagList<P> >;
+	using it_CTL_entity_list = vtll::remove_types< vtll::intersection< ETL >, typename VecsRegistryBaseClass<P>::entity_tag_list >;
 
 	template<typename P, typename ETL>
 	requires (is_entity_type_list<P, ETL>::value)
@@ -275,7 +275,7 @@ namespace vecs {
 	* Component types are the intersection of the entity types.
 	*/
 	template<typename P, typename... Es>
-	using it_CTL_entity_types = vtll::remove_types< vtll::intersection< vtll::tl<Es...> >, VecsEntityTagList<P> >;
+	using it_CTL_entity_types = vtll::remove_types< vtll::intersection< vtll::tl<Es...> >, typename VecsRegistryBaseClass<P>::entity_tag_list >;
 
 	template<typename P, typename... Es>
 	requires (sizeof...(Es) > 0 && are_entity_types<P, Es...>)
@@ -289,7 +289,7 @@ namespace vecs {
 	* \brief Iterator for given component types.
 	*/
 	template<typename P, typename... Cs>
-	using it_CTL_types = vtll::remove_types< vtll::tl<Cs...>, VecsEntityTagList<P> >;
+	using it_CTL_types = vtll::remove_types< vtll::tl<Cs...>, typename VecsRegistryBaseClass<P>::entity_tag_list >;
 
 	template<typename P, typename... Cs>
 	requires (sizeof...(Cs) > 0 && are_component_types<P, Cs...>)
@@ -303,7 +303,7 @@ namespace vecs {
 	* \brief Iterator for given entity type that has all tags.
 	*/
 	template<typename P, typename E, typename... Ts>
-	using it_CTL_entity_tags = vtll::remove_types< E, VecsEntityTagList<P> >;
+	using it_CTL_entity_tags = vtll::remove_types< E, typename VecsRegistryBaseClass<P>::entity_tag_list >;
 
 	template<typename P, typename E, typename... Ts>
 	requires (is_entity_type<P, E> && (sizeof...(Ts) > 0) && are_entity_tags<P, Ts...>)
@@ -317,7 +317,7 @@ namespace vecs {
 	* \brief Iterator for all entities.
 	*/
 	template<typename P>
-	using it_CTL_all_entities = vtll::remove_types< vtll::intersection< VecsEntityTypeList<P> >, VecsEntityTagList<P> >;
+	using it_CTL_all_entities = vtll::remove_types< vtll::intersection< VecsEntityTypeList<P> >, typename VecsRegistryBaseClass<P>::entity_tag_list >;
 
 	template<typename P>
 	class VecsIteratorT<P> : public VecsIteratorBaseClass<P, VecsEntityTypeList<P>, it_CTL_all_entities<P> > {
