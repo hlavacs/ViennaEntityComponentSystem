@@ -1340,7 +1340,7 @@ namespace vecs {
 	template<typename... Es>
 	requires (are_entity_types<P, Es...>)
 	inline auto VecsRegistryBaseClass<P>::size() noexcept	-> size_t {
-		using entity_list = std::conditional_t< (sizeof...(Es) > 0), expand_tags< P, VecsEntityTagMap<P>, vtll::tl<Es...> >, entity_type_list >;
+		using entity_list = std::conditional_t< (sizeof...(Es) > 0), expand_tags< P, typename VecsRegistryBaseClass<P>::entity_tag_map, vtll::tl<Es...> >, entity_type_list >;
 
 		size_t sum = 0;
 		vtll::static_for<size_t, 0, vtll::size<entity_list>::value >(
@@ -1364,7 +1364,7 @@ namespace vecs {
 	template<typename... Es>
 	requires (are_entity_types<P, Es...>)
 	inline auto VecsRegistryBaseClass<P>::clear() noexcept	 -> size_t {
-		using entity_list = std::conditional_t< (sizeof...(Es) > 0), expand_tags< P, VecsEntityTagMap<P>, vtll::tl<Es...> >, entity_type_list >;
+		using entity_list = std::conditional_t< (sizeof...(Es) > 0), expand_tags< P, typename VecsRegistryBaseClass<P>::entity_tag_map, vtll::tl<Es...> >, entity_type_list >;
 
 		size_t num = 0;
 		vtll::static_for<size_t, 0, vtll::size<entity_list>::value >(
