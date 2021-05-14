@@ -41,12 +41,12 @@ void do_work(R<Cs...> range ) {
 	size_t i = 0;
 
 	for (auto [handle, pos] : range) {
-		if (!handle.has_value()) continue;
+		if (!handle.is_valid()) continue;	//is_valid() is enough here!
 		pos.m_position = glm::vec3{ 7.0f + i, 8.0f + i, 9.0f + i };
 		++i;
 	}
 
-	/*range.for_each([&](auto handle, auto& pos) {
+	/*range.for_each([&](auto& handle, auto& pos) {
 		pos.m_position = glm::vec3{ 7.0f + i, 8.0f + i, 9.0f + i };
 		++i;
 	}, false);*/

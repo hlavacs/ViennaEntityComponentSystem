@@ -29,7 +29,7 @@ namespace vecs {
 			table_index_t			m_current_index{ 0 };				///< Current index in the VecsComponentTable<E>
 			std::atomic<size_t>*	m_current_sizeE_ptr{nullptr};		///< Number of entities in the table of current subiterator
 			size_t					m_current_sizeE{0};					///< Local copy of sizeE
-			VecsHandleT<P>*	m_current_handle_ptr{ nullptr };			///< Current handle the subiterator points to
+			VecsHandleT<P>*			m_current_handle_ptr{ nullptr };	///< Current handle the subiterator points to
 			std::atomic<uint32_t>*	m_current_mutex_ptr{ nullptr };		///< Current mutex the subiterator points to
 			
 			size_t					m_size{ 0 };			///< Number of entities covered by the iterator (can change due to multithreading)
@@ -37,8 +37,8 @@ namespace vecs {
 
 		public:
 			using value_type		= vtll::to_tuple< vtll::cat< vtll::tl<VecsHandleT<P>>, CTL > >;
-			using reference			= vtll::to_tuple< vtll::cat< vtll::tl<VecsHandleT<P>>, vtll::to_ref<CTL> > >;
-			using pointer			= vtll::to_tuple< vtll::cat< vtll::tl<VecsHandleT<P>>, vtll::to_ptr<CTL> > >;
+			using reference			= vtll::to_tuple< vtll::cat< vtll::tl<VecsHandleT<P>&>, vtll::to_ref<CTL> > >;
+			using pointer			= vtll::to_tuple< vtll::cat< vtll::tl<VecsHandleT<P>*>, vtll::to_ptr<CTL> > >;
 			using iterator_category = std::forward_iterator_tag;
 			using difference_type	= size_t;
 			using last_type			= vtll::back<ETL>;	///< last type for end iterator
@@ -52,9 +52,9 @@ namespace vecs {
 			auto operator!=(const VecsIteratorBaseClass<P, ETL, CTL>& v) noexcept	-> bool;	///< Unqequal
 			auto operator==(const VecsIteratorBaseClass<P, ETL, CTL>& v) noexcept	-> bool;	///< Equal
 
-			auto handle() noexcept			-> VecsHandleT<P>;	///< Return handle of the current entity
+			auto handle() noexcept			-> VecsHandleT<P>&;			///< Return handle ref of the current entity
 			auto mutex_ptr() noexcept		-> std::atomic<uint32_t>*;	///< Return pointer to the mutex of this entity
-			auto has_value() noexcept		-> bool;					///< Is currently pointing to a valid entity
+			auto is_valid() noexcept		-> bool;					///< Is currently pointing to a valid entity
 			
 			auto operator*() noexcept		-> reference;							///< Access the data
 			auto operator++() noexcept		-> VecsIteratorBaseClass<P, ETL,CTL>&;	///< Increase by 1
@@ -91,9 +91,9 @@ namespace vecs {
 	* \returns true if the iterator points to a valid entity.
 	*/
 	template<typename P, typename ETL, typename CTL>
-	inline auto VecsIteratorBaseClass<P, ETL, CTL>::has_value() noexcept	-> bool {
+	inline auto VecsIteratorBaseClass<P, ETL, CTL>::is_valid() noexcept	-> bool {
 		if (m_is_end || m_current_handle_ptr == nullptr) return false;
-		return VecsRegistryBaseClass<P>::m_registry.has_value(*m_current_handle_ptr);
+		return m_current_handle_ptr->is_valid();
 	}
 
 	/**
@@ -101,7 +101,7 @@ namespace vecs {
 	* \returns the handle of the current entity.
 	*/
 	template<typename P, typename ETL, typename CTL>
-	inline auto VecsIteratorBaseClass<P, ETL, CTL>::handle() noexcept	-> VecsHandleT<P> {
+	inline auto VecsIteratorBaseClass<P, ETL, CTL>::handle() noexcept	-> VecsHandleT<P>& {
 		if (m_is_end || m_current_handle_ptr == nullptr) return {};
 		return *m_current_handle_ptr;
 	}
@@ -451,7 +451,7 @@ namespace vecs {
 
 	template<typename P, template<typename...> typename Seq, typename... Cs>
 	struct Functor<P, Seq<Cs...>> {
-		using type = void(VecsHandleT<P>, Cs&...);	///< Arguments for the functor
+		using type = void(VecsHandleT<P>&, Cs&...);	///< Arguments for the functor
 	};
 
 
@@ -507,7 +507,7 @@ namespace vecs {
 				auto e = end();
 				for (; b != e; ++b) {
 					if( sync ) VecsWriteLock lock(b.mutex_ptr());		///< Write lock
-					if (!b.has_value()) continue;
+					if (!b.is_valid()) continue;
 					std::apply(f, *b);					///< Run the function on the references
 				}
 			}
