@@ -239,7 +239,7 @@ int main() {
 		bool test = true;
 		for (auto [handle, name, pos, orient, trans] : VecsRange<MyEntityTypeNode>{}) {
 			VecsReadLock lock(handle.mutex());
-			if (!handle.has_value()) continue;
+			if (!handle.is_valid()) continue;
 			++i;
 			if (name.m_name != "Node" && name.m_name != "Draw") { test = false; }
 		}
@@ -268,7 +268,7 @@ int main() {
 		test = true;
 		for (auto [handle, name] : VecsRange<MyComponentName>{}) {
 			VecsReadLock lock(handle.mutex());
-			if (!handle.has_value()) continue;
+			if (!handle.is_valid()) continue;
 			++i;
 			name.m_name = "Name Holder 2 " + std::to_string(i);
 			//std::cout << "Entity " << name.m_name << " " << i << "\n";
@@ -456,7 +456,7 @@ int main() {
 		int sum = 0;
 		i = 0;
 		for (auto [handle, orient] : VecsRange<MyComponentOrientation>{}) {
-			if (!handle.has_value()) continue;
+			if (!handle.is_valid()) continue;
 			sum += orient.i;
 			orient.i = orient.i * 2;
 			++i;
@@ -466,7 +466,7 @@ int main() {
 		sum = 0;
 		i = 0;
 		for (auto [handle, name, pos, orient, transf] : VecsRange<MyEntityTypeNode>{}) {
-			if (!handle.has_value()) continue;
+			if (!handle.is_valid()) continue;
 			sum += orient.i;
 			handle.erase();
 			++i;
@@ -557,7 +557,7 @@ int main() {
 
 		bool flag = true;
 		for (auto [handle, orient, transf] : VecsRange<MyComponentOrientation, MyComponentTransform>{}) {
-			if (!handle.has_value()) continue;
+			if (!handle.is_valid()) continue;
 			if (orient.i != transf.i) {
 				flag = false;
 			}

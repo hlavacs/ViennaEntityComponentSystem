@@ -162,7 +162,7 @@ We assume that is has been registered as described in the previous section. Of c
 
 Note that the parameters for this call must match the list of components that the entity is composed of. Move-semantics automatically apply. The result of creating an entity is a *handle*. A handle is an 8-bytes structure that uniquely identifies the new entity and you can use it later to access the entity again. A handle can be invalid, meaning that it does not point to any entity. You can test whether a handle is valid or not by calling
 
-    handle.is_valid();
+    handle.is_valid(); //do this in a range based or for_each loop
 
 If the handle is valid, then it IDs an entity in VECS. However, the entity might have been erased from VECS previously, e.g. by some other thread. You can test whether the entity that the handle represents is still in VECS by calling either of these:
 
@@ -170,7 +170,7 @@ If the handle is valid, then it IDs an entity in VECS. However, the entity might
     VecsRegistry{}.has_value(handle); //true if VECS contains the entity
     VecsRegistry<MyEntityTypeNode>{}.has_value(handle); //true if VECS contains the entity AND entity is of type MyEntityTypeNode
 
-A part of a handle contains a type ID for the entity type. You can get the type index by calling
+When going through a range based or for_each loop, calling *is_valid()* should be preferred. A part of a handle contains a type ID for the entity type. You can get the type index by calling
 
     handle.type();               //call this
     VecsRegistry{}.type(handle); //or this
@@ -326,12 +326,12 @@ Iterators have template parameters which determine which entity types their iter
     template<typename P, typename ETL, typename CTL>
     class VecsIteratorBaseClass {
 
-      //...
+        //...
 
       public:
-        using value_type		= vtll::to_tuple< vtll::cat< vtll::tl<VecsHandleTemplate<P>>, CTL > >;
-        using reference			= vtll::to_tuple< vtll::cat< vtll::tl<VecsHandleTemplate<P>>, vtll::to_ref<CTL> > >;
-        using pointer			= vtll::to_tuple< vtll::cat< vtll::tl<VecsHandleTemplate<P>>, vtll::to_ptr<CTL> > >;
+        using value_type		= vtll::to_tuple< vtll::cat< vtll::tl<VecsHandleT<P>>, CTL > >;
+        using reference			= vtll::to_tuple< vtll::cat< vtll::tl<VecsHandleT<P>&>, vtll::to_ref<CTL> > >;
+        using pointer			= vtll::to_tuple< vtll::cat< vtll::tl<VecsHandleT<P>*>, vtll::to_ptr<CTL> > >;
         using iterator_category = std::forward_iterator_tag;
         using difference_type	= size_t;
         using last_type			= vtll::back<ETL>;	///< last type for end iterator
@@ -345,14 +345,15 @@ Iterators have template parameters which determine which entity types their iter
         auto operator!=(const VecsIteratorBaseClass<P, ETL, CTL>& v) noexcept	-> bool;	///< Unqequal
         auto operator==(const VecsIteratorBaseClass<P, ETL, CTL>& v) noexcept	-> bool;	///< Equal
 
-        auto handle() noexcept			-> VecsHandleTemplate<P>;			///< Return handle of the current entity
-        auto mutex_ptr() noexcept		-> std::atomic<uint32_t>*;	///< Return pointer to the mutex of this entity
-        auto has_value() noexcept		-> bool;					///< Is currently pointing to a valid entity
+        inline auto handle() noexcept		-> VecsHandleT<P>&;			///< Return handle ref of the current entity
+        inline auto mutex_ptr() noexcept	-> std::atomic<uint32_t>*;	///< Return pointer to the mutex of this entity
+        inline auto is_valid() noexcept		-> bool;					///< Is currently pointing to a valid entity
 
-        auto operator*() noexcept		-> reference;							///< Access the data
-        auto operator++() noexcept		-> VecsIteratorBaseClass<P, ETL,CTL>&;	///< Increase by 1
-        auto operator++(int) noexcept	-> VecsIteratorBaseClass<P, ETL,CTL>&;	///< Increase by 1
-        auto size() noexcept			-> size_t;								///< Number of valid entities
+        inline auto operator*() noexcept		-> reference;							///< Access the data
+        inline auto operator++() noexcept		-> VecsIteratorBaseClass<P, ETL,CTL>&;	///< Increase by 1
+        inline auto operator++(int) noexcept	-> VecsIteratorBaseClass<P, ETL,CTL>&;	///< Increase by 1
+        inline auto size() noexcept				-> size_t;								///< Number of valid entities
+        inline auto sizeE() noexcept			-> size_t;
     };
 
 When specifying *VecsIterator<Ts...>* the lists *ETL* and *CTL* are created depending on the *Ts*, and the base class is determined. In the following the various ways to turn the parameters *Ts* into the base class *ETL* and *CTL* are explained.
@@ -368,13 +369,13 @@ You can specify a list *ETL* of entity types directly, which may also include en
     while( it!= end) {
       auto [handle, pos, orient, trans] = *it; //get access to the first entity, might be invalid so you better check
       //VecsWriteLock lock(handle.mutex()); //use this if you are using multithreading
-      if( handle.has_value() ) {
+      if( handle.is_valid() ) {
         //...
       }
       ++it; //use this operator if possible, the alternative it++ creates a costly copy!
     }
 
-lets you access the first possible entity in either tables for types *MyEntityTypeNode* and *MyEntityTypeNodeTagged<TAG2>*. Accessing the operator\*() yields a handle (by value), and references to those components that all the given entity types contain (their intersection). References to tags are never yielded.
+lets you access the first possible entity in either tables for types *MyEntityTypeNode* and *MyEntityTypeNodeTagged<TAG2>*. Accessing the operator\*() yields a handle (by reference), and references to those components that all the given entity types contain (their intersection). References to tags are never yielded.
 The first definition is the *CTL* for the case for a specific list of entity types, which is the intersection of all given types, and removing the tag types. Then the specific *VecsIteratorTemplate* is defined, and the base class as well as the constructor for it are defined. Finally, *VecsIterator* is then derived from *VecsIteratorTemplate*.
 
 ### Iterating over Basic Entity Types and All their Tagged Versions
@@ -416,22 +417,17 @@ The yielded components are again those contained in all entity types (this might
 
 ### Ranges and Range Based Loops
 
-In C++, a range is any class that offers *begin()* and *end()* functions yielding respective iterators. VECS offers a special range class
-
-    template<typename... Ts>
-    class VecsRange;
-
-The meanings of the template parameters are exactly the same as for iterators, and ranges are simply two iterators put together. A *VecsRange* can be used directly in a *C++ range based loop*:
+In C++, a range is any class that offers *begin()* and *end()* functions yielding respective iterators. VECS offers a special range class *VecsRange<...>* for this. The meanings of the template parameters are exactly the same as for iterators, and ranges are simply two iterators put together. A *VecsRange* can be used directly in a *C++ range based loop*:
 
     for (auto [handle, name] : VecsRange<MyComponentName, MyComponentPosition>{}) {
-      if( handle.has_value() ) {
+      if( handle.is_valid() ) {
         //....
       }
     }
 
 This version is the fastest version, but when obtaining the references does not lock the entities. Thus, when using multithreading, you should use this version only if you can make sure that no two threads write to the same entities (or components) at the same time. One way to achieve this is to run so called systems (range based loops) together that do not access the same components. Additionally, VECS ranges offer a thread save range based loop called *for_each*:
 
-    VecsRange<MyEntityTypeNode, TAG1>{}.for_each([&](VecsHandle handle, auto& name, auto& pos, auto& orient, auto& transf) {
+    VecsRange<MyEntityTypeNode, TAG1>{}.for_each([&](VecsHandle& handle, auto& name, auto& pos, auto& orient, auto& transf) {
       //...
     });
 
@@ -442,7 +438,7 @@ This loop guarantees that any loop iteration contains only valid entities, which
 
     template<typename P, template<typename...> typename Seq, typename... Cs>
     struct Functor<P, Seq<Cs...>> {
-      using type = void(VecsHandleTemplate<P>, Cs&...);	///< Arguments for the functor
+      using type = void(VecsHandleTemplate<P>&, Cs&...);	///< Arguments for the functor
     };
 
     inline auto for_each(std::function<typename Functor<P, CTL>::type> f, bool sync = true) -> void {
@@ -450,7 +446,7 @@ This loop guarantees that any loop iteration contains only valid entities, which
       auto e = end();
       for (; b != e; ++b) {
         if( sync ) VecsWriteLock lock(b.mutex_ptr());		///< Write lock
-        if (!b.has_value()) continue;
+        if (!b.is_valid()) continue;
         std::apply(f, *b);					///< Run the function on the references
       }
     }
@@ -473,7 +469,7 @@ If you only read components, then a read lock may be faster, since read locks do
 
     for (auto [handle, name] : VecsRange<MyComponentName>{}) {
       VecsReadLock handle.mutex() );
-      if( handle.has_value() ) {
+      if( handle.is_valid() ) {
         //....
       }
     }

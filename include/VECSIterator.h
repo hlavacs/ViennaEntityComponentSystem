@@ -570,7 +570,7 @@ namespace vecs {
 			[&](auto i) {
 				using type = vtll::Nth_type<ETL, i>;
 				m_dispatch[i] = std::make_unique<VecsIteratorEntity<P, type, ETL, CTL>>(is_end);
-				auto size = m_dispatch[i]->sizeE_ptr()->load();
+				auto size = m_dispatch[i]->sizeE();
 				m_size += size;
 				if (!is_end && m_current_iterator == i && size == 0 && i + 1 < vtll::size<ETL>::value) {
 					m_current_iterator++;
@@ -580,7 +580,7 @@ namespace vecs {
 
 		if (is_end) {
 			m_current_iterator = static_cast<decltype(m_current_iterator)>(m_dispatch.size() - 1);
-			m_current_index = static_cast<decltype(m_current_index)>(m_dispatch[m_current_iterator]->sizeE_ptr()->load());
+			m_current_index = static_cast<decltype(m_current_index)>(m_dispatch[m_current_iterator]->sizeE());
 		}
 
 	};
