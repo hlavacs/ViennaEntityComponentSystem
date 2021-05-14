@@ -25,19 +25,16 @@ using namespace std::chrono_literals;
 */ 
 #define VECS_DECLARE_PARTITION( NAME, ETL, TAGMAP, SIZEMAP, LAYOUTMAP ) \
 static_assert(vtll::are_unique<ETL>::value, "The elements of" #ETL " are not unique!");\
-template<> struct VecsEntityTagMap<ETL> { using type = TAGMAP; };\
-template<> struct VecsTableSizeMap<ETL> { using type = SIZEMAP; };\
-template<> struct VecsTableLayoutMap<ETL> { using type = LAYOUTMAP; };\
 using PARTITION = vtll::type_list<ETL, TAGMAP, SIZEMAP, LAYOUTMAP>;\
-using Vecs##NAME##Handle = VecsHandleT<ETL>;\
-template<typename... Ts> using Vecs##NAME##Iterator = VecsIteratorT<ETL, Ts...>;\
-template<typename... Ts> using Vecs##NAME##Range = VecsRangeT<ETL, Ts...>;\
+using Vecs##NAME##Handle = VecsHandleT<PARTITION>;\
+template<typename... Ts> using Vecs##NAME##Iterator = VecsIteratorT<PARTITION, Ts...>;\
+template<typename... Ts> using Vecs##NAME##Range = VecsRangeT<PARTITION, Ts...>;\
 \
 template<typename E = vtll::tl<>>\
-class Vecs##NAME##Registry : public VecsRegistryT<ETL,E> {};\
+class Vecs##NAME##Registry : public VecsRegistryT<PARTITION,E> {};\
 \
 template<>\
-class Vecs##NAME##Registry<vtll::tl<>> : public VecsRegistryBaseClass<ETL> {};
+class Vecs##NAME##Registry<vtll::tl<>> : public VecsRegistryBaseClass<PARTITION> {};
 
 
 namespace vecs {
@@ -63,32 +60,13 @@ namespace vecs {
 	template<typename P, typename TagMap, typename ETL>
 	using expand_tags = vtll::remove_duplicates< vtll::flatten< vtll::function3< P, TagMap, ETL, expand_tags_for_one > > >;
 
-	template<typename P>
-	struct VecsEntityTagMap {
-		using type = vtll::tl<>;
-	};
-
-	template<typename P>
-	struct VecsTableSizeMap {
-		using type = vtll::tl<>;
-	};
-
-	template<typename P>
-	struct VecsTableLayoutMap {
-		using type = vtll::tl<>;
-	};
-
-	template<typename P>
-	using VecsEntityTypeList = expand_tags< P, typename VecsEntityTagMap<P>::type, P >;
-
-
 
 	//-------------------------------------------------------------------------
-//declaration of Vecs classes
+	//declaration of Vecs classes
 
-/**
-* Declarations of the main VECS classes
-*/
+	/**
+	* Declarations of the main VECS classes
+	*/
 	class VecsReadLock;
 	class VecsWriteLock;
 
@@ -679,10 +657,11 @@ namespace vecs {
 		template<typename P, typename E> friend class VecsRegistryT;
 
 	public:
-		using entity_type_list = VecsEntityTypeList<P>;
-		using entity_tag_map = typename VecsEntityTagMap<P>::type;
-		using table_size_map = typename VecsTableSizeMap<P>::type;
-		using table_layout_map = typename VecsTableLayoutMap<P>::type;
+		using entity_type_list_wo_tags	= vtll::Nth_type<P, 0>;
+		using entity_tag_map	= vtll::Nth_type<P, 1>;
+		using table_size_map	= vtll::Nth_type<P, 2>;
+		using table_layout_map	= vtll::Nth_type<P, 3>;
+		using entity_type_list = expand_tags< entity_type_list_wo_tags, entity_tag_map, entity_type_list_wo_tags >;
 
 		using entity_tag_list = vtll::flatten< vtll::transform< entity_tag_map, vtll::back > >;
 		using component_type_list_wo_tags = vtll::remove_types< vtll::remove_duplicates< vtll::flatten<entity_type_list> >, entity_tag_list>;
