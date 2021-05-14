@@ -331,7 +331,7 @@ namespace vecs {
 
 		auto old{ segment_ptr };									///< Remember old vector
 		auto old_segs = segment_ptr ? segment_ptr->capacity() : 0;	///< Old seg capacity
-		auto num_segs = std::max((r - 1) / N + 1, 128ULL);			///< Number of segments necessary, min 128
+		auto num_segs = std::max((r - 1) / N + 1, 16ULL);			///< Number of segments necessary, min 16
 		if (!segment_ptr || num_segs > old_segs) {					///< Is it larger than what we have?
 			segment_ptr = new seg_vector_t;		///< Create new segment ptr vector
 			num_segs = std::max(num_segs, old_segs << 1);			/// Grow at least 100%
@@ -367,7 +367,7 @@ namespace vecs {
 
 			if (!segment_ptr || r > segment_ptr->capacity() * N) {	///< Retest 
 				auto old = segment_ptr;								///< Remember old vector
-				auto num_segs = std::max((r - 1) / N + 1, 128);		///< Number of segments necessary, at least 128
+				auto num_segs = std::max((r - 1) / N + 1, 16);		///< Number of segments necessary, at least 16
 				segment_ptr = new seg_vector_t;						///< Create new segment ptr
 				segment_ptr->reserve(num_segs);						///< Make vector large enough
 				if (old) {
