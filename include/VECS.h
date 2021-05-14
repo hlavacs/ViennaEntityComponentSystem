@@ -42,7 +42,7 @@ namespace vecs {
 	/**
 	* \brief Struct to expand tags to all possible combinations and append them to their entity type component lists.
 	*/
-	template<typename P, typename TagMap, typename T>
+	template<typename TagMap, typename T>
 	struct expand_tags_for_one {
 		using type =
 			vtll::transform_front<	///< Cat all partial tag sets after the elements of Ts
@@ -57,8 +57,8 @@ namespace vecs {
 	* \brief Expand the entity types of a list for all their tags.
 	*
 	*/
-	template<typename P, typename TagMap, typename ETL>
-	using expand_tags = vtll::remove_duplicates< vtll::flatten< vtll::function3< P, TagMap, ETL, expand_tags_for_one > > >;
+	template<typename TagMap, typename ETL>
+	using expand_tags = vtll::remove_duplicates< vtll::flatten< vtll::function2< TagMap, ETL, expand_tags_for_one > > >;
 
 
 	//-------------------------------------------------------------------------
@@ -661,7 +661,7 @@ namespace vecs {
 		using entity_tag_map	= vtll::Nth_type<P, 1>;
 		using table_size_map	= vtll::Nth_type<P, 2>;
 		using table_layout_map	= vtll::Nth_type<P, 3>;
-		using entity_type_list = expand_tags< entity_type_list_wo_tags, entity_tag_map, entity_type_list_wo_tags >;
+		using entity_type_list = expand_tags< entity_tag_map, entity_type_list_wo_tags >;
 
 		using entity_tag_list = vtll::flatten< vtll::transform< entity_tag_map, vtll::back > >;
 		using component_type_list_wo_tags = vtll::remove_types< vtll::remove_duplicates< vtll::flatten<entity_type_list> >, entity_tag_list>;
@@ -1320,7 +1320,7 @@ namespace vecs {
 	template<typename... Es>
 	requires (are_entity_types<P, Es...>)
 	inline auto VecsRegistryBaseClass<P>::size() noexcept	-> size_t {
-		using entity_list = std::conditional_t< (sizeof...(Es) > 0), expand_tags< P, typename VecsRegistryBaseClass<P>::entity_tag_map, vtll::tl<Es...> >, entity_type_list >;
+		using entity_list = std::conditional_t< (sizeof...(Es) > 0), expand_tags< typename VecsRegistryBaseClass<P>::entity_tag_map, vtll::tl<Es...> >, entity_type_list >;
 
 		size_t sum = 0;
 		vtll::static_for<size_t, 0, vtll::size<entity_list>::value >(
@@ -1344,7 +1344,7 @@ namespace vecs {
 	template<typename... Es>
 	requires (are_entity_types<P, Es...>)
 	inline auto VecsRegistryBaseClass<P>::clear() noexcept	 -> size_t {
-		using entity_list = std::conditional_t< (sizeof...(Es) > 0), expand_tags< P, typename VecsRegistryBaseClass<P>::entity_tag_map, vtll::tl<Es...> >, entity_type_list >;
+		using entity_list = std::conditional_t< (sizeof...(Es) > 0), expand_tags< typename VecsRegistryBaseClass<P>::entity_tag_map, vtll::tl<Es...> >, entity_type_list >;
 
 		size_t num = 0;
 		vtll::static_for<size_t, 0, vtll::size<entity_list>::value >(

@@ -275,7 +275,7 @@ namespace vecs {
 	* Component types are the intersection of the entity types.
 	*/
 	template<typename P, typename... Es>
-	using it_ETL_entity_types = expand_tags< P, typename VecsRegistryBaseClass<P>::entity_tag_map, vtll::tl<Es...> >;
+	using it_ETL_entity_types = expand_tags< typename VecsRegistryBaseClass<P>::entity_tag_map, vtll::tl<Es...> >;
 
 	template<typename P, typename... Es>
 	using it_CTL_entity_types = vtll::remove_types< vtll::intersection< vtll::tl<Es...> >, typename VecsRegistryBaseClass<P>::entity_tag_list >;
@@ -309,7 +309,7 @@ namespace vecs {
 	* \brief Iterator for given entity type that has all tags.
 	*/
 	template<typename P, typename E, typename... Ts>
-	using it_ETL_entity_tags = vtll::filter_have_all_types< expand_tags<P, typename VecsRegistryBaseClass<P>::entity_tag_map, vtll::tl<E>>, vtll::tl<Ts...> >;
+	using it_ETL_entity_tags = vtll::filter_have_all_types< expand_tags<typename VecsRegistryBaseClass<P>::entity_tag_map, vtll::tl<E>>, vtll::tl<Ts...> >;
 
 	template<typename P, typename E, typename... Ts>
 	using it_CTL_entity_tags = vtll::remove_types< E, typename VecsRegistryBaseClass<P>::entity_tag_list >;
