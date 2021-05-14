@@ -19,6 +19,7 @@
 #include <future>
 
 using namespace vecs;
+using namespace vecs::test;
 
 #define TESTRESULT(N, S, EXPR, B, C) \
 		EXPR; \

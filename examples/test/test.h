@@ -6,7 +6,7 @@
 #include <typeindex>
 #include "VECSUtil.h"
 
-namespace vecs {
+namespace vecs::test {
 
 	//-------------------------------------------------------------------------
 	//define user components here
