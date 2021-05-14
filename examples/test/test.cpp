@@ -46,7 +46,7 @@ int main() {
 	MyComponentGeometry geo{ 11 };
 
 	std::cout << vtll::size<MyEntityTypeList>::value << std::endl;
-	/*
+	
 	{
 		auto range = VecsRange<MyComponentName>{};
 		auto it = range.begin();
@@ -214,7 +214,7 @@ int main() {
 
 		for (auto [handle, name] : VecsRange<MyComponentName>{}) {
 			VecsReadLock lock( handle.mutex() );
-			if (!handle.has_value()) continue;
+			if (!handle.is_valid()) continue;
 			++i;
 			if (name.m_name != "Node" && name.m_name != "Draw") { test = false; }
 			//std::cout << "Entity " << name << "\n";
@@ -478,7 +478,7 @@ int main() {
 		VecsRegistry{}.compress();
 	}
 
-	*/
+	
 	{
 		for (int i = 0; i < 5; ++i) {
 			const int num = 100000;
