@@ -23,20 +23,20 @@ using namespace std::chrono_literals;
 * This macro declares a VECS partition.
 * 
 */ 
-#define VECS_DECLARE_PARTITION( NAME, PARTITION, TAGMAP, SIZEMAP, LAYOUTMAP ) \
-static_assert(vtll::are_unique<PARTITION>::value, "The elements of" #PARTITION " are not unique!");\
-template<> struct VecsEntityTagMap<PARTITION> { using type = TAGMAP; };\
-template<> struct VecsTableSizeMap<PARTITION> { using type = SIZEMAP; };\
-template<> struct VecsTableLayoutMap<PARTITION> { using type = LAYOUTMAP; };\
-using Vecs##NAME##Handle = VecsHandleT<PARTITION>;\
-template<typename... Ts> using Vecs##NAME##Iterator = VecsIteratorT<PARTITION, Ts...>;\
-template<typename... Ts> using Vecs##NAME##Range = VecsRangeT<PARTITION, Ts...>;\
+#define VECS_DECLARE_PARTITION( NAME, ETL, TAGMAP, SIZEMAP, LAYOUTMAP ) \
+static_assert(vtll::are_unique<ETL>::value, "The elements of" #ETL " are not unique!");\
+template<> struct VecsEntityTagMap<ETL> { using type = TAGMAP; };\
+template<> struct VecsTableSizeMap<ETL> { using type = SIZEMAP; };\
+template<> struct VecsTableLayoutMap<ETL> { using type = LAYOUTMAP; };\
+using Vecs##NAME##Handle = VecsHandleT<ETL>;\
+template<typename... Ts> using Vecs##NAME##Iterator = VecsIteratorT<ETL, Ts...>;\
+template<typename... Ts> using Vecs##NAME##Range = VecsRangeT<ETL, Ts...>;\
 \
 template<typename E = vtll::tl<>>\
-class Vecs##NAME##Registry : public VecsRegistryT<PARTITION,E> {};\
+class Vecs##NAME##Registry : public VecsRegistryT<ETL,E> {};\
 \
 template<>\
-class Vecs##NAME##Registry<vtll::tl<>> : public VecsRegistryBaseClass<PARTITION> {};
+class Vecs##NAME##Registry<vtll::tl<>> : public VecsRegistryBaseClass<ETL> {};
 
 
 namespace vecs {
@@ -49,7 +49,7 @@ namespace vecs {
 		using type =
 			vtll::transform_front<	///< Cat all partial tag sets after the elements of Ts
 				vtll::power_set<	///< Create the set of all partial tag sets
-					vtll::map< typename TagMap::type, T, vtll::type_list<> > >	///< Get tags for entity type Ts from tag map
+					vtll::map<TagMap, T, vtll::type_list<> > >	///< Get tags for entity type Ts from tag map
 				, vtll::cat			///< Use cat function on each partial tag set
 				, T					///< And put contents of Ts (the entity components) in front of the partial tag list
 			>;
@@ -78,7 +78,7 @@ namespace vecs {
 	};
 
 	template<typename P>
-	using VecsEntityTypeList = expand_tags< P, VecsEntityTagMap<P>, P >;
+	using VecsEntityTypeList = expand_tags< P, typename VecsEntityTagMap<P>::type, P >;
 
 
 
@@ -270,7 +270,7 @@ namespace vecs {
 		using tuple_value_t = vtll::to_tuple<E>;		///< A tuple storing all components of entity of type E
 		using tuple_ref_t = vtll::to_ref_tuple<E>;		///< A tuple storing references to all components of entity of type E
 		using tuple_ptr_t = vtll::to_ptr_tuple<E>;		///< A tuple storing pointers to all components of entity of type E
-		using layout_type_t = vtll::map< typename table_layout_map::type, E, VECS_LAYOUT_DEFAULT>; ///< ROW or COLUMN
+		using layout_type_t = vtll::map<table_layout_map, E, VECS_LAYOUT_DEFAULT>; ///< ROW or COLUMN
 
 		using info = vtll::type_list<VecsHandleT<P>, std::atomic<uint32_t>*>;	///< List of management data per entity (handle and mutex)
 		static const size_t c_handle = 0;		///< Component index of the handle info
@@ -280,7 +280,7 @@ namespace vecs {
 		using types = vtll::cat< info, E >;						///< List with management (info) and component (data) types
 		using types_deleted = vtll::type_list< table_index_t >;	///< List with types for holding info about erased entities 
 
-		static const size_t c_segment_size = vtll::front_value< vtll::map< typename table_size_map::type, E, table_size_default > >::value;
+		static const size_t c_segment_size = vtll::front_value< vtll::map<table_size_map, E, table_size_default > >::value;
 		static inline VecsTable<P, types, c_segment_size, layout_type_t::value>				m_data;		///< Data per entity
 		static inline VecsTable<P, types_deleted, c_segment_size, VECS_LAYOUT_ROW::value>	m_deleted;	///< Table holding the indices of erased entities
 
@@ -679,16 +679,16 @@ namespace vecs {
 
 	public:
 		using entity_type_list = VecsEntityTypeList<P>;
-		using entity_tag_map = VecsEntityTagMap<P>;
-		using table_size_map = VecsTableSizeMap<P>;
-		using table_layout_map = VecsTableLayoutMap<P>;
+		using entity_tag_map = typename VecsEntityTagMap<P>::type;
+		using table_size_map = typename VecsTableSizeMap<P>::type;
+		using table_layout_map = typename VecsTableLayoutMap<P>::type;
 
-		using entity_tag_list = vtll::flatten< vtll::transform< typename entity_tag_map::type, vtll::back > >;
+		using entity_tag_list = vtll::flatten< vtll::transform< entity_tag_map, vtll::back > >;
 		using component_type_list_wo_tags = vtll::remove_types< vtll::remove_duplicates< vtll::flatten<entity_type_list> >, entity_tag_list>;
 		using component_type_list = vtll::cat<component_type_list_wo_tags, entity_tag_list>;
 		using table_size_default = vtll::value_list< 1 << 10 >;
 
-		using table_constants = vtll::transform < vtll::apply_map< typename table_size_map::type, entity_type_list, table_size_default>, vtll::value_to_type>;
+		using table_constants = vtll::transform < vtll::apply_map< table_size_map, entity_type_list, table_size_default>, vtll::value_to_type>;
 		using table_max_seg = vtll::max< vtll::transform< table_constants, vtll::front > >;	///< Get max size from map
 
 	protected:
