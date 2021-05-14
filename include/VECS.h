@@ -42,27 +42,14 @@ class Vecs##NAME##Registry<vtll::tl<>> : public VecsRegistryBaseClass<PARTITION>
 namespace vecs {
 
 	/**
-	* \brief Entity tag map: The sum of all tag maps.
-	*
-	* An entity tag map defines the possible tags for each entity type. Tags are special components that
-	* can be appended to the end of the component list of entities. Entries in the map are type_lists of tags possible for
-	* each entry type.
-	*/
-	template<typename P>
-	struct VecsEntityTagMap {
-		using type = vtll::tl<>;
-	};
-
-
-	/**
 	* \brief Struct to expand tags to all possible combinations and append them to their entity type component lists.
 	*/
-	template<typename P, typename T>
+	template<typename P, typename TagMap, typename T>
 	struct expand_tags_for_one {
 		using type =
 			vtll::transform_front<	///< Cat all partial tag sets after the elements of Ts
 				vtll::power_set<	///< Create the set of all partial tag sets
-					vtll::map< typename VecsEntityTagMap<P>::type, T, vtll::type_list<> > >	///< Get tags for entity type Ts from tag map
+					vtll::map< typename TagMap::type, T, vtll::type_list<> > >	///< Get tags for entity type Ts from tag map
 				, vtll::cat			///< Use cat function on each partial tag set
 				, T					///< And put contents of Ts (the entity components) in front of the partial tag list
 			>;
@@ -71,46 +58,29 @@ namespace vecs {
 	/**
 	* \brief Expand the entity types of a list for all their tags.
 	*
-	* An entity type is a collection of component types. In the tag map, tags can be defined for an entity type.
-	* Thus there are variants of this entity type that also hold one or more tags as components.
-	* expand_tags takes a list of entity types, uses the tags from the tag map and creates all variants of each
-	* entity type, holding zero to all tags for this entity type.
 	*/
-	template<typename P, typename ETL>
-	using expand_tags = vtll::remove_duplicates< vtll::flatten< vtll::function2< P, ETL, expand_tags_for_one > > >;
+	template<typename P, typename TagMap, typename ETL>
+	using expand_tags = vtll::remove_duplicates< vtll::flatten< vtll::function3< P, TagMap, ETL, expand_tags_for_one > > >;
 
-	/**
-	* \brief Entity type list: a list with all possible entity types the ECS can deal with.
-	*
-	* An entity type is a collection of component types.
-	* The list is the sum of the entitiy types of the engine part, and the entity types as defined by the engine user.
-	* This list contains all possible entity types, but also their variants created by tag combinations.
-	*/
 	template<typename P>
-	using VecsEntityTypeList = expand_tags< P, P >;
+	struct VecsEntityTagMap {
+		using type = vtll::tl<>;
+	};
 
-
-	/**
-	* \brief Table size map: a VTLL map specifying the default sizes for component tables.
-	*
-	* It is the sum of the maps of the engine part, and the maps as defined by the engine user
-	* Every entity type can have an entry, but does not have to have one.
-	* An entry is alwyas a vtll::value_list<A,B>, where A defines the default size of segments, and B defines
-	* the max number of entries allowed. Both A and B are actually exponents with base 2. So segemnts have size 2^A.
-	*/
 	template<typename P>
 	struct VecsTableSizeMap {
 		using type = vtll::tl<>;
 	};
 
-
-	/**
-	* \brief Defines whether the data layout for entity type E is row or column wise. The default is columns wise.
-	*/
 	template<typename P>
 	struct VecsTableLayoutMap {
 		using type = vtll::tl<>;
 	};
+
+	template<typename P>
+	using VecsEntityTypeList = expand_tags< P, VecsEntityTagMap<P>, P >;
+
+
 
 	//-------------------------------------------------------------------------
 //declaration of Vecs classes
@@ -680,6 +650,23 @@ namespace vecs {
 	*
 	* The base class has a mapping table storing information about all currently valid entities. From there
 	* the respective subclass for type E can find the component data in the component table of type E.
+	* 
+	* An entity type is a collection of component types. In the tag map, tags can be defined for an entity type.
+	* Thus there are variants of this entity type that also hold one or more tags as components.
+	* expand_tags takes a list of entity types, uses the tags from the tag map and creates all variants of each
+	* entity type, holding zero to all tags for this entity type.
+	*
+	* An entity tag map defines the possible tags for each entity type. Tags are special components that
+	* can be appended to the end of the component list of entities. Entries in the map are type_lists of tags possible for
+	* each entry type.
+	*
+	* A table size map is a VTLL map specifying the default sizes for component tables.
+	* It is the sum of the maps of the engine part, and the maps as defined by the engine user
+	* Every entity type can have an entry, but does not have to have one.
+	* An entry is alwyas a vtll::value_list<A,B>, where A defines the default size of segments, and B defines
+	* the max number of entries allowed. Both A and B are actually exponents with base 2. So segemnts have size 2^A.
+	*
+	* A layout map efines whether the data layout for entity type E is row or column wise. The default is columns wise.
 	*/
 	template<typename P>
 	class VecsRegistryBaseClass : public VecsMonostate<VecsRegistryBaseClass<P>> {
@@ -1353,7 +1340,7 @@ namespace vecs {
 	template<typename... Es>
 	requires (are_entity_types<P, Es...>)
 	inline auto VecsRegistryBaseClass<P>::size() noexcept	-> size_t {
-		using entity_list = std::conditional_t< (sizeof...(Es) > 0), expand_tags< P, vtll::tl<Es...> >, entity_type_list >;
+		using entity_list = std::conditional_t< (sizeof...(Es) > 0), expand_tags< P, VecsEntityTagMap<P>, vtll::tl<Es...> >, entity_type_list >;
 
 		size_t sum = 0;
 		vtll::static_for<size_t, 0, vtll::size<entity_list>::value >(
@@ -1377,7 +1364,7 @@ namespace vecs {
 	template<typename... Es>
 	requires (are_entity_types<P, Es...>)
 	inline auto VecsRegistryBaseClass<P>::clear() noexcept	 -> size_t {
-		using entity_list = std::conditional_t< (sizeof...(Es) > 0), expand_tags< P, vtll::tl<Es...> >, entity_type_list >;
+		using entity_list = std::conditional_t< (sizeof...(Es) > 0), expand_tags< P, VecsEntityTagMap<P>, vtll::tl<Es...> >, entity_type_list >;
 
 		size_t num = 0;
 		vtll::static_for<size_t, 0, vtll::size<entity_list>::value >(
