@@ -28,6 +28,7 @@ static_assert(vtll::are_unique<ETL>::value, "The elements of" #ETL " are not uni
 template<> struct VecsEntityTagMap<ETL> { using type = TAGMAP; };\
 template<> struct VecsTableSizeMap<ETL> { using type = SIZEMAP; };\
 template<> struct VecsTableLayoutMap<ETL> { using type = LAYOUTMAP; };\
+using PARTITION = vtll::type_list<ETL, TAGMAP, SIZEMAP, LAYOUTMAP>;\
 using Vecs##NAME##Handle = VecsHandleT<ETL>;\
 template<typename... Ts> using Vecs##NAME##Iterator = VecsIteratorT<ETL, Ts...>;\
 template<typename... Ts> using Vecs##NAME##Range = VecsRangeT<ETL, Ts...>;\
