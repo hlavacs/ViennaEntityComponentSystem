@@ -106,7 +106,7 @@ Another choice relates to the layout of segments. Layouts of segments can be row
       //, ...
     >;
 
-Now we have all necessary data to define a *VECS partition*:
+Now we have all necessary data to define a *VECS partition* using this macro:
 
     namespace my_namespace {
       VECS_DECLARE_PARTITION(, MyEntityTypeList, MyEntityTagMap, MyTableSizeMap, MyTableLayoutMap);
@@ -119,9 +119,15 @@ This defines the following types (will be explained later):
 * my_namespace::VecsIterator<...>
 * my_namespace::VecsRange<...>
 
-As can be seen, you can declare partitions (which are represented by *my_namespace::PARTITION*) in arbitrary namespaces. The first parameter in the macro *VECS_DECLARE_PARTITION* that was left out in the example is a partition name, which would be inserted between "Vecs" and the class type.
+As can be seen, you can declare partitions represented by *my_namespace::PARTITION* in arbitrary namespaces. The macro simply does something like this:
 
-By using names and different entity lists, you can declare different partitions for VECS. For instance, if you want to use VECS in your core game engine, for some other partition *MySystemEntityTypeList* you could set
+    using PARTITION = vtll::type_list<MyEntityTypeList, MyEntityTagMap, MyTableSizeMap, MyTableLayoutMap>;
+
+So a partition is uniquely identified by a type list that holds all given macro parameters, independent of the namespace it is declared in. Two identical *PARTITION* types thus result in the same partition. Two *PARTITION* types that differ in any way lead to two completely separated VECS partitions that do not share any data with each other.
+
+The first parameter in the macro *VECS_DECLARE_PARTITION* that was left out in the example is a partition name, which would be inserted between "Vecs" and the class type.
+
+By using different names and different entity lists, you can declare different partitions for VECS. For instance, if you want to use VECS in your core game engine, for some other partition *MySystemEntityTypeList* you could set
 
     namespace my_namespace {
       VECS_DECLARE_PARTITION(System, MySystemEntityTypeList, MySystemEntityTagMap, MySystemTableSizeMap, MySystemTableLayoutMap);
@@ -140,7 +146,7 @@ Internally, the above names are just alias-declarations for the partial template
 * vecs::VecsIteratorT\<my_namespace::PARTITION, ...\>
 * vecs::VecsRangeT\<my_namespace::PARTITION, ...\>
 
-which you can also use, but this is not recommended.
+which you can also use, if you want to.
 
 In the following examples it is assumed that there was no name given. If you use partition names, then change the examples accordingly by inserting the partition names into the VECS type names.
 
