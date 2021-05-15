@@ -112,13 +112,14 @@ Now we have all necessary data to define a *VECS partition*:
       VECS_DECLARE_PARTITION(, MyEntityTypeList, MyEntityTagMap, MyTableSizeMap, MyTableLayoutMap);
     }
 
-This defines the following classes (will be explained later):
+This defines the following types (will be explained later):
+* my_namespace::PARTITION
 * my_namespace::VecsHandle
 * my_namespace::VecsRegistry<...>
 * my_namespace::VecsIterator<...>
 * my_namespace::VecsRange<...>
 
-As can be seen, you can define partitions in arbitrary namespaces. The first parameter in the macro VECS_DECLARE_PARTITION that was left out in the example is a partition name, which would be inserted between "Vecs" and the class type.
+As can be seen, you can declare partitions (which are represented by *my_namespace::PARTITION*) in arbitrary namespaces. The first parameter in the macro *VECS_DECLARE_PARTITION* that was left out in the example is a partition name, which would be inserted between "Vecs" and the class type.
 
 By using names and different entity lists, you can declare different partitions for VECS. For instance, if you want to use VECS in your core game engine, for some other partition *MySystemEntityTypeList* you could set
 
@@ -194,7 +195,7 @@ Only the last version is actually checked by the compiler at compile time, and t
     bool b2 = VecsRegistry{}.has_component<MyComponentPosition>(handle);
     bool b3 = VecsRegistry<MyEntityTypeNode>{}.has_component<MyComponentPosition>();
 
-The last call is only a wrapper for the concept *is_component_of<>* which is evaluated at compile time.
+The last call is only a wrapper for the concept *is_component_of\<\>* which is evaluated at compile time.
 
 Additionally, you can obtain all components at once packed into a tuple:
 
@@ -284,14 +285,14 @@ VECS supports creating tagged variants by offering a tag map, e.g.
 
 For each entity type, you can note the tags that this type can have. In the above example, the basic type *MyEntityTypeNode* can have the tags TAG1 and TAG2.
 Internally VECS creates entity types with the basic type (in the example *MyEntityTypeNode*) and all possible tag combinations.
-Thus, using the above example, the final list of all entity types will also contain the following types:
+Thus, using the above example, the final list of all entity types *vecs::VecsRegistryBaseClass\<my_namespace::PARTITION\>::entity_type_list* also contains the following types:
 
     vtll::type_list< MyComponentName, MyComponentPosition, MyComponentOrientation >;
     vtll::type_list< MyComponentName, MyComponentPosition, MyComponentOrientation, TAG1 >;
     vtll::type_list< MyComponentName, MyComponentPosition, MyComponentOrientation, TAG2 >;
     vtll::type_list< MyComponentName, MyComponentPosition, MyComponentOrientation, TAG1, TAG2 >;
 
-Furthermore, all tags from the partition's tag map are also copied to the partition's tag list *VecsEntityTagList<P>*, which for the above example will - amongst others - also contain *TAG1* and *TAG2*. Tags are useful for grouping entity types, since any of the above tagged entity type lands in its own table. You can create tagged entities like any normal entity:
+Also, the type list *vecs::VecsRegistryBaseClass\<my_namespace::PARTITION\>::component_type_list* contains all components of the partition, and the partition's tag list *vecs::VecsRegistryBaseClass\<my_namespace::PARTITION\>::entity_tag_list* contains all tag types, which for the above example will - amongst others - also contain *TAG1* and *TAG2*. Tags are useful for grouping entity types, since any of the above tagged entity type lands in its own table. You can create tagged entities like any normal entity:
 
     auto h1 = VecsRegistry<MyEntityTypeNode>{}.insert(MyComponentName{ "Node" }, MyComponentPosition{}, MyComponentOrientation{}, MyComponentTransform{});
     auto h2 = VecsRegistry<MyEntityTypeNodeTagged<TAG1>>{}.insert(MyComponentName{ "Node T1" }, MyComponentPosition{}, MyComponentOrientation{}, MyComponentTransform{});

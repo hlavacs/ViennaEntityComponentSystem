@@ -110,9 +110,9 @@ namespace vecs::test {
 	>;
 
 	VECS_DECLARE_PARTITION(, MyEntityTypeList, MyEntityTagMap, MyTableSizeMap, MyTableLayoutMap);
-
-
 }
+
+using etl = typename vecs::VecsRegistryBaseClass<vecs::test::PARTITION>::entity_type_list;
 
 #endif
 
