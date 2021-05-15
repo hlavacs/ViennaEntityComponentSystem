@@ -510,9 +510,13 @@ namespace vecs {
 				auto b = begin();
 				auto e = end();
 				for (; b != e; ++b) {
-					if( sync ) VecsWriteLock lock(b.mutex_ptr());		///< Write lock
-					if (!b.is_valid()) continue;
-					std::apply(f, *b);					///< Run the function on the references
+					if( sync ) VecsWriteLock::lock(b.mutex_ptr());		///< Write lock
+					if (!b.is_valid()) {
+						if (sync) VecsWriteLock::unlock(b.mutex_ptr());	///< unlock
+						continue;
+					}
+					std::apply(f, *b);			///< Run the function on the references
+					if (sync) VecsWriteLock::unlock(b.mutex_ptr());		///< unlock
 				}
 			}
 

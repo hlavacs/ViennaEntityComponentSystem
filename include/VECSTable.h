@@ -54,6 +54,7 @@ namespace vecs {
 		using seg_vector_t = std::pmr::vector<std::shared_ptr<array_tuple_t>>; ///< A seg_vector_t is a vector holding shared pointers to segments
 
 		std::pmr::memory_resource*		m_mr;
+		std::pmr::polymorphic_allocator<seg_vector_t> m_allocator;      //use this allocator
 		std::atomic<seg_vector_t*>		m_segment;		///< Vector of shared ptrs to the segments
 		std::unique_ptr<seg_vector_t>	m_old_segment;	///< Late deallocation of old segment
 		std::atomic<size_t>				m_size = 0;		///< Number of rows in the table
@@ -119,7 +120,8 @@ namespace vecs {
 	* \param[in] mr Memory allocator.
 	*/
 	template<typename P, typename DATA, size_t N0, bool ROW>
-	inline VecsTable<P, DATA, N0, ROW>::VecsTable(size_t r, std::pmr::memory_resource* mr) noexcept : m_mr{mr}, m_segment { nullptr } {};
+	inline VecsTable<P, DATA, N0, ROW>::VecsTable(size_t r, std::pmr::memory_resource* mr) noexcept 
+		: m_mr{ mr }, m_allocator{ mr }, m_segment{ nullptr } {};
 
 	/**
 	* \brief Destructor of class VecsTable.
@@ -334,11 +336,9 @@ namespace vecs {
 		auto old_segs = segment_ptr ? segment_ptr->capacity() : 0;	///< Old seg capacity
 		auto num_segs = std::max((r - 1) / N + 1, 16ULL);			///< Number of segments necessary, min 16
 		if (!segment_ptr || num_segs > old_segs) {					///< Is it larger than what we have?
-			//std::pmr::polymorphic_allocator<seg_vector_t> allocator(m_mr);      //use this allocator
-			//segment_ptr = allocator.allocate(1);                            //allocate the object
-			//allocator.construct(segment_ptr);
-
-			segment_ptr = new seg_vector_t;		///< Create new segment ptr vector
+			//segment_ptr = m_allocator.allocate(1);                ///< allocate the object
+			//m_allocator.construct(segment_ptr, m_mr);
+			segment_ptr = new seg_vector_t{m_mr};					///< Create new segment ptr vector
 			num_segs = std::max(num_segs, old_segs << 1);			/// Grow at least 100%
 			segment_ptr->reserve(num_segs);		///< Make vector large enough
 			if (old) { *segment_ptr = *old; }	///< Copy old shared pointers to the new vector
@@ -373,7 +373,9 @@ namespace vecs {
 			if (!segment_ptr || r > segment_ptr->capacity() * N) {	///< Retest 
 				auto old = segment_ptr;								///< Remember old vector
 				auto num_segs = std::max((r - 1) / N + 1, 16);		///< Number of segments necessary, at least 16
-				segment_ptr = m_mr.new_object<seg_vector_t>(); //new seg_vector_t;						///< Create new segment ptr
+				//segment_ptr = m_allocator.allocate(1);            ///< allocate the object
+				//m_allocator.construct(segment_ptr, m_mr);
+				segment_ptr = new seg_vector_t{ m_mr };				///< Create new segment ptr
 				segment_ptr->reserve(num_segs);						///< Make vector large enough
 				if (old) {
 					*segment_ptr = *old;			///< Copy old shared pointers to the new vector

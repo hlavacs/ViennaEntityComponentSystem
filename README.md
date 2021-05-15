@@ -95,9 +95,7 @@ Furthermore, components of entities are stored in tables, one table for each ent
       //, ...
     >;
 
-In this example, *N = 1<<15*, and this is fixed at compile time. Note that *N* eventually must be a power of 2. If you specify any other number *N0*, VECS at compile time for *N* uses the smallest power of 2 that is larger or equal to *N0*. If nothing is specified, the default value for *N* is
-
-    using VecsTableSizeDefault = vtll::value_list< 1<<10 >;
+In this example, *N = 1<<15*, and this is fixed at compile time. Note that *N* eventually must be a power of 2. If you specify any other number *N0*, VECS at compile time for *N* uses the smallest power of 2 that is larger or equal to *N0*. If nothing is specified, the default value for *N* is 2^10.
 
 Another choice relates to the layout of segments. Layouts of segments can be row wise or column wise (default). In row wise, the components of each entity are stored next to each other. Thus when accessing all components at once, cache efficiency is best. In column wise, components are stored in separate arrays, and cache performance is optimal if only single components are accessed in for-loops. You can choose the layout for a specific entity type *E* like so:
 
@@ -465,9 +463,13 @@ This loop guarantees that any loop iteration contains only valid entities, which
       auto b = begin();
       auto e = end();
       for (; b != e; ++b) {
-        if( sync ) VecsWriteLock lock(b.mutex_ptr());		///< Write lock
-        if (!b.is_valid()) continue;
-        std::apply(f, *b);					///< Run the function on the references
+        if( sync ) VecsWriteLock::lock(b.mutex_ptr());		///< Write lock
+        if (!b.is_valid()) {
+          if (sync) VecsWriteLock::unlock(b.mutex_ptr());	///< unlock
+          continue;
+        }
+        std::apply(f, *b);			///< Run the function on the references
+        if (sync) VecsWriteLock::unlock(b.mutex_ptr());		///< unlock
       }
     }
 

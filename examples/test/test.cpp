@@ -61,65 +61,23 @@ int main() {
 	}
 
 	{
-		const int num = 1000000;
+		std::atomic<uint32_t> mutex = 0;
 
-		struct data_t {
-			std::atomic<int> i;
-			std::atomic<int> j;
-			std::atomic<int> k;
-			std::atomic<uint32_t> mutex = 0;
-		};
-
-		std::vector<data_t> data{num};
+		VecsWriteLock::lock( &mutex );
 
 		auto a1 = std::async([&]() {
-			for (int n = 0; n < num; ++n) {
-				VecsWriteLock lock{ &data[n].mutex };
-				data[n].i = 1;
-				data[n].j = 1;
-				data[n].k = 1;
-			}
+			VecsWriteLock lock{ &mutex };
+			TESTRESULT(++number, "locking thread", , (true), );
 		});
 
-		auto a2 = std::async([&]() {
-			for (int n = 0; n < num; ++n) {
-				VecsWriteLock lock{ &data[n].mutex };
-				data[n].i = 2;
-				data[n].j = 2;
-				data[n].k = 2;
-			}
-		});
+		TESTRESULT(++number, "sleeping", , (true), );
+		std::this_thread::sleep_for(3s);
+		TESTRESULT(++number, "waking up", , (true), );
 
-		auto a3 = std::async([&]() {
-			for (int n = 0; n < num; ++n) {
-				VecsWriteLock lock{ &data[n].mutex };
-				data[n].i = 3;
-				data[n].j = 3;
-				data[n].k = 3;
-			}
-		});
+		VecsWriteLock::unlock(&mutex);
 
-		auto a4 = std::async([&]() {
-			for (int n = 0; n < num; ++n) {
-				VecsWriteLock lock{ &data[n].mutex };
-				data[n].i = 4;
-				data[n].j = 4;
-				data[n].k = 4;
-			}
-		});
-
+		TESTRESULT(++number, "unlocked", , (true), );
 		a1.wait();
-		a2.wait();
-		a3.wait();
-		a4.wait();
-
-		bool flag = true;
-		for (int n = 0; n < num; ++n) {
-			if (data[n].i != data[n].j || data[n].i != data[n].k || data[n].j != data[n].k) {
-				flag = false;
-			}
-		}
-		TESTRESULT(++number, "locking", , (flag), );
 	}
 
 	{
@@ -478,7 +436,7 @@ int main() {
 
 		VecsRegistry{}.compress();
 	}
-
+	
 	
 	{
 		for (int i = 0; i < 5; ++i) {
@@ -497,7 +455,7 @@ int main() {
 				}
 			});
 
-			/*auto a3 = std::async([&]() {
+			auto a3 = std::async([&]() {
 				for (int i = 0; i < num; i++) {
 					auto h1 = VecsRegistry<MyEntityTypeNode>{}.insert(MyComponentName{ "Node" }, MyComponentPosition{}, MyComponentOrientation{}, MyComponentTransform{});
 					auto h2 = VecsRegistry<MyEntityTypeDraw>{}.insert(MyComponentName{ "Draw" }, MyComponentPosition{}, MyComponentOrientation{}, MyComponentMaterial{ 1 }, MyComponentGeometry{ 1 });
@@ -509,65 +467,72 @@ int main() {
 					auto h1 = VecsRegistry<MyEntityTypeNode>{}.insert(MyComponentName{ "Node" }, MyComponentPosition{}, MyComponentOrientation{}, MyComponentTransform{});
 					auto h2 = VecsRegistry<MyEntityTypeDraw>{}.insert(MyComponentName{ "Draw" }, MyComponentPosition{}, MyComponentOrientation{}, MyComponentMaterial{ 1 }, MyComponentGeometry{ 1 });
 				}
-				});*/
+				});
 
 			a1.wait();
 			a2.wait();
-			//a3.wait();
-			//a4.wait();
+			a3.wait();
+			a4.wait();
 
-			TESTRESULT(++number, "system create parallel", , (VecsRegistry().size() == 4 * num && VecsRegistry<MyEntityTypeNode>().size() == 2 * num && VecsRegistry<MyEntityTypeNode>().size() == 2 * num), );
-			TESTRESULT(++number, "clear", VecsRegistry{}.clear(), (VecsRegistry().size() == 0 && VecsRegistry<MyEntityTypeNode>().size() == 0 && VecsRegistry<MyEntityTypeDraw>().size() == 0), );
-			VecsRegistry{}.compress();
+			int thr = 4;
+			TESTRESULT(++number, "system create parallel", , (VecsRegistry().size() == 2*thr * num && VecsRegistry<MyEntityTypeNode>().size() == thr * num && VecsRegistry<MyEntityTypeNode>().size() == thr * num), );
+			
+			if (i < 4) {
+				TESTRESULT(++number, "clear", VecsRegistry{}.clear(), (VecsRegistry().size() == 0 && VecsRegistry<MyEntityTypeNode>().size() == 0 && VecsRegistry<MyEntityTypeDraw>().size() == 0), );
+				VecsRegistry{}.compress();
+			}
 		}
 	}
 
 	{
-		auto a1 = std::async([]() {
-			VecsRange<MyComponentOrientation, MyComponentTransform>{}.for_each([&](VecsHandle handle, auto& orient, auto& transf) {
-				orient.i = 11;
-				transf.i = 11;
+		for (int i = 0; i < 1; ++i) {
+			bool sync = true;
+			auto a1 = std::async([&]() {
+				VecsRange<MyComponentOrientation, MyComponentTransform>{}.for_each([&](VecsHandle handle, auto& orient, auto& transf) {
+					orient.i = 11;
+					transf.i = 11;
+					}, sync);
 				});
-		});
 
-		auto a2 = std::async([]() {
-			VecsRange<MyComponentOrientation, MyComponentTransform>{}.for_each([&](VecsHandle handle, auto& orient, auto& transf) {
-				orient.i = 22;
-				transf.i = 22;
+			auto a2 = std::async([&]() {
+				VecsRange<MyComponentOrientation, MyComponentTransform>{}.for_each([&](VecsHandle handle, auto& orient, auto& transf) {
+					orient.i = 22;
+					transf.i = 22;
+					}, sync);
 				});
-		});
 
-		/*auto a3 = std::async([]() {
-			VecsRange<MyComponentOrientation, MyComponentTransform>{}.for_each([&](VecsHandle handle, auto& orient, auto& transf) {
-				orient.i = 33;
-				transf.i = 33;
+			auto a3 = std::async([&]() {
+				VecsRange<MyComponentOrientation, MyComponentTransform>{}.for_each([&](VecsHandle handle, auto& orient, auto& transf) {
+					orient.i = 33;
+					transf.i = 33;
+					}, sync);
 				});
-			});
 
-		auto a4 = std::async([]() {
-			VecsRange<MyComponentOrientation, MyComponentTransform>{}.for_each([&](VecsHandle handle, auto& orient, auto& transf) {
-				orient.i = 44;
-				transf.i = 44;
+			auto a4 = std::async([&]() {
+				VecsRange<MyComponentOrientation, MyComponentTransform>{}.for_each([&](VecsHandle handle, auto& orient, auto& transf) {
+					orient.i = 44;
+					transf.i = 44;
+					}, sync);
 				});
-			});*/
 
-		a1.wait();
-		a2.wait();
-		//a3.wait();
-		//a4.wait();
+			a1.wait();
+			a2.wait();
+			a3.wait();
+			a4.wait();
 
-		bool flag = true;
-		for (auto [handle, orient, transf] : VecsRange<MyComponentOrientation, MyComponentTransform>{}) {
-			if (!handle.is_valid()) continue;
-			if (orient.i != transf.i) {
-				flag = false;
+			bool flag = true;
+			for (auto [handle, orient, transf] : VecsRange<MyComponentOrientation, MyComponentTransform>{}) {
+				if (!handle.is_valid()) continue;
+				if (orient.i != transf.i) {
+					flag = false;
+				}
+				if (orient.i != 11 && orient.i != 22 && orient.i != 33 && orient.i != 44) {
+					flag = false;
+				}
 			}
-			if (orient.i != 11 && orient.i != 22 && orient.i != 33 && orient.i != 44) {
-				flag = false;
-			}
+
+			TESTRESULT(++number, "parallel update", , (flag), );
 		}
-
-		TESTRESULT(++number, "parallel update", , (flag), );
 	}
 
 
