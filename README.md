@@ -482,7 +482,7 @@ A write lock excludes any other lock to the entity, be it writing or reading.
 If you only read components, then a read lock may be faster, since read locks do not prevent other read locks, but they prevent write locks.
 
     for (auto [handle, name] : VecsRange<MyComponentName>{}) {
-      VecsReadLock handle.mutex_ptr() );
+      VecsReadLock lock(handle.mutex_ptr());
       if( handle.is_valid() ) {
         //....
       }
@@ -500,7 +500,7 @@ An example for looping over entities in parallel on several threads is given in 
             ++i;
         }
 
-        /*bool sync = true;
+        /*bool sync = true;   //if true, then all entities are write locked
       	range.for_each([&](auto handle, auto& pos) {
       		pos.m_position = glm::vec3{ 7.0f + i, 8.0f + i, 9.0f + i };
       		++i;
@@ -553,4 +553,4 @@ An example for looping over entities in parallel on several threads is given in 
     }
 
 Note that since the ranges do not overlap, there is actually no need for synchronization of no other thread accesses the entities. Thus there is no lock in the range based for loop.
-If there are other threads accessing the entities, then you can either introduce locks, or switch to the *for_each* version. Not that this version will take longer time on average, due to locking every entity before accessing it.
+If there are other threads accessing the entities, then you can either introduce locks, or switch to the *for_each* version. Note that this version will take longer time on average, due to locking every entity before accessing it.
