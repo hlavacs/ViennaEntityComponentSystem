@@ -18,11 +18,11 @@
 using namespace std::chrono_literals;
 
 
-/** 
-* 
+/**
+*
 * This macro declares a VECS partition.
-* 
-*/ 
+*
+*/
 #define VECS_DECLARE_PARTITION( NAME, ETL, TAGMAP, SIZEMAP, LAYOUTMAP ) \
 static_assert(vtll::are_unique<ETL>::value, "The elements of" #ETL " are not unique!");\
 using PARTITION = vtll::type_list<ETL, TAGMAP, SIZEMAP, LAYOUTMAP>;\
@@ -31,7 +31,12 @@ template<typename... Ts> using Vecs##NAME##Iterator = VecsIteratorT<PARTITION, T
 template<typename... Ts> using Vecs##NAME##Range = VecsRangeT<PARTITION, Ts...>;\
 \
 template<typename E = vtll::tl<>>\
-class Vecs##NAME##Registry : public VecsRegistryT<PARTITION,E> {};\
+class Vecs##NAME##Registry : public VecsRegistryT<PARTITION,E> {\
+public:\
+	using entity_type_list = typename VecsRegistryBaseClass<PARTITION>::entity_type_list; \
+	using entity_tag_list = typename VecsRegistryBaseClass<PARTITION>::entity_tag_list; \
+	using component_type_list = typename VecsRegistryBaseClass<PARTITION>::component_type_list; \
+};\
 \
 template<>\
 class Vecs##NAME##Registry<vtll::tl<>> : public VecsRegistryBaseClass<PARTITION> {};
