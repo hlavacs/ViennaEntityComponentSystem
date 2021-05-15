@@ -300,7 +300,13 @@ Thus, using the above example, the final list of all entity types *my_namespace:
     vtll::type_list< MyComponentName, MyComponentPosition, MyComponentOrientation, TAG2 >;
     vtll::type_list< MyComponentName, MyComponentPosition, MyComponentOrientation, TAG1, TAG2 >;
 
-Also, the type list *vecs::VecsRegistry\<\>\::component_type_list* contains all components of the partition, and the partition's tag list *vecs::VecsRegistry\<\>::entity_tag_list* contains all tag types, which for the above example will - amongst others - also contain *TAG1* and *TAG2*. Tags are useful for grouping entity types, since any of the above tagged entity type lands in its own table. You can create tagged entities like any normal entity:
+Also, the type list *my_namespace::VecsRegistry\<\>::component_type_list* contains all components of the partition, and the partition's tag list *my_namespace::VecsRegistry\<\>::entity_tag_list* contains all tag types, which for the above example will - amongst others - also contain *TAG1* and *TAG2*. The lists you can use are thus
+
+    my_namespace::VecsRegistry\<\>::entity_type_list    //list of all entity types in the partition)
+    my_namespace::VecsRegistry\<\>::component_type_list //list of all components and tags in the partition)
+    my_namespace::VecsRegistry\<\>::entity_tag_list     //list of all tags in the partition)
+
+Tags are useful for grouping entity types, since any of the above tagged entity type lands in its own table. You can create tagged entities like any normal entity:
 
     auto h1 = VecsRegistry<MyEntityTypeNode>{}.insert(MyComponentName{ "Node" }, MyComponentPosition{}, MyComponentOrientation{}, MyComponentTransform{});
     auto h2 = VecsRegistry<MyEntityTypeNodeTagged<TAG1>>{}.insert(MyComponentName{ "Node T1" }, MyComponentPosition{}, MyComponentOrientation{}, MyComponentTransform{});
