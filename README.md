@@ -390,7 +390,7 @@ You can specify a list *ETL* of entity types directly, which may also include en
     }
 
 lets you access the first possible entity in either tables for types *MyEntityTypeNode* and *MyEntityTypeNodeTagged<TAG2>*. Accessing the operator\*() yields a handle (by reference), and references to those components that all the given entity types contain (their intersection). References to tags are never yielded.
-The first definition is the *CTL* for the case for a specific list of entity types, which is the intersection of all given types, and removing the tag types. Then the specific *VecsIteratorTemplate* is defined, and the base class as well as the constructor for it are defined. Finally, *VecsIterator* is then derived from *VecsIteratorTemplate*.
+The first definition is the *CTL* for the case for a specific list of entity types, which is the intersection of all given types, and removing the tag types. Then the specific *VecsIteratorT* is defined, and the base class as well as the constructor for it are defined. Finally, *VecsIterator* is then derived from *VecsIteratorT*.
 
 ### Iterating over Basic Entity Types and All their Tagged Versions
 
@@ -452,7 +452,7 @@ This loop guarantees that any loop iteration contains only valid entities, which
 
     template<typename P, template<typename...> typename Seq, typename... Cs>
     struct Functor<P, Seq<Cs...>> {
-      using type = void(VecsHandleTemplate<P>&, Cs&...);	///< Arguments for the functor
+      using type = void(VecsHandleT<P>&, Cs&...);	///< Arguments for the functor
     };
 
     inline auto for_each(std::function<typename Functor<P, CTL>::type> f, bool sync = true) -> void {
