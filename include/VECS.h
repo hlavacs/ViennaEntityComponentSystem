@@ -199,7 +199,7 @@ namespace vecs {
 		auto table_index() noexcept -> table_index_t;	///< Get index of this entity in the component table
 		auto type() noexcept		-> type_index_t;	///< Get type of this entity
 
-		auto mutex() noexcept		-> std::atomic<uint32_t>*;	///< \returns address of the VECS mutex for this entity
+		auto mutex_ptr() noexcept	-> std::atomic<uint32_t>*;	///< \returns address of the VECS mutex for this entity
 
 		bool operator==(const VecsHandleT<P>& rhs) {	///< Equality operator
 			return m_map_index == rhs.m_map_index && m_generation_counter == rhs.m_generation_counter;
@@ -1465,7 +1465,7 @@ namespace vecs {
 	* \returns a pointer to the mutex of this entity.
 	*/
 	template<typename P>
-	inline auto VecsHandleT<P>::mutex() noexcept				-> std::atomic<uint32_t>* {
+	inline auto VecsHandleT<P>::mutex_ptr() noexcept				-> std::atomic<uint32_t>* {
 		if (!is_valid()) return nullptr;
 		return VecsRegistryBaseClass<P>::m_map_table.component_ptr<VecsRegistryBaseClass<P>::c_mutex>(m_map_index);
 	}

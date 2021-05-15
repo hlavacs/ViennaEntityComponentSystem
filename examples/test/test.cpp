@@ -214,7 +214,7 @@ int main() {
 		auto it = range.begin();
 
 		for (auto [handle, name] : VecsRange<MyComponentName>{}) {
-			VecsReadLock lock( handle.mutex() );
+			VecsReadLock lock( handle.mutex_ptr() );
 			if (!handle.is_valid()) continue;
 			++i;
 			if (name.m_name != "Node" && name.m_name != "Draw") { test = false; }
@@ -239,7 +239,7 @@ int main() {
 		int i = 0;
 		bool test = true;
 		for (auto [handle, name, pos, orient, trans] : VecsRange<MyEntityTypeNode>{}) {
-			VecsReadLock lock(handle.mutex());
+			VecsReadLock lock(handle.mutex_ptr());
 			if (!handle.is_valid()) continue;
 			++i;
 			if (name.m_name != "Node" && name.m_name != "Draw") { test = false; }
@@ -268,7 +268,7 @@ int main() {
 		i = 0;
 		test = true;
 		for (auto [handle, name] : VecsRange<MyComponentName>{}) {
-			VecsReadLock lock(handle.mutex());
+			VecsReadLock lock(handle.mutex_ptr());
 			if (!handle.is_valid()) continue;
 			++i;
 			name.m_name = "Name Holder 2 " + std::to_string(i);

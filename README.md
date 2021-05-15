@@ -382,7 +382,7 @@ You can specify a list *ETL* of entity types directly, which may also include en
 
     while( it!= end) {
       auto [handle, pos, orient, trans] = *it; //get access to the first entity, might be invalid so you better check
-      //VecsWriteLock lock(handle.mutex()); //use this if you are using multithreading
+      //VecsWriteLock lock(handle.mutex_ptr()); //use this if you are using multithreading
       if( handle.is_valid() ) {
         //...
       }
@@ -474,7 +474,7 @@ First, VECS only locks some internal data structures, but it does not lock singl
 
     {
       VecsIterator<MyComponentName> it;
-      VecsWriteLock lock(it.mutex());		///< Write lock using an iterator
+      VecsWriteLock lock(it.mutex_ptr());		///< Write lock using an iterator
       //... now the entity is completely locked
     }
 
@@ -482,7 +482,7 @@ A write lock excludes any other lock to the entity, be it writing or reading.
 If you only read components, then a read lock may be faster, since read locks do not prevent other read locks, but they prevent write locks.
 
     for (auto [handle, name] : VecsRange<MyComponentName>{}) {
-      VecsReadLock handle.mutex() );
+      VecsReadLock handle.mutex_ptr() );
       if( handle.is_valid() ) {
         //....
       }
