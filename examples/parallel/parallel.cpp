@@ -4,6 +4,7 @@
 #include <utility>
 #include <string>
 #include <atomic>
+#include <numeric>
 #include "glm.hpp"
 #include "gtc/quaternion.hpp"
 
@@ -49,7 +50,7 @@ void do_work(R<Cs...> range ) {
 	/*range.for_each([&](auto& handle, auto& pos) {
 		pos.m_position = glm::vec3{ 7.0f + i, 8.0f + i, 9.0f + i };
 		++i;
-	}, false);*/
+	}, true);*/
 
 }
 
@@ -75,10 +76,8 @@ void init(size_t num) {
 }
 
 
-vgjs::Coro<> start( size_t num ) {
-    std::cout << "Start \n";
-
-	co_await [&]() { init(num); };
+vgjs::Coro<std::pair<double,double>> clock( size_t num ) {
+    //std::cout << "Start \n";
 
 	int thr = 12;
 	std::pmr::vector<vgjs::Function> vec;
@@ -108,7 +107,6 @@ vgjs::Coro<> start( size_t num ) {
 
 	auto t2 = high_resolution_clock::now();
 
-
 	auto d1 = duration_cast<nanoseconds>(t1 - t0);
 	auto d2 = duration_cast<nanoseconds>(t2 - t1);
 
@@ -117,14 +115,36 @@ vgjs::Coro<> start( size_t num ) {
 
 	size_t size = VecsRegistry{}.size();
 
-	std::cout << "Num " << 2 * num << " Size " << size << "\n";
-	std::cout << "Linear " << dt1        << " ns Parallel 1 " << dt2        << " ns Speedup " << dt1 / dt2 << "\n\n";
-	std::cout << "Linear " << dt1 / size << " ns Parallel 1 " << dt2 / size << " ns \n";
+	//std::cout << "Num " << 2 * num << " Size " << size << "\n";
+	//std::cout << "Linear " << dt1        << " ns Parallel 1 " << dt2        << " ns Speedup " << dt1 / dt2 << "\n\n";
+	//std::cout << "Linear " << std::setprecision(5) << std::setw(10) << dt1 / size << " ns Parallel 1 " << std::setw(10) << dt2 / size << " ns \n";
 
-    vgjs::terminate();
-    co_return;
+    co_return std::make_pair(dt1 / size, dt2 / size);
 }
 
+
+vgjs::Coro<> start(size_t num) {
+
+	init(num);
+
+	std::vector<double> v1;
+	std::vector<double> v2;
+	for (int i = 0; i < 1000; ++i) {
+		auto p = co_await clock(num);
+		v1.push_back(std::get<0>(p));
+		v2.push_back(std::get<1>(p));
+	}
+	std::cout << "Average " << std::accumulate(v1.begin(), v1.end(), 0.0) / v1.size() << "\n";
+	std::cout << "Min " << *std::min_element(v1.begin(), v1.end()) << "\n";
+	std::cout << "Max " << *std::max_element(v1.begin(), v1.end()) << "\n\n";
+
+	std::cout << "Average " << std::accumulate(v2.begin(), v2.end(), 0.0) / v2.size() << "\n";
+	std::cout << "Min " << *std::min_element(v2.begin(), v2.end()) << "\n";
+	std::cout << "Max " << *std::max_element(v2.begin(), v2.end()) << "\n";
+
+	vgjs::terminate();
+	co_return;
+}
 
 
 void func1(size_t);

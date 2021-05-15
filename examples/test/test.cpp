@@ -71,7 +71,7 @@ int main() {
 		});
 
 		TESTRESULT(++number, "sleeping", , (true), );
-		std::this_thread::sleep_for(3s);
+		std::this_thread::sleep_for(1s);
 		TESTRESULT(++number, "waking up", , (true), );
 
 		VecsWriteLock::unlock(&mutex);
