@@ -26,20 +26,20 @@ using namespace std::chrono_literals;
 #define VECS_DECLARE_PARTITION( NAME, ETL, TAGMAP, SIZEMAP, LAYOUTMAP ) \
 static_assert(vtll::are_unique<ETL>::value, "The elements of" #ETL " are not unique!");\
 using PARTITION = vtll::type_list<ETL, TAGMAP, SIZEMAP, LAYOUTMAP>;\
-using Vecs##NAME##Handle = VecsHandleT<PARTITION>;\
-template<typename... Ts> using Vecs##NAME##Iterator = VecsIteratorT<PARTITION, Ts...>;\
-template<typename... Ts> using Vecs##NAME##Range = VecsRangeT<PARTITION, Ts...>;\
+using Vecs##NAME##Handle = vecs::VecsHandleT<PARTITION>;\
+template<typename... Ts> using Vecs##NAME##Iterator = vecs::VecsIteratorT<PARTITION, Ts...>;\
+template<typename... Ts> using Vecs##NAME##Range = vecs::VecsRangeT<PARTITION, Ts...>;\
 \
 template<typename E = vtll::tl<>>\
-class Vecs##NAME##Registry : public VecsRegistryT<PARTITION,E> {\
+class Vecs##NAME##Registry : public vecs::VecsRegistryT<PARTITION,E> {\
 public:\
-	using entity_type_list = typename VecsRegistryBaseClass<PARTITION>::entity_type_list; \
-	using entity_tag_list = typename VecsRegistryBaseClass<PARTITION>::entity_tag_list; \
-	using component_type_list = typename VecsRegistryBaseClass<PARTITION>::component_type_list; \
+	using entity_type_list = typename vecs::VecsRegistryBaseClass<PARTITION>::entity_type_list; \
+	using entity_tag_list = typename vecs::VecsRegistryBaseClass<PARTITION>::entity_tag_list; \
+	using component_type_list = typename vecs::VecsRegistryBaseClass<PARTITION>::component_type_list; \
 };\
 \
 template<>\
-class Vecs##NAME##Registry<vtll::tl<>> : public VecsRegistryBaseClass<PARTITION> {};
+class Vecs##NAME##Registry<vtll::tl<>> : public vecs::VecsRegistryBaseClass<PARTITION> {};
 
 
 namespace vecs {
