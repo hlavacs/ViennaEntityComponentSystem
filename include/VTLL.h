@@ -1391,8 +1391,6 @@ namespace vtll {
 		std::is_same_v< to_ref_tuple<type_list<double, int>>, std::tuple<double&, int&> >,
 		"The implementation of to_ref_tuple is bad");
 
-
-	//-------------------------------------------------------------------------
 	//-------------------------------------------------------------------------
 	//to_rvref_tuple: turn a list into a tuple of reference types. when creating such tuples, use std::ref as a wrapper for the elements!
 
@@ -1417,7 +1415,7 @@ namespace vtll {
 		std::is_same_v< to_rvref_tuple<type_list<double, int>>, std::tuple<double&&, int&&> >,
 		"The implementation of to_rvref_tuple is bad");
 
-
+	//-------------------------------------------------------------------------
 	//to_ptr_tuple: turn a list into a tuple of pointer types
 
 	namespace detail {
@@ -1440,6 +1438,21 @@ namespace vtll {
 	static_assert(
 		std::is_same_v< to_ptr_tuple<type_list<double, int>>, std::tuple<double*, int*> >,
 		"The implementation of to_ptr_tuple is bad");
+
+	//-------------------------------------------------------------------------
+	//ptr_tuple_to_ref_tuple: turn a tuple of pointers into a tuple of references
+	namespace detail {
+		template<typename ...T, size_t... I>
+		auto ptr_to_ref_tuple_detail(std::tuple<T...>& t, std::index_sequence<I...>) {
+			return std::tie(*std::get<I>(t)...);
+		}
+	}
+
+	template<typename ...T>
+	auto ptr_to_ref_tuple(std::tuple<T...>& t) {
+		return detail::ptr_to_ref_tuple_detail<T...>(t, std::make_index_sequence<sizeof...(T)>{});
+	}
+
 
 	//-------------------------------------------------------------------------
 	//is_same_tuple: test whether two tuples are the same

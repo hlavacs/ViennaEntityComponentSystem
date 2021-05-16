@@ -386,6 +386,12 @@ namespace vecs {
 	class VecsIteratorEntity<P, E, ETL, CTL<Cs...>> : public VecsIteratorEntityBaseClass<P, ETL, CTL<Cs...>> {
 
 		using reference = VecsIteratorBaseClass<P, ETL, CTL<Cs...>>::reference;
+		using pointer = VecsIteratorBaseClass<P, ETL, CTL<Cs...>>::pointer;
+
+		static const size_t c_segment_size = VecsComponentTable<P,E>::c_segment_size;
+		using layout_type_t = typename VecsComponentTable<P, E>::layout_type_t;
+
+		pointer m_value_ptr;
 
 		static inline VecsComponentTable<P, E> m_component_table;
 
@@ -405,7 +411,7 @@ namespace vecs {
 	*/
 	template<typename P, typename E, typename ETL, template<typename...> typename CTL, typename... Cs>
 	inline VecsIteratorEntity<P, E, ETL, CTL<Cs...>>::VecsIteratorEntity(bool is_end) noexcept
-		: VecsIteratorEntityBaseClass<P, ETL, CTL<Cs...>>(is_end) {
+		: m_value_ptr{}, VecsIteratorEntityBaseClass<P, ETL, CTL<Cs...>>(is_end) {
 
 		this->m_sizeE_ptr = &m_component_table.m_data.m_size; ///< iterate over ALL entries, also the invalid ones!
 		this->m_sizeE = this->m_sizeE_ptr->load();
@@ -436,7 +442,11 @@ namespace vecs {
 	*/
 	template<typename P, typename E, typename ETL, template<typename...> typename CTL, typename... Cs>
 	inline auto VecsIteratorEntity<P, E, ETL, CTL<Cs...>>::operator*() noexcept	-> reference {
-		return std::forward_as_tuple(*handle_ptr(), m_component_table.component<Cs>(this->m_current_index)...);
+		if constexpr (layout_type_t::value == VECS_LAYOUT_COLUMN::value) {
+
+		}
+		m_value_ptr = std::forward_as_tuple(handle_ptr(), &m_component_table.component<Cs>(this->m_current_index)...);
+		return vtll::ptr_to_ref_tuple(m_value_ptr);
 	};
 
 
