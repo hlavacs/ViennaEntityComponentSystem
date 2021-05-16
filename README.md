@@ -329,17 +329,12 @@ In the next section, iterators and ranges are described, which enable you to eff
 
 The basic use case of any ECS is to loop over all or some of the entities. VECS allows this in various ways. The basic mechanism is given by iterators and ranges. These can then be used to compose loops.
 
-Iterators are generalized pointers, and are the main mechanism for looping over entities in VECS. Iterators are implemented in class
-
-    template<typename... Ts>
-    class VecsIterator;
-
-and come in two versions. The first form is a general iterator that can point to any entity and can be increased to jump ahead. The second one is an end-iterator, it is created by calling it with the boolean parameter *true*:
+Iterators are generalized pointers, and are the main mechanism for looping over entities in VECS. Iterators are implemented in class *VecsIterator\<...\>*, and come in two versions. The first form is a general iterator that can point to any entity and can be increased to jump ahead. The second one is an end-iterator, it is created by calling it with the boolean parameter *true*:
 
     VecsIterator<MyComponentName, VeUserComponentPosition> it;         //normal iterator
     VecsIterator<MyComponentName, VeUserComponentPosition> end(true);  //end iterator used as looping end point
 
-Iterators have template parameters which determine which entity types their iterate over, and which components they can yield in a for-loop. This is implemented by deriving them from a common base class depending on the partition *P* and two template parameters *ETL* and *CTL*. *ETL* is a type list of entity types the iterator should iterate over, and *CTL* is a type list of components. The iterator offers a dereferencing operator*(), yielding a tuple that holds a handle and references to the components:
+Iterators have template parameters which determine which entity types their iterate over, and which components they can yield in a for-loop. This is implemented by deriving them from a common base class *VecsIteratorBaseClass* depending on the partition *P* and two template parameters *ETL* and *CTL*. *ETL* is a type list of entity types the iterator should iterate over, and *CTL* is a type list of components that should be yielded *by operator *()*. Upon being called, this dereferencing *operator *()* yields a tuple that holds references to a handle and to the components listed in *CTL*:
 
     template<typename P, typename ETL, typename CTL>
     class VecsIteratorBaseClass {
@@ -374,7 +369,7 @@ Iterators have template parameters which determine which entity types their iter
         inline auto sizeE() noexcept			-> size_t;
     };
 
-When specifying *VecsIterator<Ts...>* the lists *ETL* and *CTL* are created depending on the *Ts*, and the base class is determined. In the following the various ways to turn the parameters *Ts* into the base class *ETL* and *CTL* are explained.
+When specifying *VecsIterator\<Ts...\>* the lists *ETL* and *CTL* are created depending on the *Ts*, and the base class is determined. In the following the various ways to turn the parameters *Ts* into the base class *ETL* and *CTL* are explained.
 
 
 ### Iterating over Specific Entity types
@@ -393,16 +388,17 @@ You can specify a list *ETL* of entity types directly, which may also include en
       ++it; //use this operator if possible, the alternative it++ creates a costly copy!
     }
 
-lets you access the first possible entity in either tables for types *MyEntityTypeNode* and *MyEntityTypeNodeTagged<TAG2>*. Accessing the operator\*() yields a handle (by reference), and references to those components that all the given entity types contain (their intersection). References to tags are never yielded.
+lets you access the first possible entity in either tables for types *MyEntityTypeNode* and *MyEntityTypeNodeTagged<TAG2>*. Accessing the *operator\*()* yields a handle (by reference), and references to those components that all the given entity types contain (their intersection). References to tags are never yielded.
+
 The first definition is the *CTL* for the case for a specific list of entity types, which is the intersection of all given types, and removing the tag types. Then the specific *VecsIteratorT* is defined, and the base class as well as the constructor for it are defined. Finally, *VecsIterator* is then derived from *VecsIteratorT*.
 
 ### Iterating over Basic Entity Types and All their Tagged Versions
 
-Another use case is iterating over basic types and all their tagged version. For instance, iterating over all *MyEntityTypeNode* entities, but also over its tagged versions *MyEntityTypeNodeTagged<TAG1>*, *MyEntityTypeNodeTagged<TAG2>*, and *MyEntityTypeNodeTagged<TAG1, TAG2>* you can simply use them in as (variadic) template parameters directly:
+Another use case is iterating over basic types and all their tagged version. For instance, iterating over all *MyEntityTypeNode* entities, but also over its tagged versions *MyEntityTypeNodeTagged\<TAG1\>*, *MyEntityTypeNodeTagged\<TAG2\>*, and *MyEntityTypeNodeTagged\<TAG1, TAG2\>* you can simply use them in as (variadic) template parameters directly:
 
     VecsIterator<MyEntityTypeNode> it;
 
-This can be done for any list of basic entity types. If you specify any type for which no tags are specified in the tag map, then this type is used as is. Again, the components are those contained in all types, minus the tags. The implementation of this is similarly simple (see *VECSIterator.h*), using the metafunction *expand_tags<...>* (defined in *VECS.h*), that takes a list of entities and expands it with the tagged versions if there are any.
+This can be done for any list of basic entity types. If you specify any type for which no tags are specified in the tag map, then this type is used as is. Again, the components are those contained in all types, minus the tags. The implementation of this is similarly simple (see *VECSIterator.h*), using the metafunction *expand_tags\<...\>* (defined in *VECS.h*), that takes a list of entities and expands it with the tagged versions if there are any.
 
 
 ### Iterating over Entity Types That Contain given Tags
@@ -411,7 +407,7 @@ If you want to loop over all tagged versions of a basic type *E* (you can only u
 
     VecsIterator<MyEntityTypeNode, TAG1> it;
 
-This iterator loops over all entities of the types MyEntityTypeNodeTagged\<TAG1\> and MyEntityTypeNodeTagged\<TAG1,TAG2\>. It is essentially the same as
+This iterator loops over all entities of the types *MyEntityTypeNodeTagged\<TAG1\>* and *MyEntityTypeNodeTagged\<TAG1,TAG2\>*. It is essentially the same as
 
     VecsIterator< vtll::tl< MyEntityTypeNodeTagged<TAG1>, MyEntityTypeNodeTagged<TAG1, TAG2> > > it;
 
@@ -435,7 +431,7 @@ The yielded components are again those contained in all entity types (this might
 
 ### Ranges and Range Based Loops
 
-In C++, a range is any class that offers *begin()* and *end()* functions yielding respective iterators. VECS offers a special range class *VecsRange<...>* for this. The meanings of the template parameters are exactly the same as for iterators, and ranges are simply two iterators put together. A *VecsRange* can be used directly in a *C++ range based loop*:
+In C++, a range is any class that offers *begin()* and *end()* functions yielding respective iterators. VECS offers a special range class *VecsRange\<...\>* for this. The meanings of the template parameters are exactly the same as for iterators, and ranges are simply two iterators put together. A *VecsRange\<...\>* can be used directly in a *C++ range based loop*:
 
     for (auto [handle, name] : VecsRange<MyComponentName, MyComponentPosition>{}) {
       if( handle.is_valid() ) {
@@ -516,7 +512,7 @@ An example for looping over entities in parallel on several threads is given in 
     }
 
     vgjs::Coro<> start( size_t num ) {
-        std::cout << "Start \n";
+      std::cout << "Start \n";
 
     	co_await [&]() { init(num); };
 

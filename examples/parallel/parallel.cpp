@@ -134,11 +134,16 @@ vgjs::Coro<> start(size_t num) {
 		v1.push_back(std::get<0>(p));
 		v2.push_back(std::get<1>(p));
 	}
+	std::sort(v1.begin(), v1.end());
+	std::sort(v1.begin(), v1.end());
+
 	std::cout << "Average " << std::accumulate(v1.begin(), v1.end(), 0.0) / v1.size() << "\n";
+	std::cout << "Median " << v1[v1.size()/2] << "\n";
 	std::cout << "Min " << *std::min_element(v1.begin(), v1.end()) << "\n";
 	std::cout << "Max " << *std::max_element(v1.begin(), v1.end()) << "\n\n";
 
 	std::cout << "Average " << std::accumulate(v2.begin(), v2.end(), 0.0) / v2.size() << "\n";
+	std::cout << "Median " << v2[v2.size() / 2] << "\n";
 	std::cout << "Min " << *std::min_element(v2.begin(), v2.end()) << "\n";
 	std::cout << "Max " << *std::max_element(v2.begin(), v2.end()) << "\n";
 
