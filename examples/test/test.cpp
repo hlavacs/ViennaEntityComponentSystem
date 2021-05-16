@@ -204,19 +204,19 @@ int main() {
 		}
 
 		i = 0;
-		VecsRange<MyComponentName>{}.for_each([&](auto handle, auto& name) {
+		VecsRange<MyComponentName>{}.for_each([&](auto& handle, auto& name) {
 			++i;
 			if (name.m_name != "Node" && name.m_name != "Draw") { 
 				test = false; 
 			}
 			//std::cout << "Entity " << name.m_name << " " << i << "\n";
-			name.m_name = "Name Holder " + std::to_string(i);
+			name.m_name = "Name Holder 0 " + std::to_string(i);
 			});
 
 		i = 0;
-		VecsRange<MyComponentName>{}.for_each([&](auto handle, auto& name) {
+		VecsRange<MyComponentName>{}.for_each([&](auto& handle, auto& name) {
 			++i;
-			if (name.m_name != "Name Holder " + std::to_string(i)) { test = false; }
+			if (name.m_name != "Name Holder 0 " + std::to_string(i)) { test = false; }
 			//std::cout << "Entity " << name.m_name << " " << i << "\n";
 			});
 
@@ -226,7 +226,7 @@ int main() {
 		i = 0;
 		test = true;
 		for (auto [handle, name] : VecsRange<MyComponentName>{}) {
-			VecsReadLock lock(handle.mutex_ptr());
+			VecsWriteLock lock(handle.mutex_ptr());
 			if (!handle.is_valid()) continue;
 			++i;
 			name.m_name = "Name Holder 2 " + std::to_string(i);
@@ -234,9 +234,11 @@ int main() {
 		}
 
 		i = 0;
-		VecsRange<MyComponentName>{}.for_each([&](auto handle, auto& name) {
+		VecsRange<MyComponentName>{}.for_each([&](auto& handle, auto& name) {
 			++i;
-			if (name.m_name != ("Name Holder 2 " + std::to_string(i))) { test = false; }
+			if (name.m_name != ("Name Holder 2 " + std::to_string(i))) { 
+				test = false; 
+			}
 			//std::cout << "Entity " << name.m_name << " " << i << "\n";
 			});
 
