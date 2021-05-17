@@ -387,15 +387,13 @@ namespace vecs {
 
 		using reference = VecsIteratorBaseClass<P, ETL, CTL<Cs...>>::reference;
 		using pointer = VecsIteratorBaseClass<P, ETL, CTL<Cs...>>::pointer;
-
-		static const size_t c_segment_size = VecsComponentTable<P,E>::c_segment_size;
-		static const size_t N = vtll::smallest_pow2_leq_value< c_segment_size >::value;						///< Force N to be power of 2
-		static const uint64_t BIT_MASK = N - 1;		///< Bit mask to mask off lower bits to get index inside segment
-
-		using layout_type_t = typename VecsComponentTable<P, E>::layout_type_t;
+		using data_types = typename VecsComponentTable<P, E>::data_types;
+		using layout_type = typename VecsComponentTable<P, E>::layout_type;
+		static const uint64_t BIT_MASK = decltype(VecsComponentTable<P, E>::m_data)::BIT_MASK;
+		using tuple_value_t = vtll::to_tuple<data_types>;
 
 		pointer m_value_ptr;
-		bool is_set{false};
+		bool	m_is_set{false};
 
 		static inline VecsComponentTable<P, E> m_component_table;
 
@@ -415,7 +413,7 @@ namespace vecs {
 	*/
 	template<typename P, typename E, typename ETL, template<typename...> typename CTL, typename... Cs>
 	inline VecsIteratorEntity<P, E, ETL, CTL<Cs...>>::VecsIteratorEntity(bool is_end) noexcept
-		: m_value_ptr{}, is_set{false}, VecsIteratorEntityBaseClass<P, ETL, CTL<Cs...>>(is_end) {
+		: m_value_ptr{}, m_is_set{false}, VecsIteratorEntityBaseClass<P, ETL, CTL<Cs...>>(is_end) {
 
 		this->m_sizeE_ptr = &m_component_table.m_data.m_size; ///< iterate over ALL entries, also the invalid ones!
 		this->m_sizeE = this->m_sizeE_ptr->load();
@@ -441,17 +439,15 @@ namespace vecs {
 
 		++(this->m_current_index);
 
-		if constexpr (layout_type_t::value == VECS_LAYOUT_COLUMN::value) {
-			if ( is_set && ( (this->m_current_index & BIT_MASK) != 0) ) {
-				(++std::get<Cs*>(m_value_ptr), ...);
-				std::get<0>(m_value_ptr) = ++this->m_current_handle_ptr;
-				return;
-			}
-			else {
-				is_set = false;
-			}
+		if ( m_is_set && ( (this->m_current_index & BIT_MASK) != 0) ) {
+			( (std::get<Cs*>(m_value_ptr)	= (layout_type::value == VECS_LAYOUT_COLUMN::value ? std::get<Cs*>(m_value_ptr) + 1	: (Cs*)				(((char*)std::get<Cs*>(m_value_ptr)) + sizeof(tuple_value_t)))), ...);
+			this->m_current_handle_ptr		= (layout_type::value == VECS_LAYOUT_COLUMN::value ? std::get<0>  (m_value_ptr) + 1 : (VecsHandleT<P>*)	(((char*)std::get<0>  (m_value_ptr)) + sizeof(tuple_value_t)));
+			std::get<0>(m_value_ptr)		= this->m_current_handle_ptr;
 		}
-		this->m_current_handle_ptr = nullptr;
+		else {
+			m_is_set = false;
+			this->m_current_handle_ptr = nullptr;
+		}
 	}
 
 	/**
@@ -460,13 +456,9 @@ namespace vecs {
 	*/
 	template<typename P, typename E, typename ETL, template<typename...> typename CTL, typename... Cs>
 	inline auto VecsIteratorEntity<P, E, ETL, CTL<Cs...>>::operator*() noexcept	-> reference {
-		if constexpr (layout_type_t::value == VECS_LAYOUT_COLUMN::value) {
-			if (!is_set) {
-				m_value_ptr = std::make_tuple(handle_ptr(), &m_component_table.component<Cs>(this->m_current_index)...);
-				is_set = true;
-			}
-		} else {
+		if (!m_is_set) {
 			m_value_ptr = std::make_tuple(handle_ptr(), &m_component_table.component<Cs>(this->m_current_index)...);
+			m_is_set = true;
 		}
 		return vtll::ptr_to_ref_tuple(m_value_ptr);
 	};

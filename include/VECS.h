@@ -254,18 +254,18 @@ namespace vecs {
 		using tuple_value_t = vtll::to_tuple<E>;		///< A tuple storing all components of entity of type E
 		using tuple_ref_t = vtll::to_ref_tuple<E>;		///< A tuple storing references to all components of entity of type E
 		using tuple_ptr_t = vtll::to_ptr_tuple<E>;		///< A tuple storing pointers to all components of entity of type E
-		using layout_type_t = vtll::map<table_layout_map, E, VECS_LAYOUT_DEFAULT>; ///< ROW or COLUMN
+		using layout_type = vtll::map<table_layout_map, E, VECS_LAYOUT_DEFAULT>; ///< ROW or COLUMN
 
-		using info = vtll::type_list<VecsHandleT<P>, std::atomic<uint32_t>*>;	///< List of management data per entity (handle and mutex)
+		using info_types = vtll::type_list<VecsHandleT<P>, std::atomic<uint32_t>*>;	///< List of management data per entity (handle and mutex)
 		static const size_t c_handle = 0;		///< Component index of the handle info
 		static const size_t c_mutex = 1;		///< Component index of the handle info
 		static const size_t c_info_size = 2;	///< Index where the entity data starts
 
-		using types = vtll::cat< info, E >;						///< List with management (info) and component (data) types
+		using data_types = vtll::cat< info_types, E >;						///< List with management (info) and component (data) types
 		using types_deleted = vtll::type_list< table_index_t >;	///< List with types for holding info about erased entities 
 
 		static const size_t c_segment_size = vtll::front_value< vtll::map<table_size_map, E, table_size_default > >::value;
-		static inline VecsTable<P, types, c_segment_size, layout_type_t::value>				m_data;		///< Data per entity
+		static inline VecsTable<P, data_types, c_segment_size, layout_type::value>			m_data;		///< Data per entity
 		static inline VecsTable<P, types_deleted, c_segment_size, VECS_LAYOUT_ROW::value>	m_deleted;	///< Table holding the indices of erased entities
 
 		using array_type = std::array<std::unique_ptr<VecsComponentAccessor<P, E>>, vtll::size<component_type_list>::value>;
