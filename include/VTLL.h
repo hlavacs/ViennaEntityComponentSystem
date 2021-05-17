@@ -1441,6 +1441,7 @@ namespace vtll {
 
 	//-------------------------------------------------------------------------
 	//ptr_tuple_to_ref_tuple: turn a tuple of pointers into a tuple of references
+
 	namespace detail {
 		template<typename ...T, size_t... I>
 		auto ptr_to_ref_tuple_detail(std::tuple<T...>& t, std::index_sequence<I...>) {
@@ -1453,6 +1454,17 @@ namespace vtll {
 		return detail::ptr_to_ref_tuple_detail<T...>(t, std::make_index_sequence<sizeof...(T)>{});
 	}
 
+	namespace detail::ex1 {
+		int i;
+		double d;
+		char c;
+		auto tup1 = std::make_tuple(&i, &d, &c);
+		auto tup2 = ptr_to_ref_tuple(tup1);
+	}
+
+	static_assert(
+		std::is_same_v< decltype(detail::ex1::tup2), std::tuple<int&, double&, char&> >,
+		"The implementation of ptr_to_ref_tuple is bad");
 
 	//-------------------------------------------------------------------------
 	//is_same_tuple: test whether two tuples are the same
