@@ -196,7 +196,7 @@ namespace vecs {
 		auto erase() noexcept -> bool;				///< Erase the entity 
 
 		auto map_index() noexcept	-> table_index_t { return m_map_index; }; ///< \returns index of entity in the map
-		auto table_index() noexcept -> table_index_t;	///< Get index of this entity in the component table
+
 		auto type() noexcept		-> type_index_t;	///< Get type of this entity
 
 		auto mutex_ptr() noexcept	-> std::atomic<uint32_t>*;	///< \returns address of the VECS mutex for this entity
@@ -706,6 +706,8 @@ namespace vecs {
 
 		virtual auto sizeE() noexcept -> std::atomic<uint32_t>& { return m_size; };
 
+		auto table_index_ptr(VecsHandleT<P> h) noexcept		-> table_index_t*;	///< \returns row index in component table
+
 	public:
 		static VecsRegistryBaseClass<P> m_registry;
 
@@ -750,7 +752,6 @@ namespace vecs {
 		auto size() noexcept -> size_t;		///< \returns the total number of valid entities of types Es
 
 		auto compress() noexcept						-> void;			///< Compress all component tables
-		auto table_index(VecsHandleT<P> h) noexcept		-> table_index_t;	///< \returns row index in component table
 		auto type(VecsHandleT<P> h) noexcept			-> type_index_t;	///< \returns type of entity
 		auto has_value(VecsHandleT<P> handle) noexcept	-> bool;			///< \returns true if the ECS still holds this entity 
 
@@ -830,9 +831,9 @@ namespace vecs {
 	* \returns the index of the entity in the component table.
 	*/
 	template<typename P>
-	inline auto VecsRegistryBaseClass<P>::table_index(VecsHandleT<P> h) noexcept -> table_index_t {
-		if (!h.is_valid()) return {};
-		return *m_map_table.component_ptr<VecsRegistryBaseClass::c_index>(h.m_map_index);
+	inline auto VecsRegistryBaseClass<P>::table_index_ptr(VecsHandleT<P> h) noexcept -> table_index_t* {
+		if (!h.is_valid()) return nullptr;
+		return m_map_table.component_ptr<VecsRegistryBaseClass::c_index>(h.m_map_index);
 	}
 
 	/**
@@ -1077,7 +1078,7 @@ namespace vecs {
 
 		if (map_type == vtll::index_of<entity_type_list, E>::value) return true;	///< New type = old type -> do nothing
 
-		auto index = m_component_table.insert(handle, this->m_map_table.component_ptr<this->c_mutex>(handle.table_index()));	///< add data into component table
+		auto index = m_component_table.insert(handle, this->m_map_table.component_ptr<this->c_mutex>(*this->table_index_ptr(handle)));	///< add data into component table
 			
 		vtll::static_for<size_t, 0, vtll::size<E>::value >(	///< Move old components to new entity type
 			[&](auto i) {
@@ -1437,16 +1438,6 @@ namespace vecs {
 	template<typename P>
 	inline auto VecsHandleT<P>::erase() noexcept				-> bool {
 		return VecsRegistryBaseClass<P>::m_registry.erase(*this);
-	}
-
-	/**
-	* \brief Get index of this entity in the component table.
-	*
-	* \returns index of this entity in the component table.
-	*/
-	template<typename P>
-	inline auto VecsHandleT<P>::table_index() noexcept			-> table_index_t {
-		return VecsRegistryBaseClass<P>::m_registry.table_index(*this);
 	}
 
 	/**

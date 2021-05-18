@@ -28,7 +28,7 @@ using namespace vecs::test;
 
 
 
-int main() {
+int start_test() {
 	int number = 0;
 	std::atomic<int> counter = 0;
 
@@ -522,3 +522,8 @@ int main() {
     return 0;
 }
 
+int main() {
+
+	start_test();
+
+}
