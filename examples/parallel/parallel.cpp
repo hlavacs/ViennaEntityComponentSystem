@@ -129,7 +129,7 @@ vgjs::Coro<> start(size_t num) {
 
 	std::vector<double> v1;
 	std::vector<double> v2;
-	for (int i = 0; i < 1000; ++i) {
+	for (int i = 0; i < 10000; ++i) {
 		auto p = co_await clock(num);
 		v1.push_back(std::get<0>(p));
 		v2.push_back(std::get<1>(p));

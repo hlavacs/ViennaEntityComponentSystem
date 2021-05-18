@@ -514,8 +514,8 @@ int start_test() {
 
 
 	{
-
-
+		TESTRESULT(++number, "clear", VecsRegistry{}.clear(), (VecsRegistry().size() == 0 && VecsRegistry<MyEntityTypeNode>().size() == 0 && VecsRegistry<MyEntityTypeDraw>().size() == 0), );
+		VecsRegistry{}.compress();
 	}
 
 
@@ -524,6 +524,8 @@ int start_test() {
 
 int main() {
 
-	start_test();
+	for (int i = 0; i < 10; ++i) {
+		start_test();
+	}
 
 }
