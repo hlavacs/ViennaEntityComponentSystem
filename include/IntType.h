@@ -7,14 +7,19 @@ struct int_type {
 	static const T null = static_cast<T>(D);
 
 	T value{};
+
 	int_type() {
 		static_assert(!(std::is_unsigned_v<T> && std::is_signed_v<decltype(D)> && static_cast<int>(D) < 0));
 		value = static_cast<T>(D);
 	};
 
 	template<typename U>
-	requires std::is_convertible_v<U, T>
-	explicit int_type(const U& t) noexcept : value{ static_cast<T>(t) } {};
+	requires (std::is_convertible_v<U, T> && std::is_pod_v<U>)
+	explicit int_type(const U& u) noexcept : value{ static_cast<T>(u) } {};
+
+	template<typename U>
+	requires (std::is_convertible_v<U, T> && std::is_pod_v<U>)
+	explicit int_type(U&& u) noexcept : value{ static_cast<T>(u) } {};
 
 	int_type(const int_type<T, P, D>& t) noexcept : value{ t.value } {};
 	int_type(int_type<T, P, D>&& t) noexcept : value{ std::move(t.value) } {};

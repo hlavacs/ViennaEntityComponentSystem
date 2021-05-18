@@ -686,8 +686,8 @@ namespace vecs {
 		static const uint32_t c_uint32_max = std::numeric_limits<uint32_t>::max();
 
 		static inline VecsTable<P, types, c_segment_size, VECS_LAYOUT_ROW::value> m_map_table;	///< The main mapping table
-		static inline std::atomic<uint32_t>		m_first_free{ c_uint32_max };	///< First free entry to be reused
-		static inline std::atomic<uint32_t>		m_size{ 0 };					///< Number of valid entities in the map
+		static inline std::atomic<uint64_t>	m_first_free{ c_uint32_max };	///< First free entry to be reused
+		static inline std::atomic<uint32_t>	m_size{ 0 };					///< Number of valid entities in the map
 
 		/// Every subclass for entity type E has an entry in this table.
 		static inline std::array<std::unique_ptr<VecsRegistryBaseClass<P>>, vtll::size<entity_type_list>::value> m_dispatch;
@@ -836,7 +836,7 @@ namespace vecs {
 	template<typename P>
 	inline auto VecsRegistryBaseClass<P>::table_index_ptr(map_index_t index) noexcept -> table_index_t* {
 		if (!index.has_value()) return nullptr;
-		return m_map_table.component_ptr<VecsRegistryBaseClass::c_index>(table_index_t{ index });
+		return m_map_table.component_ptr<VecsRegistryBaseClass::c_index>(table_index_t{ index.value });
 	}
 
 	/**
@@ -847,7 +847,7 @@ namespace vecs {
 	*/
 	template<typename P>
 	inline auto VecsRegistryBaseClass<P>::counter_ptr(map_index_t index) noexcept	-> counter_t* {
-		return m_map_table.component_ptr<VecsRegistryBaseClass<P>::c_counter>(table_index_t{ index });
+		return m_map_table.component_ptr<VecsRegistryBaseClass<P>::c_counter>(table_index_t{ index.value });
 	}
 
 	/**
@@ -858,7 +858,7 @@ namespace vecs {
 	*/
 	template<typename P>
 	inline auto VecsRegistryBaseClass<P>::type_ptr(map_index_t index) noexcept		-> type_index_t* {
-		return m_map_table.component_ptr<VecsRegistryBaseClass<P>::c_type>(table_index_t{ index });
+		return m_map_table.component_ptr<VecsRegistryBaseClass<P>::c_type>(table_index_t{ index.value });
 	}
 
 	/**
@@ -869,7 +869,7 @@ namespace vecs {
 	*/
 	template<typename P>
 	inline auto VecsRegistryBaseClass<P>::mutex_ptr(map_index_t index) noexcept		-> std::atomic<uint32_t>* {
-		return m_map_table.component_ptr<VecsRegistryBaseClass<P>::c_mutex>(table_index_t{ index });
+		return m_map_table.component_ptr<VecsRegistryBaseClass<P>::c_mutex>(table_index_t{ index.value });
 	}
 
 	/**
@@ -1070,7 +1070,7 @@ namespace vecs {
 		if (succ) {						
 			map_idx = map_index_t{ ff };							///< success -> Reuse old slot
 		} else {
-			map_idx = map_index_t{ this->m_map_table.push_back() };	///< Create a new slot
+			map_idx = map_index_t{ this->m_map_table.push_back().value };	///< Create a new slot
 			if (!map_idx.has_value()) return {};
 			*this->counter_ptr(map_idx) = counter_t{ 0 };			//start with counter 0
 		}
@@ -1238,9 +1238,9 @@ namespace vecs {
 
 		bool succ = false;
 		 do {
-			 auto ff = this->m_first_free.load();										///< Get first free value ff
-			 this->table_index_ptr(handle.m_map_index)->value = ff;						///< Make old ff to successor of this map index
-			succ = this->m_first_free.compare_exchange_weak(ff, handle.m_map_index);	///< Exchange with old value atomically
+			 auto ff = this->m_first_free.load();														///< Get first free value ff
+			 this->table_index_ptr(handle.m_map_index)->value = (uint32_t)ff;							///< Make old ff to successor of this map index
+			succ = this->m_first_free.compare_exchange_weak(ff, handle.m_map_index.value);	///< Exchange with old value atomically
 		} while (!succ);
 
 		return true; 

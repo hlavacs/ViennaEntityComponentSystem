@@ -28,6 +28,23 @@ namespace vecs {
 	using table_index_t = int_type<uint32_t, struct P7, std::numeric_limits<uint32_t>::max()>;
 	using type_index_t = int_type<uint32_t, struct P8, std::numeric_limits<uint32_t>::max()>;
 
+	uint32_t get_upper( uint64_t num ) {
+		return num >> 32;
+	}
+
+	uint32_t get_lower(uint64_t num) {
+		const uint64_t BIT_MASK = ((1ULL << 32) - 1ULL);
+		return num && BIT_MASK;
+	}
+
+	uint64_t set_upper(uint64_t num, uint64_t upper) {
+		return (upper << 32) + get_lower(num);
+	}
+
+	uint64_t set_lower(uint64_t num, uint64_t lower) {
+		const uint64_t BIT_MASK = ((1ULL << 32) - 1) << 32ULL;
+		return (num & BIT_MASK) + lower;
+	}
 
 	//-------------------------------------------------------------------------
 	//Table segment layout
