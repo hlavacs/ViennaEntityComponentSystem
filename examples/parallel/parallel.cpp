@@ -152,83 +152,6 @@ vgjs::Coro<> start(size_t num) {
 }
 
 
-void func1(size_t);
-void func2(size_t);
-void func3(size_t);
-void func4(size_t);
-
-
-void func1(size_t num) {
-	std::cout << "Start \n";
-
-	VecsRegistry{};
-	VecsRegistry<MyEntityTypeNode>{};
-	VecsRegistry<MyEntityTypeDraw>{};
-	VecsRegistry<MyEntityTypeAnimation>{};
-
-	vgjs::schedule( [=]() { init(num); });
-	vgjs::continuation( vgjs::Function( [=]() {func2(num); }, vgjs::thread_index_t{}, vgjs::thread_type_t{ 1 }, vgjs::thread_id_t{ 52 }) );
-}
-
-
-void func2(size_t num) {
-	auto lin =
-		vgjs::Function([&]() {
-		do_work(VecsRange<MyComponentPosition>{});
-			}, vgjs::thread_index_t{}, vgjs::thread_type_t{ 1 }, vgjs::thread_id_t{ 100 });
-
-	t0 = high_resolution_clock::now();
-
-	lin.m_function();
-
-	t1 = high_resolution_clock::now();
-
-	vgjs::continuation(vgjs::Function([=]() {func3(num); }, vgjs::thread_index_t{}, vgjs::thread_type_t{ 1 }, vgjs::thread_id_t{ 53 }));
-}
-
-
-void func3(size_t num) {
-
-	int thr = 12;
-
-	std::pmr::vector<vgjs::Function> vec;
-
-	auto ranges = VecsRange<MyComponentPosition>{}.split(thr);
-	for (int i = 0; i < ranges.size(); ++i) {
-		vec.push_back(vgjs::Function([=]() { do_work(ranges[i]); }, vgjs::thread_index_t{}, vgjs::thread_type_t{ 1 }, vgjs::thread_id_t{ i }));
-	}
-
-	t2 = high_resolution_clock::now();
-
-	for (auto& func : vec) {
-		//co_await func.m_function;
-		vgjs::schedule(func);
-	}
-
-	vgjs::continuation(vgjs::Function([=]() {func4(num); }, vgjs::thread_index_t{}, vgjs::thread_type_t{ 1 }, vgjs::thread_id_t{ 54 }));
-}
-
-void func4(size_t num) {
-
-	//co_await vec;
-
-	t3 = high_resolution_clock::now();
-
-	auto d1 = duration_cast<nanoseconds>(t1 - t0);
-	auto d2 = duration_cast<nanoseconds>(t3 - t2);
-
-	double dt1 = d1.count() / 1.0;
-	double dt2 = d2.count() / 1.0;
-
-	size_t size = VecsRegistry().size();
-
-	std::cout << "Num " << 2*num << " Size " << size << "\n";
-	std::cout << "Linear " << dt1        << " Parallel 1 " << dt2        << " Speed Up " <<  dt1 / dt2 << "\n";
-	std::cout << "Linear " << dt1 / size << " Parallel 1 " << dt2 / size << "\n";
-
-	vgjs::terminate();
-}
-
 
 int main() {
 
@@ -241,9 +164,6 @@ int main() {
 	auto st = start( num )(vgjs::thread_index_t{}, vgjs::thread_type_t{ 1 }, vgjs::thread_id_t{ 999 });
     vgjs::schedule( st );
 	
-	//vgjs::schedule( vgjs::Function( [=]() { func1( num ); }, vgjs::thread_index_t{}, vgjs::thread_type_t{ 1 }, vgjs::thread_id_t{ 51 }) );
-
-
     vgjs::wait_for_termination();
 
     return 0;

@@ -683,11 +683,12 @@ namespace vecs {
 		static const uint32_t c_type{ 2 };		///< Index for accessing the type index
 		static const uint32_t c_mutex{ 3 };		///< Index for accessing the lock mutex
 		static const size_t	  c_segment_size = table_max_seg::value;
+		static const uint32_t c_uint32_max = std::numeric_limits<uint32_t>::max();
 
 		static inline VecsTable<P, types, c_segment_size, VECS_LAYOUT_ROW::value> m_map_table;	///< The main mapping table
-		static inline std::mutex				m_mutex;		///< Mutex for syncing insert and erase
-		static inline map_index_t				m_first_free{};	///< First free entry to be reused
-		static inline std::atomic<uint32_t>		m_size{ 0 };		///< Number of valid entities in the map
+		static inline std::mutex				m_mutex;						///< Mutex for syncing insert and erase
+		static inline std::atomic<uint32_t>		m_first_free{ c_uint32_max };	///< First free entry to be reused
+		static inline std::atomic<uint32_t>		m_size{ 0 };					///< Number of valid entities in the map
 
 		/// Every subclass for entity type E has an entry in this table.
 		static inline std::array<std::unique_ptr<VecsRegistryBaseClass<P>>, vtll::size<entity_type_list>::value> m_dispatch;
@@ -707,9 +708,9 @@ namespace vecs {
 		virtual auto sizeE() noexcept -> std::atomic<uint32_t>& { return m_size; };
 
 		auto table_index_ptr(map_index_t index) noexcept	-> table_index_t*;			///< \returns row index in component table
-		auto counter_ptr(map_index_t index) noexcept		-> counter_t*;				///< \returns row index in component table
-		auto type_ptr(map_index_t index) noexcept			-> type_index_t*;			///< \returns row index in component table
-		auto mutex_ptr(map_index_t index) noexcept			-> std::atomic<uint32_t>*;	///< \returns row index in component table
+		auto counter_ptr(map_index_t index) noexcept		-> counter_t*;				///< \returns generation counter value
+		auto type_ptr(map_index_t index) noexcept			-> type_index_t*;			///< \returns type index in map
+		auto mutex_ptr(map_index_t index) noexcept			-> std::atomic<uint32_t>*;	///< \returns mutex from map
 
 	public:
 		static VecsRegistryBaseClass<P> m_registry;
@@ -1044,9 +1045,9 @@ namespace vecs {
 
 		//std::lock_guard<std::mutex> lock(this->m_mutex);
 
-		if (locked && this->m_first_free.has_value()) {	///< If we got the lock and there is a free slot -> reuse the free slot
+		if (locked && this->m_first_free != this->c_uint32_max) {	///< If we got the lock and there is a free slot -> reuse the free slot
 		//if ( this->m_first_free.has_value()) {	///< If we got the lock and there is a free slot -> reuse the free slot
-			map_idx = this->m_first_free;
+			map_idx = map_index_t{ this->m_first_free.load() };
 			this->m_first_free = *this->table_index_ptr(map_idx);
 			this->m_mutex.unlock();
 		}
@@ -1061,7 +1062,8 @@ namespace vecs {
 		
 		VecsHandleT<P> handle{ map_idx, *this->counter_ptr(map_idx) }; ///< The new handle
 
-		*this->table_index_ptr(map_idx) = m_component_table.insert(handle, this->mutex_ptr(map_idx), std::forward<Cs>(args)...);	///< add data into component table
+		*this->table_index_ptr(map_idx) 
+			= m_component_table.insert(handle, this->mutex_ptr(map_idx), std::forward<Cs>(args)...);	///< add data into component table
 
 		this->m_size++;
 		this->m_sizeE++;
@@ -1211,13 +1213,13 @@ namespace vecs {
 	template<typename P, typename E>
 	inline auto VecsRegistryT<P, E>::erase( VecsHandleT<P> handle) noexcept -> bool {
 		if (!this->has_value(handle)) return false;
-		m_component_table.erase(*this->table_index_ptr(handle.m_map_index));		///< Erase from comp table
-		(*this->counter_ptr(handle.m_map_index))++;			///< Invalidate the entity handle
+		m_component_table.erase(*this->table_index_ptr(handle.m_map_index));	///< Erase from comp table
+		(*this->counter_ptr(handle.m_map_index))++;								///< Invalidate the entity handle
 
 		this->m_size--;	///< Decrease sizes
 		this->m_sizeE--;
 
-		std::lock_guard<std::mutex> mlock(this->m_mutex);										///< Protect free list
+		std::lock_guard<std::mutex> mlock(this->m_mutex);						///< Protect free list
 		*this->table_index_ptr(handle.m_map_index) = this->m_first_free;		///< Put old entry into free list
 		this->m_first_free = handle.m_map_index;
 
@@ -1278,7 +1280,7 @@ namespace vecs {
 			if (index.value < m_data.size()) {								///< Is it inside the table still?		
 				m_data.move(index, table_index_t{ m_data.size() - 1 });		///< Yes, move last entity to this position
 				auto& handle = *m_data.component_ptr<c_handle>(index);		///< Handle of moved entity
-				*reg.table_index_ptr(handle.m_map_index) = index;		///< Change map entry of moved last entity
+				*reg.table_index_ptr(handle.m_map_index) = index;			///< Change map entry of moved last entity
 			}
 		}
 		m_deleted.clear();
