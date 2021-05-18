@@ -244,36 +244,11 @@ int main() {
 
 		TESTRESULT(++number, "system run 2", , test, );
 
-		test = true;
-		auto f = [&]<typename B, typename E>(B&& b, E&& e, auto& self, int& i) {
-			if (b == e) return false;
-			auto [handle, name] = *b;
-			if (!handle.is_valid()) {
-				return true;
-			}
-
-			//std::cout << "Entity IN " << name.m_name << " " << i << "\n";
-			auto ii = i;
-			b++;
-			while (self(b, e, self, ++i)) { ++b;  --i; };
-
-			if (name.m_name != ("Name Holder 2 " + std::to_string(ii))) { test = false; }
-			//std::cout << "Entity " << name.m_name << " " << ii << "\n";
-			name.m_name = "Name Holder 3 " + std::to_string(ii);
-			return false;
-		};
-
-		VecsRange<MyComponentName> range;
-		auto b = range.begin();
-		auto e = range.end();
-		i = 1;
-		while (f(b, e, f, i)) { b++; };
-
 		i = 0;
 		test = true;
 		VecsRange<MyComponentName>{}.for_each([&](auto handle, auto& name) {
 			++i;
-			if (name.m_name != ("Name Holder 3 " + std::to_string(i))) { test = false; }
+			if (name.m_name != ("Name Holder 2 " + std::to_string(i))) { test = false; }
 			name.m_name = "Name Holder 4 " + std::to_string(i);
 			//std::cout << "Entity " << name.m_name << " " << i << "\n";
 			});
