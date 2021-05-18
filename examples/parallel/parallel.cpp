@@ -159,7 +159,7 @@ int main() {
 
 	//vgjs::JobSystem().enable_logging();
 
-	size_t num = 10000;
+	size_t num = 100000;
 
 	auto st = start( num )(vgjs::thread_index_t{}, vgjs::thread_type_t{ 1 }, vgjs::thread_id_t{ 999 });
     vgjs::schedule( st );
