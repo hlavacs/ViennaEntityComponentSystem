@@ -23,7 +23,7 @@ struct int_type {
 	void operator=(int_type<T, P, D>&& rhs) noexcept { value = std::move(rhs.value); };
 
 	template<typename U>
-	requires std::is_convertible_v<U, T>
+	requires (std::is_convertible_v<U, T> && std::is_pod_v<U>)
 	void operator=(const U& rhs) noexcept { value = static_cast<T>(rhs); };
 
 	operator const T& () const { return value; } 
