@@ -977,7 +977,7 @@ namespace vecs {
 	template<typename P, typename E>
 	inline auto VecsRegistryT<P, E>::updateC(VecsHandleT<P> handle, size_t compidx, void* ptr, size_t size, bool move ) noexcept -> bool {
 		if (!this->has_value(handle)) return false;
-		return m_component_table.updateC(*this->m_map_table.component_ptr<this->c_index>(handle.m_map_index), compidx, ptr, size, move);
+		return m_component_table.updateC(*this->table_index_ptr(handle), compidx, ptr, size, move);
 	}
 
 	/**
@@ -1005,8 +1005,7 @@ namespace vecs {
 	template<typename P, typename E>
 	inline auto VecsRegistryT<P, E>::componentE_ptr(VecsHandleT<P> handle, size_t compidx) noexcept -> void* {
 		if (!this->has_value(handle)) return nullptr;	///< Return the empty component
-		auto* comp_table_idx = this->m_map_table.component_ptr<this->c_index>(handle.m_map_index); ///< Get reference to component
-		return m_component_table.componentE_ptr(*comp_table_idx, compidx);	///< Return the component
+		return m_component_table.componentE_ptr(*this->table_index_ptr(handle), compidx);	///< Return the component
 	};
 
 	/**
@@ -1042,13 +1041,6 @@ namespace vecs {
 		*this->m_map_table.component_ptr<this->c_type>(map_idx) = table_index_t{ vtll::index_of<entity_type_list, E>::value }; ///< Entity type index
 		
 		VecsHandleT<P> handle{ map_idx, *this->m_map_table.component_ptr<this->c_counter>(map_idx) }; ///< The new handle
-
-		//if (map_idx.value >= this->m_map_table.size()) {
-		//	std::cout << "Error \n";
-		//}
-		//auto* idx_ptr = this->m_map_table.component_ptr<this->c_index>(map_idx);
-		//auto* mut_ptr = this->m_map_table.component_ptr<this->c_mutex>(map_idx);
-		//*idx_ptr = m_component_table.insert(handle, mut_ptr, std::forward<Cs>(args)...);
 
 		*this->m_map_table.component_ptr<this->c_index>(map_idx) ///< Need new handle here so we can put it into the component table 
 			= m_component_table.insert(handle, this->m_map_table.component_ptr<this->c_mutex>(map_idx), std::forward<Cs>(args)...);	///< add data into component table
@@ -1091,11 +1083,11 @@ namespace vecs {
 		);
 
 		if constexpr (sizeof...(Cs) > 0) {
-			m_component_table.update<Cs>(index, std::forward<Cs>(args)...);			///< Move the arguments to the new entity type
+			m_component_table.update<Cs>(index, std::forward<Cs>(args)...);		///< Move the arguments to the new entity type
 		}
 
-		auto& map_index = *this->m_map_table.component_ptr<this->c_index>(handle.m_map_index);	///< Index of old component table in the map
-		this->m_dispatch[map_type]->eraseE(map_index);								///< Erase the entity from old component table
+		auto& map_index = *this->table_index_ptr(handle);						///< Index of old component table in the map
+		this->m_dispatch[map_type]->eraseE(map_index);							///< Erase the entity from old component table
 
 		this->sizeE()++;
 		this->m_dispatch[map_type]->sizeE()--;
@@ -1115,8 +1107,7 @@ namespace vecs {
 	template<typename P, typename E>
 	inline auto VecsRegistryT<P, E>::tuple_ptr(VecsHandleT<P> handle) noexcept -> vtll::to_ptr_tuple<E> {
 		if (!this->has_value(handle)) return {};	///< Return the empty component
-		auto& comp_table_idx = *this->m_map_table.component_ptr<this->c_index>(handle.m_map_index); ///< Get reference to component
-		return m_component_table.tuple_ptr( comp_table_idx );
+		return m_component_table.tuple_ptr(*this->table_index_ptr(handle));
 	}
 
 	/**
@@ -1127,8 +1118,7 @@ namespace vecs {
 	*/
 	template<typename P, typename E>
 	inline auto VecsRegistryT<P, E>::tuple(VecsHandleT<P> handle) noexcept -> vtll::to_ref_tuple<E> {
-		auto& comp_table_idx = *this->m_map_table.component_ptr<this->c_index>(handle.m_map_index); ///< Get component copies
-		return m_component_table.tuple(comp_table_idx);
+		return m_component_table.tuple(*this->table_index_ptr(handle));
 	}
 
 	/**
@@ -1145,8 +1135,8 @@ namespace vecs {
 		if (!h1.is_valid() || !h1.is_valid() || this->type(h1) != this->type(h2)) return false;
 		if (this->type(h1) != vtll::index_of<entity_type_list, E>::value) return false;
 		
-		table_index_t& i1 = *this->m_map_table.component_ptr<this->c_index>(h1.m_map_index);
-		table_index_t& i2 = *this->m_map_table.component_ptr<this->c_index>(h2.m_map_index);
+		table_index_t& i1 = *this->table_index_ptr(h1);
+		table_index_t& i2 = *this->table_index_ptr(h2);
 		std::swap(i1, i2);								///< Swap in map
 		auto res = m_component_table.swap(i1, i2);		///< Swap in component table
 		return res;
