@@ -34,7 +34,7 @@ namespace vecs {
 
 	uint32_t get_lower(uint64_t num) {
 		const uint64_t BIT_MASK = ((1ULL << 32) - 1ULL);
-		return num && BIT_MASK;
+		return num & BIT_MASK;
 	}
 
 	uint64_t set_upper(uint64_t num, uint64_t upper) {

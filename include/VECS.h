@@ -1059,16 +1059,17 @@ namespace vecs {
 		
 		auto ff = this->m_first_free.load();	///< Is there a free empty slot left?
 		bool succ = false;
-		if (ff != this->c_uint32_max) {										///< yes
+		if (get_lower(ff) != this->c_uint32_max) {										///< yes
 			do {
-				auto nf = this->table_index_ptr(map_index_t{ ff })->value;	///< Get next free slot
+				uint64_t nf = this->table_index_ptr(map_index_t{ get_lower(ff) })->value;	///< Get next free slot
+				nf = set_upper(nf, get_upper(ff) + 1);
 				succ = this->m_first_free.compare_exchange_weak(ff, nf);	///< Exchange with old value atomically
 				if(!succ) ff = this->m_first_free.load();					///< If we did not succeed then another thread beat us -> repeat
-			} while (!succ && ff != this->c_uint32_max);					///< Repeat until success or no more free slots
+			} while (!succ && get_lower(ff) != this->c_uint32_max);			///< Repeat until success or no more free slots
 		}
 
 		if (succ) {						
-			map_idx = map_index_t{ ff };							///< success -> Reuse old slot
+			map_idx = map_index_t{ get_lower(ff) };							///< success -> Reuse old slot
 		} else {
 			map_idx = map_index_t{ this->m_map_table.push_back().value };	///< Create a new slot
 			if (!map_idx.has_value()) return {};
@@ -1237,10 +1238,10 @@ namespace vecs {
 		this->m_sizeE--;
 
 		bool succ = false;
-		 do {
-			 auto ff = this->m_first_free.load();														///< Get first free value ff
-			 this->table_index_ptr(handle.m_map_index)->value = (uint32_t)ff;							///< Make old ff to successor of this map index
-			succ = this->m_first_free.compare_exchange_weak(ff, handle.m_map_index.value);	///< Exchange with old value atomically
+		do {
+			auto ff = this->m_first_free.load();											///< Get first free value ff
+			this->table_index_ptr(handle.m_map_index)->value = get_lower(ff);				///< Make old ff to successor of this map index
+			succ = this->m_first_free.compare_exchange_weak(ff, set_upper(handle.m_map_index.value, get_upper(ff)+1));	///< Exchange with old value atomically
 		} while (!succ);
 
 		return true; 
