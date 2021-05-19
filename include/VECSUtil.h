@@ -130,19 +130,19 @@ namespace vecs {
 		* \brief Create the read lock
 		*/
 		static void lock(std::atomic<uint32_t>* mutex) {
-			if (mutex == nullptr) return;					//Is the guard valid?
-			uint32_t val = mutex->fetch_add(1);				//fetch old value and add 1 atomically
-			while (val >= WRITE) {							//Is there a writer active?
-				val = mutex->fetch_sub(1);					//Yes - remove own value
+			if (mutex == nullptr) return;					///< Is the guard valid?
+			uint32_t val = mutex->fetch_add(1);				///< fetch old value and add 1 atomically
+			while (val >= WRITE) {							///< Is there a writer active?
+				val = mutex->fetch_sub(1);					///< Yes - remove own value
 				size_t cnt = 0;
 				do {
-					val = mutex->load();					//still a writer?
-					if (val >= WRITE && ++cnt > 10) {		//sleep if too often in loop
+					val = mutex->load();					///< still a writer?
+					if (val >= WRITE && ++cnt > 10) {		///< sleep if too often in loop
 						cnt = 0;
-						std::this_thread::yield();
+						std::this_thread::yield();			///< yield the thread
 					}
-				} while(val >= WRITE);						//if yes, stay in loop
-				val = mutex->fetch_add(1);					//if no, again try to add 1 to signal reader
+				} while(val >= WRITE);						///< if yes, stay in loop
+				val = mutex->fetch_add(1);					///< if no, again try to add 1 to signal reader
 			}
 		}
 
@@ -193,7 +193,7 @@ namespace vecs {
 					val = mutex->load();				///< Are there still others?
 					if (val != 0 && ++cnt > 10) {
 						cnt = 0;
-						std::this_thread::yield();
+						std::this_thread::yield();		///< Yield the thread
 					}
 				} while (val != 0);						///< If yes stay in loop
 				val = mutex->fetch_add(WRITE);			///< Again get old value and add WRITE

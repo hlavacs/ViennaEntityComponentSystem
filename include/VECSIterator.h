@@ -260,6 +260,9 @@ namespace vecs {
 	template<typename P, typename ETL>
 	using it_CTL_entity_list = vtll::remove_types< vtll::intersection< ETL >, typename VecsRegistryBaseClass<P>::entity_tag_list >;
 
+	/**
+	* \brief Iterator for given list of entity types. Entity types are taken as is, and NOT extended by possible tags from the tags map.
+	*/
 	template<typename P, typename ETL>
 	requires (is_entity_type_list<P, ETL>::value)
 	class VecsIteratorT<P, ETL> : public VecsIteratorBaseClass< P, ETL, it_CTL_entity_list<P, ETL> > {
@@ -270,9 +273,6 @@ namespace vecs {
 
 	/**
 	* \brief Iterator for given entity types.
-	* 
-	* Entity types are the given entity types, but also their extensions using the tag map.
-	* Component types are the intersection of the entity types.
 	*/
 	template<typename P, typename... Es>
 	using it_ETL_entity_types = expand_tags< typename VecsRegistryBaseClass<P>::entity_tag_map, vtll::tl<Es...> >;
@@ -280,6 +280,12 @@ namespace vecs {
 	template<typename P, typename... Es>
 	using it_CTL_entity_types = vtll::remove_types< vtll::intersection< vtll::tl<Es...> >, typename VecsRegistryBaseClass<P>::entity_tag_list >;
 
+	/**
+	* \brief Iterator for given entity types.
+	*
+	* Entity types are the given entity types, but also their extensions using the tag map.
+	* Component types are the intersection of the entity types.
+	*/
 	template<typename P, typename... Es>
 	requires (sizeof...(Es) > 0 && are_entity_types<P, Es...>)
 	class VecsIteratorT<P, Es...> : public VecsIteratorBaseClass< P, it_ETL_entity_types<P, Es...>, it_CTL_entity_types<P, Es...> > {
@@ -297,6 +303,9 @@ namespace vecs {
 	template<typename P, typename... Cs>
 	using it_CTL_types = vtll::remove_types< vtll::tl<Cs...>, typename VecsRegistryBaseClass<P>::entity_tag_list >;
 
+	/**
+	* \brief Iterator for given component types.
+	*/
 	template<typename P, typename... Cs>
 	requires (sizeof...(Cs) > 0 && are_component_types<P, Cs...>)
 	class VecsIteratorT<P, Cs...> : public VecsIteratorBaseClass< P, it_ETL_types<P, Cs...>, it_CTL_types<P, Cs...> > {
@@ -314,6 +323,9 @@ namespace vecs {
 	template<typename P, typename E, typename... Ts>
 	using it_CTL_entity_tags = vtll::remove_types< E, typename VecsRegistryBaseClass<P>::entity_tag_list >;
 
+	/**
+	* \brief Iterator for given entity type that has all tags.
+	*/
 	template<typename P, typename E, typename... Ts>
 	requires (is_entity_type<P, E> && (sizeof...(Ts) > 0) && are_entity_tags<P, Ts...>)
 	class VecsIteratorT<P, E,Ts...> : public VecsIteratorBaseClass< P, it_ETL_entity_tags<P, E, Ts...>, it_CTL_entity_tags<P, E, Ts...> > {
@@ -328,6 +340,9 @@ namespace vecs {
 	template<typename P>
 	using it_CTL_all_entities = vtll::remove_types< vtll::intersection< typename VecsRegistryBaseClass<P>::entity_type_list >, typename VecsRegistryBaseClass<P>::entity_tag_list >;
 
+	/**
+	* \brief Iterator for all entities.
+	*/
 	template<typename P>
 	class VecsIteratorT<P> : public VecsIteratorBaseClass<P, typename VecsRegistryBaseClass<P>::entity_type_list, it_CTL_all_entities<P> > {
 	public:
@@ -376,12 +391,14 @@ namespace vecs {
 	//VecsIteratorEntity
 
 	/**
-	* \brief Iterator that iterates over a VecsComponentTable of type E and that is intested into components Ts
+	* \brief Iterator that iterates over a VecsComponentTable of type E and that is intested into components Ts.
 	*/
-
 	template<typename P, typename E, typename ETL, typename CTL>
 	class VecsIteratorEntity;
 
+	/**
+	* \brief Specialization for iterator iterating over entity type E.
+	*/
 	template<typename P, typename E, typename ETL, template<typename...> typename CTL, typename... Cs>
 	class VecsIteratorEntity<P, E, ETL, CTL<Cs...>> : public VecsIteratorEntityBaseClass<P, ETL, CTL<Cs...>> {
 
@@ -477,6 +494,9 @@ namespace vecs {
 	template<typename P, typename C>
 	struct Functor;
 
+	/**
+	* \brief Specialization of primary Functor to get the types.
+	*/
 	template<typename P, template<typename...> typename Seq, typename... Cs>
 	struct Functor<P, Seq<Cs...>> {
 		using type = void(VecsHandleT<P>&, Cs&...);	///< Arguments for the functor

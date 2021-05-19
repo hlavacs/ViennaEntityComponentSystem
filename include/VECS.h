@@ -45,7 +45,7 @@ class Vecs##NAME##Registry<vtll::tl<>> : public vecs::VecsRegistryBaseClass<PART
 namespace vecs {
 
 	/**
-	* \brief Struct to expand tags to all possible combinations and append them to their entity type component lists.
+	* \brief Struct to expand tags to all possible tag combinations and append them to their entity type component lists.
 	*/
 	template<typename TagMap, typename T>
 	struct expand_tags_for_one {
@@ -116,9 +116,11 @@ namespace vecs {
 	template<typename P, typename... Es>
 	concept are_entity_types = (is_entity_type<P, Es> && ...);		///< Es are all entity types
 
+	/// Primary template for testing whether a list contains entity types.
 	template<typename P, typename ETL>
 	struct is_entity_type_list;									///< Es are all entity types
 
+	/// Specialization for testing whether a list contains entity types.
 	template<typename P, template<typename...> typename ETL, typename... Es>
 	struct is_entity_type_list<P, ETL<Es...>> {					///< A list of entity types
 		static const bool value = (is_entity_type<P,Es> && ...);
@@ -1272,6 +1274,9 @@ namespace vecs {
 	//-------------------------------------------------------------------------
 	//partial specialization for empty template parameter list
 
+	/**
+	* \brief Partial specialization for default empty entity type = alias for the base class.
+	*/
 	template<typename P>
 	class VecsRegistryT<P, vtll::tl<>> : public VecsRegistryBaseClass<P> {};
 
