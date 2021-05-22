@@ -129,16 +129,7 @@ namespace vecs {
 	* \brief Destructor of class VecsTable.
 	*/
 	template<typename P, typename DATA, size_t N0, bool ROW>
-	inline VecsTable<P, DATA, N0, ROW>::~VecsTable() noexcept {
-		/*std::lock_guard lock(m_mutex);					///< Stop all accesses
-		auto ptr = m_seg_vector.load();
-
-		if ( ptr.get() != nullptr) {
-			for (int i = 0; i < m_num_segments.load(); ++i) {
-				if((*ptr)[i].load()) delete (*ptr)[i].load();
-			}
-		}*/
-	};
+	inline VecsTable<P, DATA, N0, ROW>::~VecsTable() noexcept {	};
 
 	/**
 	* \brief Get a reference to a particular component with index I.
@@ -372,7 +363,14 @@ namespace vecs {
 			}
 		}
 
-		if (segment_ptr) {
+		for (size_t i = new_num; segment_ptr && i < vector_ptr->size(); ++i ) {
+			auto& current_ptr = (*vector_ptr)[i];
+			if (current_ptr.compare_exchange_weak(expected, segment_ptr)) {
+				segment_ptr = nullptr;
+			}
+		}
+
+		if (segment_ptr)  {
 			m_reuse_segments.push_back(segment_ptr);
 		}
 
