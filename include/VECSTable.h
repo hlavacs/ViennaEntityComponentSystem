@@ -150,11 +150,12 @@ namespace vecs {
 	inline auto VecsTable<P, DATA, N0, ROW>::component_ref(table_index_t n) noexcept -> C& {
 		assert(n.value < size());
 		auto vector_ptr{ m_seg_vector.load() };
+		auto segment_ptr = ((*vector_ptr)[n >> L]).load();
 		if constexpr (ROW) {
-			return std::get<I>( (* ((*vector_ptr)[n >> L]).load() )[n & BIT_MASK]);
+			return std::get<I>((*segment_ptr)[n & BIT_MASK]);
 		}
 		else {
-			return std::get<I>(* ((*vector_ptr)[n >> L]).load() )[n & BIT_MASK];
+			return std::get<I>(*segment_ptr)[n & BIT_MASK];
 		}
 	};
 
@@ -168,11 +169,12 @@ namespace vecs {
 	inline auto VecsTable<P, DATA, N0, ROW>::component_ptr(table_index_t n) noexcept -> C* {
 		assert(n.value < size());
 		auto vector_ptr{ m_seg_vector.load() };
+		auto segment_ptr = ((*vector_ptr)[n >> L]).load();
 		if constexpr (ROW) {
-			return &std::get<I>((* ((*vector_ptr)[n >> L]).load() )[n & BIT_MASK]);
+			return &std::get<I>((*segment_ptr)[n & BIT_MASK]);
 		}
 		else {
-			return &std::get<I>( *((*vector_ptr)[n >> L]).load() ) [n & BIT_MASK];
+			return &std::get<I>(*segment_ptr) [n & BIT_MASK];
 		}
 	};
 
@@ -185,12 +187,13 @@ namespace vecs {
 	inline auto VecsTable<P, DATA, N0, ROW>::tuple_ref(table_index_t n) noexcept -> tuple_ref_t {
 		assert(n.value < size());
 		auto vector_ptr{ m_seg_vector.load() };
+		auto segment_ptr = ((*vector_ptr)[n >> L]).load();
 		auto f = [&]<size_t... Is>(std::index_sequence<Is...>) {
 			if constexpr (ROW) {
-				return std::tie(std::get<Is>((* ((*vector_ptr)[n >> L]).load() )[n & BIT_MASK])...);
+				return std::tie(std::get<Is>((*segment_ptr)[n & BIT_MASK])...);
 			}
 			else {
-				return std::tie(std::get<Is>(* ((*vector_ptr)[n >> L]).load() )[n & BIT_MASK]...);
+				return std::tie(std::get<Is>(*segment_ptr)[n & BIT_MASK]...);
 			}
 		};
 		return f(std::make_index_sequence<vtll::size<DATA>::value>{});
@@ -205,12 +208,13 @@ namespace vecs {
 	inline auto VecsTable<P, DATA, N0, ROW>::tuple_ptr(table_index_t n) noexcept -> tuple_ptr_t {
 		assert(n.value < size());
 		auto vector_ptr{ m_seg_vector.load() };
+		auto segment_ptr = ((*vector_ptr)[n >> L]).load();
 		auto f = [&]<size_t... Is>(std::index_sequence<Is...>) {
 			if constexpr (ROW) {
-				return std::make_tuple(&std::get<Is>((* ((*vector_ptr)[n >> L]).load() )[n & BIT_MASK])...);
+				return std::make_tuple(&std::get<Is>((*segment_ptr)[n & BIT_MASK] )...);
 			}
 			else {
-				return std::make_tuple(&std::get<Is>(* ((*vector_ptr)[n >> L]).load() )[n & BIT_MASK]...);
+				return std::make_tuple(&std::get<Is>(*segment_ptr)[n & BIT_MASK]...);
 			}
 		};
 		return f(std::make_index_sequence<vtll::size<DATA>::value>{});
@@ -344,7 +348,7 @@ namespace vecs {
 		auto vector_ptr{ m_seg_vector.load() };	///< Shared pointer to current segement ptr vector
 
 		auto old_num = m_num_segments.load();
-		auto new_num = r >> L;
+		auto new_num = ((r - 1ULL) >> L) + 1ULL;
 		if (new_num <= old_num) return true;	///< are there already segments that we can use?
 
 		array_ptr segment_ptr{ nullptr };
@@ -368,7 +372,9 @@ namespace vecs {
 			}
 		}
 
-		if (!segment_ptr) m_reuse_segments.push_back(segment_ptr);
+		if (segment_ptr) {
+			m_reuse_segments.push_back(segment_ptr);
+		}
 
 		bool flag{ false };
 		do {
@@ -389,32 +395,33 @@ namespace vecs {
 	*/
 	template<typename P, typename DATA, size_t N0, bool ROW>
 	inline auto VecsTable<P, DATA, N0, ROW>::capacity(size_t r) noexcept -> size_t {
+		auto vector_ptr{ m_seg_vector.load() };
 
-		auto segment_ptr{ m_seg_vector.load() };
+		if (r == 0) return !vector_ptr ? 0 : vector_ptr->size() * N;
 
-		if (!segment_ptr || r > segment_ptr->size() * N) {	///< is there enough space in the table?
+		if (!vector_ptr || r > vector_ptr->size() * N) {	///< is there enough space in the table?
 
-			std::lock_guard lock(m_mutex);					///< Stop all accesses
+			std::lock_guard lock(m_mutex);					///< Stop all other accesses to the vector of pointers
 
-			segment_ptr = m_seg_vector.load();				///< Reload, since another thread could have beaten us to here
+			vector_ptr = m_seg_vector.load();				///< Reload, since another thread could have beaten us to here
 
-			if (!segment_ptr || r > segment_ptr->size() * N) {				///< Retest 
-				auto old = segment_ptr;										///< Remember old vector
+			if (!vector_ptr || r > vector_ptr->size() * N) {				///< Retest 
+				auto old = vector_ptr;										///< Remember old vector
 				
-				auto num_segs = std::max((r - 1ULL) / N + 1ULL, 16ULL);			///< Number of segments necessary, at least 16
-				num_segs = std::max( num_segs, segment_ptr->size() << 1ULL );	///< At least double size
+				auto num_segs = std::max( ((r - 1ULL) >> L) + 1ULL, 16ULL);			///< Number of segments necessary, at least 16
+				num_segs = vector_ptr ? std::max( num_segs, vector_ptr->size() << 1ULL ) : num_segs;	///< At least double size
 
-				segment_ptr = std::make_shared<seg_vector_t>( num_segs, m_mr );		///< Create new segment ptr
+				vector_ptr = std::make_shared<seg_vector_t>( num_segs, m_mr );		///< Create new segment ptr
 				for (int i = 0; old && i < m_num_segments.load(); ++i) {
-					(*segment_ptr)[i].store((*old)[i].load()); 	///< Copy old shared pointers to the new vector
+					(*vector_ptr)[i].store((*old)[i].load()); 	///< Copy old shared pointers to the new vector
 				}
-				m_seg_vector.store(segment_ptr);		///< Copy new to old -> now all threads use the new vector
+				m_seg_vector.store(vector_ptr);		///< Copy new to old -> now all threads use the new vector
 			}
 		}
-		return segment_ptr->capacity() * N;
+		return vector_ptr->size() * N;
 
-		//segment_ptr = m_allocator.allocate(1);            ///< allocate the object
-		//m_allocator.construct(segment_ptr, m_mr);
+		//vector_ptr = m_allocator.allocate(1);            ///< allocate the object
+		//m_allocator.construct(vector_ptr, m_mr);
 	}
 
 	/**
@@ -423,10 +430,15 @@ namespace vecs {
 	*/
 	template<typename P, typename DATA, size_t N0, bool ROW>
 	inline auto VecsTable<P, DATA, N0, ROW>::compress() noexcept -> void {
-		if (!m_seg_vector.load()) return;
-		while (m_seg_vector.load()->size() > 1 && m_size + N <= m_seg_vector.load()->size() * N) {
-			//m_seg_vector.load()->pop_back();
+		std::lock_guard lock(m_mutex);					///< Stop all other accesses to the vector of pointers
+
+		auto vector_ptr{ m_seg_vector.load() };
+		if (!vector_ptr) return;
+		while (m_num_segments > 1 && m_size + N <= m_num_segments * N) {
+			(*vector_ptr)[m_num_segments.load()] = nullptr;
+			m_num_segments.fetch_sub(1);
 		}
+		m_reuse_segments.clear();
 	}
 
 }
