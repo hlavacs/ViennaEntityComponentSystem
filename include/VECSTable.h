@@ -130,7 +130,7 @@ namespace vecs {
 	*/
 	template<typename P, typename DATA, size_t N0, bool ROW>
 	inline VecsTable<P, DATA, N0, ROW>::~VecsTable() noexcept {
-		/*std::unique_lock lock(m_mutex);					///< Stop all accesses
+		/*std::lock_guard lock(m_mutex);					///< Stop all accesses
 		auto ptr = m_seg_vector.load();
 
 		if ( ptr.get() != nullptr) {
@@ -263,11 +263,10 @@ namespace vecs {
 	template<size_t I, typename C>
 	inline auto VecsTable<P, DATA, N0, ROW>::update(table_index_t n, C&& data) noexcept -> bool {
 		if (n >= m_size) return false;
-		if constexpr (std::is_copy_assignable_v<C>) {
-			*component_ptr<I>(n) = data;
-		}
-		else if constexpr (std::is_move_assignable_v<C>) {
+		if constexpr (std::is_move_assignable_v<C> && std::is_rvalue_reference_v<decltype(data)>) {
 			*component_ptr<I>(n) = std::move(data);
+		} else if constexpr (std::is_copy_assignable_v<C>) {
+			*component_ptr<I>(n) = data;
 		}
 
 		return true;
@@ -395,7 +394,7 @@ namespace vecs {
 
 		if (!segment_ptr || r > segment_ptr->size() * N) {	///< is there enough space in the table?
 
-			std::unique_lock lock(m_mutex);					///< Stop all accesses
+			std::lock_guard lock(m_mutex);					///< Stop all accesses
 
 			segment_ptr = m_seg_vector.load();				///< Reload, since another thread could have beaten us to here
 
