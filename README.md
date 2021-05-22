@@ -10,12 +10,13 @@ Systems do not have to be specially defined, anything that specifies a number of
 Important features of VECS are:
 * C++20
 * Header only, simply include the headers to your project
-* Make one or several partitions of your data.
+* VECS is a template library. Make one or several disconnected partitions of your data through different instantiations.
 * Compile time definition of components and entities. VECS creates a rigorous compile time frame around your data, minimizing runtime overhead.
 * Can use tags to define subsets of entities dynamically.
 * Designed to be used by multiple threads in parallel, low overhead locking.
-* Easy to use, various ways to access the entities and their components.
-* High performance by default, components are ordered sequentially in memory (row or column wise) for cache friendly  access.
+* Easy to use, various ways to access the entities and their components through iterators and ranges.
+* High performance by default, components are ordered sequentially in memory (row or column wise) for cache friendly access.
+* Data structures can grow in memory (mostly) without locking. By choosing parameters carefully, you can avoid locking altogether, without preallocating all the memory (which you could if you want).
 
 VECS is currently in BETA.
 
@@ -95,7 +96,7 @@ Furthermore, components of entities are stored in tables, one table for each ent
       //, ...
     >;
 
-In this example, *N = 1<<15*, and this is fixed at compile time. Note that *N* eventually must be a power of 2. If you specify any other number *N0*, VECS at compile time for *N* uses the smallest power of 2 that is larger or equal to *N0*. If nothing is specified, the default value for *N* is 2^10.
+In this example, *N = 1<<15*, and this is fixed at compile time. Note that *N* eventually must be a power of 2. If you specify any other number *N0*, VECS at compile time for *N* uses the smallest power of 2 that is larger or equal to *N0*. If nothing is specified, the default value for *N* is 1024.
 
 Another choice relates to the layout of segments. Layouts of segments can be row wise or column wise (default). In row wise, the components of each entity are stored next to each other. Thus when accessing all components at once, cache efficiency is best. In column wise, components are stored in separate arrays, and cache performance is optimal if only single components are accessed in for-loops. You can choose the layout for a specific entity type *E* like so:
 
@@ -471,10 +472,10 @@ This loop guarantees that any loop iteration contains only valid entities, which
 
 You see that the loop is actually quite simple, and you can easily come up with your own versions, which e.g. only read lock entities, etc.
 
-## Parallel Operations and Performance
+## Parallel Operations
 
 In principle, VECS allows parallel operations on multiple threads if certain principles are upheld.
-First, VECS only locks some internal data structures, but it does not lock single entities (the only exception being the VecsRangeBaseClass::for_each loop). So any time you change the state of an entity by writing on it (through a reference of calling *update()*), erasing it, swapping it with another entity of the same type, transforming it, etc., you should create a *VecsWriteLock* for this entity.
+First, VECS only locks some internal data structures, but it does not lock single entities (the only exception being the VecsRangeBaseClass::for_each loop if you select syncing). So any time you change the state of an entity by writing on it (through a reference of calling *update()*), erasing it, swapping it with another entity of the same type, transforming it, etc., you should create a *VecsWriteLock* for this entity, or make sure that there is no other access to this entity at this time.
 
     {
       VecsIterator<MyComponentName> it;
@@ -492,7 +493,9 @@ If you only read components, then a read lock may be faster, since read locks do
       }
     }
 
-An example for looping over entities in parallel on several threads is given in example program parallel.cpp. For parallelization, the example uses the Vienna Game Job System (VGJS, https://github.com/hlavacs/ViennaGameJobSystem), a sibling project of VECS. VGJS is a header-only C++20 library enabling using function pointers, std::function, lambdas, or coroutines to be run in the job system.
+### External Synchronization
+
+An example for looping over entities in parallel on several threads is given in example program *parallel.cpp*. For parallelization, the example uses the Vienna Game Job System (VGJS, https://github.com/hlavacs/ViennaGameJobSystem), a sibling project of VECS. VGJS is a header-only C++20 library enabling using function pointers, std::function, lambdas, or coroutines to be run in the job system.
 
     template<template<typename...> typename R, typename... Cs>
     void do_work(R<Cs...> range) {
@@ -556,5 +559,6 @@ An example for looping over entities in parallel on several threads is given in 
       co_return;
     }
 
-Note that since the ranges do not overlap, there is actually no need for synchronization of no other thread accesses the entities. Thus there is no lock in the range based for loop.
-If there are other threads accessing the entities, then you can either introduce locks, or switch to the *for_each* version. Note that this version will take longer time on average, due to locking every entity before accessing it.
+Note that since the ranges do not overlap, there is actually no need for synchronization of no other thread accesses the entities. Thus there is no lock in the range based for-loop.
+
+If there are other threads accessing the entities, then you can either introduce VECS locks, or switch to the *for_each* version. Note that this version will take longer time on average, due to locking every entity before accessing it.

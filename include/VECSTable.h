@@ -334,7 +334,7 @@ namespace vecs {
 	inline auto VecsTable<P, DATA, N0, ROW>::reserve(size_t r) noexcept -> bool {
 		capacity(r);
 
-		std::shared_lock lock(m_mutex);
+		std::shared_lock lock(m_mutex);			///< Shared lock - other threads can enter this section as well
 
 		auto vector_ptr{ m_seg_vector.load() };	///< Shared pointer to current segement ptr vector
 
@@ -347,39 +347,39 @@ namespace vecs {
 		m_reuse_segments.reserve(m_reuse_segments.size() + new_num - old_num);
 
 		for (size_t i = old_num; i < new_num; ++i) {
-			auto& current_ptr = (*vector_ptr)[i];
-			if (!current_ptr.load() && !segment_ptr) {
-				if (m_reuse_segments.size() > 0) {
-					segment_ptr = m_reuse_segments.back();
+			auto& current_ptr = (*vector_ptr)[i];			///< Previous pointer, if not nullptr then another thread beat us
+			if (!current_ptr.load() && !segment_ptr) {		///< Still nullptr, and we do not have a leftover from prev loop -> get a segment
+				if (m_reuse_segments.size() > 0) {			///< Is there a leftover in thread's reuse list?
+					segment_ptr = m_reuse_segments.back();	///< Yes, then take it out
 					m_reuse_segments.pop_back();
 				}
 				else {
-					segment_ptr = std::make_shared<array_tuple_t>();
+					segment_ptr = std::make_shared<array_tuple_t>();	///< No - create a new segment
 				}
 			}
 
-			if (current_ptr.compare_exchange_weak(expected, segment_ptr)) {
+			if (current_ptr.compare_exchange_weak(expected, segment_ptr)) { ///< Only possible if old value is nullptr
 				segment_ptr = nullptr;
 			}
 		}
 
-		for (size_t i = new_num; segment_ptr && i < vector_ptr->size(); ++i ) {
-			auto& current_ptr = (*vector_ptr)[i];
-			if (current_ptr.compare_exchange_weak(expected, segment_ptr)) {
+		for (size_t i = new_num; segment_ptr && i < vector_ptr->size(); ++i ) { ///< Do we have a leftover from loop?
+			auto& current_ptr = (*vector_ptr)[i];								///< 
+			if (current_ptr.compare_exchange_weak(expected, segment_ptr)) {		///< Try to get rid of it in the remaining slots
 				segment_ptr = nullptr;
 			}
 		}
 
-		if (segment_ptr)  {
+		if (segment_ptr)  {		///< if there is still a leftover, save it in the thread's reuse list
 			m_reuse_segments.push_back(segment_ptr);
 		}
 
 		bool flag{ false };
 		do {
-			flag = m_num_segments.compare_exchange_weak(old_num, new_num);
-			if (!flag) {
-				old_num = m_num_segments.load();
-				if (old_num >= new_num) flag = true;
+			flag = m_num_segments.compare_exchange_weak(old_num, new_num); ///< try to store new value
+			if (!flag) {								///< If it did not work then another thread has beaten us
+				old_num = m_num_segments.load();		///< Can we raise the value still?
+				if (old_num >= new_num) flag = true;	///< If the other thread's value is larger -> quit
 			}
 		} while (!flag);
 			
