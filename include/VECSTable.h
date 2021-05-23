@@ -433,7 +433,7 @@ namespace vecs {
 		auto vector_ptr{ m_seg_vector.load() };
 		if (!vector_ptr) return;
 		while (m_num_segments > 1 && m_size + N <= m_num_segments * N) {
-			(*vector_ptr)[m_num_segments.load()] = nullptr;
+			(*vector_ptr)[m_num_segments.load() - 1] = nullptr;
 			m_num_segments.fetch_sub(1);
 		}
 		m_reuse_segments.clear();
