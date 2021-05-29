@@ -139,7 +139,8 @@ namespace vecs {
 					val = mutex->load();					///< still a writer?
 					if (val >= WRITE && ++cnt > 10) {		///< sleep if too often in loop
 						cnt = 0;
-						std::this_thread::yield();			///< yield the thread
+						mutex->wait(val);
+						//std::this_thread::yield();			///< yield the thread
 					}
 				} while(val >= WRITE);						///< if yes, stay in loop
 				val = mutex->fetch_add(1);					///< if no, again try to add 1 to signal reader
@@ -152,6 +153,7 @@ namespace vecs {
 		static void unlock(std::atomic<uint32_t>* mutex) {
 			if (mutex == nullptr) return;
 			mutex->fetch_sub(1);
+			mutex->notify_one();	///< Only writers are waiting, so notify one writer.
 		}
 
 		/**
@@ -193,7 +195,8 @@ namespace vecs {
 					val = mutex->load();				///< Are there still others?
 					if (val != 0 && ++cnt > 10) {
 						cnt = 0;
-						std::this_thread::yield();		///< Yield the thread
+						mutex->wait(val);
+						//std::this_thread::yield();		///< Yield the thread
 					}
 				} while (val != 0);						///< If yes stay in loop
 				val = mutex->fetch_add(WRITE);			///< Again get old value and add WRITE
@@ -206,6 +209,7 @@ namespace vecs {
 		static void unlock(std::atomic<uint32_t>* mutex) {
 			if (mutex == nullptr) return;
 			mutex->fetch_sub(WRITE);
+			mutex->notify_all();	///< Many readers may wait, notify all of them
 		}
 
 		/**
