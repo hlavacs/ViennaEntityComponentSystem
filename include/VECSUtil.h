@@ -152,7 +152,7 @@ namespace vecs {
 		*/
 		static void unlock(std::atomic<uint32_t>* mutex) {
 			if (mutex == nullptr) return;
-			mutex->fetch_sub(1);
+			--(*mutex);
 			mutex->notify_one();	///< Only writers are waiting, so notify one writer.
 		}
 
@@ -208,7 +208,7 @@ namespace vecs {
 		*/
 		static void unlock(std::atomic<uint32_t>* mutex) {
 			if (mutex == nullptr) return;
-			mutex->fetch_sub(WRITE);
+			mutex->operator-=(WRITE);
 			mutex->notify_all();	///< Many readers may wait, notify all of them
 		}
 
