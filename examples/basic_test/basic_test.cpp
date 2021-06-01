@@ -8,10 +8,11 @@
 
 using namespace vecs;
 
+
 int main() {
     VecsRegistry reg;
     std::atomic_flag flag;
-    
+
     std::cout << sizeof(VecsHandle) << " " << sizeof(flag) << std::endl;
     std::cout << vtll::size<MyEntityTypeList>::value << std::endl;
 

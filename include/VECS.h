@@ -688,7 +688,14 @@ namespace vecs {
 		static const uint32_t c_uint32_max = std::numeric_limits<uint32_t>::max();
 
 		static inline VecsTable<P, types, c_segment_size, VECS_LAYOUT_ROW::value> m_map_table;	///< The main mapping table
-		static inline std::atomic<uint64_t>	m_first_free{ c_uint32_max };	///< First free entry to be reused
+
+		/// points to first free slot, and is guarded by a counter against the ABA problem
+		struct first_free_t {
+			uint32_t m_index;
+			uint32_t m_counter;
+		};
+
+		static inline std::atomic<first_free_t>	m_first_free = first_free_t{ .m_index = c_uint32_max, .m_counter = 0 };	///< First free entry to be reused
 		static inline std::atomic<uint32_t>	m_size{ 0 };					///< Number of valid entities in the map
 
 		/// Every subclass for entity type E has an entry in this table.
@@ -1061,17 +1068,17 @@ namespace vecs {
 		
 		auto ff = this->m_first_free.load();	///< Is there a free empty slot left?
 		bool succ = false;
-		if (get_lower(ff) != this->c_uint32_max) {							///< yes
+		if ( ff.m_index != this->c_uint32_max) {							///< yes
 			do {
-				uint64_t nf = this->table_index_ptr(map_index_t{ get_lower(ff) })->value;	///< Get next free slot
-				nf = set_upper(nf, get_upper(ff) + 1ULL);					///< increase ABA counter by 1
+				typename VecsRegistryBaseClass<P>::first_free_t nf {};
+				nf.m_index = this->table_index_ptr(map_index_t{ ff.m_index })->value;	///< Get next free slot
+				nf.m_counter = ff.m_counter + 1;							///< increase ABA counter by 1
 				succ = this->m_first_free.compare_exchange_weak(ff, nf);	///< Exchange with old ff value atomically
-				if(!succ) ff = this->m_first_free.load();					///< If we did not succeed then another thread beat us -> repeat
-			} while (!succ && get_lower(ff) != this->c_uint32_max);			///< Repeat until success or no more free slots
+			} while (!succ && ff.m_index != this->c_uint32_max);			///< Repeat until success or no more free slots
 		}
 
 		if (succ) {						
-			map_idx = map_index_t{ get_lower(ff) };							///< success -> Reuse old slot
+			map_idx = map_index_t{ ff.m_index };							///< success -> Reuse old slot
 		} else {
 			map_idx = map_index_t{ this->m_map_table.push_back().value };	///< Create a new slot
 			if (!map_idx.has_value()) return {};
@@ -1241,9 +1248,9 @@ namespace vecs {
 
 		bool succ = false;
 		do {
-			auto ff = this->m_first_free.load();											///< Get first free value ff
-			this->table_index_ptr(handle.m_map_index)->value = get_lower(ff);				///< Make old ff to successor of this map index
-			succ = this->m_first_free.compare_exchange_weak(ff, set_upper(handle.m_map_index.value, get_upper(ff) + 1ULL));	///< Exchange with old value atomically
+			auto ff = this->m_first_free.load();										///< Get first free value ff
+			this->table_index_ptr(handle.m_map_index)->value = ff.m_index;				///< Make old ff to successor of this map index
+			succ = this->m_first_free.compare_exchange_weak(ff, { handle.m_map_index.value, ff.m_counter + 1 });	///< Exchange with old value atomically
 		} while (!succ);
 
 		return true; 
