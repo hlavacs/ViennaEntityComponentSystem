@@ -22,21 +22,22 @@ namespace vecs {
 		template<typename P, typename E, typename ETL, typename CTL> friend class VecsIteratorEntity;
 
 		protected:
+			///Dispatc table type
 			using array_type = std::array<std::unique_ptr<VecsIteratorEntityBaseClass<P, ETL, CTL>>, vtll::size<ETL>::value>;
 
-			array_type				m_dispatch;							///< Subiterators for each entity type E
-			type_index_t			m_current_iterator{ 0 };			///< Current iterator of type E that is used
-			table_index_t			m_current_index{ 0 };				///< Current index in the VecsComponentTable<E>
+			array_type				m_dispatch;					///< Subiterators for each entity type E
+			type_index_t			m_current_iterator{ 0 };	///< Current iterator of type E that is used
+			table_index_t			m_current_index{ 0 };		///< Current index in the VecsComponentTable<E>
 			
 			size_t					m_size{ 0 };			///< Number of entities covered by the iterator (can change due to multithreading)
 			bool					m_is_end{ false };		///< True if this is an end iterator (for stopping the loop)
 
 		public:
-			using value_type		= vtll::to_tuple< vtll::cat< vtll::tl<VecsHandleT<P>>, CTL > >;
-			using reference			= vtll::to_tuple< vtll::cat< vtll::tl<VecsHandleT<P>&>, vtll::to_ref<CTL> > >;
-			using pointer			= vtll::to_tuple< vtll::cat< vtll::tl<VecsHandleT<P>*>, vtll::to_ptr<CTL> > >;
-			using iterator_category = std::forward_iterator_tag;
-			using difference_type	= size_t;
+			using value_type		= vtll::to_tuple< vtll::cat< vtll::tl<VecsHandleT<P>>, CTL > >;					///< Value type
+			using reference			= vtll::to_tuple< vtll::cat< vtll::tl<VecsHandleT<P>&>, vtll::to_ref<CTL> > >;	///< Reference type
+			using pointer			= vtll::to_tuple< vtll::cat< vtll::tl<VecsHandleT<P>*>, vtll::to_ptr<CTL> > >;	///< Pointer type
+			using iterator_category = std::forward_iterator_tag;	///< Forward iterator
+			using difference_type	= size_t;						///< Difference type
 			using last_type			= vtll::back<ETL>;	///< last type for end iterator
 
 			VecsIteratorBaseClass(bool is_end = false) noexcept;							///< Constructor that should be called always from outside
@@ -56,7 +57,7 @@ namespace vecs {
 			inline auto operator++() noexcept		-> VecsIteratorBaseClass<P, ETL,CTL>&;	///< Increase by 1
 			inline auto operator++(int) noexcept	-> VecsIteratorBaseClass<P, ETL,CTL>&;	///< Increase by 1
 			inline auto size() noexcept				-> size_t;								///< Number of valid entities
-			inline auto sizeE() noexcept			-> size_t;
+			inline auto sizeE() noexcept			-> size_t;								///< Number of valie entities of entity type E
 	};
 
 
@@ -371,8 +372,12 @@ namespace vecs {
 	public:
 		VecsIteratorEntityBaseClass(bool is_end = false) noexcept {};
 
-		virtual auto sizeE_ptr() noexcept	-> std::atomic<size_t>* { return m_sizeE_ptr; };	///< Total number of valid and invalid entities in the component table for type E
-		virtual auto sizeE() noexcept		-> size_t { return m_sizeE; };						///< Total number of valid and invalid entities in the component table for type E
+		virtual auto sizeE_ptr() noexcept	-> std::atomic<size_t>* { 	///< Total number of valid and invalid entities in the component table for type E
+			return m_sizeE_ptr; 
+		};
+		virtual auto sizeE() noexcept		-> size_t { 				///< Total number of valid and invalid entities in the component table for type E
+			return m_sizeE; 
+		};
 		auto handle() noexcept				-> VecsHandleT<P>&;
 		virtual auto handle_ptr() noexcept	-> VecsHandleT<P>* = 0;
 		virtual auto mutex_ptr() noexcept	-> std::atomic<uint32_t>* = 0;
@@ -417,10 +422,10 @@ namespace vecs {
 	public:
 		VecsIteratorEntity(bool is_end = false) noexcept;
 
-		auto handle_ptr() noexcept	-> VecsHandleT<P>*;
-		auto mutex_ptr() noexcept	-> std::atomic<uint32_t>*;
-		auto operator++() noexcept	-> void;
-		auto operator*() noexcept	-> reference;
+		auto handle_ptr() noexcept	-> VecsHandleT<P>*;			///< Get pointer to handle
+		auto mutex_ptr() noexcept	-> std::atomic<uint32_t>*;	///< Get pointer to mutex
+		auto operator++() noexcept	-> void;					///< Increase operator
+		auto operator*() noexcept	-> reference;				///< Dereference operator
 	};
 
 	/**

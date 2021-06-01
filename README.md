@@ -18,7 +18,6 @@ Important features of VECS are:
 * High performance by default, components are ordered sequentially in memory (row or column wise) for cache friendly access.
 * Data structures can grow in memory (mostly) without locking. By choosing parameters carefully, you can avoid locking altogether, without preallocating all the memory (which you could if you want).
 
-VECS is currently in BETA.
 
 ## The VECS Include Files
 
@@ -559,6 +558,7 @@ An example for looping over entities in parallel on several threads is given in 
       co_return;
     }
 
-Note that since the ranges do not overlap, there is actually no need for synchronization of no other thread accesses the entities. Thus there is no lock in the range based for-loop.
+Note that since the ranges do not overlap, there is actually no need for synchronization of no other thread accesses the entities. Thus there is no lock in the range based for-loop. So instead of using locks, you can start threads in parallel if they do not interfere with each other. Two threads interfere with each other, if at least one is writing on a range of components (including erasing entities), and the other is reading or writing to the same range of components.
+In order to avoid interference, only start threads in parallel that either only read the same component ranges, or do not share components that they write to.
 
-If there are other threads accessing the entities, then you can either introduce VECS locks, or switch to the *for_each* version. Note that this version will take longer time on average, due to locking every entity before accessing it.
+If you use locks in the components, be aware that two threads easily can deadlock each other by locking the same entity pair in reverse order. VecsXLocks are kept simple and do not account for such an event. In order to avoid deadlocks by locking pairs, you have to ensure that the sequence the entities are locked is always the same. For instance, if you want to lock a pair, get them into some total ordering, e.g. by using their handle's map index, and always lock the smaller one first. 

@@ -55,7 +55,7 @@ namespace vecs {
 					vtll::map<TagMap, T, vtll::type_list<> > >	///< Get tags for entity type Ts from tag map
 				, vtll::cat			///< Use cat function on each partial tag set
 				, T					///< And put contents of Ts (the entity components) in front of the partial tag list
-			>;
+			>;						///< Result of this expression
 	};
 
 	/**
@@ -185,19 +185,23 @@ namespace vecs {
 
 		template<typename C>
 		requires is_component_type<P, C>
-		auto component() noexcept		-> C& { return *component_ptr<C>(); };	///< Get a component of type C of the entity (first found is copied) 
+		auto component() noexcept		-> C& { 	///< \returns component of type C of the entity (first found is copied) 
+			return *component_ptr<C>(); 
+		};
 
 		template<typename C>
 		requires is_component_type<P, C>
 		auto component_ptr() noexcept	-> C*;		///< Get a pointer to component of type C of the entity (first found is copied) 
 
-		template<typename... Cs>
-		requires are_component_types<P, Cs...>
-		auto update(Cs&&... args) noexcept -> bool;	///< Update components of type C
+		template<typename... Cs>					///< Update components of type C
+		requires are_component_types<P, Cs...>		///< \param[in] args Arguments to write over
+		auto update(Cs&&... args) noexcept -> bool;	///< \returns true of successful
 
 		auto erase() noexcept -> bool;				///< Erase the entity 
 
-		auto map_index() noexcept	-> map_index_t { return m_map_index; }; ///< \returns index of entity in the map
+		auto map_index() noexcept	-> map_index_t { ///< \returns index of entity in the map
+			return m_map_index; 
+		}; 
 
 		auto type() noexcept		-> type_index_t;	///< Get type of this entity
 
@@ -247,11 +251,11 @@ namespace vecs {
 
 	protected:
 
-		using entity_tag_map = typename VecsRegistryBaseClass<P>::entity_tag_map;
-		using table_size_map = typename VecsRegistryBaseClass<P>::table_size_map;
-		using table_layout_map = typename VecsRegistryBaseClass<P>::table_layout_map;
-		using table_size_default = typename VecsRegistryBaseClass<P>::table_size_default;
-		using component_type_list = typename VecsRegistryBaseClass<P>::component_type_list;
+		using entity_tag_map = typename VecsRegistryBaseClass<P>::entity_tag_map;			///< Tag map of this instance
+		using table_size_map = typename VecsRegistryBaseClass<P>::table_size_map;			///< Size map of this instance
+		using table_layout_map = typename VecsRegistryBaseClass<P>::table_layout_map;		///< Layout map of this instance
+		using table_size_default = typename VecsRegistryBaseClass<P>::table_size_default;	///< Default size
+		using component_type_list = typename VecsRegistryBaseClass<P>::component_type_list;	///< List of the component types
 
 		using tuple_value_t = vtll::to_tuple<E>;		///< A tuple storing all components of entity of type E
 		using tuple_ref_t = vtll::to_ref_tuple<E>;		///< A tuple storing references to all components of entity of type E
@@ -265,11 +269,11 @@ namespace vecs {
 
 		using data_types = vtll::cat< info_types, E >;						///< List with management (info) and component (data) types
 		using types_deleted = vtll::type_list< table_index_t >;	///< List with types for holding info about erased entities 
-
+		///Size of a segment
 		static const size_t c_segment_size = vtll::front_value< vtll::map<table_size_map, E, table_size_default > >::value;
 		static inline VecsTable<P, data_types, c_segment_size, layout_type::value>			m_data;		///< Data per entity
 		static inline VecsTable<P, types_deleted, c_segment_size, VECS_LAYOUT_ROW::value>	m_deleted;	///< Table holding the indices of erased entities
-
+		///One instance for each component type
 		using array_type = std::array<std::unique_ptr<VecsComponentAccessor<P, E>>, vtll::size<component_type_list>::value>;
 		static inline array_type m_dispatch;	///< Each component type C of the entity type E gets its own specialized class instance
 
@@ -292,9 +296,9 @@ namespace vecs {
 		//-------------------------------------------------------------------------
 		//read data
 
-		template<typename C>
-		requires is_component_of<P, E, C>
-		auto component(const table_index_t index) noexcept -> C& { return *component_ptr<C>(index); };	///< Get reference to a component
+		template<typename C>				///< \brief Get reference to a component
+		requires is_component_of<P, E, C>	///< \param[in] index Index in the component table
+		auto component(const table_index_t index) noexcept -> C& { return *component_ptr<C>(index); };	///< \returns reference to a component
 
 		template<typename C>
 		requires is_component_of<P, E, C>
@@ -321,7 +325,9 @@ namespace vecs {
 
 		auto handle_ptr(const table_index_t index) noexcept		-> VecsHandleT<P>*;	///< \returns ptr to handle for an index in the table
 		auto mutex_ptr(const table_index_t index) noexcept		-> std::atomic<uint32_t>*;	///< \returns pointer to the mutex for a given index
-		auto size() noexcept -> size_t { return m_data.size(); };	///< \returns the number of entries currently in the table, can also be invalid ones
+		auto size() noexcept -> size_t { 	///< \returns the number of entries currently in the table, can also be invalid ones
+			return m_data.size(); 
+		};
 		auto compress() noexcept								-> void;	///< Compress the table
 		auto capacity(size_t) noexcept							-> size_t;	///< \returns the max number of entities that can be stored
 		auto swap(table_index_t n1, table_index_t n2) -> bool { return m_data.swap(n1, n2); }	///< Swap places for two rows
@@ -590,7 +596,7 @@ namespace vecs {
 		/**
 		* \brief Get pointer to component data.
 		* 
-		* \param[in] index Index of the entity in the component table.
+		* \param[in] entidx Index of the entity in the component table.
 		* \param[in] compidx Component index incomponent type list.
 		* \returns pointer to the component.
 		*/
@@ -1250,7 +1256,7 @@ namespace vecs {
 		do {
 			auto ff = this->m_first_free.load();										///< Get first free value ff
 			this->table_index_ptr(handle.m_map_index)->value = ff.m_index;				///< Make old ff to successor of this map index
-			succ = this->m_first_free.compare_exchange_weak(ff, { handle.m_map_index.value, ff.m_counter + 1 });	///< Exchange with old value atomically
+			succ = this->m_first_free.compare_exchange_weak(ff, { .m_index = handle.m_map_index.value, .m_counter = ff.m_counter + 1 });	///< Exchange with old value atomically
 		} while (!succ);
 
 		return true; 
