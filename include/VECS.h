@@ -389,7 +389,6 @@ namespace vecs {
 		return idx;								///< Return the index of the new data
 	};
 
-
 	/**
 	* \brief Get pointer to a component type C given as template parameter
 	* 

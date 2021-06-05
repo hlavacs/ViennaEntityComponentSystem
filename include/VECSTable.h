@@ -91,6 +91,7 @@ namespace vecs {
 		//update data
 
 		template<size_t I, typename C = vtll::Nth_type<DATA, I>>
+		requires vtll::has_type<DATA, std::decay_t<C>>::value
 		inline auto update(table_index_t n, C&& data) noexcept			-> bool;	///< Update a component  for a given row
 		
 		template<typename... Cs>
@@ -206,6 +207,7 @@ namespace vecs {
 	*/
 	template<typename P, typename DATA, size_t N0, bool ROW>
 	template<size_t I, typename C>
+	requires vtll::has_type<DATA, std::decay_t<C>>::value
 	inline auto VecsTable<P, DATA, N0, ROW>::update(table_index_t n, C&& data) noexcept -> bool {
 		if (n >= m_size) return false;
 		if constexpr (std::is_move_assignable_v<C> && std::is_rvalue_reference_v<decltype(data)>) {
