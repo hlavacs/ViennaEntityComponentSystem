@@ -165,7 +165,7 @@ namespace vecs {
 		counter_t	m_generation_counter{};		///< Generation counter
 
 	public:
-		VecsHandleT() noexcept {}; ///< Empty constructor of class VecsHandle
+		VecsHandleT() noexcept = default;		///< Empty constructor of class VecsHandle
 
 		/**
 		* \brief Constructor of class VecsHandle.

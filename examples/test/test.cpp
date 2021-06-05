@@ -135,10 +135,10 @@ int start_test() {
 		TESTRESULT(++number, "update registry", VecsRegistry{}.update(h1, MyComponentPosition{ glm::vec3{-90.0f, -22.0f, -33.0f} }),
 			(h1.component<MyComponentPosition>().m_position == glm::vec3{ -90.0f, -22.0f, -33.0f }), );
 
-		TESTRESULT(++number, "update registry", VecsRegistry{}.update(h1, MyComponentName{ "Draw" }, MyComponentPosition{ glm::vec3{-98.0f, -20.0f, -33.0f} }),
+		TESTRESULT(++number, "update registry", VecsRegistry{}.update(h1, MyComponentName{ "Draw1" }, MyComponentPosition{ glm::vec3{-98.0f, -20.0f, -33.0f} }),
 			(h1.component<MyComponentPosition>().m_position == glm::vec3{ -98.0f, -20.0f, -33.0f }), );
 
-		TESTRESULT(++number, "update registry", VecsRegistry<MyEntityTypeNode>{}.update(h1, MyComponentPosition{ glm::vec3{-97.0f, -22.0f, -33.0f} }),
+		TESTRESULT(++number, "update registry", VecsRegistry<MyEntityTypeNode>{}.update(h1, MyComponentName{ "Draw" }, MyComponentPosition{ glm::vec3{-97.0f, -22.0f, -33.0f} }),
 			(h1.component<MyComponentPosition>().m_position == glm::vec3{ -97.0f, -22.0f, -33.0f }), );
 
 		TESTRESULT(++number, "update registry", VecsRegistry<MyEntityTypeNode>{}.update<MyComponentPosition>(h1, MyComponentPosition{ glm::vec3{-97.0f, -22.0f, -30.0f} }),

@@ -23,6 +23,7 @@ int main() {
 
     std::atomic<map_index_t> aidx;
     std::atomic<S> str;
+    std::atomic<VecsHandle> handle;
 
     map_index_t idx;
 
