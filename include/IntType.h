@@ -13,7 +13,7 @@ template<typename T, typename P, auto D = -1>
 struct int_type {
 	static const T null = static_cast<T>(D);
 
-	T value{D};
+	T value{null};
 
 	int_type() = default;
 
