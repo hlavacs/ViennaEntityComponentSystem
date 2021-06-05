@@ -9,7 +9,27 @@
 using namespace vecs;
 
 
+void f( map_index_t idx) {
+    return;
+}
+
+
 int main() {
+
+    struct S {
+        map_index_t map;
+        table_index_t table;
+    };
+
+    std::atomic<map_index_t> aidx;
+    std::atomic<S> str;
+
+    map_index_t idx;
+
+    f(idx);
+    f(map_index_t{ 1 });
+    //f(1);
+
     VecsRegistry reg;
     std::atomic_flag flag;
 

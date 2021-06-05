@@ -14,15 +14,9 @@ struct int_type {
 	using type_name = T;
 	static const T null = static_cast<T>(D);
 
-	T value{};
+	T value{D};
 
-	/**
-	* \brief Empty constructor.
-	*/
-	int_type() {
-		static_assert(!(std::is_unsigned_v<T> && std::is_signed_v<decltype(D)> && static_cast<int>(D) < 0));
-		value = static_cast<T>(D);
-	};
+	int_type() = default;
 
 	/**
 	* \brief Constructor.
@@ -31,30 +25,6 @@ struct int_type {
 	template<typename U>
 	requires (std::is_convertible_v<std::decay_t<U>, T> && std::is_pod_v<std::decay_t<U>>)
 	explicit int_type(U&& u) noexcept : value{ static_cast<T>(u) } {};
-
-	/**
-	* \brief Copy constructor.
-	* \param[in] t Another int type.
-	*/
-	int_type(const int_type<T, P, D>& t) noexcept : value{ t.value } {};
-
-	/**
-	* \brief Move constructor.
-	* \param[in] t Another int type.
-	*/
-	int_type(int_type<T, P, D>&& t) noexcept : value{ std::move(t.value) } {};
-
-	/**
-	* \brief Copy assignment.
-	* \param[in] rhs Another int type.
-	*/
-	void operator=(const int_type<T, P, D>& rhs) noexcept { value = rhs.value; };
-
-	/**
-	* \brief Move assignment.
-	* \param[in] rhs Another int type.
-	*/
-	void operator=(int_type<T, P, D>&& rhs) noexcept { value = std::move(rhs.value); };
 
 	/**
 	* \brief Copy assignment.
