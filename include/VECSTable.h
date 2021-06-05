@@ -248,6 +248,9 @@ namespace vecs {
 			if constexpr (std::is_move_assignable_v<type>) {
 				*std::get<i>(dst) = std::move(*std::get<i>(src));
 			}
+			else if constexpr (std::is_copy_assignable_v<type>) {
+				*std::get<i>(dst) = std::move(*std::get<i>(src));
+			}
 		});
 		return true;
 	}
@@ -265,7 +268,7 @@ namespace vecs {
 		auto dst = tuple_ptr(idst);
 		vtll::static_for<size_t, 0, vtll::size<DATA>::value >([&](auto i) {
 			using type = vtll::Nth_type<DATA,i>;
-			if constexpr (std::is_move_assignable_v<type>) {
+			if constexpr (std::is_copy_assignable_v<type> || std::is_move_assignable_v<type>) {
 				std::swap(*std::get<i>(dst), *std::get<i>(src));
 			}
 		});
