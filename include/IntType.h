@@ -11,7 +11,6 @@
 */
 template<typename T, typename P, auto D = -1>
 struct int_type {
-	using type_name = T;
 	static const T null = static_cast<T>(D);
 
 	T value{D};
@@ -50,7 +49,7 @@ struct int_type {
 	* \brief Comparison operator.
 	* \returns the default comparison.
 	*/
-	auto operator<=>(const int_type<T, P, D>& v) const = default;
+	auto operator<=>(const int_type<T, P, D>& v) noexcept { return value <=> v.value; };
 
 	/**
 	* \brief Comparison operator.
@@ -58,7 +57,7 @@ struct int_type {
 	*/
 	template<typename U>
 	requires std::is_convertible_v<U, T>
-	auto operator<(const U& v) noexcept { return value <=> static_cast<T>(v); };
+	auto operator<(const U& v) noexcept { return value < static_cast<T>(v); };
 
 	/**
 	* \brief Left shift operator.
