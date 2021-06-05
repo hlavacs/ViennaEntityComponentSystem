@@ -428,7 +428,7 @@ namespace vecs {
 	template<typename P, typename E>
 	inline auto VecsComponentTable<P, E>::tuple(const table_index_t index) noexcept -> tuple_ref_t {
 		assert(index < m_data.size());
-		auto tup = m_data.tuple_ref(index);													///< Get the whole data from the data
+		auto tup = m_data.tuple(index);													///< Get the whole data from the data
 		return vtll::sub_ref_tuple< c_info_size, std::tuple_size_v<decltype(tup)> >(tup);	///< Return only entity components in a subtuple
 	}
 

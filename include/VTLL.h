@@ -1447,13 +1447,13 @@ namespace vtll {
 
 	namespace detail {
 		template<typename ...T, size_t... I>
-		auto ptr_to_ref_tuple_detail(std::tuple<T...>& t, std::index_sequence<I...>) {
+		auto ptr_to_ref_tuple_detail(const std::tuple<T...>& t, std::index_sequence<I...>) {
 			return std::tie(*std::get<I>(t)...);
 		}
 	}
 
 	template<typename ...T>
-	auto ptr_to_ref_tuple(std::tuple<T...>& t) {
+	auto ptr_to_ref_tuple(const std::tuple<T...>& t) {
 		return detail::ptr_to_ref_tuple_detail<T...>(t, std::make_index_sequence<sizeof...(T)>{});
 	}
 

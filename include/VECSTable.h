@@ -71,14 +71,11 @@ namespace vecs {
 		//-------------------------------------------------------------------------------------------
 		//read data
 
-		template<size_t I, typename C = vtll::Nth_type<DATA, I>>
-		inline auto component_ref(table_index_t n) noexcept	-> C&;		///< \returns a reference to a component
-
 		template<size_t I, typename C = vtll::Nth_type<DATA,I>>
 		inline auto component_ptr(table_index_t n) noexcept	-> C*;		///< \returns a pointer to a component
 
-		inline auto tuple_ref(table_index_t n) noexcept	-> tuple_ref_t;	///< \returns a tuple with copies of all components
-		inline auto tuple_ptr(table_index_t n) noexcept	-> tuple_ptr_t;		///< \returns a tuple with pointers to all components
+		inline auto tuple(table_index_t n) noexcept	-> tuple_ref_t;		///< \returns a tuple with copies of all components
+		inline auto tuple_ptr(table_index_t n) noexcept	-> tuple_ptr_t;	///< \returns a tuple with pointers to all components
 		
 		//-------------------------------------------------------------------------------------------
 		//add data
@@ -131,24 +128,6 @@ namespace vecs {
 	template<typename P, typename DATA, size_t N0, bool ROW>
 	inline VecsTable<P, DATA, N0, ROW>::~VecsTable() noexcept {	};
 
-	/**
-	* \brief Get a reference to a particular component with index I.
-	* \param[in] n Index to the entry.
-	* \returns a reference to the Ith component of entry n.
-	*/
-	template<typename P, typename DATA, size_t N0, bool ROW>
-	template<size_t I, typename C>
-	inline auto VecsTable<P, DATA, N0, ROW>::component_ref(table_index_t n) noexcept -> C& {
-		assert(n.value < size());
-		auto vector_ptr{ m_seg_vector.load() };
-		auto segment_ptr = ((*vector_ptr)[n >> L]).load();
-		if constexpr (ROW) {
-			return std::get<I>((*segment_ptr)[n & BIT_MASK]);
-		}
-		else {
-			return std::get<I>(*segment_ptr)[n & BIT_MASK];
-		}
-	};
 
 	/**
 	* \brief Get a pointger to a particular component with index I.
@@ -175,19 +154,8 @@ namespace vecs {
 	* \returns a tuple with values of all components of entry n.
 	*/
 	template<typename P, typename DATA, size_t N0, bool ROW>
-	inline auto VecsTable<P, DATA, N0, ROW>::tuple_ref(table_index_t n) noexcept -> tuple_ref_t {
-		assert(n.value < size());
-		auto vector_ptr{ m_seg_vector.load() };
-		auto segment_ptr = ((*vector_ptr)[n >> L]).load();
-		auto f = [&]<size_t... Is>(std::index_sequence<Is...>) {
-			if constexpr (ROW) {
-				return std::tie(std::get<Is>((*segment_ptr)[n & BIT_MASK])...);
-			}
-			else {
-				return std::tie(std::get<Is>(*segment_ptr)[n & BIT_MASK]...);
-			}
-		};
-		return f(std::make_index_sequence<vtll::size<DATA>::value>{});
+	inline auto VecsTable<P, DATA, N0, ROW>::tuple(table_index_t n) noexcept -> tuple_ref_t {
+		return vtll::ptr_to_ref_tuple(tuple_ptr(n));
 	};
 
 	/**
