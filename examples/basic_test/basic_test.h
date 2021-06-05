@@ -28,7 +28,7 @@ namespace vecs {
 
 	/// \brief Example for a user component
 	struct MyComponentTransform {
-		glm::mat4 m_transform;
+		glm::mat4 m_transform{};
 	};
 
 	/// \brief Example for a user component

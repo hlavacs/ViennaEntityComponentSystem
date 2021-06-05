@@ -18,14 +18,14 @@ namespace vecs::test {
 
 	/// \brief Example for a user component
 	struct MyComponentPosition {
-		glm::vec3 m_position;
+		glm::vec3 m_position{};
 		int i = 0;
 	};
 
 	/// \brief Example for a user component
 	struct MyComponentOrientation {
-		glm::quat m_orientation;
-		std::atomic<int> i = 0;
+		glm::quat m_orientation{};
+		std::atomic<int> i{ 0 };
 	};
 
 	/// \brief Example for a user component

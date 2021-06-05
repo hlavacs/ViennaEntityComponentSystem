@@ -383,11 +383,8 @@ namespace vecs {
 	template<typename... Cs>
 	requires are_components_of<P, E, Cs...> [[nodiscard]]
 		inline auto VecsComponentTable<P, E>::insert(VecsHandleT<P> handle, std::atomic<uint32_t>* mutex, Cs&&... args) noexcept -> table_index_t {
-		auto idx = m_data.push_back();			///< Allocate space a the end of the table
+		auto idx = m_data.push_back(handle, mutex);			///< Allocate space a the end of the table
 		if (!idx.has_value()) return idx;		///< Check if the allocation was successfull
-		m_data.update<c_handle>(idx, handle);	///< Update the handle data
-		m_data.update<c_mutex>(idx, mutex);		///< Update the mutex pointer
-
 		(m_data.update<c_info_size + vtll::index_of<E, std::decay_t<Cs>>::value>(idx, std::forward<Cs>(args)), ...); ///< Update the entity components
 		return idx;								///< Return the index of the new data
 	};
@@ -443,15 +440,7 @@ namespace vecs {
 	template<typename... Cs>
 	requires are_components_of<P, E, Cs...>
 		inline auto VecsComponentTable<P, E>::update(const table_index_t index, Cs&&... args) noexcept -> bool {
-		using types = vtll::tl<Cs...>;
-		auto tuple = std::forward_as_tuple(args...);
-
-		vtll::static_for<size_t, 0, sizeof...(Cs) >([&](auto i) {
-			using type = vtll::Nth_type<types, i>;
-			m_data.update<c_info_size + vtll::index_of<E, type>::value>(index, std::forward<type>(std::get<i>(tuple)));
-		});
-
-		return true;
+		return (m_data.update<c_info_size + vtll::index_of<E, Cs>::value>(index, std::forward<Cs>(args)) && ... && true );
 	}
 
 	/**
@@ -464,8 +453,8 @@ namespace vecs {
 	template<typename P, typename E>
 	inline auto VecsComponentTable<P, E>::erase(const table_index_t index) noexcept -> bool {
 		assert(index < m_data.size());
-		*m_data.component_ptr<c_handle>(index) = {};	///< Invalidate handle	
-		m_deleted.push_back(std::make_tuple(index));	///< Push the index to the deleted table.
+		m_data.component<c_handle>(index) = {};	///< Invalidate handle	
+		m_deleted.push_back(index);	///< Push the index to the deleted table.
 
 		vtll::static_for<size_t, 0, vtll::size<E>::value >(			///< Loop over all components
 			[&](auto i) {

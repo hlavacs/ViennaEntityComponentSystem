@@ -707,9 +707,14 @@ namespace vtll {
 		template<typename Seq1, typename Seq2>
 		struct has_all_types_impl;
 
+		template<template <typename...> typename Seq1, typename... Ts1, template <typename...> typename Seq2>
+		struct has_all_types_impl<Seq1<Ts1...>, Seq2<>> {
+			static const bool value = true;
+		};
+
 		template<template <typename...> typename Seq1, typename... Ts1, template <typename...> typename Seq2, typename... Ts2>
 		struct has_all_types_impl<Seq1<Ts1...>, Seq2<Ts2...>> {
-			static const bool value = (has_type<Seq1<Ts1...>, Ts2>::value && ...);
+			static const bool value = (has_type<Seq1<Ts1...>, Ts2>::value && ... && true);
 		};
 	}
 	template <typename Seq1, typename Seq2>
@@ -719,6 +724,7 @@ namespace vtll {
 
 	static_assert(has_all_types<type_list<double, int, char>, type_list<int, char>>::value, "The implementation of has_all_types is bad");
 	static_assert(!has_all_types<type_list<double, int, char>, type_list<bool, char>>::value, "The implementation of has_all_types is bad");
+	static_assert(has_all_types<type_list<double, int, char>, type_list<>>::value, "The implementation of has_all_types is bad");
 
 	//-------------------------------------------------------------------------
 	//filter_remove_types: remove types from a list, that are also part of another list
