@@ -262,7 +262,15 @@ namespace vecs {
 		using tuple_ptr_t = vtll::to_ptr_tuple<E>;		///< A tuple storing pointers to all components of entity of type E
 		using layout_type = vtll::map<table_layout_map, E, VECS_LAYOUT_DEFAULT>; ///< ROW or COLUMN
 
-		using info_types = vtll::type_list<VecsHandleT<P>, std::atomic<uint32_t>*>;	///< List of management data per entity (handle and mutex)
+		struct handle_wrapper_t {
+			VecsHandleT<P> m_handle{};
+		};
+
+		struct mutex_wrapper_t {
+			std::atomic<uint32_t>* m_mutex{};
+		};
+
+		using info_types = vtll::type_list<handle_wrapper_t, std::atomic<uint32_t>*>;	///< List of management data per entity (handle and mutex)
 		static const size_t c_handle = 0;		///< Component index of the handle info
 		static const size_t c_mutex = 1;		///< Component index of the handle info
 		static const size_t c_info_size = 2;	///< Index where the entity data starts
@@ -383,7 +391,7 @@ namespace vecs {
 	template<typename... Cs>
 	requires are_components_of<P, E, Cs...> [[nodiscard]]
 		inline auto VecsComponentTable<P, E>::insert(VecsHandleT<P> handle, std::atomic<uint32_t>* mutex, Cs&&... args) noexcept -> table_index_t {
-		auto idx = m_data.push_back(handle, mutex);			///< Allocate space a the end of the table
+		auto idx = m_data.push_back(handle_wrapper_t{ handle }, mutex);			///< Allocate space a the end of the table
 		if (!idx.has_value()) return idx;		///< Check if the allocation was successfull
 		(m_data.update<c_info_size + vtll::index_of<E, std::decay_t<Cs>>::value>(idx, std::forward<Cs>(args)), ...); ///< Update the entity components
 		return idx;								///< Return the index of the new data
@@ -476,7 +484,7 @@ namespace vecs {
 	template<typename P, typename E>
 	inline auto VecsComponentTable<P, E>::handle_ptr(const table_index_t index) noexcept -> VecsHandleT<P>* {
 		if (index >= m_data.size()) return nullptr;
-		return m_data.component_ptr<c_handle>(index);	///< Get ref to the handle and return it
+		return &m_data.component<c_handle>(index).m_handle;	///< Get ref to the handle and return it
 	}
 
 	/**
@@ -488,7 +496,7 @@ namespace vecs {
 	template<typename P, typename E>
 	inline auto VecsComponentTable<P, E>::mutex_ptr(const table_index_t index) noexcept -> std::atomic<uint32_t>* {
 		if (index >= m_data.size()) return nullptr;
-		return *m_data.component_ptr<c_mutex>(index);		///< Get ref to the mutex and return it
+		return m_data.component<c_mutex>(index);		///< Get ref to the mutex and return it
 	}
 
 	/**
@@ -511,8 +519,8 @@ namespace vecs {
 	template<typename P, typename E>
 	inline auto VecsComponentTable<P, E>::remove_deleted_tail() noexcept -> void {
 		while (m_data.size() > 0) {
-			auto& handle = *m_data.component_ptr<c_handle>(table_index_t{ m_data.size() - 1 });
-			if (handle.is_valid()) return;	///< is last entity is valid, then return
+			auto& handle = m_data.component<c_handle>(table_index_t{ m_data.size() - 1 });
+			if (handle.m_handle.is_valid()) return;	///< is last entity is valid, then return
 			m_data.pop_back();				///< Else remove it and continue the loop
 		}
 	}
@@ -552,16 +560,16 @@ namespace vecs {
 			if constexpr (is_component_of<P, E, C>) {
 				if (move) {
 					if constexpr (std::is_move_assignable_v<C>) {
-						*VecsComponentTable<P, E>().m_data.component_ptr<VecsComponentTable<P, E>::c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(index) = std::move(*((C*)ptr));
+						VecsComponentTable<P, E>().m_data.component<VecsComponentTable<P, E>::c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(index) = std::move(*((C*)ptr));
 					}
 				}
 				else {
 					if constexpr (std::is_copy_assignable_v<C>) {
-						*VecsComponentTable<P, E>().m_data.component_ptr<VecsComponentTable<P, E>::c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(index) = *((C*)ptr);
+						VecsComponentTable<P, E>().m_data.component<VecsComponentTable<P, E>::c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(index) = *((C*)ptr);
 					}
 					else {
 						if constexpr (std::is_move_assignable_v<C>) {
-							*VecsComponentTable<P, E>().m_data.component_ptr<VecsComponentTable<P, E>::c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(index) = std::move(*((C*)ptr));
+							VecsComponentTable<P, E>().m_data.component<VecsComponentTable<P, E>::c_info_size + vtll::index_of<E, std::decay_t<C>>::value>(index) = std::move(*((C*)ptr));
 						}
 					}
 				}
@@ -1206,7 +1214,7 @@ namespace vecs {
 	requires is_component_of<P, E, C>
 	auto VecsRegistryT<P, E>::component_ptr(VecsHandleT<P> handle) noexcept -> C* {
 		if (!has_value(handle)) return nullptr;	///< Return the empty component
-		return &m_component_table.component<C>(*this->table_index_ptr(handle.m_map_index));	///< Return the component
+		return m_component_table.component_ptr<C>(*this->table_index_ptr(handle.m_map_index));	///< Return the component
 	}
 
 	/**
@@ -1303,11 +1311,11 @@ namespace vecs {
 		VecsRegistryBaseClass<P> reg;
 		for (size_t i = 0; i < m_deleted.size(); ++i) {
 			remove_deleted_tail();											///< Remove invalid entities at end of table
-			auto index = *m_deleted.component_ptr<0>(table_index_t{i});		///< Get next deleted entity from deleted table
+			auto index = m_deleted.component<0>(table_index_t{i});		///< Get next deleted entity from deleted table
 			if (index.value < m_data.size()) {								///< Is it inside the table still?		
 				m_data.move(index, table_index_t{ m_data.size() - 1 });		///< Yes, move last entity to this position
-				auto& handle = *m_data.component_ptr<c_handle>(index);		///< Handle of moved entity
-				*reg.table_index_ptr(handle.m_map_index) = index;			///< Change map entry of moved last entity
+				auto& handle = m_data.component<c_handle>(index);		///< Handle of moved entity
+				*reg.table_index_ptr(handle.m_handle.m_map_index) = index;			///< Change map entry of moved last entity
 			}
 		}
 		m_deleted.clear();
@@ -1328,7 +1336,7 @@ namespace vecs {
 		size_t num = 0;
 		VecsHandleT<P> handle;
 		for (size_t i = 0; i < m_data.size(); ++i) {
-			handle = *m_data.component_ptr<c_handle>(table_index_t{ i });
+			handle = m_data.component<c_handle>(table_index_t{ i }).m_handle;
 			if( handle.is_valid() && VecsRegistryT<P, E>().erase(handle) ) ++num;
 		}
 		return num;
