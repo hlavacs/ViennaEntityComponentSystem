@@ -267,10 +267,10 @@ namespace vecs {
 		};
 
 		struct mutex_wrapper_t {
-			std::atomic<uint32_t>* m_mutex{};
+			std::atomic<uint32_t>* m_mutex{nullptr};
 		};
 
-		using info_types = vtll::type_list<handle_wrapper_t, std::atomic<uint32_t>*>;	///< List of management data per entity (handle and mutex)
+		using info_types = vtll::type_list<handle_wrapper_t, mutex_wrapper_t>;	///< List of management data per entity (handle and mutex)
 		static const size_t c_handle = 0;		///< Component index of the handle info
 		static const size_t c_mutex = 1;		///< Component index of the handle info
 		static const size_t c_info_size = 2;	///< Index where the entity data starts
@@ -390,11 +390,8 @@ namespace vecs {
 	template<typename P, typename E>
 	template<typename... Cs>
 	requires are_components_of<P, E, Cs...> [[nodiscard]]
-		inline auto VecsComponentTable<P, E>::insert(VecsHandleT<P> handle, std::atomic<uint32_t>* mutex, Cs&&... args) noexcept -> table_index_t {
-		auto idx = m_data.push_back(handle_wrapper_t{ handle }, mutex);			///< Allocate space a the end of the table
-		if (!idx.has_value()) return idx;		///< Check if the allocation was successfull
-		(m_data.update<c_info_size + vtll::index_of<E, std::decay_t<Cs>>::value>(idx, std::forward<Cs>(args)), ...); ///< Update the entity components
-		return idx;								///< Return the index of the new data
+	inline auto VecsComponentTable<P, E>::insert(VecsHandleT<P> handle, std::atomic<uint32_t>* mutex, Cs&&... args) noexcept -> table_index_t {
+		return m_data.push_back(handle_wrapper_t{ handle }, mutex_wrapper_t{ mutex }, std::forward<Cs>(args)... );			///< Allocate space a the end of the table
 	};
 
 	/**
@@ -419,8 +416,7 @@ namespace vecs {
 	template<typename P, typename E>
 	inline auto VecsComponentTable<P, E>::tuple_ptr(const table_index_t index) noexcept -> tuple_ptr_t {
 		assert(index < m_data.size());
-		auto tup = m_data.tuple_ptr(index);												///< Get the whole data from the data
-		return vtll::sub_tuple< c_info_size, std::tuple_size_v<decltype(tup)> >(tup);	///< Return only entity components in a subtuple
+		return vtll::sub_tuple< c_info_size, vtll::size<data_types>::value >(m_data.tuple_ptr(index));	///< Return only entity components in a subtuple
 	}
 
 	/**
@@ -432,8 +428,7 @@ namespace vecs {
 	template<typename P, typename E>
 	inline auto VecsComponentTable<P, E>::tuple(const table_index_t index) noexcept -> tuple_ref_t {
 		assert(index < m_data.size());
-		auto tup = m_data.tuple(index);													///< Get the whole data from the data
-		return vtll::sub_ref_tuple< c_info_size, std::tuple_size_v<decltype(tup)> >(tup);	///< Return only entity components in a subtuple
+		return vtll::sub_ref_tuple< c_info_size, vtll::size<data_types>::value >(m_data.tuple(index));	///< Return only entity components in a subtuple
 	}
 
 	/**
@@ -446,7 +441,7 @@ namespace vecs {
 	template<typename P, typename E>
 	template<typename... Cs>
 	requires are_components_of<P, E, Cs...>
-		inline auto VecsComponentTable<P, E>::update(const table_index_t index, Cs&&... args) noexcept -> bool {
+	inline auto VecsComponentTable<P, E>::update(const table_index_t index, Cs&&... args) noexcept -> bool {
 		return (m_data.update<c_info_size + vtll::index_of<E, Cs>::value>(index, std::forward<Cs>(args)) && ... && true );
 	}
 
@@ -496,7 +491,7 @@ namespace vecs {
 	template<typename P, typename E>
 	inline auto VecsComponentTable<P, E>::mutex_ptr(const table_index_t index) noexcept -> std::atomic<uint32_t>* {
 		if (index >= m_data.size()) return nullptr;
-		return m_data.component<c_mutex>(index);		///< Get ref to the mutex and return it
+		return m_data.component<c_mutex>(index).m_mutex;		///< Get ref to the mutex and return it
 	}
 
 	/**
@@ -519,8 +514,8 @@ namespace vecs {
 	template<typename P, typename E>
 	inline auto VecsComponentTable<P, E>::remove_deleted_tail() noexcept -> void {
 		while (m_data.size() > 0) {
-			auto& handle = m_data.component<c_handle>(table_index_t{ m_data.size() - 1 });
-			if (handle.m_handle.is_valid()) return;	///< is last entity is valid, then return
+			auto& handle = m_data.component<c_handle>(table_index_t{ m_data.size() - 1 }).m_handle;
+			if (handle.is_valid()) return;	///< is last entity is valid, then return
 			m_data.pop_back();				///< Else remove it and continue the loop
 		}
 	}
