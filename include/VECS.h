@@ -661,10 +661,10 @@ namespace vecs {
 		template<typename P, typename E> friend class VecsRegistryT;
 
 	public:
-		using etl_wo_tags		= vtll::Nth_type<P, 0>;
-		using entity_tag_map	= vtll::Nth_type<P, 1>;
-		using table_size_map	= vtll::Nth_type<P, 2>;
-		using table_layout_map	= vtll::Nth_type<P, 3>;
+		using etl_wo_tags		= vtll::Nth_type<P, 0>;		///< Entity type list without tags
+		using entity_tag_map	= vtll::Nth_type<P, 1>;		///< Entity tag map
+		using table_size_map	= vtll::Nth_type<P, 2>;		///< Table segment size map 
+		using table_layout_map	= vtll::Nth_type<P, 3>;		///< Table layout map
 		using entity_type_list = expand_tags< entity_tag_map, etl_wo_tags >;
 
 		using entity_tag_list = vtll::flatten< vtll::transform< entity_tag_map, vtll::back > >;
@@ -953,7 +953,7 @@ namespace vecs {
 
 		template<typename... Cs>
 		requires are_components_of<P, E, Cs...> [[nodiscard]]
-		auto insert(Cs&&... args) noexcept						-> VecsHandleT<P>;	///< Insert new entity of type E into VECS
+		auto insert(Cs&&... args) noexcept				-> VecsHandleT<P>;	///< Insert new entity of type E into VECS
 
 		template<typename... Cs>
 		auto transform(VecsHandleT<P> handle, Cs&&... args) noexcept -> bool;	///< transform entity into new type
@@ -966,7 +966,7 @@ namespace vecs {
 
 		template<typename C>
 		requires is_component_type<P, C>
-		auto has_component() noexcept				-> bool {	///< Return true if the entity type has a component C
+		auto has_component() noexcept					-> bool {	///< Return true if the entity type has a component C
 			return is_component_of<P, E, C>;
 		}
 
@@ -983,22 +983,22 @@ namespace vecs {
 
 		template<typename... Cs> 
 		requires are_components_of<P, E, Cs...>
-		auto update(VecsHandleT<P> handle, Cs&&... args) noexcept	-> bool;		///< Update one component of an entity
+		auto update(VecsHandleT<P> handle, Cs&&... args) noexcept	-> bool;	///< Update one component of an entity
 		
 		//-------------------------------------------------------------------------
 		//erase
 
 		auto erase(VecsHandleT<P> handle) noexcept				-> bool;		///< Erase an entity from VECS
-		auto clear() noexcept -> size_t { return clearE(); };				///< Clear entities of type E
+		auto clear() noexcept -> size_t { return clearE(); };					///< Clear entities of type E
 
 		//-------------------------------------------------------------------------
 		//utility
 
-		auto size() noexcept -> size_t { return m_sizeE.load(); };			///< \returns the number of valid entities of type E
-		auto compress() noexcept -> void { compressE(); }					///< Remove erased rows from the component table
-		auto capacity(size_t) noexcept						-> size_t;		///< Set max number of entities of this type
+		auto size() noexcept -> size_t { return m_sizeE.load(); };				///< \returns the number of valid entities of type E
+		auto compress() noexcept -> void { compressE(); }						///< Remove erased rows from the component table
+		auto capacity(size_t) noexcept								-> size_t;	///< Set max number of entities of this type
 		auto swap(VecsHandleT<P> h1, VecsHandleT<P> h2) noexcept	-> bool;	///< Swap rows in component table
-		auto has_value(VecsHandleT<P> handle) noexcept					-> bool;	///< \returns true if the ECS still holds this entity 
+		auto has_value(VecsHandleT<P> handle) noexcept				-> bool;	///< \returns true if the ECS still holds this entity 
 		void print_type(VecsHandleT<P> handle) {
 			std::cout << "<" << typeid(E).name() << ">"; 
 		};
@@ -1130,7 +1130,7 @@ namespace vecs {
 			m_component_table.update<Cs>(index, std::forward<Cs>(args)...);		///< Move the arguments to the new entity type
 		}
 
-		auto& map_index = *this->table_index_ptr(handle.m_map_index);						///< Index of old component table in the map
+		auto& map_index = *this->table_index_ptr(handle.m_map_index);			///< Index of old component table in the map
 		this->m_dispatch[map_type]->eraseE(map_index);							///< Erase the entity from old component table
 
 		this->sizeE()++;
