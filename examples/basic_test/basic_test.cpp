@@ -5,6 +5,7 @@
 #include "gtc/quaternion.hpp"
 #include "VECS.h"
 #include "basic_test.h"
+#include <ranges>
 
 using namespace vecs;
 
@@ -14,7 +15,96 @@ void f( map_index_t idx) {
 }
 
 
+struct TData;
+
+struct TIter {
+    using value_type = int;
+    using pointer = int*;
+    using reference = int&;
+    using difference_type = int;
+
+    TData* m_ptr;
+    size_t m_current{ 0 };
+
+    TIter() = default;
+    TIter(TData* ptr, size_t current) : m_ptr{ ptr }, m_current{ current } {};
+
+    TIter(const TIter &v) = default;
+    TIter(TIter&& v) = default;
+
+    TIter& operator=(const TIter& v) = default;
+    TIter& operator=(TIter&& v) = default;
+
+    int& operator*();
+    int& operator*() const;
+
+    TIter& operator++() { ++m_current; return *this; }
+
+    TIter operator++(int) {
+        TIter tmp = *this;
+        ++m_current;
+        return tmp;
+    };
+    auto operator->() { return operator*(); };
+    bool operator!=(const TIter& v) { return m_ptr != v.m_ptr || m_current != v.m_current; }
+    friend bool operator==(const TIter& v1, const TIter& v2) { return v1.m_ptr == v2.m_ptr && v1.m_current == v2.m_current; };
+};
+
+struct TData : public std::ranges::view_base  {
+    std::array<int, 100> m_data;
+    size_t m_size{0};
+
+    template<typename T>
+    TData(T&& data) : m_size { data.max_size() } {
+        std::copy_n(data.begin(), m_size, m_data.begin());
+    };
+    
+    TIter begin() { return TIter(this, 0);  };
+    TIter end() { return TIter(this, m_size); };
+};
+
+int& TIter::operator*() { 
+    return m_ptr->m_data[m_current]; 
+};
+
+int& TIter::operator*() const {
+    return m_ptr->m_data[m_current];
+};
+
+
 int main() {
+
+    TData data1(std::array<int, 9>{1, 2, 3, 4, 5, 6, 7, 8, 88});
+    TData data2(std::array<int, 9>{1, 2, 3, 4, 5, 6, 7, 8, 88});
+
+    for (auto&& i : data1) {
+        std::cout << i << " ";
+    }
+    std::cout << "\n";
+
+    auto it = std::begin(data1);
+    const TIter& cit = it;
+
+    int a = *it++;
+    int b = *it++;
+    *it = 99;
+    int c = *cit;
+   
+    auto vdata1 = data1 | std::views::drop(0) | std::views::take(5);
+    auto vdata2 = data2 | std::views::drop(5) | std::views::take(4);
+
+    std::vector<decltype(vdata1)> tdata;
+    tdata.push_back(vdata1);
+    tdata.push_back(vdata2);
+
+    auto joinedview = std::views::join(tdata);
+    for (auto&& i : joinedview) {
+        std::cout << i << " ";
+    }
+    std::cout << "\n";
+
+
+    //-----------------------------------------------------
 
     struct S {
         map_index_t map;
@@ -75,4 +165,8 @@ int main() {
 
     return 0;
 }
+
+
+
+
 
