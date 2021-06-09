@@ -148,7 +148,8 @@ int main() {
     auto sr2b1 = sr1e;
     auto sr2e1 = data1.end();
     auto sr21 = std::ranges::subrange(sr2b1, sr2e1) | std::views::all;
-    std::vector<decltype(sr21)> sr2v;
+    std::cout << typeid(sr21).name() << "\n";
+    std::vector<std::ranges::subrange<struct TIter, struct TIter>> sr2v;
     sr2v.push_back(sr21);
 
     auto sr2b2 = data2.begin();
