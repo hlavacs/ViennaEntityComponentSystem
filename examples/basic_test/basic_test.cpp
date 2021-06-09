@@ -61,6 +61,8 @@ struct TData : public std::ranges::view_base  {
     
     TIter begin() { return TIter(this, 0);  };
     TIter end() { return TIter(this, m_size); };
+
+    int size() { return (int)m_size; };
 };
 
 int& TIter::operator*() { 
@@ -73,6 +75,8 @@ int& TIter::operator*() const {
 
 
 int main() {
+
+    bool sr = std::ranges::sized_range<TData>;
 
     TData data1(std::array<int, 9>{1, 2, 3, 4, 5, 6, 7, 8, 88});
     TData data2(std::array<int, 9>{1, 2, 3, 4, 5, 6, 7, 8, 88});
@@ -98,7 +102,10 @@ int main() {
     tdata.push_back(vdata2);
 
     auto joinedview = std::views::join(tdata);
-    for (auto&& i : joinedview) {
+
+    auto jvt = joinedview | std::views::take(6);
+
+    for (auto&& i : jvt) {
         std::cout << i << " ";
     }
     std::cout << "\n";
@@ -134,7 +141,7 @@ int main() {
     std::cout << typeid(MyEntityTypeNode).hash_code() << " " << typeid(MyEntityTypeNode).name() << std::endl;
 
     auto comp1_2 = h1.component<MyComponentPosition>();
-    auto comp1_3 = h1.component<MyComponentMaterial>();
+    auto comp1_3 = h1.component_ptr<MyComponentMaterial>();
 
     //h1.update(MyComponentPosition{ glm::vec3{-9.0f, -2.0f, -3.0f} });
     h1.component<MyComponentPosition>() = MyComponentPosition{ glm::vec3{-9.0f, -2.0f, -3.0f} };
