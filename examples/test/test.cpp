@@ -332,13 +332,13 @@ int start_test() {
 			), );
 
 		VecsIterator<MyEntityTypeNode> b;
-		VecsIterator<MyEntityTypeNode> e( true );
+		VecsIterator<MyEntityTypeNode> e;
 		VecsRange<MyEntityTypeNode> range;
 
 		auto s = VecsRegistry<MyEntityTypeNodeTagged<TAG1>>().size();
 
 		VecsIterator<MyEntityTypeNodeTagged<TAG1>> bt;
-		VecsIterator<MyEntityTypeNodeTagged<TAG1>> et(true);
+		VecsIterator<MyEntityTypeNodeTagged<TAG1>> et;
 		VecsRange<MyEntityTypeNodeTagged<TAG1>> ranget;
 
 		VecsRange<MyEntityTypeNode, TAG1>{}.for_each([&](VecsHandle handle, auto& name, auto& pos, auto& orient, auto& transf) {

@@ -95,9 +95,9 @@ namespace vecs {
 	//user table layouts
 
 	using MyTableLayoutMap = vtll::type_list<
-		  vtll::type_list< MyEntityTypeNode, VECS_LAYOUT_COLUMN >
-		, vtll::type_list< MyEntityTypeDraw, VECS_LAYOUT_COLUMN >
-		, vtll::type_list< MyEntityTypeAnimation, VECS_LAYOUT_COLUMN >
+		  vtll::type_list< MyEntityTypeNode, vecs::VECS_LAYOUT_COLUMN >
+		, vtll::type_list< MyEntityTypeDraw, vecs::VECS_LAYOUT_COLUMN >
+		, vtll::type_list< MyEntityTypeAnimation, vecs::VECS_LAYOUT_COLUMN >
 		//, ...
 	>;
 
