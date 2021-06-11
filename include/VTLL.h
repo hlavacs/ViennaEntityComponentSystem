@@ -1547,6 +1547,24 @@ namespace vtll {
 		, "The implementation of sub_ref_tuple is bad");*/
 
 
+	//-------------------------------------------------------------------------
+	//subtype_tuple: extract a subtuple from a tuple using types
+
+	namespace detail {
+
+		template<typename Seq, typename T, size_t... Is>
+		constexpr auto subtype_tuple_impl(T&& tup, std::index_sequence<Is...>) {
+			return std::make_tuple(std::get<vtll::Nth_type<Seq,Is>>(tup)...);
+		}
+	}
+
+	template <typename Seq, typename T>
+	constexpr auto subtype_tuple(T&& tup) {
+		return detail::subtype_tuple_impl<Seq>(std::forward<T>(tup), std::make_integer_sequence<size_t, vtll::size<Seq>::value>{ });
+	}
+
+	static_assert(is_same_tuple(subtype_tuple<vtll::tl<int,char>>(std::make_tuple(1, "a", 4.5, 'C', 5.0f)), std::make_tuple(1,'C'))
+		, "The implementation of subtype_tuple is bad");
 
 
 	//-------------------------------------------------------------------------
