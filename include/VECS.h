@@ -27,7 +27,7 @@ using namespace std::chrono_literals;
 static_assert(vtll::are_unique<ETL>::value, "The elements of" #ETL " are not unique!");\
 using PARTITION = vtll::type_list<ETL, TAGMAP, SIZEMAP, LAYOUTMAP>;\
 using Vecs##NAME##Handle = vecs::VecsHandleT<PARTITION>;\
-template<typename... Ts> using Vecs##NAME##Iterator = vecs::VecsIteratorT<PARTITION, Ts...>;\
+template<typename CTL> using Vecs##NAME##Iterator = vecs::VecsIteratorT<PARTITION, CTL>;\
 template<typename... Ts> using Vecs##NAME##Range = vecs::VecsRangeT<PARTITION, Ts...>;\
 \
 template<typename E = vtll::tl<>>\
@@ -88,11 +88,7 @@ namespace vecs {
 	template<typename P, typename E> class VecsRegistryT;
 
 	//iterators and ranges
-	template<typename P, typename ETL, typename CTL> class VecsIteratorBaseClass;
-	template<typename P, typename... Ts> class VecsIteratorT;
-	template<typename P, typename ETL, typename CTL> class VecsIteratorEntityBaseClass;
-	template<typename P, typename E, typename ETL, typename CTL> class VecsIteratorEntity;
-	template<typename P, typename ETL, typename CTL> class VecsRangeBaseClass;
+	template<typename P, typename CTL> class VecsIteratorT;
 	template<typename P, typename... Ts> class VecsRangeT;
 
 	//-------------------------------------------------------------------------
@@ -246,8 +242,7 @@ namespace vecs {
 		template<typename P, typename E, size_t I> friend class VecsComponentAccessorDerived;
 		template<typename P> friend class VecsRegistryBaseClass;
 		template<typename P, typename E> friend class VecsRegistryT;
-		template<typename P, typename... Ts> friend class VecsIteratorT;
-		template<typename P, typename E, typename ETL, typename CTL> friend class VecsIteratorEntity;
+		template<typename P, typename CTL> friend class VecsIteratorT;
 
 	protected:
 
@@ -270,17 +265,19 @@ namespace vecs {
 			std::atomic<uint32_t>* m_mutex{nullptr};
 		};
 
-		using info_types = vtll::type_list<handle_wrapper_t, mutex_wrapper_t>;	///< List of management data per entity (handle and mutex)
-		static const size_t c_handle = 0;		///< Component index of the handle info
-		static const size_t c_mutex = 1;		///< Component index of the handle info
+		using info_types = vtll::type_list<mutex_wrapper_t, handle_wrapper_t>;	///< List of management data per entity (handle and mutex)
+		static const size_t c_mutex = 0;		///< Component index of the handle info
+		static const size_t c_handle = 1;		///< Component index of the handle info
 		static const size_t c_info_size = 2;	///< Index where the entity data starts
 
 		using data_types = vtll::cat< info_types, E >;						///< List with management (info) and component (data) types
 		using types_deleted = vtll::type_list< table_index_t >;	///< List with types for holding info about erased entities 
+		
 		///Size of a segment
 		static const size_t c_segment_size = vtll::front_value< vtll::map<table_size_map, E, table_size_default > >::value;
 		static inline VecsTable<P, data_types, c_segment_size, layout_type::value>			m_data;		///< Data per entity
 		static inline VecsTable<P, types_deleted, c_segment_size, VECS_LAYOUT_ROW::value>	m_deleted;	///< Table holding the indices of erased entities
+		
 		///One instance for each component type
 		using array_type = std::array<std::unique_ptr<VecsComponentAccessor<P, E>>, vtll::size<component_type_list>::value>;
 		static inline array_type m_dispatch;	///< Each component type C of the entity type E gets its own specialized class instance
@@ -944,6 +941,14 @@ namespace vecs {
 		auto compressE() noexcept	-> void { return m_component_table.compress(); };	///< Compress the table
 		auto clearE() noexcept		-> size_t { return m_component_table.clear(); };	///< Erase all entities from table
 		auto sizeE() noexcept		-> std::atomic<uint32_t>& { return m_sizeE; };
+
+		template<typename CTL>
+		static auto accessor(table_index_t index) {
+			return std::tuple_cat( 
+				std::make_tuple(m_component_table.component_ptr<0>(index), m_component_table.component_ptr<1>(index))
+				, vtll::subtype_tuple<vtll::to_ptr<CTL>>(m_component_table.tuple_ptr(index))
+			);
+		}
 
 	public:
 		VecsRegistryT() noexcept : VecsRegistryBaseClass<P>() {};					///< Constructor of class VecsRegistryT<E>

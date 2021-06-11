@@ -1,11 +1,11 @@
 
 #include <iostream>
 #include <utility>
+#include <ranges>
 #include "glm.hpp"
 #include "gtc/quaternion.hpp"
 #include "VECS.h"
 #include "basic_test.h"
-#include <ranges>
 
 using namespace vecs;
 
@@ -156,6 +156,9 @@ int main() {
     auto sr2e2 = sr2b2 + 3;
     auto sr22 = std::ranges::subrange(sr2b2, sr2e2) | std::views::all;
     sr2v.push_back(sr22);
+
+    auto range = std::views::join(sr2v);
+    std::cout << typeid(range).name() << "\n";
 
     auto sr3b = sr2e2;
     auto sr3e = data2.end();
