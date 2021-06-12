@@ -11,15 +11,15 @@ namespace vecs {
 	//-------------------------------------------------------------------------
 	//iterator
 
-	template<typename P, template<typename...> typename CTL, typename... Cs>
-	class VecsIteratorT<P, CTL<Cs...>> {
+	template<typename P, typename CTL>
+	class VecsIteratorT {
 	public:
-		using value_type	= vtll::to_tuple< vtll::cat< vtll::tl<std::atomic<uint32_t>*, VecsHandleT<P>>, CTL<Cs...> > >;					///< Value type
-		using reference		= vtll::to_tuple< vtll::cat< vtll::tl<std::atomic<uint32_t>*&, VecsHandleT<P>&>, vtll::to_ref<CTL<Cs...>> > >;	///< Reference type
-		using pointer		= vtll::to_tuple< vtll::cat< vtll::tl<std::atomic<uint32_t>**, VecsHandleT<P>*>, vtll::to_ptr<CTL<Cs...>> > >;	///< Pointer type
+		using value_type = vtll::to_tuple< vtll::cat< vtll::tl<std::atomic<uint32_t>*, VecsHandleT<P>>, CTL > >;					///< Value type
+		using reference = vtll::to_tuple< vtll::cat< vtll::tl<std::atomic<uint32_t>*&, VecsHandleT<P>&>, vtll::to_ref<CTL> > >;	///< Reference type
+		using pointer = vtll::to_tuple< vtll::cat< vtll::tl<std::atomic<uint32_t>**, VecsHandleT<P>*>, vtll::to_ptr<CTL> > >;	///< Pointer type
 		using iterator_category = std::forward_iterator_tag;				///< Forward iterator
-		using difference_type	= int64_t;									///< Difference type
-		using accessor			= std::function<pointer(table_index_t)>;
+		using difference_type = int64_t;									///< Difference type
+		using accessor = std::function<pointer(table_index_t)>;
 
 	protected:
 		type_index_t	m_type{};				///< entity type that this iterator iterates over
@@ -35,61 +35,64 @@ namespace vecs {
 
 		VecsIteratorT(type_index_t type, size_t size, size_t seg_size, size_t row_size, table_index_t index, const accessor& fn) noexcept;		///< Constructor
 
-		VecsIteratorT(const VecsIteratorT<P, CTL<Cs...>>& v) noexcept = default;		///< Copy constructor
-		VecsIteratorT(VecsIteratorT<P, CTL<Cs...>>&& v) noexcept = default;			///< Move constructor
+		VecsIteratorT(const VecsIteratorT<P, CTL>& v) noexcept = default;		///< Copy constructor
+		VecsIteratorT(VecsIteratorT<P, CTL>&& v) noexcept = default;			///< Move constructor
 
-		auto operator=(const VecsIteratorT<P, CTL<Cs...>>& v) noexcept	-> VecsIteratorT<P, CTL<Cs...>>& = default;	///< Copy
-		auto operator=(VecsIteratorT<P, CTL<Cs...>>&& v) noexcept		-> VecsIteratorT<P, CTL<Cs...>>& = default;	///< Move
+		auto operator=(const VecsIteratorT<P, CTL>& v) noexcept	-> VecsIteratorT<P, CTL> & = default;	///< Copy
+		auto operator=(VecsIteratorT<P, CTL>&& v) noexcept		-> VecsIteratorT<P, CTL> & = default;	///< Move
 
 		auto operator*() noexcept		-> reference;				///< Access the data
 		auto operator*() const noexcept	-> reference;				///< Access the const data
 		auto operator->() noexcept { return operator*(); };			///< Access
 		auto operator->() const noexcept { return operator*(); };	///< Access
 
-		auto operator++() noexcept		-> VecsIteratorT<P, CTL<Cs...>>&;				///< Increase by 1
-		auto operator++(int) noexcept	-> VecsIteratorT<P, CTL<Cs...>>;				///< Increase by 1
-		auto operator+=(difference_type N) noexcept	-> VecsIteratorT<P, CTL<Cs...>>&;	///< Increase by N
-		auto operator+(difference_type N) noexcept	-> VecsIteratorT<P, CTL<Cs...>>;	///< Increase by N
+		auto operator++() noexcept		-> VecsIteratorT<P, CTL>&;				///< Increase by 1
+		auto operator++(int) noexcept	-> VecsIteratorT<P, CTL>;				///< Increase by 1
+		auto operator+=(difference_type N) noexcept	-> VecsIteratorT<P, CTL>&;	///< Increase by N
+		auto operator+(difference_type N) noexcept	-> VecsIteratorT<P, CTL>;	///< Increase by N
 
-		bool operator!=(const VecsIteratorT<P, CTL<Cs...>>& v) noexcept;	///< Unequal
-		friend bool operator==(const VecsIteratorT<P, CTL<Cs...>>& v1, const VecsIteratorT<P, CTL<Cs...>>& v2) noexcept;	///< Equal
+		bool operator!=(const VecsIteratorT<P, CTL>& v) noexcept;	///< Unequal
+
+		friend auto operator==(const VecsIteratorT<P, CTL>& v1, const VecsIteratorT<P, CTL>& v2) noexcept -> bool {	///< Equal
+			return v1.m_type == v2.m_type && v1.m_current == v2.m_current;
+		}
 	};
 
 
 	///< Constructor
-	template<typename P, template<typename...> typename CTL, typename... Cs>
-	inline VecsIteratorT<P, CTL<Cs...>>::VecsIteratorT(type_index_t type, size_t size, size_t seg_size, size_t row_size, table_index_t index, const accessor& fn ) noexcept
+	template<typename P, typename CTL>
+	inline VecsIteratorT<P, CTL>::VecsIteratorT(type_index_t type, size_t size, size_t seg_size, size_t row_size, table_index_t index, const accessor& fn) noexcept
 		: m_type{ type }, m_size{ size }, m_bit_mask{ seg_size - 1 }, m_row_size{ row_size }, m_current{ index }, m_accessor{ fn } {
 
 		m_pointers = m_current.value < m_size ? m_accessor(m_current) : pointer{};
 	};
 
 	///< Access the data
-	template<typename P, template<typename...> typename CTL, typename... Cs>
-	inline auto VecsIteratorT<P, CTL<Cs...>>::operator*() noexcept	-> reference {
-		return ptr_to_ref_tuple( m_pointers );
+	template<typename P, typename CTL>
+	inline auto VecsIteratorT<P, CTL>::operator*() noexcept	-> reference {
+		return ptr_to_ref_tuple(m_pointers);
 	}
 
 	///< Access the const data
-	template<typename P, template<typename...> typename CTL, typename... Cs>
-	inline auto VecsIteratorT<P, CTL<Cs...>>::operator*() const noexcept ->reference {
-		return ptr_to_ref_tuple( m_pointers );
+	template<typename P, typename CTL>
+	inline auto VecsIteratorT<P, CTL>::operator*() const noexcept ->reference {
+		return ptr_to_ref_tuple(m_pointers);
 	}
 
 	///< Increase by 1
-	template<typename P, template<typename...> typename CTL, typename... Cs>
-	inline auto VecsIteratorT<P, CTL<Cs...>>::operator++() noexcept	-> VecsIteratorT<P, CTL<Cs...>>& {
+	template<typename P, typename CTL>
+	inline auto VecsIteratorT<P, CTL>::operator++() noexcept	-> VecsIteratorT<P, CTL>& {
 		m_current.value++;
-		if ( (m_current.value & m_bit_mask) == 0) {	//is at the start of a segment, so load pointers from table
+		if ((m_current.value & m_bit_mask) == 0) {	//is at the start of a segment, so load pointers from table
 			m_pointers = m_current.value < m_size ? m_accessor(m_current) : pointer{};
 		}
 		else {
-			if(m_row_size > 0) {
+			if (m_row_size > 0) {
 				vtll::static_for<size_t, 0, std::tuple_size_v<pointer> >(			///< Loop over all components
 					[&](auto i) {
 						using type = std::tuple_element_t<i, pointer>;
 						auto& ptr = std::get<i>(m_pointers);
-						ptr = (type)((char*) ptr + m_row_size);
+						ptr = (type)((char*)ptr + m_row_size);
 					}
 				);
 			}
@@ -103,40 +106,36 @@ namespace vecs {
 		}
 		return *this;
 	}
-	
+
 	///< Increase by 1
-	template<typename P, template<typename...> typename CTL, typename... Cs>
-	inline auto VecsIteratorT<P, CTL<Cs...>>::operator++(int) noexcept	-> VecsIteratorT<P, CTL<Cs...>> {
+	template<typename P, typename CTL>
+	inline auto VecsIteratorT<P, CTL>::operator++(int) noexcept	-> VecsIteratorT<P, CTL> {
 		auto tmp = *this;
 		operator++();
 		return *this;
 	}
 
 	///< Increase by N
-	template<typename P, template<typename...> typename CTL, typename... Cs>
-	inline auto VecsIteratorT<P, CTL<Cs...>>::operator+=(difference_type N) noexcept -> VecsIteratorT<P, CTL<Cs...>>& {
-		m_current += N;
-		m_pointers = m_current.value < m_size ? m_accessor(m_current) : pointer{};
-		return *this;
-	}
-	
-	///< Increase by N
-	template<typename P, template<typename...> typename CTL, typename... Cs>
-	inline auto VecsIteratorT<P, CTL<Cs...>>::operator+(difference_type N) noexcept	-> VecsIteratorT<P, CTL<Cs...>> {
+	template<typename P, typename CTL>
+	inline auto VecsIteratorT<P, CTL>::operator+=(difference_type N) noexcept -> VecsIteratorT<P, CTL>& {
 		m_current += N;
 		m_pointers = m_current.value < m_size ? m_accessor(m_current) : pointer{};
 		return *this;
 	}
 
-	template<typename P, template<typename...> typename CTL, typename... Cs>
-	inline auto VecsIteratorT<P, CTL<Cs...>>::operator!=(const VecsIteratorT<P, CTL<Cs...>>& v) noexcept -> bool{
+	///< Increase by N
+	template<typename P, typename CTL>
+	inline auto VecsIteratorT<P, CTL>::operator+(difference_type N) noexcept	-> VecsIteratorT<P, CTL> {
+		m_current += N;
+		m_pointers = m_current.value < m_size ? m_accessor(m_current) : pointer{};
+		return *this;
+	}
+
+	template<typename P, typename CTL>
+	inline auto VecsIteratorT<P, CTL>::operator!=(const VecsIteratorT<P, CTL>& v) noexcept -> bool {
 		return m_type != v.m_type || m_current != v.m_current;
 	}
 
-	template<typename P, template<typename...> typename CTL, typename... Cs>
-	inline auto operator==(const VecsIteratorT<P, CTL<Cs...>>& v1, const VecsIteratorT<P, CTL<Cs...>>& v2) noexcept -> bool {
-		return v1.m_type == v2.m_type && v1.m_current == v2.m_current;
-	};
 
 
 
@@ -153,7 +152,7 @@ namespace vecs {
 	*/
 	template<typename P, template<typename...> typename Seq, typename... Cs>
 	struct Functor<P, Seq<Cs...>> {
-		using type = void(VecsHandleT<P>&, Cs&...);	///< Arguments for the functor
+		using type = void(std::atomic<uint32_t>*&, VecsHandleT<P>&, Cs&...);	///< Arguments for the functor
 	};
 
 
@@ -183,49 +182,50 @@ namespace vecs {
 			vtll::static_for<size_t, 0, vtll::size<ETL>::value >(			///< Loop over all components
 				[&](auto i) {
 					using E = vtll::Nth_type<ETL, i>;
-					VecsRegistryT<P, E> r;
+					auto size = VecsRegistryT<P, E>{}.size();
 
-					VecsIteratorT<P, CTL> b {
-						type_index_t{vtll::index_of<decltype(r)::entity_type_list,E>::value}
-						, r.size()
+					VecsIteratorT<P, CTL> b{
+						type_index_t{vtll::index_of<typename VecsRegistryBaseClass<P>::entity_type_list,E>::value}
+						, size
 						, VecsComponentTable<P,E>::c_segment_size
 						, VecsComponentTable<P, E>::c_row_size
-						, table_index_t{0} 
+						, table_index_t{0}
 						, std::bind(VecsComponentTable<P, E>::template accessor<CTL>, std::placeholders::_1)
 					};
 
-					VecsIteratorT<P, CTL> e {
-						type_index_t{vtll::index_of<decltype(r)::entity_type_list,E>::value}
-						, r.size()
+					VecsIteratorT<P, CTL> e{
+						type_index_t{vtll::index_of<typename VecsRegistryBaseClass<P>::entity_type_list,E>::value}
+						, size
 						, VecsComponentTable<P,E>::c_segment_size
 						, VecsComponentTable<P, E>::c_row_size
-						, table_index_t{r.size()}
+						, table_index_t{size}
 						, std::bind(VecsComponentTable<P, E>::template accessor<CTL>, std::placeholders::_1)
 					};
+					auto a = (b != e);
 
-					v.push_back(range_t{b,e});
-			});
+					v.push_back(range_t{ b,e });
+				});
 
 			m_view = std::views::join(v);
 		};
 
-		auto operator=(const VecsRangeBaseClass<P, ETL, CTL>& v) noexcept -> VecsRangeBaseClass<P, ETL, CTL>& = default;
-		auto operator=(VecsRangeBaseClass<P, ETL, CTL>&& v) noexcept -> VecsRangeBaseClass<P, ETL, CTL>& = default;
+		auto operator=(const VecsRangeBaseClass<P, ETL, CTL>& v) noexcept -> VecsRangeBaseClass<P, ETL, CTL> & = default;
+		auto operator=(VecsRangeBaseClass<P, ETL, CTL>&& v) noexcept -> VecsRangeBaseClass<P, ETL, CTL> & = default;
 
-		void begin() noexcept { return m_view.begin(); }
+		auto begin() noexcept { return m_view.begin(); }
 
-		void end() noexcept { return m_view.end(); }
+		auto end() noexcept { return m_view.end(); }
 
 		auto split(size_t N) noexcept {
 			return *this;
 		}
 
 		inline auto for_each(std::function<typename Functor<P, CTL>::type> f, bool sync = true) -> void {
-			/*auto b = begin();
+			auto b = begin();
 			auto e = end();
 			for (; b != e; ++b) {
 				auto tuple = *b;
-				auto mutex_ptr = std::get<0>(tuple);
+				auto& mutex_ptr = std::get<0>(tuple);
 				if (sync) VecsWriteLock::lock(mutex_ptr);		///< Write lock
 				if (!std::get<1>(tuple).is_valid()) {
 					if (sync) VecsWriteLock::unlock(mutex_ptr);	///< unlock
@@ -233,7 +233,7 @@ namespace vecs {
 				}
 				std::apply(f, tuple);			///< Run the function on the references
 				if (sync) VecsWriteLock::unlock(mutex_ptr);		///< unlock
-			}*/
+			}
 		}
 
 	};
@@ -250,7 +250,7 @@ namespace vecs {
 	*/
 	template<typename P, typename ETL>
 	requires (is_entity_type_list<P, ETL>::value)
-	class VecsRangeT<P, ETL> : public VecsRangeBaseClass< P, ETL, it_CTL_entity_list<P, ETL> > {};
+		class VecsRangeT<P, ETL> : public VecsRangeBaseClass< P, ETL, it_CTL_entity_list<P, ETL> > {};
 
 
 	/**
@@ -267,7 +267,7 @@ namespace vecs {
 	*/
 	template<typename P, typename... Es>
 	requires (sizeof...(Es) > 0 && are_entity_types<P, Es...>)
-	class VecsRangeT<P, Es...> : public VecsRangeBaseClass< P, it_ETL_entity_types<P, Es...>, it_CTL_entity_types<P, Es...> > {};
+		class VecsRangeT<P, Es...> : public VecsRangeBaseClass< P, it_ETL_entity_types<P, Es...>, it_CTL_entity_types<P, Es...> > {};
 
 
 	/**
@@ -284,7 +284,7 @@ namespace vecs {
 	*/
 	template<typename P, typename... Cs>
 	requires (sizeof...(Cs) > 0 && are_component_types<P, Cs...>)
-	class VecsRangeT<P, Cs...> : public VecsRangeBaseClass< P, it_ETL_types<P, Cs...>, it_CTL_types<P, Cs...> > {};
+		class VecsRangeT<P, Cs...> : public VecsRangeBaseClass< P, it_ETL_types<P, Cs...>, it_CTL_types<P, Cs...> > {};
 
 
 	/**
@@ -301,7 +301,7 @@ namespace vecs {
 	*/
 	template<typename P, typename E, typename... Ts>
 	requires (is_entity_type<P, E> && (sizeof...(Ts) > 0) && are_entity_tags<P, Ts...>)
-	class VecsRangeT<P, E, Ts...> : public VecsRangeBaseClass< P, it_ETL_entity_tags<P, E, Ts...>, it_CTL_entity_tags<P, E, Ts...> > {};
+		class VecsRangeT<P, E, Ts...> : public VecsRangeBaseClass< P, it_ETL_entity_tags<P, E, Ts...>, it_CTL_entity_tags<P, E, Ts...> > {};
 
 
 	/**
@@ -316,7 +316,7 @@ namespace vecs {
 	template<typename P>
 	class VecsRangeT<P> : public VecsRangeBaseClass < P, typename VecsRegistryBaseClass<P>::entity_type_list, it_CTL_all_entities<P> > {};
 
-
+}
 
 
 
@@ -958,9 +958,9 @@ namespace vecs {
 			m_current_index = static_cast<decltype(m_current_index)>(m_dispatch[m_current_iterator]->sizeE());
 		}
 
-	};*/
+	};
 
-}
+}*/
 
 
 #endif

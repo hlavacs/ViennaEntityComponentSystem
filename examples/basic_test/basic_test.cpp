@@ -265,7 +265,7 @@ int main() {
     using entity_types = vtll::filter_have_all_types< MyEntityTypeList, vtll::type_list<MyComponentPosition> >;
     std::cout << typeid(entity_types).name() << std::endl;
 
-    VecsRange<MyComponentPosition, MyComponentOrientation>{}.for_each([&](auto handle, auto& pos, auto& orient) {
+   VecsRange<MyComponentPosition, MyComponentOrientation>{}.for_each([&](auto& mutex, auto& handle, auto& pos, auto& orient) {
         pos = MyComponentPosition{ glm::vec3{12345.0f, -299.0f, -334.0f} };
         std::cout << "entity\n";
     });
