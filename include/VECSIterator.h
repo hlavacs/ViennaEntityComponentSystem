@@ -33,7 +33,8 @@ namespace vecs {
 	public:
 		VecsIteratorT() noexcept = default;									///< Empty constructor is required
 
-		VecsIteratorT(type_index_t type, size_t size, size_t seg_size, size_t row_size, table_index_t index, const accessor& fn) noexcept;		///< Constructor
+		template<typename E>
+		VecsIteratorT(VecsRegistryT<P, E>& reg, size_t current) noexcept;		///< Constructor
 
 		VecsIteratorT(const VecsIteratorT<P, CTL>& v) noexcept = default;		///< Copy constructor
 		VecsIteratorT(VecsIteratorT<P, CTL>&& v) noexcept = default;			///< Move constructor
@@ -61,8 +62,14 @@ namespace vecs {
 
 	///< Constructor
 	template<typename P, typename CTL>
-	inline VecsIteratorT<P, CTL>::VecsIteratorT(type_index_t type, size_t size, size_t seg_size, size_t row_size, table_index_t index, const accessor& fn) noexcept
-		: m_type{ type }, m_size{ size }, m_bit_mask{ seg_size - 1 }, m_row_size{ row_size }, m_current{ index }, m_accessor{ fn } {
+	template<typename E>
+	inline VecsIteratorT<P, CTL>::VecsIteratorT(VecsRegistryT<P, E>& reg, size_t current) noexcept
+		: m_type{ type_index_t{ vtll::index_of<typename VecsRegistryBaseClass<P>::entity_type_list,E>::value } }
+		, m_size{ VecsRegistryT<P, E>{}.size() }
+		, m_bit_mask{ VecsComponentTable<P, E>::c_segment_size - 1 }
+		, m_row_size{ VecsComponentTable<P, E>::c_row_size }
+		, m_current{ current }
+		, m_accessor{ std::bind(VecsComponentTable<P, E>::template accessor<CTL>, std::placeholders::_1) } {
 
 		m_pointers = m_current.value < m_size ? m_accessor(m_current) : pointer{};
 	};
@@ -182,28 +189,11 @@ namespace vecs {
 			vtll::static_for<size_t, 0, vtll::size<ETL>::value >(			///< Loop over all components
 				[&](auto i) {
 					using E = vtll::Nth_type<ETL, i>;
-					auto size = VecsRegistryT<P, E>{}.size();
+					VecsRegistryT<P, E> reg;
+					VecsIteratorT<P, CTL> b = VecsIteratorT<P, CTL>(reg, 0);
+					VecsIteratorT<P, CTL> e = VecsIteratorT<P, CTL>(reg, reg.size());
 
-					VecsIteratorT<P, CTL> b{
-						type_index_t{vtll::index_of<typename VecsRegistryBaseClass<P>::entity_type_list,E>::value}
-						, size
-						, VecsComponentTable<P,E>::c_segment_size
-						, VecsComponentTable<P, E>::c_row_size
-						, table_index_t{0}
-						, std::bind(VecsComponentTable<P, E>::template accessor<CTL>, std::placeholders::_1)
-					};
-
-					VecsIteratorT<P, CTL> e{
-						type_index_t{vtll::index_of<typename VecsRegistryBaseClass<P>::entity_type_list,E>::value}
-						, size
-						, VecsComponentTable<P,E>::c_segment_size
-						, VecsComponentTable<P, E>::c_row_size
-						, table_index_t{size}
-						, std::bind(VecsComponentTable<P, E>::template accessor<CTL>, std::placeholders::_1)
-					};
-					auto a = (b != e);
-
-					v.push_back(range_t{ b,e });
+					v.push_back(range_t{ b, e });
 				});
 
 			m_view = std::views::join(v);
