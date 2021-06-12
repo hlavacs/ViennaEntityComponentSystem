@@ -2,6 +2,7 @@
 #include <iostream>
 #include <utility>
 #include <ranges>
+#include <utility>
 #include "glm.hpp"
 #include "gtc/quaternion.hpp"
 #include "VECS.h"
@@ -67,6 +68,10 @@ struct TData : public std::ranges::view_base  {
     std::array<int, 100> m_data;
     int m_size{0};
 
+    TData() = default;
+    TData(const TData& ) = default;
+    TData(TData&&) = default;
+
     template<typename T>
     TData(T&& data) : m_size { (int)data.max_size() } {
         std::copy_n(data.begin(), m_size, m_data.begin());
@@ -85,6 +90,18 @@ int& TIter::operator*() {
 int& TIter::operator*() const {
     return m_ptr->m_data[m_current];
 };
+
+
+template<typename T>
+auto make_range(TData &data1, TData &data2, T& tdata) {
+    auto vdata1 = data1 | std::views::drop(0) | std::views::take(9);
+    auto vdata2 = data2 | std::views::drop(0) | std::views::take(9);
+
+    tdata.push_back(vdata1);
+    tdata.push_back(vdata2);
+
+    return std::views::join(tdata);
+}
 
 
 int main() {
@@ -107,14 +124,16 @@ int main() {
     *it = 99;
     int c = *cit;
    
-    auto vdata1 = data1 | std::views::drop(0) | std::views::take(9);
-    auto vdata2 = data2 | std::views::drop(0) | std::views::take(9);
+    auto vdata1 = data1 | std::views::all; // | std::views::drop(0) | std::views::take(9);
+    auto vdata2 = data2 | std::views::all; // | std::views::drop(0) | std::views::take(9);
+    std::cout << typeid(decltype(vdata1)).name() << "\n";
 
     std::vector<decltype(vdata1)> tdata;
     tdata.push_back(vdata1);
     tdata.push_back(vdata2);
 
     auto joinedview = std::views::join(tdata);
+    std::cout << typeid(decltype(joinedview)).name() << "\n";
 
     auto jvt = joinedview | std::views::drop(5) | std::views::take(10);
 
@@ -136,6 +155,20 @@ int main() {
     }
     std::cout << "\n";
     for (auto&& i : r3 | std::views::take(6)) {
+        std::cout << i << " ";
+    }
+    std::cout << "\n\n";
+
+    //----------------------------------------------------
+
+    TData data3(std::array<int, 9>{1, 2, 3, 4, 5, 6, 7, 8, 88});
+    TData data4(std::array<int, 9>{11, 21, 31, 41, 51, 61, 71, 81, 881});
+
+    std::vector<decltype(std::views::take( std::views::drop(std::declval<TData&>(), 0), 0) )> tdata2;
+    auto range3 = make_range(data3, data4, tdata2);
+
+    std::cout << "\nTRange\n";
+    for (auto&& i : range3) {
         std::cout << i << " ";
     }
     std::cout << "\n\n";
@@ -176,6 +209,12 @@ int main() {
         std::cout << i << " ";
     }
     std::cout << "\n";
+
+    //----------------------------------------------------
+
+
+
+
 
     //-----------------------------------------------------
 

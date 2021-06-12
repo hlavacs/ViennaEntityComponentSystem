@@ -89,7 +89,9 @@ namespace vecs {
 
 	//iterators and ranges
 	template<typename P, typename CTL> class VecsIteratorT;
+	template<typename P, typename ETL, typename CTL> class VecsRangeBaseClass;
 	template<typename P, typename... Ts> class VecsRangeT;
+
 
 	//-------------------------------------------------------------------------
 	//concepts
@@ -243,6 +245,7 @@ namespace vecs {
 		template<typename P> friend class VecsRegistryBaseClass;
 		template<typename P, typename E> friend class VecsRegistryT;
 		template<typename P, typename CTL> friend class VecsIteratorT;
+		template<typename P, typename ETL, typename CTL> friend class VecsRangeBaseClass;
 
 	protected:
 
@@ -273,14 +276,24 @@ namespace vecs {
 		using data_types = vtll::cat< info_types, E >;						///< List with management (info) and component (data) types
 		using types_deleted = vtll::type_list< table_index_t >;	///< List with types for holding info about erased entities 
 		
-		///Size of a segment
-		static const size_t c_segment_size = vtll::front_value< vtll::map<table_size_map, E, table_size_default > >::value;
+		static const size_t c_segment_size = vtll::front_value< vtll::map<table_size_map, E, table_size_default > >::value;///Size of a segment
 		static inline VecsTable<P, data_types, c_segment_size, layout_type::value>			m_data;		///< Data per entity
 		static inline VecsTable<P, types_deleted, c_segment_size, VECS_LAYOUT_ROW::value>	m_deleted;	///< Table holding the indices of erased entities
-		
+		static const size_t c_row_size = layout_type::value ? 0 : sizeof(data_types);					///< Size of a row
+
 		///One instance for each component type
 		using array_type = std::array<std::unique_ptr<VecsComponentAccessor<P, E>>, vtll::size<component_type_list>::value>;
 		static inline array_type m_dispatch;	///< Each component type C of the entity type E gets its own specialized class instance
+
+		template<typename CTL>
+		static inline auto accessor(table_index_t index) {
+			return std::tuple_cat(
+				std::make_tuple(
+					&m_data.component_ptr<c_mutex>(index)->m_mutex, &m_data.component_ptr<c_handle>(index)->m_handle)
+					, vtll::subtype_tuple<vtll::to_ptr<CTL>>(m_data.tuple_ptr(index)
+				)
+			);
+		}
 
 		//-------------------------------------------------------------------------
 
@@ -925,6 +938,7 @@ namespace vecs {
 	class VecsRegistryT : public VecsRegistryBaseClass<P> {
 
 		friend class VecsRegistryBaseClass<P>;
+		template<typename P, typename ETL, typename CTL> friend class VecsRangeBaseClass;
 
 	protected:
 		using entity_type_list = typename VecsRegistryBaseClass<P>::entity_type_list;
@@ -941,14 +955,6 @@ namespace vecs {
 		auto compressE() noexcept	-> void { return m_component_table.compress(); };	///< Compress the table
 		auto clearE() noexcept		-> size_t { return m_component_table.clear(); };	///< Erase all entities from table
 		auto sizeE() noexcept		-> std::atomic<uint32_t>& { return m_sizeE; };
-
-		template<typename CTL>
-		static auto accessor(table_index_t index) {
-			return std::tuple_cat( 
-				std::make_tuple(m_component_table.component_ptr<0>(index), m_component_table.component_ptr<1>(index))
-				, vtll::subtype_tuple<vtll::to_ptr<CTL>>(m_component_table.tuple_ptr(index))
-			);
-		}
 
 	public:
 		VecsRegistryT() noexcept : VecsRegistryBaseClass<P>() {};					///< Constructor of class VecsRegistryT<E>

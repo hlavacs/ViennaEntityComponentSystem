@@ -4,6 +4,7 @@
 #include <concepts>
 #include <functional>
 #include <type_traits>
+#include <utility>
 
 namespace vecs {
 
@@ -32,9 +33,7 @@ namespace vecs {
 	public:
 		VecsIteratorT() noexcept = default;									///< Empty constructor is required
 
-		template<typename Fn>
-		requires std::is_same_v< std::decay_t<Fn>, typename VecsIteratorT<P, CTL<Cs...>>::accessor >
-		VecsIteratorT(type_index_t type, size_t size, size_t seg, size_t row, table_index_t index, Fn&& fn) noexcept;		///< Constructor
+		VecsIteratorT(type_index_t type, size_t size, size_t seg_size, size_t row_size, table_index_t index, const accessor& fn) noexcept;		///< Constructor
 
 		VecsIteratorT(const VecsIteratorT<P, CTL<Cs...>>& v) noexcept = default;		///< Copy constructor
 		VecsIteratorT(VecsIteratorT<P, CTL<Cs...>>&& v) noexcept = default;			///< Move constructor
@@ -59,10 +58,8 @@ namespace vecs {
 
 	///< Constructor
 	template<typename P, template<typename...> typename CTL, typename... Cs>
-	template<typename Fn>
-	requires std::is_same_v< std::decay_t<Fn>, typename VecsIteratorT<P, CTL<Cs...>>::accessor >
-	inline VecsIteratorT<P, CTL<Cs...>>::VecsIteratorT(type_index_t type, size_t size, size_t seg, size_t row, table_index_t index, Fn&& fn) noexcept
-		: m_type{ type }, m_size{ size }, m_bit_mask{ seg - 1 }, m_row_size{ row }, m_current{ index }, m_accessor{ fn } {
+	inline VecsIteratorT<P, CTL<Cs...>>::VecsIteratorT(type_index_t type, size_t size, size_t seg_size, size_t row_size, table_index_t index, const accessor& fn ) noexcept
+		: m_type{ type }, m_size{ size }, m_bit_mask{ seg_size - 1 }, m_row_size{ row_size }, m_current{ index }, m_accessor{ fn } {
 
 		m_pointers = m_current.value < m_size ? m_accessor(m_current) : pointer{};
 	};
@@ -163,31 +160,61 @@ namespace vecs {
 	template<typename P, typename ETL, typename CTL>
 	class VecsRangeBaseClass {
 
+		struct range_t {
+			VecsIteratorT<P, CTL> m_begin{};
+			VecsIteratorT<P, CTL> m_end{};
+
+			range_t() = default;
+			range_t(const VecsIteratorT<P, CTL>& b, const VecsIteratorT<P, CTL>& e) : m_begin{ b }, m_end{ e } {};
+			range_t(const range_t&) = default;
+			range_t(range_t&&) = default;
+
+			auto begin() { return m_begin; };
+			auto end() { return m_end; };
+		};
+
+		decltype(std::views::join(std::declval<std::vector<range_t>&>())) m_view;
+
 	public:
-		VecsRangeBaseClass() = default;
+		VecsRangeBaseClass() noexcept {
+			std::vector<range_t> v;
+			v.reserve(vtll::size<ETL>::value);
+
+			vtll::static_for<size_t, 0, vtll::size<ETL>::value >(			///< Loop over all components
+				[&](auto i) {
+					using E = vtll::Nth_type<ETL, i>;
+					VecsRegistryT<P, E> r;
+
+					VecsIteratorT<P, CTL> b {
+						type_index_t{vtll::index_of<decltype(r)::entity_type_list,E>::value}
+						, r.size()
+						, VecsComponentTable<P,E>::c_segment_size
+						, VecsComponentTable<P, E>::c_row_size
+						, table_index_t{0} 
+						, std::bind(VecsComponentTable<P, E>::template accessor<CTL>, std::placeholders::_1)
+					};
+
+					VecsIteratorT<P, CTL> e {
+						type_index_t{vtll::index_of<decltype(r)::entity_type_list,E>::value}
+						, r.size()
+						, VecsComponentTable<P,E>::c_segment_size
+						, VecsComponentTable<P, E>::c_row_size
+						, table_index_t{r.size()}
+						, std::bind(VecsComponentTable<P, E>::template accessor<CTL>, std::placeholders::_1)
+					};
+
+					v.push_back(range_t{b,e});
+			});
+
+			m_view = std::views::join(v);
+		};
+
 		auto operator=(const VecsRangeBaseClass<P, ETL, CTL>& v) noexcept -> VecsRangeBaseClass<P, ETL, CTL>& = default;
 		auto operator=(VecsRangeBaseClass<P, ETL, CTL>&& v) noexcept -> VecsRangeBaseClass<P, ETL, CTL>& = default;
 
-		void begin() noexcept {
-			vtll::static_for<size_t, 0, std::size<ETL>::value >(			///< Loop over all components
-				[&](auto i) {
-					using E = vtll::index_of<ETL, i>;
-					VecsRegistryT<P, E> r;
-					//VecsIteratorT<P, CTL> b{r.type(), r.size(), VecsRegistryBaseClass<P>::};
-				}
-			);
-		}
+		void begin() noexcept { return m_view.begin(); }
 
-		void end() noexcept {
-			vtll::static_for<size_t, 0, std::size<ETL>::value >(			///< Loop over all components
-				[&](auto i) {
-					using E = vtll::index_of<ETL, i>;
-					VecsRegistryT<P, E> r;
-					//VecsIteratorT<P, CTL> e{ r.type(), };
-
-				}
-			);
-		}
+		void end() noexcept { return m_view.end(); }
 
 		auto split(size_t N) noexcept {
 			return *this;
