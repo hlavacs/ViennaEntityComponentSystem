@@ -65,7 +65,7 @@ namespace vecs {
 	template<typename E>
 	inline VecsIteratorT<P, CTL>::VecsIteratorT(VecsRegistryT<P, E>& reg, size_t current) noexcept
 		: m_type{ type_index_t{ vtll::index_of<typename VecsRegistryBaseClass<P>::entity_type_list,E>::value } }
-		, m_size{ VecsRegistryT<P, E>{}.size() }
+		, m_size{ reg.size() }
 		, m_bit_mask{ VecsComponentTable<P, E>::c_segment_size - 1 }
 		, m_row_size{ VecsComponentTable<P, E>::c_row_size }
 		, m_current{ current }
@@ -144,8 +144,6 @@ namespace vecs {
 	}
 
 
-
-
 	/**
 	* \brief General functor type that can hold any function, and depends on a number of component types.
 	*
@@ -190,10 +188,7 @@ namespace vecs {
 				[&](auto i) {
 					using E = vtll::Nth_type<ETL, i>;
 					VecsRegistryT<P, E> reg;
-					VecsIteratorT<P, CTL> b = VecsIteratorT<P, CTL>(reg, 0);
-					VecsIteratorT<P, CTL> e = VecsIteratorT<P, CTL>(reg, reg.size());
-
-					v.push_back(range_t{ b, e });
+					v.push_back(range_t{ VecsIteratorT<P, CTL>(reg, 0), VecsIteratorT<P, CTL>(reg, reg.size()) } );
 				});
 
 			m_view = std::views::join(v);
