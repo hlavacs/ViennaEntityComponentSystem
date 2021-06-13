@@ -183,6 +183,8 @@ namespace vecs {
 		std::array<size_t, vtll::size<ETL>::value>	m_sizeE{0};
 		std::vector<range_t>						m_v;
 		std::vector<std::vector<range_t>>			m_ranges;
+		std::vector<view_type>						m_result;			///< Result vector
+
 
 	public:
 		VecsRangeBaseClass() noexcept {
@@ -216,8 +218,9 @@ namespace vecs {
 		auto size() noexcept { return m_size; }
 
 		auto split(size_t N) noexcept {
-			std::vector<view_type> result;			///< Result vector
-			result.reserve(N);						///< Need exactly N slots
+			if (m_result.size() == N) return m_result;
+			m_result.clear();
+			m_result.reserve(N);					///< Need exactly N slots
 			size_t remain = m_size;					///< Remaining entities
 			size_t num = remain / N;				///< Put the same number in each slot (except maybe last slot)
 			if (num * N < remain) ++num;			///< We might need one more per slot
@@ -245,17 +248,17 @@ namespace vecs {
 						need -= take;
 						remain -= take;
 						if (need == 0) {
-							result.push_back(std::views::join(v));
+							m_result.push_back(std::views::join(v));
 							if (remain > 0) {
 								m_ranges.push_back();
 								v = m_ranges.back();
-								need = result.size() < N ? num : remain;
+								need = m_result.size() < N ? num : remain;
 							}
 						}
 					}
 				}
 			);
-			return result;
+			return m_result;
 		}
 
 		inline auto for_each(std::function<typename Functor<P, CTL>::type> f, bool sync = true) -> void {
