@@ -24,7 +24,7 @@ namespace vecs {
 	protected:
 		type_index_t	m_type{};				///< entity type that this iterator iterates over
 		size_t			m_size{ 0 };			///< Size of the components, m_current must be smaller than this
-		size_t			m_bit_mask{ 0 };		///< Size of table segments - 1
+		size_t			m_bit_mask{ 0 };		///< Size of table segments - 1 , use as bit mask 
 		size_t			m_row_size{ 0 };		///< Size of a row for row layout, or zero for column layout
 		table_index_t	m_current{ 0 };			///< Current index in the VecsComponentTable<E>
 		pointer			m_pointers;				///< Pointers to the components
@@ -35,7 +35,6 @@ namespace vecs {
 
 		template<typename E>
 		VecsIteratorT(VecsRegistryT<P, E>& reg, size_t current) noexcept;		///< Constructor
-
 		VecsIteratorT(const VecsIteratorT<P, CTL>& v) noexcept = default;		///< Copy constructor
 		VecsIteratorT(VecsIteratorT<P, CTL>&& v) noexcept = default;			///< Move constructor
 
@@ -64,7 +63,7 @@ namespace vecs {
 	template<typename P, typename CTL>
 	template<typename E>
 	inline VecsIteratorT<P, CTL>::VecsIteratorT(VecsRegistryT<P, E>& reg, size_t current) noexcept
-		: m_type{ type_index_t{ vtll::index_of<typename VecsRegistryBaseClass<P>::entity_type_list,E>::value } }
+		: m_type{ type_index_t{ vtll::index_of<typename VecsRegistryBaseClass<P>::entity_type_list, E>::value } }
 		, m_size{ reg.size() }
 		, m_bit_mask{ VecsComponentTable<P, E>::c_segment_size - 1 }
 		, m_row_size{ VecsComponentTable<P, E>::c_row_size }
@@ -94,8 +93,8 @@ namespace vecs {
 			m_pointers = m_current.value < m_size ? m_accessor(m_current) : pointer{};
 		}
 		else {
-			if (m_row_size > 0) {
-				vtll::static_for<size_t, 0, std::tuple_size_v<pointer> >(			///< Loop over all components
+			if (m_row_size > 0) {											///< If row layout
+				vtll::static_for<size_t, 0, std::tuple_size_v<pointer> >(	///< Loop over all components
 					[&](auto i) {
 						using type = std::tuple_element_t<i, pointer>;
 						auto& ptr = std::get<i>(m_pointers);
@@ -104,7 +103,7 @@ namespace vecs {
 				);
 			}
 			else {
-				vtll::static_for<size_t, 0, std::tuple_size_v<pointer> >(			///< Loop over all components
+				vtll::static_for<size_t, 0, std::tuple_size_v<pointer> >(	///< Column layout, loop over all components
 					[&](auto i) {
 						std::get<i>(m_pointers)++;
 					}
@@ -170,6 +169,7 @@ namespace vecs {
 
 			range_t() = default;
 			range_t(const VecsIteratorT<P, CTL>& b, const VecsIteratorT<P, CTL>& e) : m_begin{ b }, m_end{ e } {};
+			range_t(VecsIteratorT<P, CTL>&& b, VecsIteratorT<P, CTL>&& e) : m_begin{ b }, m_end{ e } {};
 			range_t(const range_t&) = default;
 			range_t(range_t&&) = default;
 
@@ -177,18 +177,26 @@ namespace vecs {
 			auto end() { return m_end; };
 		};
 
-		decltype(std::views::join(std::declval<std::vector<range_t>&>())) m_view;
+		using view_type = decltype(std::views::join(std::declval<std::vector<range_t>&>()));
+		view_type									m_view;
+		size_t										m_size{0};
+		std::array<size_t, vtll::size<ETL>::value>	m_sizeE{0};
 
 	public:
 		VecsRangeBaseClass() noexcept {
 			std::vector<range_t> v;
 			v.reserve(vtll::size<ETL>::value);
 
+			m_size = 0;
 			vtll::static_for<size_t, 0, vtll::size<ETL>::value >(			///< Loop over all components
 				[&](auto i) {
 					using E = vtll::Nth_type<ETL, i>;
 					VecsRegistryT<P, E> reg;
-					v.push_back(range_t{ VecsIteratorT<P, CTL>(reg, 0), VecsIteratorT<P, CTL>(reg, reg.size()) } );
+					m_sizeE[i] = reg.size();
+					if (m_sizeE[i]) {
+						v.push_back(range_t{ VecsIteratorT<P, CTL>(reg, 0), VecsIteratorT<P, CTL>(reg, m_sizeE[i]) });
+						m_size += m_sizeE[i];
+					}
 				});
 
 			m_view = std::views::join(v);
@@ -198,11 +206,45 @@ namespace vecs {
 		auto operator=(VecsRangeBaseClass<P, ETL, CTL>&& v) noexcept -> VecsRangeBaseClass<P, ETL, CTL> & = default;
 
 		auto begin() noexcept { return m_view.begin(); }
-
 		auto end() noexcept { return m_view.end(); }
+		auto size() noexcept { return m_size; }
 
 		auto split(size_t N) noexcept {
-			return *this;
+			std::pmr::vector<view_type> result;		///< Result vector
+			result.reserve(N);						///< Need exactly N slots
+			size_t remain = m_size;					///< Remaining entities
+			size_t num = remain / N;				///< Put the same number in each slot (except maybe last slot)
+			if (num * N < remain) ++num;			///< We might need one more per slot
+
+			std::vector<range_t> v;					///< Collect ranges to put into the same view
+			size_t need = num;						///< Still need that many entities to complete the next slot
+			vtll::static_for<size_t, 0, vtll::size<ETL>::value >(		///< Loop over all components
+				[&](auto i) {
+					using E = vtll::Nth_type<ETL, i>;
+					size_t available = m_sizeE[i];	///< Still available in the current range
+					size_t current = 0;				///< Index of current entity
+					size_t take = 0;				///< Number of entities to take
+					while (available > 0) {
+						if (need <= available) {	///< We have enough to fill the current slot
+							take = need;
+						}
+						else {
+							take = m_sizeE[i] - current;	///< Do not have enough -> get the rest of this type
+						}
+						VecsRegistryT<P, E> reg;
+						v.push_back(range_t{ VecsIteratorT<P, CTL>(reg, current), VecsIteratorT<P, CTL>(reg, current + take) });
+						current += take;
+						available -= take;
+						need -= take;
+						remain -= take;
+						if (need == 0) {
+							result.push_back(std::views::join(v));
+							need = result.size() < N ? num : remain;
+						}
+					}
+				}
+			);
+			return result;
 		}
 
 		inline auto for_each(std::function<typename Functor<P, CTL>::type> f, bool sync = true) -> void {
