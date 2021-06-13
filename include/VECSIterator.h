@@ -181,12 +181,12 @@ namespace vecs {
 		view_type									m_view;
 		size_t										m_size{0};
 		std::array<size_t, vtll::size<ETL>::value>	m_sizeE{0};
+		std::vector<range_t>						m_v;
+		std::vector<std::vector<range_t>>			m_ranges;
 
 	public:
 		VecsRangeBaseClass() noexcept {
-			std::vector<range_t> v;
-			v.reserve(vtll::size<ETL>::value);
-
+			m_v.reserve(vtll::size<ETL>::value);
 			m_size = 0;
 			vtll::static_for<size_t, 0, vtll::size<ETL>::value >(			///< Loop over all components
 				[&](auto i) {
@@ -194,29 +194,36 @@ namespace vecs {
 					VecsRegistryT<P, E> reg;
 					m_sizeE[i] = reg.size();
 					if (m_sizeE[i]) {
-						v.push_back(range_t{ VecsIteratorT<P, CTL>(reg, 0), VecsIteratorT<P, CTL>(reg, m_sizeE[i]) });
+						m_v.push_back(range_t{ VecsIteratorT<P, CTL>(reg, 0), VecsIteratorT<P, CTL>(reg, m_sizeE[i]) });
 						m_size += m_sizeE[i];
 					}
 				});
 
-			m_view = std::views::join(v);
+			m_view = std::views::join(m_v);
 		};
 
 		auto operator=(const VecsRangeBaseClass<P, ETL, CTL>& v) noexcept -> VecsRangeBaseClass<P, ETL, CTL> & = default;
 		auto operator=(VecsRangeBaseClass<P, ETL, CTL>&& v) noexcept -> VecsRangeBaseClass<P, ETL, CTL> & = default;
 
-		auto begin() noexcept { return m_view.begin(); }
-		auto end() noexcept { return m_view.end(); }
+		auto begin() noexcept { 
+			return m_view.begin(); 
+		}
+
+		auto end() noexcept { 
+			return m_view.end(); 
+		}
+
 		auto size() noexcept { return m_size; }
 
 		auto split(size_t N) noexcept {
-			std::pmr::vector<view_type> result;		///< Result vector
+			std::vector<view_type> result;			///< Result vector
 			result.reserve(N);						///< Need exactly N slots
 			size_t remain = m_size;					///< Remaining entities
 			size_t num = remain / N;				///< Put the same number in each slot (except maybe last slot)
 			if (num * N < remain) ++num;			///< We might need one more per slot
 
-			std::vector<range_t> v;					///< Collect ranges to put into the same view
+			m_ranges.push_back();
+			std::vector<range_t> &v = m_ranges[0];	///< Collect ranges to put into the same view
 			size_t need = num;						///< Still need that many entities to complete the next slot
 			vtll::static_for<size_t, 0, vtll::size<ETL>::value >(		///< Loop over all components
 				[&](auto i) {
@@ -239,7 +246,11 @@ namespace vecs {
 						remain -= take;
 						if (need == 0) {
 							result.push_back(std::views::join(v));
-							need = result.size() < N ? num : remain;
+							if (remain > 0) {
+								m_ranges.push_back();
+								v = m_ranges.back();
+								need = result.size() < N ? num : remain;
+							}
 						}
 					}
 				}
