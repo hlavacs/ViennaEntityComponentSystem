@@ -56,6 +56,10 @@ int start_test() {
 		}
 		for (auto [mutex, handle, name] : VecsRange<>{}) {
 		}
+
+		//for (auto& [mutex, handle, transf] : VecsRange<MyComponentTransform>{}) {
+		//}
+
 		for (auto [mutex, handle, name, pos, orient, transf] : VecsRange<MyEntityTypeNode>{}) {
 		}
 	}
