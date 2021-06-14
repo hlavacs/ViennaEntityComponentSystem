@@ -17,7 +17,7 @@ namespace vecs {
 		template<typename P, typename ETL, typename CTL> friend class VecsRangeBaseClass;
 
 	public:
-		using value_type = vtll::to_tuple< vtll::cat< vtll::tl<std::atomic<uint32_t>*&, VecsHandleT<P>&>, vtll::to_ref<CTL> > >;					///< Value type
+		using value_type = vtll::to_tuple< vtll::cat< vtll::tl<std::atomic<uint32_t>*&, VecsHandleT<P>&>, vtll::to_ref<CTL> > >;///< Value type - use refs to deal with atomics and unique_ptr
 		using reference = vtll::to_tuple< vtll::cat< vtll::tl<std::atomic<uint32_t>*&, VecsHandleT<P>&>, vtll::to_ref<CTL> > >;	///< Reference type
 		using pointer = vtll::to_tuple< vtll::cat< vtll::tl<std::atomic<uint32_t>**, VecsHandleT<P>*>, vtll::to_ptr<CTL> > >;	///< Pointer type
 		using iterator_category = std::forward_iterator_tag;				///< Forward iterator

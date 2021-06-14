@@ -174,7 +174,7 @@ We assume that is has been registered as described in the previous section. Of c
 
 Note that the parameters for this call must match the list of components that the entity is composed of. Move-semantics automatically apply. The result of creating an entity is a *handle*. A handle is an 8-bytes structure that uniquely identifies the new entity and you can use it later to access the entity again. A handle can be invalid, meaning that it does not point to any entity. You can test whether a handle is valid or not by calling
 
-    handle.is_valid(); //do this in a range based or for_each loop
+    handle.is_valid(); //do this in a range based loop
 
 If the handle is valid, then it IDs an entity in VECS. However, the entity might have been erased from VECS previously, e.g. by some other thread. You can test whether the entity that the handle represents is still in VECS by calling either of these:
 
@@ -182,7 +182,7 @@ If the handle is valid, then it IDs an entity in VECS. However, the entity might
     VecsRegistry{}.has_value(handle); //true if VECS contains the entity
     VecsRegistry<MyEntityTypeNode>{}.has_value(handle); //true if VECS contains the entity AND entity is of type MyEntityTypeNode
 
-When going through a range based or for_each loop, calling *is_valid()* should be preferred. A part of a handle contains a type ID for the entity type. You can get the type index by calling
+You can get the type index of an entity by calling
 
     handle.type();               //call this
     VecsRegistry{}.type(handle); //or this
@@ -433,43 +433,20 @@ The yielded components are again those contained in all entity types (this might
 
 In C++, a range is any class that offers *begin()* and *end()* functions yielding respective iterators. VECS offers a special range class *VecsRange\<...\>* for this. The meanings of the template parameters are exactly the same as for iterators, and ranges are simply two iterators put together. A *VecsRange\<...\>* can be used directly in a *C++ range based loop*:
 
-    for (auto [handle, name] : VecsRange<MyComponentName, MyComponentPosition>{}) {
+    for (auto [mutex, handle, name, pos] : VecsRange<MyComponentName, MyComponentPosition>{}) { //can use the mutex to lock the entity
       if( handle.is_valid() ) {
         //....
       }
     }
 
-This version is the fastest version, but when obtaining the references does not lock the entities. Thus, when using multithreading, you should use this version only if you can make sure that no two threads write to the same entities (or components) at the same time. One way to achieve this is to run so called systems (range based loops) together that do not access the same components. Additionally, VECS ranges offer a thread save range based loop called *for_each*:
+This version is the fastest version, but when obtaining the references does not lock the entities. Thus, when using multithreading, you should use this version only if you can make sure that no two threads write to the same entities (or components) at the same time. One way to achieve this is to run so called systems (range based loops) together that do not access the same components. Additionally, VECS ranges offer a thread safe range based loop called *for_each*:
 
-    VecsRange<MyEntityTypeNode, TAG1>{}.for_each([&](VecsHandle& handle, auto& name, auto& pos, auto& orient, auto& transf) {
+    bool sync = true; //if true -> lock the entities before entering the loop
+    VecsRange<MyEntityTypeNode, TAG1>{}.for_each([&](auto& mutex, auto& handle, auto& name, auto& pos, auto& orient, auto& transf) {
       //...
-    });
+    }, sync);
 
-This loop guarantees that any loop iteration contains only valid entities, which are also automatically write locked, depending on the parameter sync. Due to the write lock, this loop is slightly slower than the C++ range based version, but you do not have to worry about locking or using the references. The implementation looks like this:
-
-    template<typename P, typename C>
-    struct Functor;
-
-    template<typename P, template<typename...> typename Seq, typename... Cs>
-    struct Functor<P, Seq<Cs...>> {
-      using type = void(VecsHandleT<P>&, Cs&...);	///< Arguments for the functor
-    };
-
-    inline auto for_each(std::function<typename Functor<P, CTL>::type> f, bool sync = true) -> void {
-      auto b = begin();
-      auto e = end();
-      for (; b != e; ++b) {
-        if( sync ) VecsWriteLock::lock(b.mutex_ptr());		///< Write lock
-        if (!b.is_valid()) {
-          if (sync) VecsWriteLock::unlock(b.mutex_ptr());	///< unlock
-          continue;
-        }
-        std::apply(f, *b);			///< Run the function on the references
-        if (sync) VecsWriteLock::unlock(b.mutex_ptr());		///< unlock
-      }
-    }
-
-You see that the loop is actually quite simple, and you can easily come up with your own versions, which e.g. only read lock entities, etc.
+This loop guarantees that any loop iteration contains only valid entities, which are also automatically write locked, depending on the parameter sync. Due to the write lock, this loop is slightly slower than the C++ range based version, but you do not have to worry about locking or using the references.
 
 ## Parallel Operations
 
@@ -500,14 +477,14 @@ An example for looping over entities in parallel on several threads is given in 
     void do_work(R<Cs...> range) {
         size_t i = 0;
 
-        for (auto [handle, pos] : range) {
+        for (auto [mutex, handle, pos] : range) {
             if (!handle.is_valid()) continue;
             pos.m_position = glm::vec3{ 7.0f + i, 8.0f + i, 9.0f + i };
             ++i;
         }
 
         /*bool sync = true;   //if true, then all entities are write locked
-      	range.for_each([&](auto handle, auto& pos) {
+      	range.for_each([&](auto& mutex, auto& handle, auto& pos) {
       		pos.m_position = glm::vec3{ 7.0f + i, 8.0f + i, 9.0f + i };
       		++i;
       	}, sync);*/
@@ -561,4 +538,4 @@ An example for looping over entities in parallel on several threads is given in 
 Note that since the ranges do not overlap, there is actually no need for synchronization of no other thread accesses the entities. Thus there is no lock in the range based for-loop. So instead of using locks, you can start threads in parallel if they do not interfere with each other. Two threads interfere with each other, if at least one is writing on a range of components (including erasing entities), and the other is reading or writing to the same range of components.
 In order to avoid interference, only start threads in parallel that either only read the same component ranges, or do not share components that they write to.
 
-If you use locks in the components, be aware that two threads easily can deadlock each other by locking the same entity pair in reverse order. VecsXLocks are kept simple and do not account for such an event. In order to avoid deadlocks by locking pairs, you have to ensure that the sequence the entities are locked is always the same. For instance, if you want to lock a pair, get them into some total ordering, e.g. by using their handle's map index, and always lock the smaller one first. 
+If you use locks in the components, be aware that two threads easily can deadlock each other by locking the same entity pair in reverse order. VecsXLocks are kept simple and do not account for such an event. In order to avoid deadlocks by locking pairs, you have to ensure that the sequence the entities are locked is always the same. For instance, if you want to lock a pair, get them into some total ordering, e.g. by using their handle's map index, and always lock the smaller one first.
