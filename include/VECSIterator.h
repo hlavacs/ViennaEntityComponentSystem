@@ -13,6 +13,9 @@ namespace vecs {
 
 	template<typename P, typename CTL>
 	class VecsIteratorT {
+
+		template<typename P, typename ETL, typename CTL> friend class VecsRangeBaseClass;
+
 	public:
 		using value_type = vtll::to_tuple< vtll::cat< vtll::tl<std::atomic<uint32_t>*, VecsHandleT<P>>, CTL > >;					///< Value type
 		using reference = vtll::to_tuple< vtll::cat< vtll::tl<std::atomic<uint32_t>*&, VecsHandleT<P>&>, vtll::to_ref<CTL> > >;	///< Reference type
@@ -164,74 +167,73 @@ namespace vecs {
 	class VecsRangeBaseClass {
 
 		struct range_t {
-			VecsIteratorT<P, CTL> m_begin{};
-			VecsIteratorT<P, CTL> m_end{};
+			VecsIteratorT<P, CTL>	m_begin{};
+			VecsIteratorT<P, CTL>	m_end{};
+			size_t					m_size{0};
 
 			range_t() = default;
-			range_t(const VecsIteratorT<P, CTL>& b, const VecsIteratorT<P, CTL>& e) : m_begin{ b }, m_end{ e } {};
-			range_t(VecsIteratorT<P, CTL>&& b, VecsIteratorT<P, CTL>&& e) : m_begin{ b }, m_end{ e } {};
+			range_t(const VecsIteratorT<P, CTL>& b, const VecsIteratorT<P, CTL>& e) : m_begin{ b }, m_end{ e }, m_size{ e.m_current - b.m_current } {};
+			range_t(VecsIteratorT<P, CTL>&& b, VecsIteratorT<P, CTL>&& e) : m_begin{ b }, m_end{ e }, m_size{ e.m_current - b.m_current } {};
 			range_t(const range_t&) = default;
 			range_t(range_t&&) = default;
 
 			auto begin() { return m_begin; };
 			auto end() { return m_end; };
+			auto size() { return m_size; };
 		};
 
 		using view_type = decltype(std::views::join(std::declval<std::vector<range_t>&>()));
-		view_type									m_view;
-		size_t										m_size{0};
-		std::array<size_t, vtll::size<ETL>::value>	m_sizeE{0};
-		std::vector<range_t>						m_v;
-		std::vector<std::vector<range_t>>			m_ranges;
-		std::vector<view_type>						m_result;			///< Result vector
-
+		view_type				m_view;
+		size_t					m_size{0};
+		std::vector<range_t>	m_ranges;
 
 	public:
-		VecsRangeBaseClass() noexcept {
-			m_v.reserve(vtll::size<ETL>::value);
+		VecsRangeBaseClass() noexcept = default;
+
+		auto operator=(const VecsRangeBaseClass<P, ETL, CTL>& v) noexcept -> VecsRangeBaseClass<P, ETL, CTL> & = default;
+		auto operator=(VecsRangeBaseClass<P, ETL, CTL>&& v) noexcept -> VecsRangeBaseClass<P, ETL, CTL> & = default;
+
+		void compute_ranges() {
+			m_ranges.reserve(vtll::size<ETL>::value);
 			m_size = 0;
 			vtll::static_for<size_t, 0, vtll::size<ETL>::value >(			///< Loop over all components
 				[&](auto i) {
 					using E = vtll::Nth_type<ETL, i>;
 					VecsRegistryT<P, E> reg;
-					m_sizeE[i] = reg.size();
-					if (m_sizeE[i]) {
-						m_v.push_back(range_t{ VecsIteratorT<P, CTL>(reg, 0), VecsIteratorT<P, CTL>(reg, m_sizeE[i]) });
-						m_size += m_sizeE[i];
-					}
-				});
+					m_ranges.push_back(range_t{ VecsIteratorT<P, CTL>(reg, 0), VecsIteratorT<P, CTL>(reg, reg.size()) });
+					m_size += m_ranges.back().size();
+				}
+			);
+			m_view = std::views::join(m_ranges);
+		}
 
-			m_view = std::views::join(m_v);
-		};
-
-		auto operator=(const VecsRangeBaseClass<P, ETL, CTL>& v) noexcept -> VecsRangeBaseClass<P, ETL, CTL> & = default;
-		auto operator=(VecsRangeBaseClass<P, ETL, CTL>&& v) noexcept -> VecsRangeBaseClass<P, ETL, CTL> & = default;
-
-		auto begin() noexcept { 
-			return m_view.begin(); 
+		auto begin() noexcept {
+			if (m_ranges.size() == 0) { compute_ranges(); }
+			return m_view.begin();
 		}
 
 		auto end() noexcept { 
-			return m_view.end(); 
+			return m_view.end();
 		}
 
 		auto size() noexcept { return m_size; }
 
 		auto split(size_t N) noexcept {
-			if (m_result.size() == N) return m_result;
-			m_result.clear();
-			m_result.reserve(N);					///< Need exactly N slots
+			std::vector<VecsRangeBaseClass<P, ETL, CTL>> result;
+			if (m_ranges.size() == 0) { compute_ranges(); }
+			if (m_ranges.size() == 0) return result;
+
+			VecsRangeBaseClass<P, ETL, CTL> new_range;
+
 			size_t remain = m_size;					///< Remaining entities
 			size_t num = remain / N;				///< Put the same number in each slot (except maybe last slot)
 			if (num * N < remain) ++num;			///< We might need one more per slot
-
-			m_ranges.push_back();
-			std::vector<range_t> &v = m_ranges[0];	///< Collect ranges to put into the same view
 			size_t need = num;						///< Still need that many entities to complete the next slot
+
 			vtll::static_for<size_t, 0, vtll::size<ETL>::value >(		///< Loop over all components
 				[&](auto i) {
 					using E = vtll::Nth_type<ETL, i>;
-					size_t available = m_sizeE[i];	///< Still available in the current range
+					size_t available = m_ranges[i].size();	///< Still available in the current range
 					size_t current = 0;				///< Index of current entity
 					size_t take = 0;				///< Number of entities to take
 					while (available > 0) {
@@ -239,26 +241,28 @@ namespace vecs {
 							take = need;
 						}
 						else {
-							take = m_sizeE[i] - current;	///< Do not have enough -> get the rest of this type
+							take = m_ranges[i].size() - current;	///< Do not have enough -> get the rest of this type
 						}
 						VecsRegistryT<P, E> reg;
-						v.push_back(range_t{ VecsIteratorT<P, CTL>(reg, current), VecsIteratorT<P, CTL>(reg, current + take) });
+						new_range.m_ranges.push_back(range_t{ VecsIteratorT<P, CTL>(reg, current), VecsIteratorT<P, CTL>(reg, current + take) });
+						new_range.n_size += take;
+
 						current += take;
 						available -= take;
 						need -= take;
 						remain -= take;
+
 						if (need == 0) {
-							m_result.push_back(std::views::join(v));
+							result.push_back(new_range);
 							if (remain > 0) {
-								m_ranges.push_back();
-								v = m_ranges.back();
-								need = m_result.size() < N ? num : remain;
+								new_range = VecsRangeBaseClass<P, ETL, CTL>{};
+								need = result.size() < N ? num : remain;
 							}
 						}
 					}
 				}
 			);
-			return m_result;
+			return result;
 		}
 
 		inline auto for_each(std::function<typename Functor<P, CTL>::type> f, bool sync = true) -> void {
