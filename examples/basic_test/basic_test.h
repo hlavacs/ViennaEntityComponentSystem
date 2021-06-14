@@ -29,6 +29,8 @@ namespace vecs {
 	/// \brief Example for a user component
 	struct MyComponentTransform {
 		glm::mat4 m_transform{};
+		std::unique_ptr<int> ptr{};
+		std::atomic<int> i = 0;
 	};
 
 	/// \brief Example for a user component
