@@ -25,14 +25,16 @@ namespace vecs::test {
 	/// \brief Example for a user component
 	struct MyComponentOrientation {
 		glm::quat m_orientation{};
-		std::atomic<int> i{ 0 };
+		int i{0};
+		//std::atomic<int> i{ 0 };
 	};
 
 	/// \brief Example for a user component
 	struct MyComponentTransform {
 		glm::mat4 m_transform;
-		std::unique_ptr<int> ptr;
-		std::atomic<int> i = 0;
+		int i{ 0 };
+		//std::unique_ptr<int> ptr;
+		//std::atomic<int> i = 0;
 	};
 
 	/// \brief Example for a user component

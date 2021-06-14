@@ -279,7 +279,7 @@ namespace vecs {
 		static const size_t c_segment_size = vtll::front_value< vtll::map<table_size_map, E, table_size_default > >::value;///Size of a segment
 		static inline VecsTable<P, data_types, c_segment_size, layout_type::value>			m_data;		///< Data per entity
 		static inline VecsTable<P, types_deleted, c_segment_size, VECS_LAYOUT_ROW::value>	m_deleted;	///< Table holding the indices of erased entities
-		static const size_t c_row_size = layout_type::value ? 0 : sizeof(data_types);					///< Size of a row
+		static const size_t c_row_size = layout_type::value ? sizeof(vtll::to_tuple<data_types>) : 0;					///< Size of a row
 
 		///One instance for each component type
 		using array_type = std::array<std::unique_ptr<VecsComponentAccessor<P, E>>, vtll::size<component_type_list>::value>;
@@ -343,7 +343,7 @@ namespace vecs {
 
 		auto handle_ptr(const table_index_t index) noexcept		-> VecsHandleT<P>*;	///< \returns ptr to handle for an index in the table
 		auto mutex_ptr(const table_index_t index) noexcept		-> std::atomic<uint32_t>*;	///< \returns pointer to the mutex for a given index
-		auto size() noexcept -> size_t { 	///< \returns the number of entries currently in the table, can also be invalid ones
+		auto size() const noexcept -> size_t { 	///< \returns the number of entries currently in the table, can also be invalid ones
 			return m_data.size(); 
 		};
 		auto compress() noexcept								-> void;	///< Compress the table
@@ -768,7 +768,7 @@ namespace vecs {
 
 		template<typename... Es>
 		requires (are_entity_types<P, Es...>)
-		auto size() noexcept -> size_t;		///< \returns the total number of valid entities of types Es
+		auto size() const noexcept -> size_t;		///< \returns the total number of valid entities of types Es
 
 		auto compress() noexcept						-> void;			///< Compress all component tables
 		auto type(VecsHandleT<P> h) noexcept			-> type_index_t;	///< \returns type of entity
@@ -1005,7 +1005,7 @@ namespace vecs {
 		//-------------------------------------------------------------------------
 		//utility
 
-		auto size() noexcept -> size_t { return m_sizeE.load(); };				///< \returns the number of valid entities of type E
+		auto size() const noexcept -> size_t { return m_sizeE.load(); };		///< \returns the number of valid entities of type E
 		auto compress() noexcept -> void { compressE(); }						///< Remove erased rows from the component table
 		auto capacity(size_t) noexcept								-> size_t;	///< Set max number of entities of this type
 		auto swap(VecsHandleT<P> h1, VecsHandleT<P> h2) noexcept	-> bool;	///< Swap rows in component table
@@ -1376,7 +1376,7 @@ namespace vecs {
 	template<typename P>
 	template<typename... Es>
 	requires (are_entity_types<P, Es...>)
-	inline auto VecsRegistryBaseClass<P>::size() noexcept	-> size_t {
+	inline auto VecsRegistryBaseClass<P>::size() const noexcept	-> size_t {
 		using entity_list = std::conditional_t< (sizeof...(Es) > 0), expand_tags< typename VecsRegistryBaseClass<P>::entity_tag_map, vtll::tl<Es...> >, entity_type_list >;
 
 		size_t sum = 0;

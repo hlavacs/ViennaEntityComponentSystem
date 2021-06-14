@@ -77,8 +77,12 @@ struct TData : public std::ranges::view_base  {
         std::copy_n(data.begin(), m_size, m_data.begin());
     };
     
-    TIter begin() { return TIter(this, 0);  };
-    TIter end() { return TIter(this, m_size); };
+    TIter begin() { 
+        return TIter(this, 0);  
+    };
+    TIter end() { 
+        return TIter(this, m_size); 
+    };
 
     int size() { return m_size; };
 };
@@ -106,13 +110,13 @@ auto make_range(TData &data1, TData &data2, T& tdata) {
 
 int main() {
 
-    bool sr = std::ranges::sized_range<TData>;
+    /*bool sr = std::ranges::sized_range<TData>;
 
     TData data1(std::array<int, 9>{1, 2, 3, 4, 5, 6, 7, 8, 88});
     TData data2(std::array<int, 9>{11, 21, 31, 41, 51, 61, 71, 81, 881});
 
-    for (auto&& i : data1) {
-        std::cout << i << " ";
+    for (auto& i : data1) {
+        std::cout << i << "\n";
     }
     std::cout << "\n";
 
@@ -208,7 +212,7 @@ int main() {
     for (auto&& i : sr3) {
         std::cout << i << " ";
     }
-    std::cout << "\n";
+    std::cout << "\n";*/
 
     //----------------------------------------------------
 
@@ -265,7 +269,12 @@ int main() {
     using entity_types = vtll::filter_have_all_types< MyEntityTypeList, vtll::type_list<MyComponentPosition> >;
     std::cout << typeid(entity_types).name() << std::endl;
 
-   VecsRange<MyComponentPosition, MyComponentOrientation>{}.for_each([&](auto& mutex, auto& handle, auto& pos, auto& orient) {
+
+    for (auto [mutex, handle, name, pos, orient, transf] : VecsRange<MyEntityTypeNode>{}) {
+        auto po = pos;
+    }
+
+    VecsRange<MyComponentPosition, MyComponentOrientation>{}.for_each([&](auto& mutex, auto& handle, auto& pos, auto& orient) {
         pos = MyComponentPosition{ glm::vec3{12345.0f, -299.0f, -334.0f} };
         std::cout << "entity\n";
     });
