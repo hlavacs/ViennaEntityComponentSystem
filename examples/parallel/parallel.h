@@ -85,7 +85,7 @@ namespace vecs {
 	//user size maps
 
 	using MyTableSizeMap = vtll::type_list<
-		//vtll::type_list< MyEntityTypeNode, vtll::value_list< 1<<15 > >
+		vtll::type_list< MyEntityTypeNode, vtll::value_list< 1<<10 > >
 	  //, vtll::type_list< MyEntityTypeDraw, vtll::value_list< 1<<15 > >
 	  //, vtll::type_list< MyEntityTypeAnimation, vtll::value_list< 1<<15 > >
 	  //, ...

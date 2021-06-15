@@ -97,21 +97,15 @@ namespace vecs {
 			m_pointers = m_current.value < m_size ? m_accessor(m_current) : pointer_tuple{};
 		}
 		else {
-			if (m_row_size > 0) {											///< If row layout
+			if (m_row_size > 0) {		///< If row layout
 				vtll::static_for<size_t, 0, std::tuple_size_v<pointer_tuple> >(	///< Loop over all components
 					[&](auto i) {
-						using type = std::tuple_element_t<i, pointer_tuple>;
-						auto& ptr = std::get<i>(m_pointers);
-						ptr = (type)((char*)ptr + m_row_size);
+						std::get<i>(m_pointers) = (std::tuple_element_t<i, pointer_tuple>)((char*)std::get<i>(m_pointers) + m_row_size);
 					}
 				);
 			}
-			else {
-				vtll::static_for<size_t, 0, std::tuple_size_v<pointer_tuple> >(	///< Column layout, loop over all components
-					[&](auto i) {
-						std::get<i>(m_pointers)++;
-					}
-				);
+			else {						///< Column layout
+				vtll::static_for<size_t, 0, std::tuple_size_v<pointer_tuple> >(	[&](auto i) { std::get<i>(m_pointers)++; } );
 			}
 		}
 		return *this;

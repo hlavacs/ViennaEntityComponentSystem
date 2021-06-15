@@ -103,7 +103,7 @@ namespace vecs::test {
 	//user table layouts
 
 	using MyTableLayoutMap = vtll::type_list<
-		vtll::type_list< MyEntityTypeNode, VECS_LAYOUT_COLUMN >
+		vtll::type_list< MyEntityTypeNode, VECS_LAYOUT_ROW >
 		, vtll::type_list< MyEntityTypeDraw, VECS_LAYOUT_COLUMN >
 		, vtll::type_list< MyEntityTypeAnimation, VECS_LAYOUT_COLUMN >
 		//, ...
