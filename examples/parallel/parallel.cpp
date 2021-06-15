@@ -47,13 +47,22 @@ void do_work(R range ) {
 		++i;
 	}
 	//std::cout << i << "\n";
+}
 
-	/*range.for_each([&](auto& mutex, auto& handle, auto& pos) {
+
+template<typename R>
+void do_work2(R range) {
+	size_t i = 0;
+
+	range.for_each([&](auto& mutex, auto& handle, auto& pos) {
 		pos.m_position = glm::vec3{ 7.0f + i, 8.0f + i, 9.0f + i };
 		++i;
-	}, true);*/
+	}, false);
+	//std::cout << i << "\n";
 
 }
+
+
 
 
 void init(size_t num) {
@@ -77,15 +86,20 @@ void init(size_t num) {
 }
 
 
-vgjs::Coro<std::pair<double,double>> clock( size_t num ) {
+vgjs::Coro<std::tuple<double,double,double>> clock( size_t num ) {
     //std::cout << "Start \n";
 
 	int thr = 12;
-	std::pmr::vector<vgjs::Function> vec;
+	std::pmr::vector<vgjs::Function> vec1;
+	std::pmr::vector<vgjs::Function> vec2;
 
 	auto ranges = VecsRange<MyComponentPosition>{}.split(thr);
 	for (int i = 0; i < ranges.size(); ++i) {
-		vec.push_back(vgjs::Function([=]() { do_work(ranges[i]); }, vgjs::thread_index_t{}, vgjs::thread_type_t{ 1 }, vgjs::thread_id_t{ i }));
+		vec1.push_back(vgjs::Function([=]() { do_work(ranges[i]); }, vgjs::thread_index_t{}, vgjs::thread_type_t{ 1 }, vgjs::thread_id_t{ i }));
+	}
+
+	for (int i = 0; i < ranges.size(); ++i) {
+		vec2.push_back(vgjs::Function([=]() { do_work2(ranges[i]); }, vgjs::thread_index_t{}, vgjs::thread_type_t{ 1 }, vgjs::thread_id_t{ i }));
 	}
 
 	auto lin =
@@ -99,20 +113,22 @@ vgjs::Coro<std::pair<double,double>> clock( size_t num ) {
 	co_await lin;
 
 	auto t1 = high_resolution_clock::now();
-
-	//for (auto& func : vec) {
-		//func.m_function();
-	//}
 	
-	co_await vec;
+	co_await vec1;
 
 	auto t2 = high_resolution_clock::now();
 
+	co_await vec2;
+
+	auto t3 = high_resolution_clock::now();
+
 	auto d1 = duration_cast<nanoseconds>(t1 - t0);
 	auto d2 = duration_cast<nanoseconds>(t2 - t1);
+	auto d3 = duration_cast<nanoseconds>(t3 - t2);
 
 	double dt1 = d1.count() / 1.0;
 	double dt2 = d2.count() / 1.0;
+	double dt3 = d3.count() / 1.0;
 
 	size_t size = VecsRegistry{}.size();
 
@@ -120,7 +136,7 @@ vgjs::Coro<std::pair<double,double>> clock( size_t num ) {
 	//std::cout << "Linear " << dt1        << " ns Parallel 1 " << dt2        << " ns Speedup " << dt1 / dt2 << "\n\n";
 	//std::cout << "Linear " << std::setprecision(5) << std::setw(10) << dt1 / size << " ns Parallel 1 " << std::setw(10) << dt2 / size << " ns \n";
 
-    co_return std::make_pair(dt1 / size, dt2 / size);
+    co_return std::make_tuple(dt1 / size, dt2 / size, dt3 / size);
 }
 
 
@@ -130,23 +146,34 @@ vgjs::Coro<> start(size_t num) {
 
 	std::vector<double> v1;
 	std::vector<double> v2;
-	for (int i = 0; i < 10000; ++i) {
+	std::vector<double> v3;
+	for (int i = 0; i < 5000; ++i) {
 		auto p = co_await clock(num);
 		v1.push_back(std::get<0>(p));
 		v2.push_back(std::get<1>(p));
+		v3.push_back(std::get<2>(p));
 	}
 	std::sort(v1.begin(), v1.end());
-	std::sort(v1.begin(), v1.end());
+	std::sort(v2.begin(), v2.end());
+	std::sort(v3.begin(), v3.end());
 
+	std::cout << "Linear\n";
 	std::cout << "Average " << std::accumulate(v1.begin(), v1.end(), 0.0) / v1.size() << "\n";
 	std::cout << "Median " << v1[v1.size()/2] << "\n";
 	std::cout << "Min " << *std::min_element(v1.begin(), v1.end()) << "\n";
 	std::cout << "Max " << *std::max_element(v1.begin(), v1.end()) << "\n\n";
 
+	std::cout << "Range based\n";
 	std::cout << "Average " << std::accumulate(v2.begin(), v2.end(), 0.0) / v2.size() << "\n";
 	std::cout << "Median " << v2[v2.size() / 2] << "\n";
 	std::cout << "Min " << *std::min_element(v2.begin(), v2.end()) << "\n";
-	std::cout << "Max " << *std::max_element(v2.begin(), v2.end()) << "\n";
+	std::cout << "Max " << *std::max_element(v2.begin(), v2.end()) << "\n\n";
+
+	std::cout << "for_each\n";
+	std::cout << "Average " << std::accumulate(v3.begin(), v3.end(), 0.0) / v3.size() << "\n";
+	std::cout << "Median " << v3[v3.size() / 2] << "\n";
+	std::cout << "Min " << *std::min_element(v3.begin(), v3.end()) << "\n";
+	std::cout << "Max " << *std::max_element(v3.begin(), v3.end()) << "\n";
 
 	vgjs::terminate();
 	co_return;
