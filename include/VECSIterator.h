@@ -279,34 +279,34 @@ namespace vecs {
 
 
 	/**
-	* \brief Iterator for given list of entity types. Entity types are taken as is, and NOT extended by possible tags from the tags map.
+	* \brief Range over a list of entity types.´In this case, entity types are expanded with the tag map.
 	*/
+	template<typename P, typename ETL>
+	using it_ETL_entity_list = expand_tags< typename VecsRegistryBaseClass<P>::entity_tag_map, ETL >;
+
 	template<typename P, typename ETL>
 	using it_CTL_entity_list = vtll::remove_types< vtll::intersection< ETL >, typename VecsRegistryBaseClass<P>::entity_tag_list >;
 
 	/**
-	* \brief Range over a list of entity types. In this case, entity types are taken as is, and are NOT expanded with the tag map.
+	* \brief Range over a list of entity types. In this case, entity types are expanded with the tag map.
 	*/
 	template<typename P, typename ETL>
 	requires (is_entity_type_list<P, ETL>::value)
-		class VecsRangeT<P, ETL> : public VecsRangeBaseClass< P, ETL, it_CTL_entity_list<P, ETL> > {};
+	class VecsRangeT<P, ETL> : public VecsRangeBaseClass< P, it_ETL_entity_list<P, ETL>, it_CTL_entity_list<P, ETL> > {};
 
 
 	/**
-	* \brief Iterator for given entity types.
+	* \brief Range over a set of entity types. Entity types are NOT expanded with the tag map.
 	*/
-	template<typename P, typename... Es>
-	using it_ETL_entity_types = expand_tags< typename VecsRegistryBaseClass<P>::entity_tag_map, vtll::tl<Es...> >;
-
 	template<typename P, typename... Es>
 	using it_CTL_entity_types = vtll::remove_types< vtll::intersection< vtll::tl<Es...> >, typename VecsRegistryBaseClass<P>::entity_tag_list >;
 
 	/**
-	* \brief Range over a set of entity types. Entity types are expanded using the tag map.
+	* \brief Range over a set of entity types. Entity types are NOT expanded with the tag map.
 	*/
 	template<typename P, typename... Es>
 	requires (sizeof...(Es) > 0 && are_entity_types<P, Es...>)
-		class VecsRangeT<P, Es...> : public VecsRangeBaseClass< P, it_ETL_entity_types<P, Es...>, it_CTL_entity_types<P, Es...> > {};
+	class VecsRangeT<P, Es...> : public VecsRangeBaseClass< P, vtll::tl<Es...>, it_CTL_entity_types<P, Es...> > {};
 
 
 	/**
@@ -340,7 +340,7 @@ namespace vecs {
 	*/
 	template<typename P, typename E, typename... Ts>
 	requires (is_entity_type<P, E> && (sizeof...(Ts) > 0) && are_entity_tags<P, Ts...>)
-		class VecsRangeT<P, E, Ts...> : public VecsRangeBaseClass< P, it_ETL_entity_tags<P, E, Ts...>, it_CTL_entity_tags<P, E, Ts...> > {};
+	class VecsRangeT<P, E, Ts...> : public VecsRangeBaseClass< P, it_ETL_entity_tags<P, E, Ts...>, it_CTL_entity_tags<P, E, Ts...> > {};
 
 
 	/**
