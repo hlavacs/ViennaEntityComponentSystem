@@ -1003,6 +1003,12 @@ namespace vecs {
 		auto clear() noexcept -> size_t { return clearE(); };					///< Clear entities of type E
 
 		//-------------------------------------------------------------------------
+		//iterate
+
+		auto begin() { return VecsIteratorT<P, E>{m_component_table, 0}; };
+		auto end() { return VecsIteratorT<P, E>{m_component_table, m_component_table.size()}; };
+
+		//-------------------------------------------------------------------------
 		//utility
 
 		auto size() const noexcept -> size_t { return m_sizeE.load(); };		///< \returns the number of valid entities of type E
