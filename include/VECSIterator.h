@@ -279,7 +279,7 @@ namespace vecs {
 
 
 	/**
-	* \brief Range over a list of entity types.´In this case, entity types are expanded with the tag map.
+	* \brief Range over a list of entity types. In this case, entity types are expanded with the tag map.
 	*/
 	template<typename P, typename ETL>
 	using it_ETL_entity_list = expand_tags< typename VecsRegistryBaseClass<P>::entity_tag_map, ETL >;
