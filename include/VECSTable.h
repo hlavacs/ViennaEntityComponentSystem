@@ -249,7 +249,7 @@ namespace vecs {
 				*std::get<i>(dst) = std::move(*std::get<i>(src));
 			}
 			else if constexpr (std::is_copy_assignable_v<type>) {
-				*std::get<i>(dst) = std::move(*std::get<i>(src));
+				*std::get<i>(dst) = *std::get<i>(src);
 			}
 		});
 		return true;
