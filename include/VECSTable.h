@@ -49,18 +49,26 @@ namespace vecs {
 
 		using array_tuple_t1 = std::array<tuple_value_t, N>;								///< ROW: an array of tuples
 		using array_tuple_t2 = vtll::to_tuple<vtll::transform_size_t<DATA,std::array,N>>;	///< COLUMN: a tuple of arrays
-		using array_tuple_t  = std::conditional_t<ROW, array_tuple_t1, array_tuple_t2>;		///< Memory layout of the table
+		using segment_t  = std::conditional_t<ROW, array_tuple_t1, array_tuple_t2>;		///< Memory layout of the table
 
-		using array_ptr = std::shared_ptr<array_tuple_t>;
-		using seg_vector_t = std::pmr::vector<std::atomic<array_ptr>>; ///< A seg_vector_t is a vector holding shared pointers to segments
+		using segment_ptr_t = std::shared_ptr<segment_t>;
+		using seg_vector_t = std::pmr::vector<std::atomic<segment_ptr_t>>; ///< A seg_vector_t is a vector holding shared pointers to segments
 
-		std::pmr::memory_resource*								m_mr;
-		std::pmr::polymorphic_allocator<seg_vector_t>			m_allocator;		///< use this allocator
-		std::atomic<std::shared_ptr<seg_vector_t>>				m_seg_vector;		///< Vector of shared ptrs to the segments
-		std::atomic<size_t>										m_num_segments{0};	///< Current number of segments
-		inline static thread_local std::pmr::vector<array_ptr>	m_reuse_segments; ///< Might allocate too much, so remember that
-		std::atomic<size_t>										m_size = 0;			///< Number of rows in the table
-		std::shared_mutex										m_mutex;			///< Mutex for reallocating the vector
+		struct slot_size_t {
+			uint32_t m_next_slot{ 0 };
+			uint32_t m_size{ 0 };
+		};
+
+		std::pmr::memory_resource*									m_mr;
+		std::pmr::polymorphic_allocator<seg_vector_t>				m_allocator;		///< use this allocator
+		std::atomic<std::shared_ptr<seg_vector_t>>					m_seg_vector;		///< Vector of shared ptrs to the segments
+		std::atomic<size_t>											m_num_segments{0};	///< Current number of segments
+		inline static thread_local std::pmr::vector<segment_ptr_t>	m_reuse_segments; ///< Might allocate too much, so remember that
+		std::atomic<size_t>											m_size = 0;			///< Number of rows in the table
+		std::shared_mutex											m_mutex;			///< Mutex for reallocating the vector
+
+		std::atomic<slot_size_t>									m_slot_size{ {0,0} };
+
 
 	public:
 		VecsTable(size_t r = 1 << 16, std::pmr::memory_resource* mr = std::pmr::new_delete_resource()) noexcept;
@@ -92,11 +100,11 @@ namespace vecs {
 
 		template<size_t I, typename C = vtll::Nth_type<DATA, I>>
 		requires vtll::has_type<DATA, std::decay_t<C>>::value
-		inline auto update(table_index_t n, C&& data) noexcept			-> bool;	///< Update a component  for a given row
+		inline auto update(table_index_t n, C&& data) noexcept		-> bool;	///< Update a component  for a given row
 		
 		template<typename... Cs>
 		requires vtll::has_all_types<DATA, vtll::tl<std::decay_t<Cs>...>>::value
-		inline auto update(table_index_t n, Cs&&... data) noexcept -> bool;
+		inline auto update(table_index_t n, Cs&&... data) noexcept	-> bool;
 
 		//-------------------------------------------------------------------------------------------
 		//move and remove data
@@ -188,6 +196,8 @@ namespace vecs {
 	template<typename... Cs>
 	requires vtll::has_all_types<DATA, vtll::tl<std::decay_t<Cs>...>>::value
 	inline auto VecsTable<P, DATA, N0, ROW>::push_back(Cs&&... data) noexcept -> table_index_t {
+
+
 		auto idx = m_size.fetch_add(1);			///< Increase table size and get old size.
 		if (!reserve(idx + 1)) {				///< Make sure there is enough space in the table
 			m_size--;
@@ -197,7 +207,18 @@ namespace vecs {
 			(update<vtll::index_of<DATA,std::decay_t<Cs>>::value>(table_index_t{ idx }, std::forward<Cs>(data)), ...);
 		}
 		return table_index_t{ idx }; ///< Return index of new entry
+
+
+		//auto vector_ptr{ m_seg_vector.load() };	///< Shared pointer to current segement ptr vector
+
+
 	}
+
+
+
+
+
+
 
 	/**
 	* \brief Update the component with index I of an entry.
@@ -297,8 +318,8 @@ namespace vecs {
 		auto new_num = ((r - 1ULL) >> L) + 1ULL;
 		if (new_num <= old_num) return true;	///< are there already segments that we can use?
 
-		array_ptr segment_ptr{ nullptr };
-		array_ptr expected{ nullptr };
+		segment_ptr_t segment_ptr{ nullptr };
+		segment_ptr_t expected{ nullptr };
 		m_reuse_segments.reserve(m_reuse_segments.size() + new_num - old_num);
 
 		for (size_t i = old_num; i < new_num; ++i) {
@@ -309,7 +330,7 @@ namespace vecs {
 					m_reuse_segments.pop_back();
 				}
 				else {
-					segment_ptr = std::make_shared<array_tuple_t>();	///< No - create a new segment
+					segment_ptr = std::make_shared<segment_t>();	///< No - create a new segment
 				}
 			}
 
