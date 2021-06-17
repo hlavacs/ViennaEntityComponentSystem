@@ -267,9 +267,14 @@ namespace vecs {
 		auto src = tuple_ptr(isrc);
 		auto dst = tuple_ptr(idst);
 		vtll::static_for<size_t, 0, vtll::size<DATA>::value >([&](auto i) {
-			using type = vtll::Nth_type<DATA,i>;
-			if constexpr (std::is_copy_assignable_v<type> || std::is_move_assignable_v<type>) {
+			using type = vtll::Nth_type<DATA, i>;
+			if constexpr (std::is_move_assignable_v<type> && std::is_move_constructible_v<type>) {
 				std::swap(*std::get<i>(dst), *std::get<i>(src));
+			}
+			else if constexpr (std::is_copy_assignable_v<type> && std::is_copy_constructible_v<type>) {
+				type tmp{ *std::get<i>(src) };
+				*std::get<i>(src) = *std::get<i>(dst);
+				*std::get<i>(dst) = tmp;
 			}
 		});
 		return true;
