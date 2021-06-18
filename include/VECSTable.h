@@ -67,7 +67,8 @@ namespace vecs {
 		std::atomic<size_t>											m_size = 0;			///< Number of rows in the table
 		std::shared_mutex											m_mutex;			///< Mutex for reallocating the vector
 
-		std::atomic<slot_size_t>									m_slot_size{ {0,0} };
+		std::atomic<slot_size_t>									m_size_cnt{ {0,0} };
+		std::atomic<std::shared_ptr<seg_vector_t>>					m_next_seg_vector{};		///< Vector of shared ptrs to the segments
 
 
 	public:
@@ -209,9 +210,50 @@ namespace vecs {
 		return table_index_t{ idx }; ///< Return index of new entry
 
 
-		//auto vector_ptr{ m_seg_vector.load() };	///< Shared pointer to current segement ptr vector
+		slot_size_t size;
+		bool done = false;
+		do {
+			size = m_size_cnt.load();
+			if (size.m_next_slot >= size.m_size) {
+				done = m_size_cnt.compare_exchange_weak(size, slot_size_t{ size.m_next_slot + 1, size.m_size });
+			}
+			else {
+				m_size_cnt.wait(size);
+			}
+		} while (!done);
 
+		auto vector_ptr{ m_seg_vector.load() };	///< Shared pointer to current segment ptr vector
+		if ((size.m_next_slot & BIT_MASK) == 0) {
+			if (size.m_next_slot >= N * vector_ptr->capacity()) {
+				auto new_vector_ptr = std::make_shared<seg_vector_t>(vector_ptr->capacity() * 2, m_mr);
+				for (size_t i = 0; i < vector_ptr->size(); ++i) { (*new_vector_ptr)[i].store( (*vector_ptr)[i].load() );  };
+				m_seg_vector.compare_exchange_strong(vector_ptr, new_vector_ptr);
+				vector_ptr = new_vector_ptr;
+			}
+		}
+		auto seg_num = size.m_next_slot >> L;
+		auto seg_ptr = (*vector_ptr)[seg_num].load();
+		if (!seg_ptr) {
+			auto new_seg_ptr = std::make_shared<segment_t>();	///< Create a new segment
+			done = (*vector_ptr)[seg_num].compare_exchange_strong( seg_ptr, new_seg_ptr);
+		}
 
+		done = false;
+		do {
+			slot_size_t new_size = m_size_cnt.load();
+			if (new_size.m_size == size.m_size) {
+				done = m_size_cnt.compare_exchange_weak(new_size, slot_size_t{ new_size.m_next_slot, size.m_size + 1 });
+			}
+			else {
+				m_size_cnt.wait(new_size);
+			}
+		} while (!done);
+
+		m_size_cnt.notify_all();
+		if constexpr (sizeof...(Cs) > 0) {
+			(update<vtll::index_of<DATA, std::decay_t<Cs>>::value>(table_index_t{ size.m_next_slot }, std::forward<Cs>(data)), ...);
+		}
+		return table_index_t{ size.m_next_slot }; ///< Return index of new entry
 	}
 
 
