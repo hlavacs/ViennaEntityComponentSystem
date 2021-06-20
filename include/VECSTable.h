@@ -6,6 +6,7 @@
 #include <shared_mutex>
 #include <optional>
 #include <array>
+#include <concepts>
 #include <algorithm>
 #include "VTLL.h"
 #include "VECSUtil.h"
@@ -107,7 +108,8 @@ namespace vecs {
 		//-------------------------------------------------------------------------------------------
 		//move and remove data
 
-		inline auto pop_back()	noexcept -> void;// { m_size--; }	///< Remove the last row
+		inline auto pop_back( vtll::to_tuple<DATA>& tup )	noexcept -> bool;				///< Remove the last row
+		inline auto remove_back()	noexcept -> bool;			///< Remove the last row
 		inline auto clear() noexcept -> void { m_size = 0; };	///< Set the number if rows to zero - effectively clear the table
 		inline auto move(table_index_t idst, table_index_t isrc) noexcept	-> bool;	///< Move contents of a row to another row
 		inline auto swap(table_index_t n1, table_index_t n2) noexcept		-> bool;	///< Swap contents of two rows
@@ -207,7 +209,11 @@ namespace vecs {
 	requires vtll::has_all_types<DATA, vtll::tl<std::decay_t<Cs>...>>::value
 	inline auto VecsTable<P, DATA, N0, ROW>::push_back(Cs&&... data) noexcept -> table_index_t {
 		slot_size_t size = m_size_cnt.load();
-		while( !m_size_cnt.compare_exchange_weak(size, slot_size_t{ size.m_next_slot + 1, size.m_size }));
+		while (size.m_next_slot < size.m_size || !m_size_cnt.compare_exchange_weak(size, slot_size_t{ size.m_next_slot + 1, size.m_size })) {
+			if (size.m_next_slot < size.m_size) {
+				size = m_size_cnt.load();
+			}
+		};
 
 		auto vector_ptr{ m_seg_vector.load() };					///< Shared pointer to current segment ptr vector, can be nullptr
 		size_t num_seg = vector_ptr ? vector_ptr->size() : 0;	///< Current number of segments
@@ -231,7 +237,6 @@ namespace vecs {
 		}
 
 		slot_size_t new_size = m_size_cnt.load();
-		auto loaded = new_size;
 		do {
 			new_size.m_size = size.m_next_slot;
 		} while (!m_size_cnt.compare_exchange_weak(new_size, slot_size_t{ new_size.m_next_slot, new_size.m_size + 1 }));
@@ -241,11 +246,50 @@ namespace vecs {
 
 
 	template<typename P, typename DATA, size_t N0, bool ROW>
-	inline auto VecsTable<P, DATA, N0, ROW>::pop_back() noexcept -> void {
-		auto size = m_size_cnt.load();
-		if (size.m_next_slot > 0 && size.m_size > 0) {
-			m_size_cnt.compare_exchange_strong(size, slot_size_t{ size.m_next_slot - 1, size.m_size - 1 } );
-		}
+	inline auto VecsTable<P, DATA, N0, ROW>::pop_back(vtll::to_tuple<DATA>& tup) noexcept -> bool {
+		slot_size_t size = m_size_cnt.load();
+		if (size.m_next_slot == 0) return false;
+
+		while (size.m_next_slot > size.m_size || !m_size_cnt.compare_exchange_weak(size, slot_size_t{ size.m_next_slot - 1, size.m_size })) {
+			if (size.m_next_slot > size.m_size) { size = m_size_cnt.load(); }
+			if (size.m_next_slot == 0) return false;
+		};
+
+		vtll::static_for<size_t, 0, vtll::size<DATA>::value >(			///< Loop over all components
+			[&](auto i) {
+				using type = vtll::Nth_type<DATA, i>;
+				if constexpr (std::is_move_assignable_v<type>) {
+					std::get<i>(tup) = std::move(component_ptr<i>(table_index_t{ size.m_next_slot }));
+				}
+				else if constexpr (std::is_copy_assignable_v<type>) {
+					std::get<i>(tup) = component_ptr<i>(table_index_t{ size.m_next_slot });
+
+					if constexpr (std::is_destructible_v<type> && !std::is_trivially_destructible_v<type>) {
+						component_ptr<i>(table_index_t{ size.m_next_slot })->~type();	///< Call destructor
+					}
+				}
+			}
+		);
+
+		slot_size_t new_size = m_size_cnt.load();
+		do {
+			new_size.m_size = size.m_next_slot;
+		} while (!m_size_cnt.compare_exchange_weak(new_size, slot_size_t{ new_size.m_next_slot, new_size.m_size - 1 }));
+
+		return true;
+	}
+
+
+	template<typename P, typename DATA, size_t N0, bool ROW>
+	inline auto VecsTable<P, DATA, N0, ROW>::remove_back() noexcept -> bool {
+		slot_size_t size = m_size_cnt.load();
+		if (size.m_next_slot == 0) return false;
+
+		while (size.m_next_slot > size.m_size || !m_size_cnt.compare_exchange_weak(size, slot_size_t{ size.m_next_slot - 1, size.m_size - 1 })) {
+			if (size.m_next_slot > size.m_size) { size = m_size_cnt.load(); }
+			if (size.m_next_slot == 0) return false;
+		};
+		return true;
 	}
 
 
@@ -350,20 +394,7 @@ namespace vecs {
 	template<typename P, typename DATA, size_t N0, bool ROW>
 	inline auto VecsTable<P, DATA, N0, ROW>::capacity(size_t r) noexcept -> size_t {
 		auto vector_ptr{ m_seg_vector.load() };
-		if (r == 0) return !vector_ptr ? 0 : vector_ptr->size() * N;
-
-		/*size_t num_seg = vector_ptr ? vector_ptr->size() : 0;	///< Current number of segments
-
-		if (r > N * num_seg) {					///< Do we have enough?
-			auto new_vector_ptr = std::make_shared<seg_vector_t>(std::max( (r >> L) + 1, 16ULL), m_mr);		///< Reallocate
-
-			for (size_t i = 0; i < num_seg; ++i) { (*new_vector_ptr)[i].store((*vector_ptr)[i].load()); };	///< Copy segment pointers
-			if (m_seg_vector.compare_exchange_strong(vector_ptr, new_vector_ptr)) {	///< Try to exchange old segment vector with new
-				vector_ptr = new_vector_ptr;						///< Remember for later
-			}
-		}*/
-
-		return vector_ptr->size() * N;
+		return !vector_ptr ? 0 : vector_ptr->size() * N;
 	}
 
 	/**

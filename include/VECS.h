@@ -526,7 +526,7 @@ namespace vecs {
 		while (m_data.size() > 0) {
 			auto& handle = m_data.component<c_handle>(table_index_t{ m_data.size() - 1 }).m_handle;
 			if (handle.is_valid()) return;	///< is last entity is valid, then return
-			m_data.pop_back();				///< Else remove it and continue the loop
+			m_data.remove_back();			///< Else remove it and continue the loop
 		}
 	}
 
