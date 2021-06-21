@@ -17,7 +17,7 @@ namespace vecs {
 		template<typename P, typename ETL, typename CTL> friend class VecsRangeBaseClass;
 
 	public:
-		using handle_type = typename handle_wrapper_t<P>::handle_type;
+		using handle_type = typename VecsComponentTable < P, vtll::front<vtll::front<P> > >::handle_wrapper_t::handle_type;
 
 		using value_type = vtll::to_tuple< vtll::cat< vtll::tl<std::atomic<uint32_t>*, VecsHandleT<P>>, vtll::to_ref<CTL> > >;	///< Value type - use refs to deal with atomics and unique_ptr
 		using reference = value_type&;										///< Reference type

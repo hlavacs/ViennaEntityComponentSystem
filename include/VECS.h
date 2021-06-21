@@ -229,21 +229,6 @@ namespace vecs {
 		virtual auto has_componentE()  noexcept										-> bool = 0;	///< Test for component
 	};
 
-	template<typename P>
-	struct handle_wrapper_t {
-		using handle_type = std::atomic<VecsHandleT<P>>;
-		handle_type m_handle{};
-
-		handle_wrapper_t() = default;
-		handle_wrapper_t(const VecsHandleT<P>& t) { m_handle.store(t); }
-		handle_wrapper_t(const handle_wrapper_t<P>& t) { m_handle.store(t.m_handle.load()); }
-		auto operator=(const handle_wrapper_t& t) { m_handle.store( t.m_handle.load() ); }
-	};
-
-	struct mutex_wrapper_t {
-		std::atomic<uint32_t>* m_mutex{ nullptr };
-	};
-
 
 	/**
 	* \brief This class stores all components of entities of type E. It as basically an adaptor for class VecsTable.
@@ -275,7 +260,21 @@ namespace vecs {
 		using tuple_ptr_t = vtll::to_ptr_tuple<E>;		///< A tuple storing pointers to all components of entity of type E
 		using layout_type = vtll::map<table_layout_map, E, VECS_LAYOUT_DEFAULT>; ///< ROW or COLUMN
 
-		using info_types = vtll::type_list<mutex_wrapper_t, handle_wrapper_t<P>>;	///< List of management data per entity (handle and mutex)
+		struct handle_wrapper_t {
+			using handle_type = std::atomic<VecsHandleT<P>>;
+			handle_type m_handle{};
+
+			handle_wrapper_t() = default;
+			handle_wrapper_t(const VecsHandleT<P>& t) { m_handle.store(t); }
+			handle_wrapper_t(const handle_wrapper_t& t) { m_handle.store(t.m_handle.load()); }
+			auto operator=(const handle_wrapper_t& t) { m_handle.store(t.m_handle.load()); }
+		};
+
+		struct mutex_wrapper_t {
+			std::atomic<uint32_t>* m_mutex{ nullptr };
+		};
+
+		using info_types = vtll::type_list<mutex_wrapper_t, handle_wrapper_t>;	///< List of management data per entity (handle and mutex)
 		static const size_t c_mutex = 0;		///< Component index of the handle info
 		static const size_t c_handle = 1;		///< Component index of the handle info
 		static const size_t c_info_size = 2;	///< Index where the entity data starts
@@ -408,7 +407,7 @@ namespace vecs {
 	template<typename... Cs>
 	requires are_components_of<P, E, Cs...> [[nodiscard]]
 	inline auto VecsComponentTable<P, E>::insert(std::atomic<uint32_t>* mutex, VecsHandleT<P> handle, Cs&&... args) noexcept -> table_index_t {
-		return m_data.push_back(mutex_wrapper_t{ mutex }, handle_wrapper_t<P>{ handle }, std::forward<Cs>(args)... );			///< Allocate space a the end of the table
+		return m_data.push_back(mutex_wrapper_t{ mutex }, handle_wrapper_t{ handle }, std::forward<Cs>(args)... );			///< Allocate space a the end of the table
 	};
 
 	/**
