@@ -407,6 +407,12 @@ namespace vecs {
 	template<typename... Cs>
 	requires are_components_of<P, E, Cs...> [[nodiscard]]
 	inline auto VecsComponentTable<P, E>::insert(std::atomic<uint32_t>* mutex, VecsHandleT<P> handle, Cs&&... args) noexcept -> table_index_t {
+		std::tuple<table_index_t> tup;
+		/*if (m_deleted.pop_back(tup)) {
+			table_index_t index = std::get<0>(tup);
+			m_data.update(index, mutex_wrapper_t{ mutex }, handle_wrapper_t{ handle }, std::forward<Cs>(args)...);
+			return index;
+		}*/
 		return m_data.push_back(mutex_wrapper_t{ mutex }, handle_wrapper_t{ handle }, std::forward<Cs>(args)... );			///< Allocate space a the end of the table
 	};
 

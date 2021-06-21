@@ -102,7 +102,7 @@ namespace vecs {
 		inline auto update(table_index_t n, C&& data) noexcept		-> bool;	///< Update a component  for a given row
 		
 		template<typename... Cs>
-		requires vtll::has_all_types<DATA, vtll::tl<std::decay_t<Cs>...>>::value
+		requires (sizeof...(Cs) > 0 && vtll::has_all_types<DATA, vtll::tl<std::decay_t<Cs>...>>::value)
 		inline auto update(table_index_t n, Cs&&... data) noexcept	-> bool;
 
 		//-------------------------------------------------------------------------------------------
@@ -259,10 +259,10 @@ namespace vecs {
 			[&](auto i) {
 				using type = vtll::Nth_type<DATA, i>;
 				if constexpr (std::is_move_assignable_v<type>) {
-					std::get<i>(tup) = std::move(component_ptr<i>(table_index_t{ size.m_next_slot }));
+					std::get<i>(tup) = std::move(*component_ptr<i>(table_index_t{ size.m_next_slot }));
 				}
 				else if constexpr (std::is_copy_assignable_v<type>) {
-					std::get<i>(tup) = component_ptr<i>(table_index_t{ size.m_next_slot });
+					std::get<i>(tup) = *component_ptr<i>(table_index_t{ size.m_next_slot });
 
 					if constexpr (std::is_destructible_v<type> && !std::is_trivially_destructible_v<type>) {
 						component_ptr<i>(table_index_t{ size.m_next_slot })->~type();	///< Call destructor
@@ -327,9 +327,9 @@ namespace vecs {
 	*/
 	template<typename P, typename DATA, size_t N0, bool ROW>
 	template<typename... Cs>
-	requires vtll::has_all_types<DATA, vtll::tl<std::decay_t<Cs>...>>::value
+	requires (sizeof...(Cs)>0 && vtll::has_all_types<DATA, vtll::tl<std::decay_t<Cs>...>>::value)
 	inline auto VecsTable<P, DATA, N0, ROW>::update(table_index_t n, Cs&&... data) noexcept -> bool {
-		return (update<vtll::index_of<DATA,std::decay_t<Cs>>>(n, std::forward<Cs>(data)) && ... && true);
+		return (update<vtll::index_of<DATA,std::decay_t<Cs>>::value>(n, std::forward<Cs>(data)) && ... && true);
 	}
 
 	/**
