@@ -285,10 +285,16 @@ namespace vecs {
 		slot_size_t size = m_size_cnt.load();
 		if (size.m_next_slot == 0) return false;
 
-		while (size.m_next_slot > size.m_size || !m_size_cnt.compare_exchange_weak(size, slot_size_t{ size.m_next_slot - 1, size.m_size - 1 })) {
+		while (size.m_next_slot > size.m_size || !m_size_cnt.compare_exchange_weak(size, slot_size_t{ size.m_next_slot - 1, size.m_size })) {
 			if (size.m_next_slot > size.m_size) { size = m_size_cnt.load(); }
 			if (size.m_next_slot == 0) return false;
 		};
+
+		slot_size_t new_size = m_size_cnt.load();
+		do {
+			new_size.m_size = size.m_next_slot;
+		} while (!m_size_cnt.compare_exchange_weak(new_size, slot_size_t{ new_size.m_next_slot, new_size.m_size - 1 }));
+
 		return true;
 	}
 
