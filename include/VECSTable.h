@@ -118,7 +118,7 @@ namespace vecs {
 		//memory management
 
 		inline auto reserve(size_t r) noexcept	-> bool;		///< Reserve enough memory ny allocating segments
-		inline auto capacity(size_t r) noexcept	-> size_t;		///< Set new max capacity -> might reallocate the segment vector!
+		inline auto capacity() noexcept			-> size_t;		///< Set new max capacity -> might reallocate the segment vector!
 		inline auto compress() noexcept			-> void;		///< Deallocate unsused segements
 	};
 
@@ -399,7 +399,7 @@ namespace vecs {
 	* \param[in] r Max number of entities to be allowed in the table.
 	*/
 	template<typename P, typename DATA, size_t N0, bool ROW>
-	inline auto VecsTable<P, DATA, N0, ROW>::capacity(size_t r) noexcept -> size_t {
+	inline auto VecsTable<P, DATA, N0, ROW>::capacity() noexcept -> size_t {
 		auto vector_ptr{ m_seg_vector.load() };
 		return !vector_ptr ? 0 : vector_ptr->size() * N;
 	}

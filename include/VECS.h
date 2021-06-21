@@ -352,9 +352,9 @@ namespace vecs {
 		auto size() const noexcept -> size_t { 	///< \returns the number of entries currently in the table, can also be invalid ones
 			return m_data.size(); 
 		};
-		auto compress() noexcept								-> void;	///< Compress the table
-		auto capacity(size_t) noexcept							-> size_t;	///< \returns the max number of entities that can be stored
-		auto swap(table_index_t n1, table_index_t n2) -> bool { return m_data.swap(n1, n2); }	///< Swap places for two rows
+		auto compress() noexcept						-> void;	///< Compress the table
+		auto capacity() noexcept						-> size_t;	///< \returns the max number of entities that can be stored
+		auto swap(table_index_t n1, table_index_t n2)	-> bool { return m_data.swap(n1, n2); }	///< Swap places for two rows
 	};
 
 	/**
@@ -472,7 +472,6 @@ namespace vecs {
 	inline auto VecsComponentTable<P, E>::erase(const table_index_t index) noexcept -> bool {
 		assert(index < m_data.size());
 		m_data.component<c_handle>(index).m_handle.store({});	///< Invalidate handle	
-		m_deleted.push_back(index);	///< Push the index to the deleted table.
 
 		vtll::static_for<size_t, 0, vtll::size<E>::value >(			///< Loop over all components
 			[&](auto i) {
@@ -482,6 +481,8 @@ namespace vecs {
 				}
 			}
 		);
+
+		m_deleted.push_back(index);	///< Push the index to the deleted table.
 
 		return true;
 	}
@@ -519,9 +520,8 @@ namespace vecs {
 	* \returns the current max number, or the new one.
 	*/
 	template<typename P, typename E>
-	inline auto VecsComponentTable<P, E>::capacity(size_t r) noexcept -> size_t {
-		m_data.capacity(r);
-		return m_deleted.capacity(r);
+	inline auto VecsComponentTable<P, E>::capacity() noexcept -> size_t {
+		return m_data.capacity();
 	}
 
 	/**
