@@ -17,10 +17,12 @@ namespace vecs {
 		template<typename P, typename ETL, typename CTL> friend class VecsRangeBaseClass;
 
 	public:
-		using value_type = vtll::to_tuple< vtll::cat< vtll::tl<std::atomic<uint32_t>*&, VecsHandleT<P>&>, vtll::to_ref<CTL> > >;	///< Value type - use refs to deal with atomics and unique_ptr
+		using handle_type = typename handle_wrapper_t<P>::handle_type;
+
+		using value_type = vtll::to_tuple< vtll::cat< vtll::tl<std::atomic<uint32_t>*, VecsHandleT<P>>, vtll::to_ref<CTL> > >;	///< Value type - use refs to deal with atomics and unique_ptr
 		using reference = value_type&;										///< Reference type
 		using pointer = value_type*;										///< Pointer to value
-		using pointer_tuple = vtll::to_tuple< vtll::cat< vtll::tl<std::atomic<uint32_t>**, VecsHandleT<P>*>, vtll::to_ptr<CTL> > >;		///< Pointer type
+		using pointer_tuple = vtll::to_tuple< vtll::cat< vtll::tl<std::atomic<uint32_t>**, handle_type*>, vtll::to_ptr<CTL> > >;		///< Pointer type
 		using iterator_category = std::forward_iterator_tag;				///< Forward iterator
 		using difference_type = int64_t;									///< Difference type
 		using accessor = std::function<pointer_tuple(table_index_t)>;
@@ -80,13 +82,17 @@ namespace vecs {
 	///< Access the data
 	template<typename P, typename CTL>
 	inline auto VecsIteratorT<P, CTL>::operator*() noexcept	-> value_type {
-		return ptr_to_ref_tuple(m_pointers);
+		return std::tuple_cat( std::make_tuple( *std::get<VecsComponentTable<P, vtll::front<vtll::front<P>>>::c_mutex>(m_pointers)
+			, *std::get<VecsComponentTable<P, vtll::front<vtll::front<P>>>::c_handle>(m_pointers) )
+			, vtll::ptr_to_ref_tuple( vtll::sub_tuple<2,std::tuple_size_v<pointer_tuple>>(m_pointers) ));
 	}
 
 	///< Access the const data
 	template<typename P, typename CTL>
 	inline auto VecsIteratorT<P, CTL>::operator*() const noexcept -> value_type {
-		return ptr_to_ref_tuple(m_pointers);
+		return std::tuple_cat(std::make_tuple(*std::get<VecsComponentTable<P, vtll::front<vtll::front<P>>>::c_mutex>(m_pointers)
+			, *std::get<VecsComponentTable<P, vtll::front<vtll::front<P>>>::c_handle>(m_pointers))
+			, vtll::ptr_to_ref_tuple(vtll::sub_tuple<2, std::tuple_size_v<pointer_tuple>>(m_pointers)));
 	}
 
 	///< Increase by 1
@@ -154,7 +160,7 @@ namespace vecs {
 	*/
 	template<typename P, template<typename...> typename Seq, typename... Cs>
 	struct Functor<P, Seq<Cs...>> {
-		using type = void(std::atomic<uint32_t>*&, VecsHandleT<P>&, Cs&...);	///< Arguments for the functor
+		using type = void(std::atomic<uint32_t>*&, VecsHandleT<P>, Cs&...);	///< Arguments for the functor
 	};
 
 

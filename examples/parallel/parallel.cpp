@@ -54,7 +54,7 @@ template<typename R>
 void do_work2(R range, bool sync = false) {
 	size_t i = 0;
 
-	range.for_each([&](auto& mutex, auto& handle, auto& pos) {
+	range.for_each([&](auto& mutex, auto handle, auto& pos) {
 		pos.m_position = glm::vec3{ 7.0f + i, 8.0f + i, 9.0f + i };
 		++i;
 	}, sync);
@@ -187,7 +187,7 @@ vgjs::Coro<> start(size_t num) {
 	std::vector<double> v4;
 	std::vector<double> v5;
 	std::vector<double> v6;
-	for (int i = 0; i < 5000; ++i) {
+	for (int i = 0; i < 1000; ++i) {
 		auto p = co_await clock(num);
 		v1.push_back(std::get<0>(p));
 		v2.push_back(std::get<1>(p));

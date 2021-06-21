@@ -229,6 +229,16 @@ namespace vecs {
 		virtual auto has_componentE()  noexcept										-> bool = 0;	///< Test for component
 	};
 
+	template<typename P>
+	struct handle_wrapper_t {
+		using handle_type = VecsHandleT<P>;
+		VecsHandleT<P> m_handle{};
+	};
+
+	struct mutex_wrapper_t {
+		std::atomic<uint32_t>* m_mutex{ nullptr };
+	};
+
 
 	/**
 	* \brief This class stores all components of entities of type E. It as basically an adaptor for class VecsTable.
@@ -260,15 +270,7 @@ namespace vecs {
 		using tuple_ptr_t = vtll::to_ptr_tuple<E>;		///< A tuple storing pointers to all components of entity of type E
 		using layout_type = vtll::map<table_layout_map, E, VECS_LAYOUT_DEFAULT>; ///< ROW or COLUMN
 
-		struct handle_wrapper_t {
-			VecsHandleT<P> m_handle{};
-		};
-
-		struct mutex_wrapper_t {
-			std::atomic<uint32_t>* m_mutex{nullptr};
-		};
-
-		using info_types = vtll::type_list<mutex_wrapper_t, handle_wrapper_t>;	///< List of management data per entity (handle and mutex)
+		using info_types = vtll::type_list<mutex_wrapper_t, handle_wrapper_t<P>>;	///< List of management data per entity (handle and mutex)
 		static const size_t c_mutex = 0;		///< Component index of the handle info
 		static const size_t c_handle = 1;		///< Component index of the handle info
 		static const size_t c_info_size = 2;	///< Index where the entity data starts
@@ -309,7 +311,7 @@ namespace vecs {
 
 		template<typename... Cs>
 		requires are_components_of<P, E, Cs...> [[nodiscard]]
-		auto insert(VecsHandleT<P> handle, std::atomic<uint32_t>* mutex, Cs&&... args) noexcept	-> table_index_t; ///< Insert new entity
+		auto insert(std::atomic<uint32_t>* mutex, VecsHandleT<P> handle, Cs&&... args) noexcept	-> table_index_t; ///< Insert new entity
 
 		//-------------------------------------------------------------------------
 		//read data
@@ -341,7 +343,7 @@ namespace vecs {
 		//-------------------------------------------------------------------------
 		//utilities
 
-		auto handle_ptr(const table_index_t index) noexcept		-> VecsHandleT<P>*;	///< \returns ptr to handle for an index in the table
+		auto handle(const table_index_t index) noexcept			-> VecsHandleT<P>;	///< \returns ptr to handle for an index in the table
 		auto mutex_ptr(const table_index_t index) noexcept		-> std::atomic<uint32_t>*;	///< \returns pointer to the mutex for a given index
 		auto size() const noexcept -> size_t { 	///< \returns the number of entries currently in the table, can also be invalid ones
 			return m_data.size(); 
@@ -400,8 +402,8 @@ namespace vecs {
 	template<typename P, typename E>
 	template<typename... Cs>
 	requires are_components_of<P, E, Cs...> [[nodiscard]]
-	inline auto VecsComponentTable<P, E>::insert(VecsHandleT<P> handle, std::atomic<uint32_t>* mutex, Cs&&... args) noexcept -> table_index_t {
-		return m_data.push_back(handle_wrapper_t{ handle }, mutex_wrapper_t{ mutex }, std::forward<Cs>(args)... );			///< Allocate space a the end of the table
+	inline auto VecsComponentTable<P, E>::insert(std::atomic<uint32_t>* mutex, VecsHandleT<P> handle, Cs&&... args) noexcept -> table_index_t {
+		return m_data.push_back(mutex_wrapper_t{ mutex }, handle_wrapper_t<P>{ handle }, std::forward<Cs>(args)... );			///< Allocate space a the end of the table
 	};
 
 	/**
@@ -487,9 +489,9 @@ namespace vecs {
 	* \returns the handle of an entity from the component table.
 	*/
 	template<typename P, typename E>
-	inline auto VecsComponentTable<P, E>::handle_ptr(const table_index_t index) noexcept -> VecsHandleT<P>* {
-		if (index >= m_data.size()) return nullptr;
-		return &m_data.component<c_handle>(index).m_handle;	///< Get ref to the handle and return it
+	inline auto VecsComponentTable<P, E>::handle(const table_index_t index) noexcept -> VecsHandleT<P> {
+		if (index >= m_data.size()) return {};
+		return m_data.component<c_handle>(index).m_handle;	///< Get ref to the handle and return it
 	}
 
 	/**
@@ -779,6 +781,13 @@ namespace vecs {
 			auto t = type(handle);
 			m_dispatch[t]->print_type(handle);
 		};
+
+		virtual auto print_entities(VecsHandleT<P> handle)					-> void {
+			for (auto& t : m_dispatch) {
+				t->print_type(handle);
+			}
+		};
+
 	};
 
 	template<typename P>
@@ -1019,6 +1028,13 @@ namespace vecs {
 		void print_type(VecsHandleT<P> handle) {
 			std::cout << "<" << typeid(E).name() << ">"; 
 		};
+		auto print_entities(VecsHandleT<P> handle)					-> void {
+			std::cout << "<" << typeid(E).name() << ">\n";
+			for (size_t i = 0; i < m_component_table.m_data.size(); ++i) {
+				std::cout << i << " " << m_component_table.handle(table_index_t{ i }).m_map_index << " " << m_component_table.handle(table_index_t{ i }).m_generation_counter << "\n";
+			}
+		};
+
 	};
 
 
@@ -1104,7 +1120,7 @@ namespace vecs {
 		VecsHandleT<P> handle{ map_idx, *this->counter_ptr(map_idx) }; ///< The new handle
 
 		*this->table_index_ptr(map_idx) 
-			= m_component_table.insert(handle, this->mutex_ptr(map_idx), std::forward<Cs>(args)...);	///< add data into component table
+			= m_component_table.insert(this->mutex_ptr(map_idx), handle, std::forward<Cs>(args)...);	///< add data into component table
 
 		this->m_size++;
 		this->m_sizeE++;
@@ -1131,7 +1147,7 @@ namespace vecs {
 
 		if (map_type == vtll::index_of<entity_type_list, E>::value) return true;	///< New type = old type -> do nothing
 
-		auto index = m_component_table.insert(handle, this->mutex_ptr(handle.m_map_index));	///< add data into component table
+		auto index = m_component_table.insert(this->mutex_ptr(handle.m_map_index), handle );	///< add data into component table
 			
 		vtll::static_for<size_t, 0, vtll::size<E>::value >(	///< Move old components to new entity type
 			[&](auto i) {

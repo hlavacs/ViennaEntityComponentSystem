@@ -26,6 +26,11 @@ namespace vecs::test {
 	struct MyComponentOrientation {
 		glm::quat m_orientation{};
 		std::atomic<int> i{ 0 };
+
+		auto operator=(const MyComponentOrientation& t) {
+			m_orientation = t.m_orientation;
+			i = t.i.load();
+		}
 	};
 
 	/// \brief Example for a user component
@@ -33,6 +38,12 @@ namespace vecs::test {
 		glm::mat4 m_transform{};
 		std::unique_ptr<int> ptr{};
 		std::atomic<int> i = 0;
+
+		auto operator=(MyComponentTransform&& t) {
+			m_transform = t.m_transform;
+			ptr = std::move(t.ptr);
+			i = t.i.load();
+		}
 	};
 
 	/// \brief Example for a user component

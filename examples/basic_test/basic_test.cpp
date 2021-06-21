@@ -274,11 +274,11 @@ int main() {
         auto po = pos;
     }
 
-    VecsRange<MyComponentTransform>{}.for_each([&](auto& mutex, auto& handle, auto& trans) {
+    VecsRange<MyComponentTransform>{}.for_each([&](auto& mutex, auto handle, auto& trans) {
         std::cout << "entity\n";
      });
 
-    VecsRange<MyComponentPosition, MyComponentOrientation>{}.for_each([&](auto& mutex, auto& handle, auto& pos, auto& orient) {
+    VecsRange<MyComponentPosition, MyComponentOrientation>{}.for_each([&](auto& mutex, auto handle, auto& pos, auto& orient) {
         pos = MyComponentPosition{ glm::vec3{12345.0f, -299.0f, -334.0f} };
         std::cout << "entity\n";
     });

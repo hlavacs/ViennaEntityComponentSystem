@@ -212,7 +212,7 @@ int start_test() {
 		TESTRESULT(++number, "system run 0", , (test&& i == num), );
 
 		i = 0;
-		VecsRange<MyComponentName>{}.for_each([&](auto& mutex, auto& handle, auto& name) {
+		VecsRange<MyComponentName>{}.for_each([&](auto& mutex, auto handle, auto& name) {
 			++i;
 			if (name.m_name != "Node" && name.m_name != "Draw") { 
 				test = false; 
@@ -222,7 +222,7 @@ int start_test() {
 			});
 
 		i = 0;
-		VecsRange<MyComponentName>{}.for_each([&](auto& mutex, auto& handle, auto& name) {
+		VecsRange<MyComponentName>{}.for_each([&](auto& mutex, auto handle, auto& name) {
 			++i;
 			if (name.m_name != "Name Holder 0 " + std::to_string(i)) { test = false; }
 			//std::cout << "Entity " << name.m_name << " " << i << "\n";
@@ -242,7 +242,7 @@ int start_test() {
 		}
 
 		i = 0;
-		VecsRange<MyComponentName>{}.for_each([&](auto& mutex, auto& handle, auto& name) {
+		VecsRange<MyComponentName>{}.for_each([&](auto& mutex, auto handle, auto& name) {
 			++i;
 			if (name.m_name != ("Name Holder 2 " + std::to_string(i))) { 
 				test = false; 
@@ -254,7 +254,7 @@ int start_test() {
 
 		i = 0;
 		test = true;
-		VecsRange<MyComponentName>{}.for_each([&](auto& mutex, auto& handle, auto& name) {
+		VecsRange<MyComponentName>{}.for_each([&](auto& mutex, auto handle, auto& name) {
 			++i;
 			if (name.m_name != ("Name Holder 2 " + std::to_string(i))) { test = false; }
 			name.m_name = "Name Holder 4 " + std::to_string(i);
@@ -264,7 +264,7 @@ int start_test() {
 		TESTRESULT(++number, "system run 3", , test, );
 
 		i = 0;
-		VecsRange<MyComponentName>{}.for_each([&](auto& mutex, auto& handle, auto& name) {
+		VecsRange<MyComponentName>{}.for_each([&](auto& mutex, auto handle, auto& name) {
 			++i;
 			if (name.m_name != ("Name Holder 4 " + std::to_string(i))) { test = false; }
 			//std::cout << "Entity " << name.m_name << " " << i << "\n";
@@ -304,7 +304,7 @@ int start_test() {
 	{
 		int i = 0;
 		bool test = true;
-		VecsRange<MyEntityTypeNode, MyEntityTypeDraw>{}.for_each([&](auto& mutex, auto& handle, auto& name, auto& pos, auto& orient) {
+		VecsRange<MyEntityTypeNode, MyEntityTypeDraw>{}.for_each([&](auto& mutex, auto handle, auto& name, auto& pos, auto& orient) {
 			++i;
 			if (name.m_name != ("Name Holder 4 " + std::to_string(i))) { test = false; }
 			//std::cout << "Entity " << name.m_name << " " << i << "\n";
@@ -349,24 +349,24 @@ int start_test() {
 		VecsIterator<MyEntityTypeNodeTagged<TAG1>> et;
 		VecsRange<MyEntityTypeNodeTagged<TAG1>> ranget;
 
-		VecsRange<MyEntityTypeNode, TAG1>{}.for_each([&](auto& mutex, auto& handle, auto& name, auto& pos, auto& orient, auto& transf) {
+		VecsRange<MyEntityTypeNode, TAG1>{}.for_each([&](auto& mutex, auto handle, auto& name, auto& pos, auto& orient, auto& transf) {
 			//std::cout << handle.map_index().value << "\n";
 		});
 
 		VecsRange<MyEntityTypeNode, TAG1> range_par;
 		auto split = range_par.split(2);
 
-		split[0].for_each([&](auto& mutex, auto& handle, auto& name, auto& pos, auto& orient, auto& transf) {
+		split[0].for_each([&](auto& mutex, auto handle, auto& name, auto& pos, auto& orient, auto& transf) {
 			//std::cout << handle.map_index().value << "\n";
 			VecsRegistry<MyEntityTypeNode>{}.transform(handle);
 			});
 
-		split[1].for_each([&](auto& mutex, auto& handle, auto& name, auto& pos, auto& orient, auto& transf) {
+		split[1].for_each([&](auto& mutex, auto handle, auto& name, auto& pos, auto& orient, auto& transf) {
 			//std::cout << handle.map_index().value << "\n";
 			VecsRegistry<MyEntityTypeNode>{}.transform(handle);
 			});
 
-		VecsRange<MyEntityTypeNode, TAG1>{}.for_each([&](auto& mutex, auto& handle, auto& name, auto& pos, auto& orient, auto& transf) {
+		VecsRange<MyEntityTypeNode, TAG1>{}.for_each([&](auto& mutex, auto handle, auto& name, auto& pos, auto& orient, auto& transf) {
 			VecsRegistry<MyEntityTypeNode>{}.transform(handle);
 		});
 
@@ -392,7 +392,7 @@ int start_test() {
 
 		int i = 0;
 
-		VecsRange<MyEntityTypeNode, MyEntityTypeDraw>{}.for_each([&](auto& mutex, auto& handle, auto& name, auto& pos, auto& orient) {
+		VecsRange<MyEntityTypeNode, MyEntityTypeDraw>{}.for_each([&](auto& mutex, auto handle, auto& name, auto& pos, auto& orient) {
 			orient.i = 1;
 			++i;
 		});
@@ -474,28 +474,28 @@ int start_test() {
 		for (int i = 0; i < 1; ++i) {
 			bool sync = true;
 			auto a1 = std::async([&]() {
-				VecsRange<MyComponentOrientation, MyComponentTransform>{}.for_each([&](auto& mutex, auto& handle, auto& orient, auto& transf) {
+				VecsRange<MyComponentOrientation, MyComponentTransform>{}.for_each([&](auto& mutex, auto handle, auto& orient, auto& transf) {
 					orient.i = 11;
 					transf.i = 11;
 					}, sync);
 				});
 
 			auto a2 = std::async([&]() {
-				VecsRange<MyComponentOrientation, MyComponentTransform>{}.for_each([&](auto& mutex, auto& handle, auto& orient, auto& transf) {
+				VecsRange<MyComponentOrientation, MyComponentTransform>{}.for_each([&](auto& mutex, auto handle, auto& orient, auto& transf) {
 					orient.i = 22;
 					transf.i = 22;
 					}, sync);
 				});
 
 			auto a3 = std::async([&]() {
-				VecsRange<MyComponentOrientation, MyComponentTransform>{}.for_each([&](auto& mutex, auto& handle, auto& orient, auto& transf) {
+				VecsRange<MyComponentOrientation, MyComponentTransform>{}.for_each([&](auto& mutex, auto handle, auto& orient, auto& transf) {
 					orient.i = 33;
 					transf.i = 33;
 					}, sync);
 				});
 
 			auto a4 = std::async([&]() {
-				VecsRange<MyComponentOrientation, MyComponentTransform>{}.for_each([&](auto& mutex, auto& handle, auto& orient, auto& transf) {
+				VecsRange<MyComponentOrientation, MyComponentTransform>{}.for_each([&](auto& mutex, auto handle, auto& orient, auto& transf) {
 					orient.i = 44;
 					transf.i = 44;
 					}, sync);
