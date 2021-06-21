@@ -88,12 +88,12 @@ int start_test() {
 		TESTRESULT(++number, "size", , (VecsRegistry().size() == 0 && VecsRegistry<MyEntityTypeNode>().size() == 0 && VecsRegistry<MyEntityTypeDraw>().size() == 0), );
 
 		TESTRESULT(++number, "insert",
-			auto h1 = VecsRegistry<MyEntityTypeNode>{}.insert(MyComponentName{ "Node" }, pos, orient, MyComponentTransform{ glm::mat4{ 1.0f } }),
-			h1.has_value() && VecsRegistry().size() == 1, );
+			auto h0 = VecsRegistry<MyEntityTypeNode>{}.insert(MyComponentName{ "Node" }, pos, orient, MyComponentTransform{ glm::mat4{ 1.0f } }),
+			h0.has_value() && VecsRegistry().size() == 1, );
 
 		TESTRESULT(++number, "insert",
-			auto h1_2 = VecsRegistry<MyEntityTypeNode>{}.insert(MyComponentName{ "Node" }, pos2, orient, MyComponentTransform{ glm::mat4{ 1.0f } }),
-			h1_2.has_value() && VecsRegistry().size() == 2, );
+			auto h1 = VecsRegistry<MyEntityTypeNode>{}.insert(MyComponentName{ "Node" }, pos2, orient, MyComponentTransform{ glm::mat4{ 1.0f } }),
+			h1.has_value() && VecsRegistry().size() == 2, );
 
 		TESTRESULT(++number, "insert<type>",
 			auto h2 = VecsRegistry<MyEntityTypeDraw>{}.insert(MyComponentName{ "Draw" }, pos, orient, mat, geo),
@@ -105,71 +105,71 @@ int start_test() {
 
 		//--------------------------------------------------------------------------------------------------------------------------
 
-		TESTRESULT(++number, "component handle", auto& comp1 = h1.component<MyComponentPosition>(),
+		TESTRESULT(++number, "component handle", auto& comp1 = h0.component<MyComponentPosition>(),
 			(comp1.m_position == glm::vec3{ 9.0f, 2.0f, 3.0f }), );
 
-		TESTRESULT(++number, "component handle", auto bb1 = h1.has_component<MyComponentMaterial>(), (!bb1), );
+		TESTRESULT(++number, "component handle", auto bb1 = h0.has_component<MyComponentMaterial>(), (!bb1), );
 
 		TESTRESULT(++number, "component handle", auto comp3 = h2.component<MyComponentMaterial>(), (comp3.i == 99), );
 
-		TESTRESULT(++number, "value tuple", auto tup1 = VecsRegistry<MyEntityTypeNode>{}.tuple(h1),
+		TESTRESULT(++number, "value tuple", auto tup1 = VecsRegistry<MyEntityTypeNode>{}.tuple(h0),
 			(std::get<MyComponentPosition&>(tup1).m_position == glm::vec3{ 9.0f, 2.0f, 3.0f }), );
 
-		TESTRESULT(++number, "ptr tuple", auto tup2 = VecsRegistry<MyEntityTypeNode>{}.tuple_ptr(h1_2),
+		TESTRESULT(++number, "ptr tuple", auto tup2 = VecsRegistry<MyEntityTypeNode>{}.tuple_ptr(h1),
 			(std::get<MyComponentPosition*>(tup2)->m_position == glm::vec3{ 22.0f, 2.0f, 3.0f }), );
 
 		//--------------------------------------------------------------------------------------------------------------------------
 
-		TESTRESULT(++number, "update", h1.update(MyComponentName{ "Node" }, MyComponentPosition{ glm::vec3{-99.0f, -22.0f, -33.0f} }),
-			(h1.component<MyComponentPosition>().m_position == glm::vec3{ -99.0f, -22.0f, -33.0f }), );
+		TESTRESULT(++number, "update", h0.update(MyComponentName{ "Node" }, MyComponentPosition{ glm::vec3{-99.0f, -22.0f, -33.0f} }),
+			(h0.component<MyComponentPosition>().m_position == glm::vec3{ -99.0f, -22.0f, -33.0f }), );
 
 		//std::get<MyComponentPosition>(tup1).m_position = glm::vec3{ -9.0f, -255.0f, -3.0f };
-		//TESTRESULT(++number, "update tuple", VecsRegistry<MyEntityTypeNode>{}.update(h1, tup1),
-		//	(h1.component<MyComponentPosition>().m_position == glm::vec3{ -9.0f, -255.0f, -3.0f }), );
+		//TESTRESULT(++number, "update tuple", VecsRegistry<MyEntityTypeNode>{}.update(h0, tup1),
+		//	(h0.component<MyComponentPosition>().m_position == glm::vec3{ -9.0f, -255.0f, -3.0f }), );
 
 		std::get<MyComponentPosition*>(tup2)->m_position = glm::vec3{ -9.0f, -255.0f, -355.0f };
-		TESTRESULT(++number, "update tuple ref", , (h1_2.component<MyComponentPosition>().m_position == glm::vec3{ -9.0f, -255.0f, -355.0f }), );
+		TESTRESULT(++number, "update tuple ref", , (h1.component<MyComponentPosition>().m_position == glm::vec3{ -9.0f, -255.0f, -355.0f }), );
 
-		TESTRESULT(++number, "update handle", h1.update(MyComponentPosition{ glm::vec3{99.0f, 22.0f, 33.0f} }),
-			(h1.component<MyComponentPosition>().m_position == glm::vec3{ 99.0f, 22.0f, 33.0f }), );
+		TESTRESULT(++number, "update handle", h0.update(MyComponentPosition{ glm::vec3{99.0f, 22.0f, 33.0f} }),
+			(h0.component<MyComponentPosition>().m_position == glm::vec3{ 99.0f, 22.0f, 33.0f }), );
 
-		TESTRESULT(++number, "update handle", h1.update(MyComponentPosition{ glm::vec3{-99.0f, -22.0f, -33.0f} }),
-			(h1.component<MyComponentPosition>().m_position == glm::vec3{ -99.0f, -22.0f, -33.0f }), );
+		TESTRESULT(++number, "update handle", h0.update(MyComponentPosition{ glm::vec3{-99.0f, -22.0f, -33.0f} }),
+			(h0.component<MyComponentPosition>().m_position == glm::vec3{ -99.0f, -22.0f, -33.0f }), );
 
-		TESTRESULT(++number, "update registry", VecsRegistry{}.update(h1, MyComponentPosition{ glm::vec3{-90.0f, -22.0f, -33.0f} }),
-			(h1.component<MyComponentPosition>().m_position == glm::vec3{ -90.0f, -22.0f, -33.0f }), );
+		TESTRESULT(++number, "update registry", VecsRegistry{}.update(h0, MyComponentPosition{ glm::vec3{-90.0f, -22.0f, -33.0f} }),
+			(h0.component<MyComponentPosition>().m_position == glm::vec3{ -90.0f, -22.0f, -33.0f }), );
 
-		TESTRESULT(++number, "update registry", VecsRegistry{}.update(h1, MyComponentName{ "Draw1" }, MyComponentPosition{ glm::vec3{-98.0f, -20.0f, -33.0f} }),
-			(h1.component<MyComponentPosition>().m_position == glm::vec3{ -98.0f, -20.0f, -33.0f }), );
+		TESTRESULT(++number, "update registry", VecsRegistry{}.update(h0, MyComponentName{ "Draw1" }, MyComponentPosition{ glm::vec3{-98.0f, -20.0f, -33.0f} }),
+			(h0.component<MyComponentPosition>().m_position == glm::vec3{ -98.0f, -20.0f, -33.0f }), );
 
-		TESTRESULT(++number, "update registry", VecsRegistry<MyEntityTypeNode>{}.update(h1, MyComponentName{ "Draw" }, MyComponentPosition{ glm::vec3{-97.0f, -22.0f, -33.0f} }),
-			(h1.component<MyComponentPosition>().m_position == glm::vec3{ -97.0f, -22.0f, -33.0f }), );
+		TESTRESULT(++number, "update registry", VecsRegistry<MyEntityTypeNode>{}.update(h0, MyComponentName{ "Draw" }, MyComponentPosition{ glm::vec3{-97.0f, -22.0f, -33.0f} }),
+			(h0.component<MyComponentPosition>().m_position == glm::vec3{ -97.0f, -22.0f, -33.0f }), );
 
-		TESTRESULT(++number, "update registry", VecsRegistry<MyEntityTypeNode>{}.update<MyComponentPosition>(h1, MyComponentPosition{ glm::vec3{-97.0f, -22.0f, -30.0f} }),
-			(h1.component<MyComponentPosition>().m_position == glm::vec3{ -97.0f, -22.0f, -30.0f }), );
+		TESTRESULT(++number, "update registry", VecsRegistry<MyEntityTypeNode>{}.update<MyComponentPosition>(h0, MyComponentPosition{ glm::vec3{-97.0f, -22.0f, -30.0f} }),
+			(h0.component<MyComponentPosition>().m_position == glm::vec3{ -97.0f, -22.0f, -30.0f }), );
 
 		//--------------------------------------------------------------------------------------------------------------------------
 
-		auto position1 = h1.component<MyComponentPosition>().m_position;
-		auto position1_2 = h1_2.component<MyComponentPosition>().m_position;
-		TESTRESULT(++number, "swap", auto swap1 = VecsRegistry{}.swap(h1, h1_2),
-			(swap1	&& h1.component<MyComponentPosition>().m_position == position1
-					&& h1_2.component<MyComponentPosition>().m_position == position1_2), );
+		auto position1 = h0.component<MyComponentPosition>().m_position;
+		auto position1_2 = h1.component<MyComponentPosition>().m_position;
+		TESTRESULT(++number, "swap", auto swap1 = VecsRegistry{}.swap(h0, h1),
+			(swap1	&& h0.component<MyComponentPosition>().m_position == position1
+					&& h1.component<MyComponentPosition>().m_position == position1_2), );
 
 		//--------------------------------------------------------------------------------------------------------------------------
 
 		TESTRESULT(++number, "erase handle per entity", h3.erase(), (!h3.has_value() && VecsRegistry().size() == 3), );
 		TESTRESULT(++number, "size", , (VecsRegistry<MyEntityTypeDraw>().size() == 1), );
 
-		TESTRESULT(++number, "erase handle", h1.erase(), (!h1.has_value() && VecsRegistry().size() == 2), );
+		TESTRESULT(++number, "erase handle", h0.erase(), (!h0.has_value() && VecsRegistry().size() == 2), );
 		TESTRESULT(++number, "size", , (VecsRegistry<MyEntityTypeNode>().size() == 1), );
 
 		TESTRESULT(++number, "erase handle", h2.erase(), (!h2.has_value() && VecsRegistry().size() == 1), );
 		TESTRESULT(++number, "size", , (VecsRegistry<MyEntityTypeDraw>().size() == 0), );
 
-		TESTRESULT(++number, "clear", VecsRegistry{}.clear(), (!h1_2.has_value() && VecsRegistry().size() == 0 && VecsRegistry<MyEntityTypeNode>().size() == 0 && VecsRegistry<MyEntityTypeDraw>().size() == 0), );
+		TESTRESULT(++number, "clear", VecsRegistry{}.clear(), (!h1.has_value() && VecsRegistry().size() == 0 && VecsRegistry<MyEntityTypeNode>().size() == 0 && VecsRegistry<MyEntityTypeDraw>().size() == 0), );
 
-		//VecsRegistry{}.compress();
+		VecsRegistry{}.compress();
 
 		int i = 0;
 		bool test = true;

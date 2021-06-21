@@ -82,16 +82,18 @@ namespace vecs {
 	///< Access the data
 	template<typename P, typename CTL>
 	inline auto VecsIteratorT<P, CTL>::operator*() noexcept	-> value_type {
-		return std::tuple_cat( std::make_tuple( *std::get<VecsComponentTable<P, vtll::front<vtll::front<P>>>::c_mutex>(m_pointers)
-			, *std::get<VecsComponentTable<P, vtll::front<vtll::front<P>>>::c_handle>(m_pointers) )
+		return std::tuple_cat( 
+			std::make_tuple( *std::get<VecsComponentTable<P, vtll::front<vtll::front<P>>>::c_mutex>(m_pointers)
+			, std::get<VecsComponentTable<P, vtll::front<vtll::front<P>>>::c_handle>(m_pointers)->load() )
 			, vtll::ptr_to_ref_tuple( vtll::sub_tuple<2,std::tuple_size_v<pointer_tuple>>(m_pointers) ));
 	}
 
 	///< Access the const data
 	template<typename P, typename CTL>
 	inline auto VecsIteratorT<P, CTL>::operator*() const noexcept -> value_type {
-		return std::tuple_cat(std::make_tuple(*std::get<VecsComponentTable<P, vtll::front<vtll::front<P>>>::c_mutex>(m_pointers)
-			, *std::get<VecsComponentTable<P, vtll::front<vtll::front<P>>>::c_handle>(m_pointers))
+		return std::tuple_cat(
+			std::make_tuple(*std::get<VecsComponentTable<P, vtll::front<vtll::front<P>>>::c_mutex>(m_pointers)
+			, std::get<VecsComponentTable<P, vtll::front<vtll::front<P>>>::c_handle>(m_pointers)->load())
 			, vtll::ptr_to_ref_tuple(vtll::sub_tuple<2, std::tuple_size_v<pointer_tuple>>(m_pointers)));
 	}
 

@@ -231,8 +231,13 @@ namespace vecs {
 
 	template<typename P>
 	struct handle_wrapper_t {
-		using handle_type = VecsHandleT<P>;
-		VecsHandleT<P> m_handle{};
+		using handle_type = std::atomic<VecsHandleT<P>>;
+		handle_type m_handle{};
+
+		handle_wrapper_t() = default;
+		handle_wrapper_t(const VecsHandleT<P>& t) { m_handle.store(t); }
+		handle_wrapper_t(const handle_wrapper_t<P>& t) { m_handle.store(t.m_handle.load()); }
+		auto operator=(const handle_wrapper_t& t) { m_handle.store( t.m_handle.load() ); }
 	};
 
 	struct mutex_wrapper_t {
@@ -467,7 +472,7 @@ namespace vecs {
 	template<typename P, typename E>
 	inline auto VecsComponentTable<P, E>::erase(const table_index_t index) noexcept -> bool {
 		assert(index < m_data.size());
-		m_data.component<c_handle>(index) = {};	///< Invalidate handle	
+		m_data.component<c_handle>(index).m_handle.store({});	///< Invalidate handle	
 		m_deleted.push_back(index);	///< Push the index to the deleted table.
 
 		vtll::static_for<size_t, 0, vtll::size<E>::value >(			///< Loop over all components
@@ -491,7 +496,7 @@ namespace vecs {
 	template<typename P, typename E>
 	inline auto VecsComponentTable<P, E>::handle(const table_index_t index) noexcept -> VecsHandleT<P> {
 		if (index >= m_data.size()) return {};
-		return m_data.component<c_handle>(index).m_handle;	///< Get ref to the handle and return it
+		return m_data.component<c_handle>(index).m_handle.load();	///< Get ref to the handle and return it
 	}
 
 	/**
@@ -526,7 +531,7 @@ namespace vecs {
 	template<typename P, typename E>
 	inline auto VecsComponentTable<P, E>::remove_deleted_tail() noexcept -> void {
 		while (m_data.size() > 0) {
-			auto& handle = m_data.component<c_handle>(table_index_t{ m_data.size() - 1 }).m_handle;
+			auto handle = m_data.component<c_handle>(table_index_t{ m_data.size() - 1 }).m_handle.load();
 			if (handle.is_valid()) return;	///< is last entity is valid, then return
 			m_data.remove_back();			///< Else remove it and continue the loop
 		}
@@ -782,9 +787,9 @@ namespace vecs {
 			m_dispatch[t]->print_type(handle);
 		};
 
-		virtual auto print_entities(VecsHandleT<P> handle)					-> void {
+		virtual auto print_entities()					-> void {
 			for (auto& t : m_dispatch) {
-				t->print_type(handle);
+				t->print_entities();
 			}
 		};
 
@@ -1028,7 +1033,8 @@ namespace vecs {
 		void print_type(VecsHandleT<P> handle) {
 			std::cout << "<" << typeid(E).name() << ">"; 
 		};
-		auto print_entities(VecsHandleT<P> handle)					-> void {
+		auto print_entities()					-> void {
+			//if (size() == 0) return;
 			std::cout << "<" << typeid(E).name() << ">\n";
 			for (size_t i = 0; i < m_component_table.m_data.size(); ++i) {
 				std::cout << i << " " << m_component_table.handle(table_index_t{ i }).m_map_index << " " << m_component_table.handle(table_index_t{ i }).m_generation_counter << "\n";
@@ -1342,8 +1348,8 @@ namespace vecs {
 			auto index = m_deleted.component<0>(table_index_t{i});		///< Get next deleted entity from deleted table
 			if (index.value < m_data.size()) {								///< Is it inside the table still?		
 				m_data.move(index, table_index_t{ m_data.size() - 1 });		///< Yes, move last entity to this position
-				auto& handle = m_data.component<c_handle>(index);		///< Handle of moved entity
-				*reg.table_index_ptr(handle.m_handle.m_map_index) = index;			///< Change map entry of moved last entity
+				auto handle = m_data.component<c_handle>(index).m_handle.load();		///< Handle of moved entity
+				*reg.table_index_ptr(handle.m_map_index) = index;			///< Change map entry of moved last entity
 			}
 		}
 		m_deleted.clear();
@@ -1364,7 +1370,7 @@ namespace vecs {
 		size_t num = 0;
 		VecsHandleT<P> handle;
 		for (size_t i = 0; i < m_data.size(); ++i) {
-			handle = m_data.component<c_handle>(table_index_t{ i }).m_handle;
+			handle = m_data.component<c_handle>(table_index_t{ i }).m_handle.load();
 			if( handle.is_valid() && VecsRegistryT<P, E>().erase(handle) ) ++num;
 		}
 		return num;

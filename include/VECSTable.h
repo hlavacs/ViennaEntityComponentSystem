@@ -368,6 +368,7 @@ namespace vecs {
 		auto dst = tuple_ptr(idst);
 		vtll::static_for<size_t, 0, vtll::size<DATA>::value >([&](auto i) {
 			using type = vtll::Nth_type<DATA, i>;
+			//std::cout << typeid(type).name() << "\n";
 			if constexpr (std::is_move_assignable_v<type> && std::is_move_constructible_v<type>) {
 				std::swap(*std::get<i>(dst), *std::get<i>(src));
 			}
