@@ -105,7 +105,7 @@ int start_test() {
 
 		//--------------------------------------------------------------------------------------------------------------------------
 
-		TESTRESULT(++number, "component handle", auto& comp1 = h0.component<MyComponentPosition>(),
+		TESTRESULT(++number, "component handle", auto & comp1 = h0.component<MyComponentPosition>(),
 			(comp1.m_position == glm::vec3{ 9.0f, 2.0f, 3.0f }), );
 
 		TESTRESULT(++number, "component handle", auto bb1 = h0.has_component<MyComponentMaterial>(), (!bb1), );
@@ -153,9 +153,8 @@ int start_test() {
 		auto position1 = h0.component<MyComponentPosition>().m_position;
 		auto position1_2 = h1.component<MyComponentPosition>().m_position;
 		TESTRESULT(++number, "swap", auto swap1 = VecsRegistry{}.swap(h0, h1),
-			(swap1	&& h0.component<MyComponentPosition>().m_position == position1
-					&& h1.component<MyComponentPosition>().m_position == position1_2), );
-
+			(swap1 && h0.component<MyComponentPosition>().m_position == position1
+				&& h1.component<MyComponentPosition>().m_position == position1_2), );
 		//--------------------------------------------------------------------------------------------------------------------------
 
 		TESTRESULT(++number, "erase handle per entity", h3.erase(), (!h3.has_value() && VecsRegistry().size() == 3), );
@@ -166,6 +165,27 @@ int start_test() {
 
 		TESTRESULT(++number, "erase handle", h2.erase(), (!h2.has_value() && VecsRegistry().size() == 1), );
 		TESTRESULT(++number, "size", , (VecsRegistry<MyEntityTypeDraw>().size() == 0), );
+
+		TESTRESULT(++number, "erase handle", h1.erase(), (!h1.has_value() && VecsRegistry().size() == 0), );
+		TESTRESULT(++number, "size", , (VecsRegistry<MyEntityTypeDraw>().size() == 0), );
+	}
+
+	{
+		TESTRESULT(++number, "insert",
+			auto h0 = VecsRegistry<MyEntityTypeNode>{}.insert(MyComponentName{ "Node" }, pos, orient, MyComponentTransform{ glm::mat4{ 1.0f } }),
+			h0.has_value() && VecsRegistry().size() == 1, );
+
+		TESTRESULT(++number, "insert",
+			auto h1 = VecsRegistry<MyEntityTypeNode>{}.insert(MyComponentName{ "Node" }, pos2, orient, MyComponentTransform{ glm::mat4{ 1.0f } }),
+			h1.has_value() && VecsRegistry().size() == 2, );
+
+		TESTRESULT(++number, "insert<type>",
+			auto h2 = VecsRegistry<MyEntityTypeDraw>{}.insert(MyComponentName{ "Draw" }, pos, orient, mat, geo),
+			h2.has_value() && VecsRegistry().size() == 3, );
+
+		TESTRESULT(++number, "insert<type>",
+			auto h3 = VecsRegistry<MyEntityTypeDraw>{}.insert(MyComponentName{ "Draw" }, pos, orient, mat, geo),
+			h3.has_value() && VecsRegistry().size() == 4, );
 
 		TESTRESULT(++number, "clear", VecsRegistry{}.clear(), (!h1.has_value() && VecsRegistry().size() == 0 && VecsRegistry<MyEntityTypeNode>().size() == 0 && VecsRegistry<MyEntityTypeDraw>().size() == 0), );
 
