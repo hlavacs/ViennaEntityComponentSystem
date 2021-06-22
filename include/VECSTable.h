@@ -63,7 +63,7 @@ namespace vecs {
 		std::pmr::memory_resource*									m_mr;
 		std::pmr::polymorphic_allocator<seg_vector_t>				m_allocator;			///< use this allocator
 		std::atomic<std::shared_ptr<seg_vector_t>>					m_seg_vector;			///< Vector of shared ptrs to the segments
-		std::atomic<size_t>											m_size = 0;				///< Number of rows in the table
+		//std::atomic<size_t>											m_size = 0;				///< Number of rows in the table
 		std::atomic<slot_size_t>									m_size_cnt{ {0,0} };	///< Next slot and size as atomic
 		std::atomic<std::shared_ptr<seg_vector_t>>					m_next_seg_vector{};	///< Vector of shared ptrs to the segments
 
@@ -108,9 +108,10 @@ namespace vecs {
 		//-------------------------------------------------------------------------------------------
 		//move and remove data
 
-		inline auto pop_back( vtll::to_tuple<DATA>& tup )	noexcept -> bool;				///< Remove the last row
+		inline auto pop_back( vtll::to_tuple<DATA>* tup=nullptr ) noexcept -> bool;		///< Remove the last row
 		inline auto remove_back()	noexcept -> bool;			///< Remove the last row
-		inline auto clear() noexcept -> void { m_size = 0; };	///< Set the number if rows to zero - effectively clear the table
+		inline auto remove_all()	noexcept -> size_t;			///< Remove all rows
+		inline auto clear() noexcept -> size_t;					///< Set the number if rows to zero - effectively clear the table
 		inline auto move(table_index_t idst, table_index_t isrc) noexcept	-> bool;	///< Move contents of a row to another row
 		inline auto swap(table_index_t n1, table_index_t n2) noexcept		-> bool;	///< Swap contents of two rows
 
@@ -246,7 +247,7 @@ namespace vecs {
 
 
 	template<typename P, typename DATA, size_t N0, bool ROW>
-	inline auto VecsTable<P, DATA, N0, ROW>::pop_back(vtll::to_tuple<DATA>& tup) noexcept -> bool {
+	inline auto VecsTable<P, DATA, N0, ROW>::pop_back(vtll::to_tuple<DATA>* tup) noexcept -> bool {
 		slot_size_t size = m_size_cnt.load();
 		if (size.m_next_slot == 0) return false;
 
@@ -259,14 +260,13 @@ namespace vecs {
 			[&](auto i) {
 				using type = vtll::Nth_type<DATA, i>;
 				if constexpr (std::is_move_assignable_v<type>) {
-					std::get<i>(tup) = std::move(*component_ptr<i>(table_index_t{ size.m_next_slot }));
+					if (tup != nullptr) { std::get<i>(*tup) = std::move(*component_ptr<i>(table_index_t{ size.m_next_slot - 1 })); }
 				}
 				else if constexpr (std::is_copy_assignable_v<type>) {
-					std::get<i>(tup) = *component_ptr<i>(table_index_t{ size.m_next_slot });
-
-					if constexpr (std::is_destructible_v<type> && !std::is_trivially_destructible_v<type>) {
-						component_ptr<i>(table_index_t{ size.m_next_slot })->~type();	///< Call destructor
-					}
+					if (tup != nullptr) { std::get<i>(*tup) = *component_ptr<i>(table_index_t{ size.m_next_slot - 1 }); }
+				}
+				if constexpr (std::is_destructible_v<type> && !std::is_trivially_destructible_v<type>) {
+					component_ptr<i>(table_index_t{ size.m_next_slot - 1 })->~type();	///< Call destructor
 				}
 			}
 		);
@@ -298,6 +298,20 @@ namespace vecs {
 		return true;
 	}
 
+	template<typename P, typename DATA, size_t N0, bool ROW>
+	inline auto VecsTable<P, DATA, N0, ROW>::remove_all() noexcept -> size_t {
+		size_t num = 0;
+		while (remove_back()) { ++num; }
+		return num;
+	}
+
+
+	template<typename P, typename DATA, size_t N0, bool ROW>
+	inline auto VecsTable<P, DATA, N0, ROW>::clear() noexcept -> size_t {
+		size_t num = 0;
+		while (pop_back()) { ++num; }
+		return num;
+	}
 
 	/**
 	* \brief Update the component with index I of an entry.
