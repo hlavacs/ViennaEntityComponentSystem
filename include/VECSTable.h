@@ -19,10 +19,11 @@ namespace vecs {
 	* VecsTable has the following properties:
 	* 1) It stores tuples of data, thus the result is a table.
 	* 2) The memory layout can be row-oriented or column-oriented.
-	* 3) It can grow even when used with multiple threads. This is achieved by storing data in segments,
-	* which are accessed over via a std::vector of unique_ptr. New segments can simply be added to the 
-	* std::vector, and no reallocation occurs if the std::vector has a large enough capacity.
-	* If more segments are needed then multithreaded operations must be stopped to reallocate this std::vector. 
+	* 3) Lockless ultithreaded access. It can grow - by calling push_back() - even when 
+	* used with multiple threads. This is achieved by storing data in segments,
+	* which are accessed over via a std::vector of shared_ptr. New segments can simply be added to the 
+	* std::vector. Also the std::vector can seamlessly grow using CAS.
+	* Is can also shrink when using multithreading by calling pop_back(). Again, no locks are used!
 	* 
 	* The number of items S per segment must be a power of 2 : N = 2^L. This way, random access to row K is esily achieved
 	* by first right shift K >> L to get the index of the segment pointer, then use K & (N-1) to get the index within 
@@ -60,7 +61,7 @@ namespace vecs {
 			uint32_t m_size{ 0 };
 		};
 
-		std::pmr::memory_resource*									m_mr;
+		std::pmr::memory_resource*									m_mr;					///< Memory resource for allocating segments
 		std::pmr::polymorphic_allocator<seg_vector_t>				m_allocator;			///< use this allocator
 		std::atomic<std::shared_ptr<seg_vector_t>>					m_seg_vector;			///< Vector of shared ptrs to the segments
 		std::atomic<slot_size_t>									m_size_cnt{ {0,0} };	///< Next slot and size as atomic
@@ -106,18 +107,12 @@ namespace vecs {
 		//-------------------------------------------------------------------------------------------
 		//move and remove data
 
-		inline auto pop_back( vtll::to_tuple<DATA>* tup=nullptr ) noexcept -> bool;		///< Remove the last row
-		inline auto remove_back()	noexcept -> bool;			///< Remove the last row
-		inline auto remove_all()	noexcept -> size_t;			///< Remove all rows
-		inline auto clear() noexcept -> size_t;					///< Set the number if rows to zero - effectively clear the table
+		inline auto pop_back( vtll::to_tuple<DATA>* tup=nullptr ) noexcept -> bool;		///< Remove the last row, call destructor on components
+		inline auto clear() noexcept			-> size_t;			///< Set the number if rows to zero - effectively clear the table, call destructors
+		inline auto remove_back()	noexcept	-> bool;			///< Remove the last row - no destructor called
+		inline auto remove_all()	noexcept	-> size_t;			///< Remove all rows - no destructor called
 		inline auto move(table_index_t idst, table_index_t isrc) noexcept	-> bool;	///< Move contents of a row to another row
 		inline auto swap(table_index_t n1, table_index_t n2) noexcept		-> bool;	///< Swap contents of two rows
-
-		//-------------------------------------------------------------------------------------------
-		//memory management
-
-		inline auto reserve(size_t r) noexcept	-> bool;		///< Reserve enough memory ny allocating segments
-		inline auto capacity() noexcept			-> size_t;		///< Set new max capacity -> might reallocate the segment vector!
 		inline auto compress() noexcept			-> void;		///< Deallocate unsused segements
 	};
 
@@ -137,18 +132,31 @@ namespace vecs {
 	template<typename P, typename DATA, size_t N0, bool ROW>
 	inline VecsTable<P, DATA, N0, ROW>::~VecsTable() noexcept { clear(); };
 
+	/**
+	* \brief Return number of rows when growing including new rows not yet established.
+	* \returns number of rows when growing including new rows not yet established.
+	*/
 	template<typename P, typename DATA, size_t N0, bool ROW>
 	inline auto VecsTable<P, DATA, N0, ROW>::size2() noexcept -> size_t {
 		auto size = m_size_cnt.load();
 		return std::max(size.m_next_slot, size.m_size);
 	};
 
+	/**
+	* \brief Return number of valid rows.
+	* \returns number of valid rows.
+	*/
 	template<typename P, typename DATA, size_t N0, bool ROW>
 	inline auto VecsTable<P, DATA, N0, ROW>::size() noexcept -> size_t {
 		auto size = m_size_cnt.load();
 		return std::min( size.m_next_slot, size.m_size );
 	};
 
+	/**
+	* \brief Return reference to a component with index I.
+	* \param[in] n Index to the entry.
+	* \returns reference to a component with index I.
+	*/
 	template<typename P, typename DATA, size_t N0, bool ROW>
 	template<size_t I, typename C>
 	inline auto VecsTable<P, DATA, N0, ROW>::component(table_index_t n) noexcept -> C& {
@@ -156,7 +164,7 @@ namespace vecs {
 	}
 
 	/**
-	* \brief Get a pointger to a particular component with index I.
+	* \brief Get a pointer to a particular component with index I.
 	* \param[in] n Index to the entry.
 	* \returns a pointer to the Ith component of entry n.
 	*/
@@ -175,9 +183,9 @@ namespace vecs {
 	};
 
 	/**
-	* \brief Get a tuple with valuesof all components of an entry.
+	* \brief Get a tuple with references to all components of a row.
 	* \param[in] n Index to the entry.
-	* \returns a tuple with values of all components of entry n.
+	* \returns a tuple with references to all components of a row.
 	*/
 	template<typename P, typename DATA, size_t N0, bool ROW>
 	inline auto VecsTable<P, DATA, N0, ROW>::tuple(table_index_t n) noexcept -> tuple_ref_t {
@@ -185,9 +193,9 @@ namespace vecs {
 	};
 
 	/**
-	* \brief Get a tuple with references to all components of an entry.
+	* \brief Get a tuple with pointers to all components of an entry.
 	* \param[in] n Index to the entry.
-	* \returns a tuple with references to all components of entry n.
+	* \returns a tuple with pointers to all components of entry n.
 	*/
 	template<typename P, typename DATA, size_t N0, bool ROW>
 	inline auto VecsTable<P, DATA, N0, ROW>::tuple_ptr(table_index_t n) noexcept -> tuple_ptr_t {
@@ -200,14 +208,14 @@ namespace vecs {
 
 	/**
 	* \brief Create a new entry at the end of the table.
-	* Must be externally synchronized!
+	* \param[in] data References to values to be moved or copied to the new row.
 	* \returns the index of the new entry.
 	*/
 	template<typename P, typename DATA, size_t N0, bool ROW>
 	template<typename... Cs>
 	requires vtll::has_all_types<DATA, vtll::tl<std::decay_t<Cs>...>>::value
 	inline auto VecsTable<P, DATA, N0, ROW>::push_back(Cs&&... data) noexcept -> table_index_t {
-		slot_size_t size = m_size_cnt.load();
+		slot_size_t size = m_size_cnt.load();	///< Make sure that no other thread is popping currently
 		while (size.m_next_slot < size.m_size || !m_size_cnt.compare_exchange_weak(size, slot_size_t{ size.m_next_slot + 1, size.m_size })) {
 			if (size.m_next_slot < size.m_size) {
 				size = m_size_cnt.load();
@@ -220,7 +228,7 @@ namespace vecs {
 			auto new_vector_ptr = std::make_shared<seg_vector_t>( std::max( num_seg * 2, 16ULL  ), m_mr);		///< Reallocate
 			for (size_t i = 0; i < num_seg; ++i) { (*new_vector_ptr)[i].store( (*vector_ptr)[i].load() );  };	///< Copy segment pointers
 			if (m_seg_vector.compare_exchange_strong(vector_ptr, new_vector_ptr)) {	///< Try to exchange old segment vector with new
-				vector_ptr = new_vector_ptr;						///< Remember for later
+				vector_ptr = new_vector_ptr;					///< Remember for later
 			}
 		}
 			
@@ -235,26 +243,31 @@ namespace vecs {
 			(update<vtll::index_of<DATA, std::decay_t<Cs>>::value>(table_index_t{ size.m_next_slot }, std::forward<Cs>(data)), ...);
 		}
 
-		slot_size_t new_size = m_size_cnt.load();
+		slot_size_t new_size = m_size_cnt.load();	///< Increase size to validate the new row
 		do {
 			new_size.m_size = size.m_next_slot;
 		} while (!m_size_cnt.compare_exchange_weak(new_size, slot_size_t{ new_size.m_next_slot, new_size.m_size + 1 }));
 
-		return table_index_t{ size.m_next_slot }; ///< Return index of new entry
+		return table_index_t{ size.m_next_slot };	///< Return index of new entry
 	}
 
-
+	/**
+	* \brief Pop the last row if there is one.
+	* \param[in] tup Pointer to tuple to move the row data into.
+	* \returns true if a row was popped.
+	*/
 	template<typename P, typename DATA, size_t N0, bool ROW>
 	inline auto VecsTable<P, DATA, N0, ROW>::pop_back(vtll::to_tuple<DATA>* tup) noexcept -> bool {
 		slot_size_t size = m_size_cnt.load();
-		if (size.m_next_slot == 0) return false;
+		if (size.m_next_slot == 0) return false;	///< Is there a row to pop off?
 
+		/// Make sure that no other thread is currently pushing a new row
 		while (size.m_next_slot > size.m_size || !m_size_cnt.compare_exchange_weak(size, slot_size_t{ size.m_next_slot - 1, size.m_size })) {
 			if (size.m_next_slot > size.m_size) { size = m_size_cnt.load(); }
-			if (size.m_next_slot == 0) return false;
+			if (size.m_next_slot == 0) return false;	///< Is there a row to pop off?
 		};
 
-		vtll::static_for<size_t, 0, vtll::size<DATA>::value >(			///< Loop over all components
+		vtll::static_for<size_t, 0, vtll::size<DATA>::value >(	///< Loop over all components
 			[&](auto i) {
 				using type = vtll::Nth_type<DATA, i>;
 				if constexpr (std::is_move_assignable_v<type>) {
@@ -269,7 +282,7 @@ namespace vecs {
 			}
 		);
 
-		slot_size_t new_size = m_size_cnt.load();
+		slot_size_t new_size = m_size_cnt.load();	///< Commit the popping of the row
 		do {
 			new_size.m_size = size.m_next_slot;
 		} while (!m_size_cnt.compare_exchange_weak(new_size, slot_size_t{ new_size.m_next_slot, new_size.m_size - 1 }));
@@ -278,6 +291,10 @@ namespace vecs {
 	}
 
 
+	/**
+	* \brief Remove the last row if there is one.
+	* \returns true if a row was popped.
+	*/
 	template<typename P, typename DATA, size_t N0, bool ROW>
 	inline auto VecsTable<P, DATA, N0, ROW>::remove_back() noexcept -> bool {
 		slot_size_t size = m_size_cnt.load();
@@ -296,6 +313,10 @@ namespace vecs {
 		return true;
 	}
 
+	/**
+	* \brief Remove all rows.
+	* \returns number of removed rows.
+	*/
 	template<typename P, typename DATA, size_t N0, bool ROW>
 	inline auto VecsTable<P, DATA, N0, ROW>::remove_all() noexcept -> size_t {
 		size_t num = 0;
@@ -303,7 +324,10 @@ namespace vecs {
 		return num;
 	}
 
-
+	/**
+	* \brief Pop all rows.
+	* \returns number of popped rows.
+	*/
 	template<typename P, typename DATA, size_t N0, bool ROW>
 	inline auto VecsTable<P, DATA, N0, ROW>::clear() noexcept -> size_t {
 		size_t num = 0;
@@ -332,7 +356,7 @@ namespace vecs {
 	}
 
 	/**
-	* \brief Update all components of an entry.
+	* \brief Update components of an entry.
 	* \param[in] n Index of entry holding the component.
 	* \param[in] C Universal reference to tuple holding the components with the data.
 	* \returns true if the operation was successful.
@@ -391,29 +415,6 @@ namespace vecs {
 			}
 		});
 		return true;
-	}
-
-	/**
-	* \brief Allocate segements to make sure enough memory is available.
-	* \param[in] r Number of entries to be stored in the table.
-	* \returns true if the operation was successful.
-	*/
-	template<typename P, typename DATA, size_t N0, bool ROW>
-	inline auto VecsTable<P, DATA, N0, ROW>::reserve(size_t r) noexcept -> bool {
-		capacity(r);
-
-		return true;
-	}
-
-	/**
-	* \brief Set capacity of the segment table. This might reallocate the whole vector.
-	* No parallel processing is allowed when calling this function!
-	* \param[in] r Max number of entities to be allowed in the table.
-	*/
-	template<typename P, typename DATA, size_t N0, bool ROW>
-	inline auto VecsTable<P, DATA, N0, ROW>::capacity() noexcept -> size_t {
-		auto vector_ptr{ m_seg_vector.load() };
-		return !vector_ptr ? 0 : vector_ptr->size() * N;
 	}
 
 	/**
