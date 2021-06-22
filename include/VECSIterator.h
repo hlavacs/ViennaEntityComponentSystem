@@ -11,6 +11,12 @@ namespace vecs {
 	//-------------------------------------------------------------------------
 	//iterator
 
+	/**
+	* \brief Main iterator class template.
+	* 
+	* The iterator always maintains a tuple with pointers to the current entity, if there is one.
+	* The pointers are delivered by an accessor function provided by a VecsComponentTable.
+	*/
 	template<typename P, typename CTL>
 	class VecsIteratorT {
 
@@ -25,24 +31,24 @@ namespace vecs {
 		using pointer_tuple = vtll::to_tuple< vtll::cat< vtll::tl<std::atomic<uint32_t>**, handle_type*>, vtll::to_ptr<CTL> > >;		///< Pointer type
 		using iterator_category = std::forward_iterator_tag;				///< Forward iterator
 		using difference_type = int64_t;									///< Difference type
-		using accessor = std::function<pointer_tuple(table_index_t)>;
+		using accessor = std::function<pointer_tuple(table_index_t)>;		///< Function for obtaining pointers to the components
 
 	protected:
-		type_index_t	m_type{};				///< entity type that this iterator iterates over
-		size_t			m_size{ 0 };			///< Size of the components, m_current must be smaller than this
-		size_t			m_bit_mask{ 0 };		///< Size of table segments - 1 , use as bit mask 
-		size_t			m_row_size{ 0 };		///< Size of a row for row layout, or zero for column layout
-		table_index_t	m_current{ 0 };			///< Current index in the VecsComponentTable<E>
-		pointer_tuple	m_pointers;				///< Pointers to the components
-		accessor		m_accessor;				///< Get pointers to the components
+		type_index_t	m_type{};			///< entity type that this iterator iterates over
+		size_t			m_size{ 0 };		///< Size of the components, m_current must be smaller than this
+		size_t			m_bit_mask{ 0 };	///< Size of table segments - 1 , use as bit mask 
+		size_t			m_row_size{ 0 };	///< Size of a row for row layout, or zero for column layout
+		table_index_t	m_current{ 0 };		///< Current index in the VecsComponentTable<E>
+		pointer_tuple	m_pointers;			///< Pointers to the components
+		accessor		m_accessor;			///< Get pointers to the components
 
 	public:
-		VecsIteratorT() noexcept = default;									///< Empty constructor is required
+		VecsIteratorT() noexcept = default;	///< Empty constructor is required
 
 		template<typename E>
-		VecsIteratorT(const VecsComponentTable<P, E>& tab, size_t current) noexcept;		///< Constructor
-		VecsIteratorT(const VecsIteratorT<P, CTL>& v) noexcept = default;		///< Copy constructor
-		VecsIteratorT(VecsIteratorT<P, CTL>&& v) noexcept = default;			///< Move constructor
+		VecsIteratorT(const VecsComponentTable<P, E>& tab, size_t current) noexcept;	///< Constructor
+		VecsIteratorT(const VecsIteratorT<P, CTL>& v) noexcept = default;	///< Copy constructor
+		VecsIteratorT(VecsIteratorT<P, CTL>&& v) noexcept = default;		///< Move constructor
 
 		auto operator=(const VecsIteratorT<P, CTL>& v) noexcept	-> VecsIteratorT<P, CTL> & = default;	///< Copy
 		auto operator=(VecsIteratorT<P, CTL>&& v) noexcept		-> VecsIteratorT<P, CTL> & = default;	///< Move
@@ -65,7 +71,9 @@ namespace vecs {
 	};
 
 
-	///< Constructor
+	/**
+	* \brief Constructor of class VecsIteratorT.
+	*/
 	template<typename P, typename CTL>
 	template<typename E>
 	inline VecsIteratorT<P, CTL>::VecsIteratorT(const VecsComponentTable<P, E>& tab, size_t current) noexcept
@@ -76,28 +84,37 @@ namespace vecs {
 		, m_current{ current }
 		, m_accessor{ std::bind(VecsComponentTable<P, E>::template accessor<CTL>, std::placeholders::_1) } {
 
-		m_pointers = m_current.value < m_size ? m_accessor(m_current) : pointer_tuple{};
+		m_pointers = m_current.value < m_size ? m_accessor(m_current) : pointer_tuple{}; ///< Get pointers from accessor
 	};
 
-	///< Access the data
+	/**
+	* \brief Operator for accessing the data.
+	*/
 	template<typename P, typename CTL>
 	inline auto VecsIteratorT<P, CTL>::operator*() noexcept	-> value_type {
 		return std::tuple_cat( 
-			std::make_tuple( *std::get<VecsComponentTable<P, vtll::front<vtll::front<P>>>::c_mutex>(m_pointers)
-			, std::get<VecsComponentTable<P, vtll::front<vtll::front<P>>>::c_handle>(m_pointers)->load() )
-			, vtll::ptr_to_ref_tuple( vtll::sub_tuple<2,std::tuple_size_v<pointer_tuple>>(m_pointers) ));
+			std::make_tuple( 
+				*std::get<VecsComponentTable<P, vtll::front<vtll::front<P>>>::c_mutex>(m_pointers)
+				, std::get<VecsComponentTable<P, vtll::front<vtll::front<P>>>::c_handle>(m_pointers)->load() )
+				, vtll::ptr_to_ref_tuple( vtll::sub_tuple<2,std::tuple_size_v<pointer_tuple>>(m_pointers) ));
 	}
 
-	///< Access the const data
+	/**
+	* \brief Operator for accessing const data.
+	*/
 	template<typename P, typename CTL>
 	inline auto VecsIteratorT<P, CTL>::operator*() const noexcept -> value_type {
 		return std::tuple_cat(
-			std::make_tuple(*std::get<VecsComponentTable<P, vtll::front<vtll::front<P>>>::c_mutex>(m_pointers)
-			, std::get<VecsComponentTable<P, vtll::front<vtll::front<P>>>::c_handle>(m_pointers)->load())
-			, vtll::ptr_to_ref_tuple(vtll::sub_tuple<2, std::tuple_size_v<pointer_tuple>>(m_pointers)));
+			std::make_tuple(
+				*std::get<VecsComponentTable<P, vtll::front<vtll::front<P>>>::c_mutex>(m_pointers)
+				, std::get<VecsComponentTable<P, vtll::front<vtll::front<P>>>::c_handle>(m_pointers)->load())
+				, vtll::ptr_to_ref_tuple(vtll::sub_tuple<2, std::tuple_size_v<pointer_tuple>>(m_pointers)));
 	}
 
-	///< Increase by 1
+	/**
+	* \brief Increase by 1.
+	* \returns reference to itself.
+	*/
 	template<typename P, typename CTL>
 	inline auto VecsIteratorT<P, CTL>::operator++() noexcept	-> VecsIteratorT<P, CTL>& {
 		m_current.value++;
@@ -119,7 +136,10 @@ namespace vecs {
 		return *this;
 	}
 
-	///< Increase by 1
+	/**
+	* \brief Increase by 1.
+	* \returns itself.
+	*/
 	template<typename P, typename CTL>
 	inline auto VecsIteratorT<P, CTL>::operator++(int) noexcept	-> VecsIteratorT<P, CTL> {
 		auto tmp = *this;
@@ -127,7 +147,11 @@ namespace vecs {
 		return *this;
 	}
 
-	///< Increase by N
+	/**
+	* \brief Increase by N.
+	* \param[in] N Number of rows to skip ahead.
+	* \returns reference to itself.
+	*/
 	template<typename P, typename CTL>
 	inline auto VecsIteratorT<P, CTL>::operator+=(difference_type N) noexcept -> VecsIteratorT<P, CTL>& {
 		m_current += N;
@@ -135,7 +159,11 @@ namespace vecs {
 		return *this;
 	}
 
-	///< Increase by N
+	/**
+	* \brief Increase by N.
+	* \param[in] N Number of rows to skip ahead.
+	* \returns itself.
+	*/
 	template<typename P, typename CTL>
 	inline auto VecsIteratorT<P, CTL>::operator+(difference_type N) noexcept	-> VecsIteratorT<P, CTL> {
 		m_current += N;
@@ -143,6 +171,11 @@ namespace vecs {
 		return *this;
 	}
 
+	/**
+	* \brief Test for inequality.
+	* \param[in] v Const reference to the other iterator.
+	* \returns true, if the iterators are not equal.
+	*/
 	template<typename P, typename CTL>
 	inline auto VecsIteratorT<P, CTL>::operator!=(const VecsIteratorT<P, CTL>& v) noexcept -> bool {
 		return m_type != v.m_type || m_current != v.m_current;
@@ -166,6 +199,9 @@ namespace vecs {
 	};
 
 
+	/**
+	* \brief Class representing a range of rows.
+	*/
 	template<typename P, typename ETL, typename CTL>
 	class VecsRangeBaseClass {
 
@@ -198,32 +234,51 @@ namespace vecs {
 		auto operator=(const VecsRangeBaseClass<P, ETL, CTL>& v) noexcept -> VecsRangeBaseClass<P, ETL, CTL> & = default;
 		auto operator=(VecsRangeBaseClass<P, ETL, CTL>&& v) noexcept -> VecsRangeBaseClass<P, ETL, CTL> & = default;
 
+		/**
+		* \brief Create a rang that surpasses the tables of given list of entities ETL.
+		*/
 		void compute_ranges() noexcept {
 			m_ranges.reserve(vtll::size<ETL>::value);
 			m_size = 0;
-			vtll::static_for<size_t, 0, vtll::size<ETL>::value >(			///< Loop over all components
+			vtll::static_for<size_t, 0, vtll::size<ETL>::value >(	///< Loop over all entity types in ETL
 				[&](auto i) {
 					using E = vtll::Nth_type<ETL, i>;
 					VecsComponentTable<P, E> tab;
 					auto range = range_t{ VecsIteratorT<P, CTL>(tab, 0), VecsIteratorT<P, CTL>(tab, tab.size()) };
 					m_ranges.push_back(range);
-					m_size += m_ranges.back().size();
+					m_size += m_ranges.back().size();	///< Sum of the rows 
 				}
 			);
 		}
 
+		/**
+		* \brief Return begin iterator of a range which is the join of all currently stored ranges.
+		* \returns begin iterator of a range which is the join of all currently stored ranges.
+		*/
 		auto begin() noexcept {
 			if (m_ranges.size() == 0) { compute_ranges(); }
 			m_view = std::views::join(m_ranges);
 			return m_view.begin();
 		}
 
-		auto end() noexcept { 
+		/**
+		* \brief Return end iterator of a range which is the join of all currently stored ranges.
+		* \returns end iterator of a range which is the join of all currently stored ranges.
+		*/
+		auto end() noexcept {
 			return m_view.end();
 		}
 
+		/**
+		* \brief Return number if rows that are covered by this range
+		* \returns number if rows that are covered by this range
+		*/
 		auto size() const noexcept { return m_size; }
 
+		/**
+		* \brief Split the range into N subranges.
+		* \returns a vector holding N subranges.
+		*/
 		auto split(size_t N) noexcept {
 			std::vector<VecsRangeBaseClass<P, ETL, CTL>> result;
 			if (m_ranges.size() == 0) { compute_ranges(); }
@@ -267,6 +322,9 @@ namespace vecs {
 			return result;
 		}
 
+		/**
+		* \brief Loop over the range.
+		*/
 		inline auto for_each(std::function<typename Functor<P, CTL>::type> f, bool sync = false) noexcept -> void {
 			auto b = begin();
 			auto e = end();
