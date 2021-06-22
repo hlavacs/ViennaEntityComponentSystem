@@ -63,9 +63,7 @@ namespace vecs {
 		std::pmr::memory_resource*									m_mr;
 		std::pmr::polymorphic_allocator<seg_vector_t>				m_allocator;			///< use this allocator
 		std::atomic<std::shared_ptr<seg_vector_t>>					m_seg_vector;			///< Vector of shared ptrs to the segments
-		//std::atomic<size_t>											m_size = 0;				///< Number of rows in the table
 		std::atomic<slot_size_t>									m_size_cnt{ {0,0} };	///< Next slot and size as atomic
-		std::atomic<std::shared_ptr<seg_vector_t>>					m_next_seg_vector{};	///< Vector of shared ptrs to the segments
 
 		inline auto size2() noexcept -> size_t;
 
@@ -324,9 +322,9 @@ namespace vecs {
 	requires vtll::has_type<DATA, std::decay_t<C>>::value
 	inline auto VecsTable<P, DATA, N0, ROW>::update(table_index_t n, C&& data) noexcept -> bool {
 		assert(n.value < size2());
-		if constexpr (std::is_move_assignable_v<C> && std::is_rvalue_reference_v<decltype(data)>) {
+		if constexpr (std::is_move_assignable_v<std::decay_t<C>> && std::is_rvalue_reference_v<decltype(data)>) {
 			component<I>(n) = std::move(data);
-		} else if constexpr (std::is_copy_assignable_v<C>) {
+		} else if constexpr (std::is_copy_assignable_v<std::decay_t<C>>) {
 			component<I>(n) = data;
 		}
 

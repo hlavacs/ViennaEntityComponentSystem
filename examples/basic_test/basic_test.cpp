@@ -232,6 +232,7 @@ int main() {
     std::atomic<VecsHandle> handle;
 
     map_index_t idx;
+    auto bl = std::is_copy_assignable_v<table_index_t>;
 
     f(idx);
     f(map_index_t{ 1 });
