@@ -601,18 +601,6 @@ namespace vtll {
 	//-------------------------------------------------------------------------
 	//is_pow2: test whether a std::integral_constant<size_t, I> is a power of 2
 
-	/*namespace detail {
-		template<typename T, uint64_t... Is>
-		constexpr auto is_pow2_impl(std::index_sequence<Is...>) {
-			return ((T::value == (1ULL << Is)) || ...);
-		}
-	}
-
-	template <typename T>
-	constexpr auto is_pow2() {
-		return detail::is_pow2_impl<T>(std::make_integer_sequence<size_t, 64>{ });
-	}*/
-
 	template <typename T>
 	constexpr auto is_pow2() {
 		return has_type<all_pow2, T>::value;
@@ -725,6 +713,33 @@ namespace vtll {
 	static_assert(has_all_types<type_list<double, int, char>, type_list<int, char>>::value, "The implementation of has_all_types is bad");
 	static_assert(!has_all_types<type_list<double, int, char>, type_list<bool, char>>::value, "The implementation of has_all_types is bad");
 	static_assert(has_all_types<type_list<double, int, char>, type_list<>>::value, "The implementation of has_all_types is bad");
+
+	//-------------------------------------------------------------------------
+	//not_in_list: Return those elements of Seq2 that are NOT in Seq1
+
+	namespace detail {
+		template<typename Seq1, typename Seq2>
+		struct not_in_list_impl;
+
+		template<typename Seq1, template <typename...> typename Seq2>
+		struct not_in_list_impl<Seq1, Seq2<>> {
+			using type = Seq2<>;
+		};
+
+		template<typename Seq1, template <typename...> typename Seq2, typename T, typename... Ts>
+		struct not_in_list_impl<Seq1, Seq2<T, Ts...>> {
+			using T1 = typename not_in_list_impl<Seq1, tl<Ts...>>::type;
+			using T2 = cat< Seq2<T>, typename not_in_list_impl<Seq1, Seq2<Ts...>>::type >;
+			using type = std::conditional_t< has_type<Seq1, T>::value, T1, T2 >;
+		};
+
+	}
+	template <typename Seq1, typename Seq2>
+	using not_in_list = typename detail::not_in_list_impl<Seq1, Seq2>::type;
+
+	static_assert(
+		std::is_same_v<not_in_list<tl<double, int, char>, tl<bool, int, char, float>>, tl<bool, float>>
+		, "The implementation of has_all_types is bad");
 
 	//-------------------------------------------------------------------------
 	//filter_remove_types: remove types from a list, that are also part of another list
