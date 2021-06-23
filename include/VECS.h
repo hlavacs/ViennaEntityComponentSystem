@@ -345,7 +345,7 @@ namespace vecs {
 		//erase data
 
 		auto erase(const table_index_t idx, bool destruct) noexcept	-> bool;	///< Erase an entity from the table
-		auto clear() noexcept										-> size_t;	///< Mark all rows as erased
+		auto clear(bool destruct) noexcept							-> size_t;	///< Mark all rows as erased
 
 		//-------------------------------------------------------------------------
 		//utilities
@@ -788,7 +788,7 @@ namespace vecs {
 
 		template<typename... Es>
 		requires (are_entity_types<P, Es...>)
-		auto clear() noexcept	-> size_t;		///< Clear the whole ECS
+		auto clear(bool destruct=true) noexcept	-> size_t;		///< Clear the whole ECS
 
 		//-------------------------------------------------------------------------
 		//utility
@@ -988,7 +988,7 @@ namespace vecs {
 		auto has_componentE(VecsHandleT<P> handle, size_t compidx) noexcept	-> bool; ///< Check if E has a component
 		auto eraseE(table_index_t index, bool destruct=true) noexcept	-> void { m_component_table.erase(index, destruct); };	 ///< Erase some entity
 		auto compressE() noexcept	-> void { return m_component_table.compress(); };	///< Compress the table
-		auto clearE() noexcept		-> size_t { return m_component_table.clear(); };	///< Erase all entities from table
+		auto clearE(bool destruct) noexcept	-> size_t { return m_component_table.clear(destruct); };	///< Erase all entities from table
 		auto sizeE() noexcept		-> std::atomic<uint32_t>& { return m_sizeE; };
 
 	public:
@@ -1035,8 +1035,9 @@ namespace vecs {
 		//erase
 
 		auto erase(VecsHandleT<P> handle, bool destruct=true) noexcept	-> bool;		///< Erase an entity from VECS
+		auto clear(bool destruct = true) noexcept						-> size_t { return clearE(destruct); };	///< Clear entities of type E
 		auto mark_erased(VecsHandleT<P> handle) noexcept				-> bool { return erase(handle, false); };	///< Mark an entity as erased
-		auto clear() noexcept											-> size_t { return clearE(); };	///< Clear entities of type E
+		auto mark_all_erased() noexcept									-> size_t { return clear(false); };	///< Mark an entity as erased
 
 		//-------------------------------------------------------------------------
 		//iterate
@@ -1396,12 +1397,12 @@ namespace vecs {
 	* \returns the number of erased entities.
 	*/
 	template<typename P, typename E>
-	inline auto VecsComponentTable<P, E>::clear() noexcept -> size_t {
+	inline auto VecsComponentTable<P, E>::clear(bool destruct) noexcept -> size_t {
 		size_t num = 0;
 		VecsHandleT<P> handle;
 		for (size_t i = 0; i < m_data.size(); ++i) {
 			handle = m_data.component<c_handle>(table_index_t{ i }).m_handle.load();
-			if( handle.is_valid() && VecsRegistryT<P, E>().erase(handle) ) ++num;
+			if( handle.is_valid() && VecsRegistryT<P, E>().erase(handle, destruct) ) ++num;
 		}
 		return num;
 	}
@@ -1458,14 +1459,14 @@ namespace vecs {
 	template<typename P>
 	template<typename... Es>
 	requires (are_entity_types<P, Es...>)
-	inline auto VecsRegistryBaseClass<P>::clear() noexcept	 -> size_t {
+	inline auto VecsRegistryBaseClass<P>::clear(bool destruct) noexcept	 -> size_t {
 		using entity_list = std::conditional_t< (sizeof...(Es) > 0), expand_tags< typename VecsRegistryBaseClass<P>::entity_tag_map, vtll::tl<Es...> >, entity_type_list >;
 
 		size_t num = 0;
 		vtll::static_for<size_t, 0, vtll::size<entity_list>::value >(
 			[&](auto i) {
 				using type = vtll::Nth_type<entity_list, i>;
-				num += VecsRegistryT<P, type>().clearE();
+				num += VecsRegistryT<P, type>().clearE(destruct);
 			}
 		);
 		return num;
