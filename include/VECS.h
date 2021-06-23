@@ -195,8 +195,8 @@ namespace vecs {
 		requires are_component_types<P, Cs...>		///< \param[in] args Arguments to write over
 		auto update(Cs&&... args) noexcept -> bool;	///< \returns true of successful
 
-		auto erase(bool destruct=true) noexcept -> bool;							///< Erase the entity 
-		auto mark_erased() noexcept				-> bool { return erase(false); };	///< Erase the entity 
+		auto erase(bool destruct=false) noexcept -> bool;							///< Erase the entity 
+		auto destruct() noexcept				 -> bool { return erase(true); };	///< Destruct the entity 
 
 		auto map_index() noexcept	-> map_index_t { ///< \returns index of entity in the map
 			return m_map_index; 
@@ -744,7 +744,7 @@ namespace vecs {
 		virtual auto has_componentE(VecsHandleT<P> handle, size_t compidx) noexcept -> bool { return false; };
 
 		/// Virtual function for dispatching erasing an entity from a component table 
-		virtual auto eraseE(table_index_t index, bool destruct=true) noexcept	-> void { };
+		virtual auto eraseE(table_index_t index, bool destruct) noexcept	-> void { };
 
 		virtual auto sizeE() noexcept -> std::atomic<uint32_t>& { return m_size; };
 
@@ -783,8 +783,8 @@ namespace vecs {
 		//-------------------------------------------------------------------------
 		//erase data
 
-		virtual auto erase(VecsHandleT<P> handle, bool destruct=true) noexcept -> bool;						///< Erase an entity
-		virtual auto mark_erased(VecsHandleT<P> handle) noexcept -> bool { return erase(handle, false); };	///< Mark an entity as erased
+		virtual auto erase(VecsHandleT<P> handle, bool destruct=false) noexcept -> bool;				///< Erase an entity
+		virtual auto destruct(VecsHandleT<P> handle) noexcept -> bool { return erase(handle, true); };	///< Mark an entity as erased
 
 		template<typename... Es>
 		requires (are_entity_types<P, Es...>)
@@ -986,7 +986,7 @@ namespace vecs {
 		auto updateC(VecsHandleT<P> handle, size_t compidx, void* ptr, size_t size, bool move = false) noexcept	-> bool; ///< Dispatch from base class
 		auto componentE_ptr(VecsHandleT<P> handle, size_t compidx) noexcept	-> void*;///< Get a pointer to a component
 		auto has_componentE(VecsHandleT<P> handle, size_t compidx) noexcept	-> bool; ///< Check if E has a component
-		auto eraseE(table_index_t index, bool destruct=true) noexcept	-> void { m_component_table.erase(index, destruct); };	 ///< Erase some entity
+		auto eraseE(table_index_t index, bool destruct) noexcept	-> void { m_component_table.erase(index, destruct); };	 ///< Erase some entity
 		auto compressE() noexcept	-> void { return m_component_table.compress(); };	///< Compress the table
 		auto clearE(bool destruct) noexcept	-> size_t { return m_component_table.clear(destruct); };	///< Erase all entities from table
 		auto sizeE() noexcept		-> std::atomic<uint32_t>& { return m_sizeE; };
@@ -1034,10 +1034,10 @@ namespace vecs {
 		//-------------------------------------------------------------------------
 		//erase
 
-		auto erase(VecsHandleT<P> handle, bool destruct=true) noexcept	-> bool;		///< Erase an entity from VECS
-		auto clear(bool destruct = true) noexcept						-> size_t { return clearE(destruct); };	///< Clear entities of type E
-		auto mark_erased(VecsHandleT<P> handle) noexcept				-> bool { return erase(handle, false); };	///< Mark an entity as erased
-		auto mark_all_erased() noexcept									-> size_t { return clear(false); };	///< Mark an entity as erased
+		auto erase(VecsHandleT<P> handle, bool destruct=false) noexcept	-> bool;		///< Erase an entity from VECS
+		auto clear(bool destruct = false) noexcept						-> size_t { return clearE(destruct); };	///< Clear entities of type E
+		auto destruct(VecsHandleT<P> handle) noexcept					-> bool { return erase(handle, true); };	///< Mark an entity as erased
+		auto destruct_all() noexcept									-> size_t { return clear(true); };	///< Mark an entity as erased
 
 		//-------------------------------------------------------------------------
 		//iterate
@@ -1193,7 +1193,7 @@ namespace vecs {
 		}
 
 		auto& map_index = *this->table_index_ptr(handle.m_map_index);			///< Index of old component table in the map
-		this->m_dispatch[map_type]->eraseE(map_index);							///< Erase the entity from old component table
+		this->m_dispatch[map_type]->eraseE(map_index, true);					///< Erase the entity from old component table
 
 		this->sizeE()++;
 		this->m_dispatch[map_type]->sizeE()--;
