@@ -107,9 +107,9 @@ namespace vecs {
 		//-------------------------------------------------------------------------------------------
 		//move and remove data
 
-		inline auto pop_back( vtll::to_tuple<DATA>* tup=nullptr ) noexcept -> bool;		///< Remove the last row, call destructor on components
+		inline auto pop_back( vtll::to_tuple<DATA>* tup = nullptr, bool del = true ) noexcept -> bool;	///< Remove the last row, call destructor on components
 		inline auto clear() noexcept			-> size_t;			///< Set the number if rows to zero - effectively clear the table, call destructors
-		inline auto remove_back()	noexcept	-> bool;			///< Remove the last row - no destructor called
+		inline auto remove_back(vtll::to_tuple<DATA>* tup = nullptr)	noexcept	-> bool;			///< Remove the last row - no destructor called
 		inline auto remove_all()	noexcept	-> size_t;			///< Remove all rows - no destructor called
 		inline auto move(table_index_t idst, table_index_t isrc) noexcept	-> bool;	///< Move contents of a row to another row
 		inline auto swap(table_index_t n1, table_index_t n2) noexcept		-> bool;	///< Swap contents of two rows
@@ -257,7 +257,7 @@ namespace vecs {
 	* \returns true if a row was popped.
 	*/
 	template<typename P, typename DATA, size_t N0, bool ROW>
-	inline auto VecsTable<P, DATA, N0, ROW>::pop_back(vtll::to_tuple<DATA>* tup) noexcept -> bool {
+	inline auto VecsTable<P, DATA, N0, ROW>::pop_back(vtll::to_tuple<DATA>* tup, bool del) noexcept -> bool {
 		slot_size_t size = m_size_cnt.load();
 		if (size.m_next_slot == 0) return false;	///< Is there a row to pop off?
 
@@ -277,7 +277,7 @@ namespace vecs {
 					if (tup != nullptr) { std::get<i>(*tup) = *component_ptr<i>(table_index_t{ size.m_next_slot - 1 }); }
 				}
 				if constexpr (std::is_destructible_v<type> && !std::is_trivially_destructible_v<type>) {
-					component_ptr<i>(table_index_t{ size.m_next_slot - 1 })->~type();	///< Call destructor
+					if (del) { component_ptr<i>(table_index_t{ size.m_next_slot - 1 })->~type(); }	///< Call destructor
 				}
 			}
 		);
@@ -296,21 +296,8 @@ namespace vecs {
 	* \returns true if a row was popped.
 	*/
 	template<typename P, typename DATA, size_t N0, bool ROW>
-	inline auto VecsTable<P, DATA, N0, ROW>::remove_back() noexcept -> bool {
-		slot_size_t size = m_size_cnt.load();
-		if (size.m_next_slot == 0) return false;
-
-		while (size.m_next_slot > size.m_size || !m_size_cnt.compare_exchange_weak(size, slot_size_t{ size.m_next_slot - 1, size.m_size })) {
-			if (size.m_next_slot > size.m_size) { size = m_size_cnt.load(); }
-			if (size.m_next_slot == 0) return false;
-		};
-
-		slot_size_t new_size = m_size_cnt.load();
-		do {
-			new_size.m_size = size.m_next_slot;
-		} while (!m_size_cnt.compare_exchange_weak(new_size, slot_size_t{ new_size.m_next_slot, new_size.m_size - 1 }));
-
-		return true;
+	inline auto VecsTable<P, DATA, N0, ROW>::remove_back(vtll::to_tuple<DATA>* tup) noexcept -> bool {
+		return pop_back(tup, false);
 	}
 
 	/**

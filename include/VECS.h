@@ -195,7 +195,8 @@ namespace vecs {
 		requires are_component_types<P, Cs...>		///< \param[in] args Arguments to write over
 		auto update(Cs&&... args) noexcept -> bool;	///< \returns true of successful
 
-		auto erase() noexcept -> bool;				///< Erase the entity 
+		auto erase(bool destruct=true) noexcept -> bool;							///< Erase the entity 
+		auto mark_erased() noexcept				-> bool { return erase(false); };	///< Erase the entity 
 
 		auto map_index() noexcept	-> map_index_t { ///< \returns index of entity in the map
 			return m_map_index; 
@@ -284,7 +285,8 @@ namespace vecs {
 		
 		static const size_t c_segment_size = vtll::front_value< vtll::map<table_size_map, E, table_size_default > >::value;///Size of a segment
 		static inline VecsTable<P, data_types, c_segment_size, layout_type::value>			m_data;		///< Data per entity
-		static inline VecsTable<P, types_deleted, c_segment_size, VECS_LAYOUT_ROW::value>	m_deleted;	///< Table holding the indices of erased entities
+		static inline VecsTable<P, types_deleted, c_segment_size, VECS_LAYOUT_ROW::value>	m_erased;	///< Table holding the indices of erased entities
+		static inline VecsTable<P, types_deleted, c_segment_size, VECS_LAYOUT_ROW::value>	m_destructed;	///< Table holding the indices of deleted entities
 		static const size_t c_row_size = layout_type::value ? sizeof(vtll::to_tuple<data_types>) : 0;					///< Size of a row
 
 		///One instance for each component type
@@ -307,6 +309,7 @@ namespace vecs {
 		auto componentE_ptr(table_index_t entidx, size_t compidx) noexcept						-> void*;	///< For dispatching
 		auto has_componentE(size_t compidx)  noexcept											-> bool;	///< Test for component
 		auto remove_deleted_tail() noexcept														-> void;	///< Remove empty slots at the end of the table
+		auto destruct(table_index_t index) noexcept -> void;
 
 		VecsComponentTable() noexcept;			///< Protected constructor that does not allocate the dispatch table
 
@@ -341,8 +344,8 @@ namespace vecs {
 		//-------------------------------------------------------------------------
 		//erase data
 
-		auto erase(const table_index_t idx) noexcept			-> bool;	///< Mark a row as erased
-		auto clear() noexcept									-> size_t;	///< Mark all rows as erased
+		auto erase(const table_index_t idx, bool destruct) noexcept	-> bool;	///< Erase an entity from the table
+		auto clear() noexcept										-> size_t;	///< Mark all rows as erased
 
 		//-------------------------------------------------------------------------
 		//utilities
@@ -408,7 +411,7 @@ namespace vecs {
 	requires are_components_of<P, E, Cs...> [[nodiscard]]
 	inline auto VecsComponentTable<P, E>::insert(std::atomic<uint32_t>* mutex, VecsHandleT<P> handle, Cs&&... args) noexcept -> table_index_t {
 		std::tuple<table_index_t> tup;
-		if (m_deleted.pop_back(&tup)) {
+		if (m_destructed.pop_back(&tup)) {
 			table_index_t index = std::get<0>(tup);
 			m_data.update(index, mutex_wrapper_t{ mutex }, handle_wrapper_t{ handle }, std::forward<Cs>(args)...);
 			return index;
@@ -472,26 +475,37 @@ namespace vecs {
 	*
 	* The data is not really erased but the handle is invalidated. The index is also pushed to the deleted table.
 	* \param[in] index The index of the entity data in the component table.
+	* \param[in] destruct If true, the component destructors are called.
 	* \returns true if the data was set to invalid.
 	*/
 	template<typename P, typename E>
-	inline auto VecsComponentTable<P, E>::erase(const table_index_t index) noexcept -> bool {
+	inline auto VecsComponentTable<P, E>::erase(const table_index_t index, bool destr) noexcept -> bool {
 		assert(index < m_data.size());
 		m_data.component<c_handle>(index).m_handle.store({});	///< Invalidate handle	
 
+		if (destr) {
+			destruct(index);
+			m_destructed.push_back(index);	///< Push the index to the deleted table.
+		}
+		else {
+			m_erased.push_back(index);	///< Push the index to the deleted table.
+		}
+
+		return true;
+	}
+
+	template<typename P, typename E>
+	inline auto VecsComponentTable<P, E>::destruct(table_index_t index) noexcept -> void {
 		vtll::static_for<size_t, 0, vtll::size<E>::value >(			///< Loop over all components
 			[&](auto i) {
 				using type = vtll::Nth_type<E, i>;
 				if constexpr (std::is_destructible_v<type> && !std::is_trivially_destructible_v<type>) {
-					m_data.component_ptr<c_info_size + i>(index)->~type();	///< Call destructor
+					m_data.component_ptr<c_info_size + i>(index)->~type(); 	///< Call destructor
 				}
 			}
 		);
-
-		m_deleted.push_back(index);	///< Push the index to the deleted table.
-
-		return true;
 	}
+
 
 	/**
 	* \brief Get pointer to a handle.
@@ -730,7 +744,7 @@ namespace vecs {
 		virtual auto has_componentE(VecsHandleT<P> handle, size_t compidx) noexcept -> bool { return false; };
 
 		/// Virtual function for dispatching erasing an entity from a component table 
-		virtual auto eraseE(table_index_t index) noexcept	-> void { };
+		virtual auto eraseE(table_index_t index, bool destruct=true) noexcept	-> void { };
 
 		virtual auto sizeE() noexcept -> std::atomic<uint32_t>& { return m_size; };
 
@@ -769,7 +783,8 @@ namespace vecs {
 		//-------------------------------------------------------------------------
 		//erase data
 
-		virtual auto erase(VecsHandleT<P> handle) noexcept -> bool;		///< Erase a specific entity
+		virtual auto erase(VecsHandleT<P> handle, bool destruct=true) noexcept -> bool;						///< Erase an entity
+		virtual auto mark_erased(VecsHandleT<P> handle) noexcept -> bool { return erase(handle, false); };	///< Mark an entity as erased
 
 		template<typename... Es>
 		requires (are_entity_types<P, Es...>)
@@ -857,10 +872,11 @@ namespace vecs {
 	* \returns true if the operation was successful.
 	*/
 	template<typename P>
-	inline auto VecsRegistryBaseClass<P>::erase(VecsHandleT<P> handle) noexcept -> bool {
+	inline auto VecsRegistryBaseClass<P>::erase(VecsHandleT<P> handle, bool destruct) noexcept -> bool {
 		if (!handle.is_valid()) return false;
-		return m_dispatch[type(handle)]->erase(handle); ///< Dispatch to the correct subclass for type E and return result
+		return m_dispatch[type(handle)]->erase(handle, destruct); ///< Dispatch to the correct subclass for type E and return result
 	}
+
 
 	/**
 	* \brief Return table index of an entity in the component table.
@@ -970,7 +986,7 @@ namespace vecs {
 		auto updateC(VecsHandleT<P> handle, size_t compidx, void* ptr, size_t size, bool move = false) noexcept	-> bool; ///< Dispatch from base class
 		auto componentE_ptr(VecsHandleT<P> handle, size_t compidx) noexcept	-> void*;///< Get a pointer to a component
 		auto has_componentE(VecsHandleT<P> handle, size_t compidx) noexcept	-> bool; ///< Check if E has a component
-		auto eraseE(table_index_t index) noexcept	-> void { m_component_table.erase(index); };	 ///< Erase some entity
+		auto eraseE(table_index_t index, bool destruct=true) noexcept	-> void { m_component_table.erase(index, destruct); };	 ///< Erase some entity
 		auto compressE() noexcept	-> void { return m_component_table.compress(); };	///< Compress the table
 		auto clearE() noexcept		-> size_t { return m_component_table.clear(); };	///< Erase all entities from table
 		auto sizeE() noexcept		-> std::atomic<uint32_t>& { return m_sizeE; };
@@ -1018,8 +1034,9 @@ namespace vecs {
 		//-------------------------------------------------------------------------
 		//erase
 
-		auto erase(VecsHandleT<P> handle) noexcept				-> bool;		///< Erase an entity from VECS
-		auto clear() noexcept -> size_t { return clearE(); };					///< Clear entities of type E
+		auto erase(VecsHandleT<P> handle, bool destruct=true) noexcept	-> bool;		///< Erase an entity from VECS
+		auto mark_erased(VecsHandleT<P> handle) noexcept				-> bool { return erase(handle, false); };	///< Mark an entity as erased
+		auto clear() noexcept											-> size_t { return clearE(); };	///< Clear entities of type E
 
 		//-------------------------------------------------------------------------
 		//iterate
@@ -1279,10 +1296,10 @@ namespace vecs {
 	* \returns true if the operation was successful.
 	*/
 	template<typename P, typename E>
-	inline auto VecsRegistryT<P, E>::erase( VecsHandleT<P> handle) noexcept -> bool {
+	inline auto VecsRegistryT<P, E>::erase( VecsHandleT<P> handle, bool destruct) noexcept -> bool {
 		if (!this->has_value(handle)) return false;
-		m_component_table.erase(*this->table_index_ptr(handle.m_map_index));	///< Erase from comp table
-		(*this->counter_ptr(handle.m_map_index))++;								///< Invalidate the entity handle
+		m_component_table.erase(*this->table_index_ptr(handle.m_map_index), destruct);	///< Erase from comp table
+		(*this->counter_ptr(handle.m_map_index))++;										///< Invalidate the entity handle
 
 		this->m_size--;	///< Decrease sizes
 		this->m_sizeE--;
@@ -1341,25 +1358,33 @@ namespace vecs {
 	* \brief Remove all invalid entities from the component table.
 	* 
 	* The algorithm makes sure that there are no deleted entities at the end of the table.
-	* Then it runs trough all deleted entities (m_deleted table) and tests whether it lies
+	* Then it runs trough all deleted entities (m_destructed table) and tests whether it lies
 	* inside the table. if it does, it is swapped with the last entity, which must be valid.
 	* Then all invalid entities at the end are again removed.
 	*/
 	template<typename P, typename E>
 	inline auto VecsComponentTable<P, E>::compress() noexcept -> void {
 		VecsRegistryBaseClass<P> reg;
-		for (size_t i = 0; i < m_deleted.size(); ++i) {
+		std::tuple<table_index_t> tup;
+		table_index_t index;
+
+		while (m_erased.remove_back(&tup)) {
+			destruct(std::get<0>(tup));
+			m_destructed.push_back(std::get<0>(tup));
+		}
+
+		while (m_destructed.remove_back(&tup)) {
 			remove_deleted_tail();											///< Remove invalid entities at end of table
-			auto index = m_deleted.component<0>(table_index_t{i});		///< Get next deleted entity from deleted table
+			auto index = std::get<0>(tup);									///< Get next deleted entity from deleted table
 			if (index.value < m_data.size()) {								///< Is it inside the table still?		
 				m_data.move(index, table_index_t{ m_data.size() - 1 });		///< Yes, move last entity to this position
 				auto handle = m_data.component<c_handle>(index).m_handle.load();		///< Handle of moved entity
 				*reg.table_index_ptr(handle.m_map_index) = index;			///< Change map entry of moved last entity
 			}
 		}
-		m_deleted.clear();
 		m_data.compress();
-		m_deleted.compress();
+		m_erased.compress();
+		m_destructed.compress();
 	}
 
 	/**
@@ -1520,8 +1545,8 @@ namespace vecs {
 	* \returns true if the operation was successful.
 	*/
 	template<typename P>
-	inline auto VecsHandleT<P>::erase() noexcept				-> bool {
-		return VecsRegistryBaseClass<P>::m_registry.erase(*this);
+	inline auto VecsHandleT<P>::erase(bool destruct) noexcept				-> bool {
+		return VecsRegistryBaseClass<P>::m_registry.erase(*this, destruct);
 	}
 
 	/**
