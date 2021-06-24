@@ -714,8 +714,11 @@ namespace vecs {
 		using table_constants = vtll::transform < vtll::apply_map< table_size_map, entity_type_list, table_size_default>, vtll::value_to_type>;
 		using table_max_seg = vtll::max< vtll::transform< table_constants, vtll::front > >;	///< Get max size from map
 
+		using types_deleted = vtll::type_list< map_index_t >;	///< List with types for holding erased map entries
+
 	protected:
-		using types = vtll::type_list<table_index_t, counter_t, type_index_t, std::atomic<uint32_t>>;	///< Type for the table
+		/// Types for the table: index in the component table, generation counter, entity type, mutex for locking entity
+		using types = vtll::type_list<table_index_t, counter_t, type_index_t, std::atomic<uint32_t>>;
 		static const uint32_t c_index{ 0 };		///< Index for accessing the index to next free or entry in component table
 		static const uint32_t c_counter{ 1 };	///< Index for accessing the generation counter
 		static const uint32_t c_type{ 2 };		///< Index for accessing the type index
@@ -723,15 +726,8 @@ namespace vecs {
 		static const size_t	  c_segment_size = table_max_seg::value;
 		static const uint32_t c_uint32_max = std::numeric_limits<uint32_t>::max();
 
-		static inline VecsTable<P, types, c_segment_size, VECS_LAYOUT_ROW::value> m_map_table;	///< The main mapping table
-
-		/// points to first free slot, and is guarded by a counter against the ABA problem
-		struct first_free_t {
-			uint32_t m_index;
-			uint32_t m_counter;
-		};
-
-		static inline std::atomic<first_free_t>	m_first_free = first_free_t{ .m_index = c_uint32_max, .m_counter = 0 };	///< First free entry to be reused
+		static inline VecsTable<P, types, c_segment_size, VECS_LAYOUT_ROW::value>			 m_map_table;	///< The main mapping table
+		static inline VecsTable<P, types_deleted, c_segment_size, VECS_LAYOUT_COLUMN::value> m_erased;		///< Table holding the indices of erased map entries
 		static inline std::atomic<uint32_t>	m_size{ 0 };					///< Number of valid entities in the map
 
 		/// Every subclass for entity type E has an entry in this table.
@@ -1126,21 +1122,11 @@ namespace vecs {
 	template<typename... Cs>
 	requires are_components_of<P, E, Cs...> [[nodiscard]]
 	inline auto VecsRegistryT<P, E>::insert(Cs&&... args) noexcept	-> VecsHandleT<P> {
-		map_index_t map_idx{};	///< index in the map
+		std::tuple<map_index_t> tup;
+		map_index_t				map_idx{};	///< index in the map
 		
-		auto ff = this->m_first_free.load();	///< Is there a free empty slot left?
-		bool succ = false;
-		if ( ff.m_index != this->c_uint32_max) {							///< yes
-			do {
-				typename VecsRegistryBaseClass<P>::first_free_t nf {};
-				nf.m_index = this->table_index_ptr(map_index_t{ ff.m_index })->value;	///< Get next free slot
-				nf.m_counter = ff.m_counter + 1;							///< increase ABA counter by 1
-				succ = this->m_first_free.compare_exchange_weak(ff, nf);	///< Exchange with old ff value atomically
-			} while (!succ && ff.m_index != this->c_uint32_max);			///< Repeat until success or no more free slots
-		}
-
-		if (succ) {						
-			map_idx = map_index_t{ ff.m_index };							///< success -> Reuse old slot
+		if (this->m_erased.pop_back(&tup)) {						
+			map_idx = std::get<0>(tup);					///< success -> Reuse old slot
 		} else {
 			map_idx = map_index_t{ this->m_map_table.push_back().value };	///< Create a new slot
 			if (!map_idx.has_value()) return {};
@@ -1308,13 +1294,7 @@ namespace vecs {
 		this->m_size--;	///< Decrease sizes
 		this->m_sizeE--;
 
-		bool succ = false;
-		do {
-			auto ff = this->m_first_free.load();										///< Get first free value ff
-			this->table_index_ptr(handle.m_map_index)->value = ff.m_index;				///< Make old ff to successor of this map index
-			succ = this->m_first_free.compare_exchange_weak(ff, { .m_index = handle.m_map_index.value, .m_counter = ff.m_counter + 1 });	///< Exchange with old value atomically
-		} while (!succ);
-
+		this->m_erased.push_back(handle.m_map_index);
 		return true; 
 	}
 
