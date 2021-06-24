@@ -331,7 +331,7 @@ namespace vecs {
 		requires is_component_of<P, E, C>
 		auto component_ptr(const table_index_t index) noexcept	-> C*;		///< Get pointer to a component
 
-		auto tuple(const table_index_t index) noexcept			-> tuple_ref_t;	///< \returns tuple with copies of the components
+		auto tuple(const table_index_t index) noexcept			-> tuple_ref_t;	///< \returns tuple with references of the components
 		auto tuple_ptr(const table_index_t index) noexcept		-> tuple_ptr_t;	///< \returns tuple with pointers to the components
 
 		//-------------------------------------------------------------------------
@@ -782,8 +782,8 @@ namespace vecs {
 		//-------------------------------------------------------------------------
 		//erase data
 
-		virtual auto erase(VecsHandleT<P> handle, bool destruct=false) noexcept -> bool;				///< Erase an entity
-		virtual auto destruct(VecsHandleT<P> handle) noexcept -> bool { return erase(handle, true); };	///< Mark an entity as erased
+		virtual auto erase(VecsHandleT<P> handle, bool destruct=false) noexcept -> bool;				///< Mark an entity as erased
+		virtual auto destruct(VecsHandleT<P> handle) noexcept -> bool { return erase(handle, true); };	///< Destruct an entity
 
 		template<typename... Es>
 		requires (are_entity_types<P, Es...>)
@@ -796,7 +796,7 @@ namespace vecs {
 		requires (are_entity_types<P, Es...>)
 		auto size() const noexcept -> size_t;		///< \returns the total number of valid entities of types Es
 
-		auto compress() noexcept						-> void;			///< Compress all component tables
+		auto compress() noexcept						-> void;			///< Compress all component tables, destruct erased entities
 		auto type(VecsHandleT<P> h) noexcept			-> type_index_t;	///< \returns type of entity
 		auto has_value(VecsHandleT<P> handle) noexcept	-> bool;			///< \returns true if the ECS still holds this entity 
 
