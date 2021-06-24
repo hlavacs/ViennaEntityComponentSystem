@@ -283,6 +283,9 @@ namespace vecs {
 				}
 				else if constexpr (std::is_copy_assignable_v<type>) {
 					if (tup != nullptr) { std::get<i>(*tup) = *component_ptr<i>(table_index_t{ size.m_next_slot - 1 }); }
+				} 
+				else if constexpr (is_atomic< std::decay_t<type>>::value) {
+					if (tup != nullptr) { std::get<i>(*tup).store( component_ptr<i>(table_index_t{ size.m_next_slot - 1 })->load() ); }
 				}
 				if constexpr (std::is_destructible_v<type> && !std::is_trivially_destructible_v<type>) {
 					if (del) { component_ptr<i>(table_index_t{ size.m_next_slot - 1 })->~type(); }	///< Call destructor
@@ -343,8 +346,12 @@ namespace vecs {
 		assert(n.value < size2());
 		if constexpr (std::is_move_assignable_v<std::decay_t<C>> && std::is_rvalue_reference_v<decltype(data)>) {
 			component<I>(n) = std::move(data);
-		} else if constexpr (std::is_copy_assignable_v<std::decay_t<C>>) {
+		} 
+		else if constexpr (std::is_copy_assignable_v<std::decay_t<C>>) {
 			component<I>(n) = data;
+		} 
+		else if constexpr (is_atomic< std::decay_t<C>>::value) {
+			component<I>(n).store( data.load() );
 		}
 
 		return true;
@@ -375,12 +382,15 @@ namespace vecs {
 		auto src = tuple_ptr(isrc);
 		auto dst = tuple_ptr(idst);
 		vtll::static_for<size_t, 0, vtll::size<DATA>::value >([&](auto i) {
-			using type = vtll::Nth_type<DATA,i>;
+			using type = vtll::Nth_type<DATA, i>;
 			if constexpr (std::is_move_assignable_v<type>) {
 				*std::get<i>(dst) = std::move(*std::get<i>(src));
 			}
 			else if constexpr (std::is_copy_assignable_v<type>) {
 				*std::get<i>(dst) = *std::get<i>(src);
+			} 
+			else if constexpr (is_atomic<type>::value) {
+				std::get<i>(dst).store(std::get<i>(src).load());
 			}
 		});
 		return true;
@@ -407,7 +417,8 @@ namespace vecs {
 				type tmp{ *std::get<i>(src) };
 				*std::get<i>(src) = *std::get<i>(dst);
 				*std::get<i>(dst) = tmp;
-			} if constexpr (is_atomic<type>::value) {
+			} 
+			else if constexpr (is_atomic<type>::value) {
 				type tmp{ std::get<i>(src)->load() };
 				std::get<i>(src)->store(std::get<i>(dst)->load());
 				std::get<i>(dst)->store( tmp->load() );
