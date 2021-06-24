@@ -718,7 +718,7 @@ namespace vecs {
 
 	protected:
 		/// Types for the table: index in the component table, generation counter, entity type, mutex for locking entity
-		using types = vtll::type_list<table_index_t, counter_t, type_index_t, std::atomic<uint32_t>>;
+		using types = vtll::type_list<table_index_t, std::atomic<counter_t>, type_index_t, std::atomic<uint32_t>>;
 		static const uint32_t c_index{ 0 };		///< Index for accessing the index to next free or entry in component table
 		static const uint32_t c_counter{ 1 };	///< Index for accessing the generation counter
 		static const uint32_t c_type{ 2 };		///< Index for accessing the type index
@@ -748,7 +748,7 @@ namespace vecs {
 		virtual auto sizeE() noexcept -> std::atomic<uint32_t>& { return m_size; };
 
 		auto table_index_ptr(map_index_t index) noexcept	-> table_index_t*;			///< \returns row index in component table
-		auto counter_ptr(map_index_t index) noexcept		-> counter_t*;				///< \returns generation counter value
+		auto counter_ptr(map_index_t index) noexcept		-> std::atomic<counter_t>*;	///< \returns generation counter value
 		auto type_ptr(map_index_t index) noexcept			-> type_index_t*;			///< \returns type index in map
 		auto mutex_ptr(map_index_t index) noexcept			-> std::atomic<uint32_t>*;	///< \returns mutex from map
 
@@ -896,7 +896,7 @@ namespace vecs {
 	* \returns pointer to the generation counter of an entity.
 	*/
 	template<typename P>
-	inline auto VecsRegistryBaseClass<P>::counter_ptr(map_index_t index) noexcept	-> counter_t* {
+	inline auto VecsRegistryBaseClass<P>::counter_ptr(map_index_t index) noexcept	-> std::atomic<counter_t>* {
 		return m_map_table.component_ptr<VecsRegistryBaseClass<P>::c_counter>(table_index_t{ index.value });
 	}
 
@@ -958,7 +958,7 @@ namespace vecs {
 	template<typename P>
 	inline auto VecsRegistryBaseClass<P>::has_value(VecsHandleT<P> handle) noexcept	-> bool {
 		if (!handle.is_valid()) return false;
-		return (handle.m_generation_counter == *counter_ptr(handle.m_map_index));
+		return (handle.m_generation_counter == counter_ptr(handle.m_map_index)->load());
 	}
 
 
@@ -1130,12 +1130,12 @@ namespace vecs {
 		} else {
 			map_idx = map_index_t{ this->m_map_table.push_back().value };	///< Create a new slot
 			if (!map_idx.has_value()) return {};
-			*this->counter_ptr(map_idx) = counter_t{ 0 };			//start with counter 0
+			this->counter_ptr(map_idx)->store( counter_t{ 0 } );			//start with counter 0
 		}
 
 		*this->type_ptr(map_idx) = type_index_t{ vtll::index_of<entity_type_list, E>::value }; ///< Entity type index
 		
-		VecsHandleT<P> handle{ map_idx, *this->counter_ptr(map_idx) }; ///< The new handle
+		VecsHandleT<P> handle{ map_idx, this->counter_ptr(map_idx)->load() }; ///< The new handle
 
 		*this->table_index_ptr(map_idx) 
 			= m_component_table.insert(this->mutex_ptr(map_idx), handle, std::forward<Cs>(args)...);	///< add data into component table
@@ -1288,8 +1288,10 @@ namespace vecs {
 	template<typename P, typename E>
 	inline auto VecsRegistryT<P, E>::erase( VecsHandleT<P> handle, bool destruct) noexcept -> bool {
 		if (!this->has_value(handle)) return false;
+		auto counter_ptr = this->counter_ptr(handle.m_map_index);
+		counter_ptr->store(++(counter_ptr->load()));									///< Invalidate the entity handle
+
 		m_component_table.erase(*this->table_index_ptr(handle.m_map_index), destruct);	///< Erase from comp table
-		(*this->counter_ptr(handle.m_map_index))++;										///< Invalidate the entity handle
 
 		this->m_size--;	///< Decrease sizes
 		this->m_sizeE--;
