@@ -101,7 +101,7 @@ namespace vecs {
 		inline auto update(table_index_t n, C&& data) noexcept		-> bool;	///< Update a component  for a given row
 		
 		template<typename... Cs>
-		requires (sizeof...(Cs) > 0 && vtll::has_all_types<DATA, vtll::tl<std::decay_t<Cs>...>>::value)
+		requires (sizeof...(Cs) > 1 && vtll::has_all_types<DATA, vtll::tl<std::decay_t<Cs>...>>::value)
 		inline auto update(table_index_t n, Cs&&... data) noexcept	-> bool;
 
 		//-------------------------------------------------------------------------------------------
@@ -350,7 +350,7 @@ namespace vecs {
 	*/
 	template<typename P, typename DATA, size_t N0, bool ROW>
 	template<typename... Cs>
-	requires (sizeof...(Cs)>0 && vtll::has_all_types<DATA, vtll::tl<std::decay_t<Cs>...>>::value)
+	requires (sizeof...(Cs)>1 && vtll::has_all_types<DATA, vtll::tl<std::decay_t<Cs>...>>::value)
 	inline auto VecsTable<P, DATA, N0, ROW>::update(table_index_t n, Cs&&... data) noexcept -> bool {
 		return (update<vtll::index_of<DATA,std::decay_t<Cs>>::value>(n, std::forward<Cs>(data)) && ... && true);
 	}

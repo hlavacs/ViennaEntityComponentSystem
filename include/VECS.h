@@ -411,9 +411,12 @@ namespace vecs {
 	requires are_components_of<P, E, Cs...> [[nodiscard]]
 	inline auto VecsComponentTable<P, E>::insert(std::atomic<uint32_t>* mutex, VecsHandleT<P> handle, Cs&&... args) noexcept -> table_index_t {
 		std::tuple<table_index_t> tup;
-		if (m_destructed.pop_back(&tup)) {
+		if (m_destructed.pop_back(&tup)) {				/// Can recycle an old row?
 			table_index_t index = std::get<0>(tup);
 			m_data.update(index, mutex_wrapper_t{ mutex }, handle_wrapper_t{ handle }, std::forward<Cs>(args)...);
+
+			using types = vtll::not_in_list<E,vtll::tl<std::decay_t<Cs>...>>; //initilialize the other components
+			vtll::static_for<size_t, 0, vtll::size<types>::value >([&](auto i) { m_data.update(index, vtll::Nth_type<types, i>{}); });
 			return index;
 		}
 		return m_data.push_back(mutex_wrapper_t{ mutex }, handle_wrapper_t{ handle }, std::forward<Cs>(args)... );			///< Allocate space a the end of the table
