@@ -8,10 +8,18 @@
 #include <array>
 #include <concepts>
 #include <algorithm>
+#include <type_traits>
 #include "VTLL.h"
 #include "VECSUtil.h"
 
 namespace vecs {
+
+	template<typename T>
+	struct is_atomic : std::false_type {};
+
+	template<typename T>
+	struct is_atomic<std::atomic<T>> : std::true_type {};
+
 
 	/**
 	* \brief VecsTable is a data container similar to std::vector, but with additional properties
@@ -399,6 +407,10 @@ namespace vecs {
 				type tmp{ *std::get<i>(src) };
 				*std::get<i>(src) = *std::get<i>(dst);
 				*std::get<i>(dst) = tmp;
+			} if constexpr (is_atomic<type>::value) {
+				type tmp{ std::get<i>(src)->load() };
+				std::get<i>(src)->store(std::get<i>(dst)->load());
+				std::get<i>(dst)->store( tmp->load() );
 			}
 		});
 		return true;
