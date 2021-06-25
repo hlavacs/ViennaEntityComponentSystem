@@ -234,7 +234,7 @@ namespace vllt {
 		}
 
 		auto seg_num = size.m_next_slot >> L;					///< Index of segment we need
-		auto seg_ptr = (*vector_ptr)[seg_num].load();			///< Does the segment exist yet?
+		auto seg_ptr = (*vector_ptr)[seg_num].load();			///< Does the segment exist yet? If yes, increases use count.
 		if (!seg_ptr) {											///< If not, create one
 			auto new_seg_ptr = std::make_shared<segment_t>();	///< Create a new segment
 			(*vector_ptr)[seg_num].compare_exchange_strong( seg_ptr, new_seg_ptr);	///< Try to put it into seg vector, someone might beat us here
@@ -428,9 +428,11 @@ namespace vllt {
 	inline auto VlltTable<DATA, N0, ROW, table_index_t>::compress() noexcept -> void {
 		auto vector_ptr{ m_seg_vector.load() };
 		if (!vector_ptr) return;
-		for( size_t i = (size() >> L) + 1; i< vector_ptr->size(); ++i ) {
-			if ((*vector_ptr)[i].load()) {
-				(*vector_ptr)[i] = nullptr;
+		for (size_t i = vector_ptr->size() - 1; i > (size2() >> L); --i) {
+			auto seg_ptr = (*vector_ptr)[i].load();
+			if (seg_ptr && seg_ptr.use_count() == 2) {
+				std::shared_ptr<segment_t> new_seg_ptr;
+				(*vector_ptr)[i].compare_exchange_strong(seg_ptr, new_seg_ptr);	///< Try to put it into seg vector, someone might beat us here
 			}
 		}
 	}
