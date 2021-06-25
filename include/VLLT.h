@@ -172,7 +172,7 @@ namespace vllt {
 	template<typename DATA, size_t N0, bool ROW, typename table_index_t>
 	template<size_t I, typename C>
 	inline auto VlltTable<DATA, N0, ROW, table_index_t>::component_ptr(table_index_t n) noexcept -> C* {
-		assert(n.value < size2());
+		assert(n < size2());
 		auto vector_ptr{ m_seg_vector.load() };
 		auto segment_ptr = ((*vector_ptr)[n >> L]).load();
 		if constexpr (ROW) {
@@ -200,7 +200,7 @@ namespace vllt {
 	*/
 	template<typename DATA, size_t N0, bool ROW, typename table_index_t>
 	inline auto VlltTable<DATA, N0, ROW, table_index_t>::tuple_ptr(table_index_t n) noexcept -> tuple_ptr_t {
-		assert(n.value < size());
+		assert(n < size());
 		auto f = [&]<size_t... Is>(std::index_sequence<Is...>) {
 			return std::make_tuple(component_ptr<Is>(n)...);
 		};
@@ -336,7 +336,7 @@ namespace vllt {
 	template<size_t I, typename C>
 	requires vtll::has_type<DATA, std::decay_t<C>>::value
 	inline auto VlltTable<DATA, N0, ROW, table_index_t>::update(table_index_t n, C&& data) noexcept -> bool {
-		assert(n.value < size2());
+		assert(n < size2());
 		if constexpr (std::is_move_assignable_v<std::decay_t<C>> && std::is_rvalue_reference_v<decltype(data)>) {
 			component<I>(n) = std::move(data);
 		}
