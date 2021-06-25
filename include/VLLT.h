@@ -37,7 +37,7 @@ namespace vllt {
 	* the segment.
 	*
 	*/
-	template<typename P, typename DATA, size_t N0 = 1<<10, bool ROW = true, typename table_index_t = uint32_t>
+	template<typename DATA, size_t N0 = 1<<10, bool ROW = true, typename table_index_t = uint32_t>
 	class VlltTable {
 
 		static_assert(std::is_default_constructible_v<DATA>, "Your components are not default constructible!");
@@ -123,22 +123,22 @@ namespace vllt {
 	* \param[in] r Max number of rows that can be stored in the table.
 	* \param[in] mr Memory allocator.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
-	inline VlltTable<P, DATA, N0, ROW, table_index_t>::VlltTable(size_t r, std::pmr::memory_resource* mr) noexcept
+	template<typename DATA, size_t N0, bool ROW, typename table_index_t>
+	inline VlltTable<DATA, N0, ROW, table_index_t>::VlltTable(size_t r, std::pmr::memory_resource* mr) noexcept
 		: m_mr{ mr }, m_allocator{ mr }, m_seg_vector{ nullptr } {};
 
 	/**
 	* \brief Destructor of class VlltTable.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
-	inline VlltTable<P, DATA, N0, ROW, table_index_t>::~VlltTable() noexcept { clear(); };
+	template<typename DATA, size_t N0, bool ROW, typename table_index_t>
+	inline VlltTable<DATA, N0, ROW, table_index_t>::~VlltTable() noexcept { clear(); };
 
 	/**
 	* \brief Return number of rows when growing including new rows not yet established.
 	* \returns number of rows when growing including new rows not yet established.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
-	inline auto VlltTable<P, DATA, N0, ROW, table_index_t>::size2() noexcept -> size_t {
+	template<typename DATA, size_t N0, bool ROW, typename table_index_t>
+	inline auto VlltTable<DATA, N0, ROW, table_index_t>::size2() noexcept -> size_t {
 		auto size = m_size_cnt.load();
 		return std::max(size.m_next_slot, size.m_size);
 	};
@@ -147,8 +147,8 @@ namespace vllt {
 	* \brief Return number of valid rows.
 	* \returns number of valid rows.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
-	inline auto VlltTable<P, DATA, N0, ROW, table_index_t>::size() noexcept -> size_t {
+	template<typename DATA, size_t N0, bool ROW, typename table_index_t>
+	inline auto VlltTable<DATA, N0, ROW, table_index_t>::size() noexcept -> size_t {
 		auto size = m_size_cnt.load();
 		return std::min( size.m_next_slot, size.m_size );
 	};
@@ -158,9 +158,9 @@ namespace vllt {
 	* \param[in] n Index to the entry.
 	* \returns reference to a component with index I.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
+	template<typename DATA, size_t N0, bool ROW, typename table_index_t>
 	template<size_t I, typename C>
-	inline auto VlltTable<P, DATA, N0, ROW, table_index_t>::component(table_index_t n) noexcept -> C& {
+	inline auto VlltTable<DATA, N0, ROW, table_index_t>::component(table_index_t n) noexcept -> C& {
 		return *component_ptr<I>(n);
 	}
 
@@ -169,9 +169,9 @@ namespace vllt {
 	* \param[in] n Index to the entry.
 	* \returns a pointer to the Ith component of entry n.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
+	template<typename DATA, size_t N0, bool ROW, typename table_index_t>
 	template<size_t I, typename C>
-	inline auto VlltTable<P, DATA, N0, ROW, table_index_t>::component_ptr(table_index_t n) noexcept -> C* {
+	inline auto VlltTable<DATA, N0, ROW, table_index_t>::component_ptr(table_index_t n) noexcept -> C* {
 		assert(n.value < size2());
 		auto vector_ptr{ m_seg_vector.load() };
 		auto segment_ptr = ((*vector_ptr)[n >> L]).load();
@@ -188,8 +188,8 @@ namespace vllt {
 	* \param[in] n Index to the entry.
 	* \returns a tuple with references to all components of a row.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
-	inline auto VlltTable<P, DATA, N0, ROW, table_index_t>::tuple(table_index_t n) noexcept -> tuple_ref_t {
+	template<typename DATA, size_t N0, bool ROW, typename table_index_t>
+	inline auto VlltTable<DATA, N0, ROW, table_index_t>::tuple(table_index_t n) noexcept -> tuple_ref_t {
 		return vtll::ptr_to_ref_tuple(tuple_ptr(n));
 	};
 
@@ -198,8 +198,8 @@ namespace vllt {
 	* \param[in] n Index to the entry.
 	* \returns a tuple with pointers to all components of entry n.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
-	inline auto VlltTable<P, DATA, N0, ROW, table_index_t>::tuple_ptr(table_index_t n) noexcept -> tuple_ptr_t {
+	template<typename DATA, size_t N0, bool ROW, typename table_index_t>
+	inline auto VlltTable<DATA, N0, ROW, table_index_t>::tuple_ptr(table_index_t n) noexcept -> tuple_ptr_t {
 		assert(n.value < size());
 		auto f = [&]<size_t... Is>(std::index_sequence<Is...>) {
 			return std::make_tuple(component_ptr<Is>(n)...);
@@ -212,10 +212,10 @@ namespace vllt {
 	* \param[in] data References to values to be moved or copied to the new row.
 	* \returns the index of the new entry.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
+	template<typename DATA, size_t N0, bool ROW, typename table_index_t>
 	template<typename... Cs>
 	requires vtll::has_all_types<DATA, vtll::tl<std::decay_t<Cs>...>>::value
-	inline auto VlltTable<P, DATA, N0, ROW, table_index_t>::push_back(Cs&&... data) noexcept -> table_index_t {
+	inline auto VlltTable<DATA, N0, ROW, table_index_t>::push_back(Cs&&... data) noexcept -> table_index_t {
 		slot_size_t size = m_size_cnt.load();	///< Make sure that no other thread is popping currently
 		while (size.m_next_slot < size.m_size || !m_size_cnt.compare_exchange_weak(size, slot_size_t{ size.m_next_slot + 1, size.m_size })) {
 			if (size.m_next_slot < size.m_size) {
@@ -257,8 +257,8 @@ namespace vllt {
 	* \param[in] tup Pointer to tuple to move the row data into.
 	* \returns true if a row was popped.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
-	inline auto VlltTable<P, DATA, N0, ROW, table_index_t>::pop_back(vtll::to_tuple<DATA>* tup, bool del) noexcept -> bool {
+	template<typename DATA, size_t N0, bool ROW, typename table_index_t>
+	inline auto VlltTable<DATA, N0, ROW, table_index_t>::pop_back(vtll::to_tuple<DATA>* tup, bool del) noexcept -> bool {
 		slot_size_t size = m_size_cnt.load();
 		if (size.m_next_slot == 0) return false;	///< Is there a row to pop off?
 
@@ -299,8 +299,8 @@ namespace vllt {
 	* \brief Remove the last row if there is one.
 	* \returns true if a row was popped.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
-	inline auto VlltTable<P, DATA, N0, ROW, table_index_t>::remove_back(vtll::to_tuple<DATA>* tup) noexcept -> bool {
+	template<typename DATA, size_t N0, bool ROW, typename table_index_t>
+	inline auto VlltTable<DATA, N0, ROW, table_index_t>::remove_back(vtll::to_tuple<DATA>* tup) noexcept -> bool {
 		return pop_back(tup, false);
 	}
 
@@ -308,8 +308,8 @@ namespace vllt {
 	* \brief Remove all rows.
 	* \returns number of removed rows.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
-	inline auto VlltTable<P, DATA, N0, ROW, table_index_t>::remove_all() noexcept -> size_t {
+	template<typename DATA, size_t N0, bool ROW, typename table_index_t>
+	inline auto VlltTable<DATA, N0, ROW, table_index_t>::remove_all() noexcept -> size_t {
 		size_t num = 0;
 		while (remove_back()) { ++num; }
 		return num;
@@ -319,8 +319,8 @@ namespace vllt {
 	* \brief Pop all rows.
 	* \returns number of popped rows.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
-	inline auto VlltTable<P, DATA, N0, ROW, table_index_t>::clear() noexcept -> size_t {
+	template<typename DATA, size_t N0, bool ROW, typename table_index_t>
+	inline auto VlltTable<DATA, N0, ROW, table_index_t>::clear() noexcept -> size_t {
 		size_t num = 0;
 		while (pop_back()) { ++num; }
 		return num;
@@ -332,10 +332,10 @@ namespace vllt {
 	* \param[in] C Universal reference to the component holding the data.
 	* \returns true if the operation was successful.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
+	template<typename DATA, size_t N0, bool ROW, typename table_index_t>
 	template<size_t I, typename C>
 	requires vtll::has_type<DATA, std::decay_t<C>>::value
-	inline auto VlltTable<P, DATA, N0, ROW, table_index_t>::update(table_index_t n, C&& data) noexcept -> bool {
+	inline auto VlltTable<DATA, N0, ROW, table_index_t>::update(table_index_t n, C&& data) noexcept -> bool {
 		assert(n.value < size2());
 		if constexpr (std::is_move_assignable_v<std::decay_t<C>> && std::is_rvalue_reference_v<decltype(data)>) {
 			component<I>(n) = std::move(data);
@@ -356,10 +356,10 @@ namespace vllt {
 	* \param[in] C Universal reference to tuple holding the components with the data.
 	* \returns true if the operation was successful.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
+	template<typename DATA, size_t N0, bool ROW, typename table_index_t>
 	template<typename... Cs>
 	requires (sizeof...(Cs)>1 && vtll::has_all_types<DATA, vtll::tl<std::decay_t<Cs>...>>::value)
-	inline auto VlltTable<P, DATA, N0, ROW, table_index_t>::update(table_index_t n, Cs&&... data) noexcept -> bool {
+	inline auto VlltTable<DATA, N0, ROW, table_index_t>::update(table_index_t n, Cs&&... data) noexcept -> bool {
 		return (update<vtll::index_of<DATA,std::decay_t<Cs>>::value>(n, std::forward<Cs>(data)) && ... && true);
 	}
 
@@ -369,8 +369,8 @@ namespace vllt {
 	* \param[in] isrc Index of source row.
 	* \returns true if the operation was successful.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
-	inline auto VlltTable<P, DATA, N0, ROW, table_index_t>::move(table_index_t idst, table_index_t isrc) noexcept -> bool {
+	template<typename DATA, size_t N0, bool ROW, typename table_index_t>
+	inline auto VlltTable<DATA, N0, ROW, table_index_t>::move(table_index_t idst, table_index_t isrc) noexcept -> bool {
 		if (idst >= size() || isrc >= size()) return false;
 		auto src = tuple_ptr(isrc);
 		auto dst = tuple_ptr(idst);
@@ -395,8 +395,8 @@ namespace vllt {
 	* \param[in] n2 Index of second row.
 	* \returns true if the operation was successful.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
-	inline auto VlltTable<P, DATA, N0, ROW, table_index_t>::swap(table_index_t idst, table_index_t isrc) noexcept -> bool {
+	template<typename DATA, size_t N0, bool ROW, typename table_index_t>
+	inline auto VlltTable<DATA, N0, ROW, table_index_t>::swap(table_index_t idst, table_index_t isrc) noexcept -> bool {
 		if (idst >= size() || isrc >= size()) return false;
 		auto src = tuple_ptr(isrc);
 		auto dst = tuple_ptr(idst);
@@ -424,8 +424,8 @@ namespace vllt {
 	* \brief Deallocate segments that are currently not used.
 	* No parallel processing allowed when calling this function.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
-	inline auto VlltTable<P, DATA, N0, ROW, table_index_t>::compress() noexcept -> void {
+	template<typename DATA, size_t N0, bool ROW, typename table_index_t>
+	inline auto VlltTable<DATA, N0, ROW, table_index_t>::compress() noexcept -> void {
 		auto vector_ptr{ m_seg_vector.load() };
 		if (!vector_ptr) return;
 		for( size_t i = (size() >> L) + 1; i< vector_ptr->size(); ++i ) {
