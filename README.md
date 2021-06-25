@@ -29,12 +29,20 @@ VECS is a header only library, consisting of the following header files:
 * *VTLL.h*: The Vienna Type List Library is a collection of meta-algorithms for treating type lists and value lists.
 * *VECS.h*: The main include file containing most of VECS functionality, loading all other include files. Include this file into your source code.
 
-VECS depends on two projects, the Vienna Type List Library (VTLL) and Vienna Game Job System (VGJS).
+VECS depends on other projects, the Vienna Type List Library (VTLL), the Vienna Lock Less Table (VLLT), and the Vienna Game Job System (VGJS).
 
 ### Vienna Type List Library (VTLL)
 
 As stated, VECS is a compile time ECS. Compositions of entities are defined in source code only. VECS thus heavily relies on its partner project Vienna Type List Library (VTLL), a header-only meta-programming library that helps creating entity types, type lists, compositions of components, accessing list elements, mapping data, etc. Especially, entities are defined as *vtll::type_list<...>* (or its shorter version *vtll::tl<...>*) and therefore are nothing more than a list of types. For more information goto https://github.com/hlavacs/ViennaTypeListLibrary.
 
+### Vienna Lock Less Table (VLLT)
+
+The Vienna Lock Less Table (VLLT) is a C++20 container that like std::vector allows to store arbitrary sets of data. However, it is meant as 2-dimensional table, i.e., each row can store *N* independent data items. The unique features of VLLT are:
+* Cache optimal data layout. Data is stored in independent segments, and there consecutively.
+* The data layout can be row-oriented or column-oriented.
+* Allows operations for multithreaded access: push_back, pop_back, compress. The table can grow seamlessly without stopping operations.
+* Lockless operations. VLLT does not use mutexes, only compare and swap (CAS).
+* Can be used as basis to create more advanced containers.
 
 ### Vienna Game Job System (VGJS)
 

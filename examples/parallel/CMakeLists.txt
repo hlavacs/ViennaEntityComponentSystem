@@ -10,7 +10,7 @@ set(HEADERS
   VGJSCoro.h
   ${INCLUDE}/VTLL.h
   ${INCLUDE}/VECSUtil.h
-  ${INCLUDE}/VECSTable.h
+  ${INCLUDE}/VLLT.h
   ${INCLUDE}/VECS.h
   ${INCLUDE}/VECSIterator.h
 )

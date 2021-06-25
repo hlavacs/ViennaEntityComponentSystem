@@ -1,5 +1,5 @@
-#ifndef VECSTABLE_H
-#define VECSTABLE_H
+#ifndef VlltTABLE_H
+#define VlltTABLE_H
 
 #include <assert.h>
 #include <memory_resource>
@@ -10,9 +10,8 @@
 #include <algorithm>
 #include <type_traits>
 #include "VTLL.h"
-#include "VECSUtil.h"
 
-namespace vecs {
+namespace vllt {
 
 	template<typename T>
 	struct is_atomic : std::false_type {};
@@ -22,30 +21,24 @@ namespace vecs {
 
 
 	/**
-	* \brief VecsTable is a data container similar to std::vector, but with additional properties
-	* 
-	* VecsTable has the following properties:
+	* \brief VlltTable is a data container similar to std::vector, but with additional properties
+	*
+	* VlltTable has the following properties:
 	* 1) It stores tuples of data, thus the result is a table.
-	* 2) The memory layout can be row-oriented or column-oriented.
-	* 3) Lockless ultithreaded access. It can grow - by calling push_back() - even when 
+	* 2) The memory layout is cache-friendly and can be row-oriented or column-oriented.
+	* 3) Lockless multithreaded access. It can grow - by calling push_back() - even when
 	* used with multiple threads. This is achieved by storing data in segments,
-	* which are accessed over via a std::vector of shared_ptr. New segments can simply be added to the 
+	* which are accessed over via a std::vector of shared_ptr. New segments can simply be added to the
 	* std::vector. Also the std::vector can seamlessly grow using CAS.
 	* Is can also shrink when using multithreading by calling pop_back(). Again, no locks are used!
-	* 
+	*
 	* The number of items S per segment must be a power of 2 : N = 2^L. This way, random access to row K is esily achieved
-	* by first right shift K >> L to get the index of the segment pointer, then use K & (N-1) to get the index within 
+	* by first right shift K >> L to get the index of the segment pointer, then use K & (N-1) to get the index within
 	* the segment.
-	* 
+	*
 	*/
-	template<typename P, typename DATA, size_t N0 = 1<<10, bool ROW = true>
-	class VecsTable {
-
-		//friends
-		template<typename P, typename E> friend class VecsRegistryTemplate;
-		template<typename P, typename E> friend class VecsComponentTable;
-		template<typename P, typename E, size_t I> friend class VecsComponentTableDerived;
-		template<typename P, typename E, typename ETL, typename CTL> friend class VecsIteratorEntity;
+	template<typename P, typename DATA, size_t N0 = 1<<10, bool ROW = true, typename table_index_t = uint32_t>
+	class VlltTable {
 
 		static_assert(std::is_default_constructible_v<DATA>, "Your components are not default constructible!");
 
@@ -69,19 +62,19 @@ namespace vecs {
 			uint32_t m_size{ 0 };
 		};
 
-		std::pmr::memory_resource*									m_mr;					///< Memory resource for allocating segments
-		std::pmr::polymorphic_allocator<seg_vector_t>				m_allocator;			///< use this allocator
-		std::atomic<std::shared_ptr<seg_vector_t>>					m_seg_vector;			///< Vector of shared ptrs to the segments
-		std::atomic<slot_size_t>									m_size_cnt{ {0,0} };	///< Next slot and size as atomic
+		std::pmr::memory_resource*						m_mr;					///< Memory resource for allocating segments
+		std::pmr::polymorphic_allocator<seg_vector_t>	m_allocator;			///< use this allocator
+		std::atomic<std::shared_ptr<seg_vector_t>>		m_seg_vector;			///< Vector of shared ptrs to the segments
+		std::atomic<slot_size_t>						m_size_cnt{ {0,0} };	///< Next slot and size as atomic
 
 		inline auto size2() noexcept -> size_t;
 
 	public:
-		VecsTable(size_t r = 1 << 16, std::pmr::memory_resource* mr = std::pmr::new_delete_resource()) noexcept;
-		~VecsTable() noexcept;
+		VlltTable(size_t r = 1 << 16, std::pmr::memory_resource* mr = std::pmr::new_delete_resource()) noexcept;
+		~VlltTable() noexcept;
 
 		inline auto size() noexcept -> size_t ; ///< \returns the current numbers of rows in the table
-		
+
 		//-------------------------------------------------------------------------------------------
 		//read data
 
@@ -93,7 +86,7 @@ namespace vecs {
 
 		inline auto tuple(table_index_t n) noexcept	-> tuple_ref_t;		///< \returns a tuple with copies of all components
 		inline auto tuple_ptr(table_index_t n) noexcept	-> tuple_ptr_t;	///< \returns a tuple with pointers to all components
-		
+
 		//-------------------------------------------------------------------------------------------
 		//add data
 
@@ -107,7 +100,7 @@ namespace vecs {
 		template<size_t I, typename C = vtll::Nth_type<DATA, I>>
 		requires vtll::has_type<DATA, std::decay_t<C>>::value
 		inline auto update(table_index_t n, C&& data) noexcept		-> bool;	///< Update a component  for a given row
-		
+
 		template<typename... Cs>
 		requires (sizeof...(Cs) > 1 && vtll::has_all_types<DATA, vtll::tl<std::decay_t<Cs>...>>::value)
 		inline auto update(table_index_t n, Cs&&... data) noexcept	-> bool;
@@ -126,26 +119,26 @@ namespace vecs {
 
 
 	/**
-	* \brief Constructor of class VecsTable.
+	* \brief Constructor of class VlltTable.
 	* \param[in] r Max number of rows that can be stored in the table.
 	* \param[in] mr Memory allocator.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW>
-	inline VecsTable<P, DATA, N0, ROW>::VecsTable(size_t r, std::pmr::memory_resource* mr) noexcept 
+	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
+	inline VlltTable<P, DATA, N0, ROW, table_index_t>::VlltTable(size_t r, std::pmr::memory_resource* mr) noexcept
 		: m_mr{ mr }, m_allocator{ mr }, m_seg_vector{ nullptr } {};
 
 	/**
-	* \brief Destructor of class VecsTable.
+	* \brief Destructor of class VlltTable.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW>
-	inline VecsTable<P, DATA, N0, ROW>::~VecsTable() noexcept { clear(); };
+	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
+	inline VlltTable<P, DATA, N0, ROW, table_index_t>::~VlltTable() noexcept { clear(); };
 
 	/**
 	* \brief Return number of rows when growing including new rows not yet established.
 	* \returns number of rows when growing including new rows not yet established.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW>
-	inline auto VecsTable<P, DATA, N0, ROW>::size2() noexcept -> size_t {
+	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
+	inline auto VlltTable<P, DATA, N0, ROW, table_index_t>::size2() noexcept -> size_t {
 		auto size = m_size_cnt.load();
 		return std::max(size.m_next_slot, size.m_size);
 	};
@@ -154,8 +147,8 @@ namespace vecs {
 	* \brief Return number of valid rows.
 	* \returns number of valid rows.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW>
-	inline auto VecsTable<P, DATA, N0, ROW>::size() noexcept -> size_t {
+	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
+	inline auto VlltTable<P, DATA, N0, ROW, table_index_t>::size() noexcept -> size_t {
 		auto size = m_size_cnt.load();
 		return std::min( size.m_next_slot, size.m_size );
 	};
@@ -165,9 +158,9 @@ namespace vecs {
 	* \param[in] n Index to the entry.
 	* \returns reference to a component with index I.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW>
+	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
 	template<size_t I, typename C>
-	inline auto VecsTable<P, DATA, N0, ROW>::component(table_index_t n) noexcept -> C& {
+	inline auto VlltTable<P, DATA, N0, ROW, table_index_t>::component(table_index_t n) noexcept -> C& {
 		return *component_ptr<I>(n);
 	}
 
@@ -176,9 +169,9 @@ namespace vecs {
 	* \param[in] n Index to the entry.
 	* \returns a pointer to the Ith component of entry n.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW>
+	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
 	template<size_t I, typename C>
-	inline auto VecsTable<P, DATA, N0, ROW>::component_ptr(table_index_t n) noexcept -> C* {
+	inline auto VlltTable<P, DATA, N0, ROW, table_index_t>::component_ptr(table_index_t n) noexcept -> C* {
 		assert(n.value < size2());
 		auto vector_ptr{ m_seg_vector.load() };
 		auto segment_ptr = ((*vector_ptr)[n >> L]).load();
@@ -195,8 +188,8 @@ namespace vecs {
 	* \param[in] n Index to the entry.
 	* \returns a tuple with references to all components of a row.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW>
-	inline auto VecsTable<P, DATA, N0, ROW>::tuple(table_index_t n) noexcept -> tuple_ref_t {
+	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
+	inline auto VlltTable<P, DATA, N0, ROW, table_index_t>::tuple(table_index_t n) noexcept -> tuple_ref_t {
 		return vtll::ptr_to_ref_tuple(tuple_ptr(n));
 	};
 
@@ -205,8 +198,8 @@ namespace vecs {
 	* \param[in] n Index to the entry.
 	* \returns a tuple with pointers to all components of entry n.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW>
-	inline auto VecsTable<P, DATA, N0, ROW>::tuple_ptr(table_index_t n) noexcept -> tuple_ptr_t {
+	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
+	inline auto VlltTable<P, DATA, N0, ROW, table_index_t>::tuple_ptr(table_index_t n) noexcept -> tuple_ptr_t {
 		assert(n.value < size());
 		auto f = [&]<size_t... Is>(std::index_sequence<Is...>) {
 			return std::make_tuple(component_ptr<Is>(n)...);
@@ -219,10 +212,10 @@ namespace vecs {
 	* \param[in] data References to values to be moved or copied to the new row.
 	* \returns the index of the new entry.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW>
+	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
 	template<typename... Cs>
 	requires vtll::has_all_types<DATA, vtll::tl<std::decay_t<Cs>...>>::value
-	inline auto VecsTable<P, DATA, N0, ROW>::push_back(Cs&&... data) noexcept -> table_index_t {
+	inline auto VlltTable<P, DATA, N0, ROW, table_index_t>::push_back(Cs&&... data) noexcept -> table_index_t {
 		slot_size_t size = m_size_cnt.load();	///< Make sure that no other thread is popping currently
 		while (size.m_next_slot < size.m_size || !m_size_cnt.compare_exchange_weak(size, slot_size_t{ size.m_next_slot + 1, size.m_size })) {
 			if (size.m_next_slot < size.m_size) {
@@ -239,12 +232,12 @@ namespace vecs {
 				vector_ptr = new_vector_ptr;					///< Remember for later
 			}
 		}
-			
+
 		auto seg_num = size.m_next_slot >> L;					///< Index of segment we need
 		auto seg_ptr = (*vector_ptr)[seg_num].load();			///< Does the segment exist yet?
 		if (!seg_ptr) {											///< If not, create one
 			auto new_seg_ptr = std::make_shared<segment_t>();	///< Create a new segment
-			(*vector_ptr)[seg_num].compare_exchange_strong( seg_ptr, new_seg_ptr);	///< Try to put it into seg vector, someone might beat us here 
+			(*vector_ptr)[seg_num].compare_exchange_strong( seg_ptr, new_seg_ptr);	///< Try to put it into seg vector, someone might beat us here
 		}
 
 		if constexpr (sizeof...(Cs) > 0) {						///< copy/move the data
@@ -264,8 +257,8 @@ namespace vecs {
 	* \param[in] tup Pointer to tuple to move the row data into.
 	* \returns true if a row was popped.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW>
-	inline auto VecsTable<P, DATA, N0, ROW>::pop_back(vtll::to_tuple<DATA>* tup, bool del) noexcept -> bool {
+	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
+	inline auto VlltTable<P, DATA, N0, ROW, table_index_t>::pop_back(vtll::to_tuple<DATA>* tup, bool del) noexcept -> bool {
 		slot_size_t size = m_size_cnt.load();
 		if (size.m_next_slot == 0) return false;	///< Is there a row to pop off?
 
@@ -283,7 +276,7 @@ namespace vecs {
 				}
 				else if constexpr (std::is_copy_assignable_v<type>) {
 					if (tup != nullptr) { std::get<i>(*tup) = *component_ptr<i>(table_index_t{ size.m_next_slot - 1 }); }
-				} 
+				}
 				else if constexpr (is_atomic< std::decay_t<type>>::value) {
 					if (tup != nullptr) { std::get<i>(*tup).store( component_ptr<i>(table_index_t{ size.m_next_slot - 1 })->load() ); }
 				}
@@ -306,8 +299,8 @@ namespace vecs {
 	* \brief Remove the last row if there is one.
 	* \returns true if a row was popped.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW>
-	inline auto VecsTable<P, DATA, N0, ROW>::remove_back(vtll::to_tuple<DATA>* tup) noexcept -> bool {
+	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
+	inline auto VlltTable<P, DATA, N0, ROW, table_index_t>::remove_back(vtll::to_tuple<DATA>* tup) noexcept -> bool {
 		return pop_back(tup, false);
 	}
 
@@ -315,8 +308,8 @@ namespace vecs {
 	* \brief Remove all rows.
 	* \returns number of removed rows.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW>
-	inline auto VecsTable<P, DATA, N0, ROW>::remove_all() noexcept -> size_t {
+	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
+	inline auto VlltTable<P, DATA, N0, ROW, table_index_t>::remove_all() noexcept -> size_t {
 		size_t num = 0;
 		while (remove_back()) { ++num; }
 		return num;
@@ -326,8 +319,8 @@ namespace vecs {
 	* \brief Pop all rows.
 	* \returns number of popped rows.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW>
-	inline auto VecsTable<P, DATA, N0, ROW>::clear() noexcept -> size_t {
+	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
+	inline auto VlltTable<P, DATA, N0, ROW, table_index_t>::clear() noexcept -> size_t {
 		size_t num = 0;
 		while (pop_back()) { ++num; }
 		return num;
@@ -339,17 +332,17 @@ namespace vecs {
 	* \param[in] C Universal reference to the component holding the data.
 	* \returns true if the operation was successful.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW>
+	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
 	template<size_t I, typename C>
 	requires vtll::has_type<DATA, std::decay_t<C>>::value
-	inline auto VecsTable<P, DATA, N0, ROW>::update(table_index_t n, C&& data) noexcept -> bool {
+	inline auto VlltTable<P, DATA, N0, ROW, table_index_t>::update(table_index_t n, C&& data) noexcept -> bool {
 		assert(n.value < size2());
 		if constexpr (std::is_move_assignable_v<std::decay_t<C>> && std::is_rvalue_reference_v<decltype(data)>) {
 			component<I>(n) = std::move(data);
-		} 
+		}
 		else if constexpr (std::is_copy_assignable_v<std::decay_t<C>>) {
 			component<I>(n) = data;
-		} 
+		}
 		else if constexpr (is_atomic< std::decay_t<C>>::value) {
 			component<I>(n).store( data.load() );
 		}
@@ -363,10 +356,10 @@ namespace vecs {
 	* \param[in] C Universal reference to tuple holding the components with the data.
 	* \returns true if the operation was successful.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW>
+	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
 	template<typename... Cs>
 	requires (sizeof...(Cs)>1 && vtll::has_all_types<DATA, vtll::tl<std::decay_t<Cs>...>>::value)
-	inline auto VecsTable<P, DATA, N0, ROW>::update(table_index_t n, Cs&&... data) noexcept -> bool {
+	inline auto VlltTable<P, DATA, N0, ROW, table_index_t>::update(table_index_t n, Cs&&... data) noexcept -> bool {
 		return (update<vtll::index_of<DATA,std::decay_t<Cs>>::value>(n, std::forward<Cs>(data)) && ... && true);
 	}
 
@@ -376,8 +369,8 @@ namespace vecs {
 	* \param[in] isrc Index of source row.
 	* \returns true if the operation was successful.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW>
-	inline auto VecsTable<P, DATA, N0, ROW>::move(table_index_t idst, table_index_t isrc) noexcept -> bool {
+	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
+	inline auto VlltTable<P, DATA, N0, ROW, table_index_t>::move(table_index_t idst, table_index_t isrc) noexcept -> bool {
 		if (idst >= size() || isrc >= size()) return false;
 		auto src = tuple_ptr(isrc);
 		auto dst = tuple_ptr(idst);
@@ -388,7 +381,7 @@ namespace vecs {
 			}
 			else if constexpr (std::is_copy_assignable_v<type>) {
 				*std::get<i>(dst) = *std::get<i>(src);
-			} 
+			}
 			else if constexpr (is_atomic<type>::value) {
 				std::get<i>(dst).store(std::get<i>(src).load());
 			}
@@ -402,8 +395,8 @@ namespace vecs {
 	* \param[in] n2 Index of second row.
 	* \returns true if the operation was successful.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW>
-	inline auto VecsTable<P, DATA, N0, ROW>::swap(table_index_t idst, table_index_t isrc) noexcept -> bool {
+	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
+	inline auto VlltTable<P, DATA, N0, ROW, table_index_t>::swap(table_index_t idst, table_index_t isrc) noexcept -> bool {
 		if (idst >= size() || isrc >= size()) return false;
 		auto src = tuple_ptr(isrc);
 		auto dst = tuple_ptr(idst);
@@ -417,7 +410,7 @@ namespace vecs {
 				type tmp{ *std::get<i>(src) };
 				*std::get<i>(src) = *std::get<i>(dst);
 				*std::get<i>(dst) = tmp;
-			} 
+			}
 			else if constexpr (is_atomic<type>::value) {
 				type tmp{ std::get<i>(src)->load() };
 				std::get<i>(src)->store(std::get<i>(dst)->load());
@@ -431,8 +424,8 @@ namespace vecs {
 	* \brief Deallocate segments that are currently not used.
 	* No parallel processing allowed when calling this function.
 	*/
-	template<typename P, typename DATA, size_t N0, bool ROW>
-	inline auto VecsTable<P, DATA, N0, ROW>::compress() noexcept -> void {
+	template<typename P, typename DATA, size_t N0, bool ROW, typename table_index_t>
+	inline auto VlltTable<P, DATA, N0, ROW, table_index_t>::compress() noexcept -> void {
 		auto vector_ptr{ m_seg_vector.load() };
 		if (!vector_ptr) return;
 		for( size_t i = (size() >> L) + 1; i< vector_ptr->size(); ++i ) {
@@ -446,4 +439,3 @@ namespace vecs {
 
 
 #endif
-

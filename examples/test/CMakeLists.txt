@@ -8,7 +8,7 @@ set(HEADERS
   ${INCLUDE}/VTLL.h
   ${INCLUDE}/IntType.h
   ${INCLUDE}/VECSUtil.h
-  ${INCLUDE}/VECSTable.h
+  ${INCLUDE}/VLLT.h
   ${INCLUDE}/VECS.h
   ${INCLUDE}/VECSIterator.h
 )

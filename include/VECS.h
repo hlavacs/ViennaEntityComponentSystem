@@ -13,7 +13,8 @@
 #include <chrono>
 #include <ranges>
 #include "VTLL.h"
-#include "VECSTable.h"
+#include "VECSUtil.h"
+#include "VLLT.h"
 
 using namespace std::chrono_literals;
 
@@ -232,7 +233,7 @@ namespace vecs {
 
 
 	/**
-	* \brief This class stores all components of entities of type E. It as basically an adaptor for class VecsTable.
+	* \brief This class stores all components of entities of type E. It as basically an adaptor for class VlltTable.
 	*
 	* Since templated functions cannot be virtual, the class emulates virtual functions to access components
 	* by creating a dispatch table. Each component from the component table gets its own entry, even if the
@@ -284,9 +285,9 @@ namespace vecs {
 		using types_deleted = vtll::type_list< table_index_t >;	///< List with types for holding info about erased entities 
 		
 		static const size_t c_segment_size = vtll::front_value< vtll::map<table_size_map, E, table_size_default > >::value;///Size of a segment
-		static inline VecsTable<P, data_types, c_segment_size, layout_type::value>			m_data;		///< Data per entity
-		static inline VecsTable<P, types_deleted, c_segment_size, VECS_LAYOUT_ROW::value>	m_erased;	///< Table holding the indices of erased entities
-		static inline VecsTable<P, types_deleted, c_segment_size, VECS_LAYOUT_ROW::value>	m_destructed;	///< Table holding the indices of deleted entities
+		static inline vllt::VlltTable<P, data_types, c_segment_size, layout_type::value, table_index_t>			m_data;		///< Data per entity
+		static inline vllt::VlltTable<P, types_deleted, c_segment_size, VECS_LAYOUT_ROW::value, table_index_t>	m_erased;	///< Table holding the indices of erased entities
+		static inline vllt::VlltTable<P, types_deleted, c_segment_size, VECS_LAYOUT_ROW::value, table_index_t>	m_destructed;	///< Table holding the indices of deleted entities
 		static const size_t c_row_size = layout_type::value ? sizeof(vtll::to_tuple<data_types>) : 0;					///< Size of a row
 
 		///One instance for each component type
@@ -726,8 +727,8 @@ namespace vecs {
 		static const size_t	  c_segment_size = table_max_seg::value;
 		static const uint32_t c_uint32_max = std::numeric_limits<uint32_t>::max();
 
-		static inline VecsTable<P, types, c_segment_size, VECS_LAYOUT_ROW::value>			 m_map_table;	///< The main mapping table
-		static inline VecsTable<P, types_deleted, c_segment_size, VECS_LAYOUT_COLUMN::value> m_erased;		///< Table holding the indices of erased map entries
+		static inline vllt::VlltTable<P, types, c_segment_size, VECS_LAYOUT_ROW::value, table_index_t>				m_map_table;	///< The main mapping table
+		static inline vllt::VlltTable<P, types_deleted, c_segment_size, VECS_LAYOUT_COLUMN::value, table_index_t>	m_erased;		///< Table holding the indices of erased map entries
 		static inline std::atomic<uint32_t>	m_size{ 0 };					///< Number of valid entities in the map
 
 		/// Every subclass for entity type E has an entry in this table.
