@@ -8,10 +8,13 @@
 * T...the integer type
 * P...phantom type as unique ID
 * D...default value (=null value)
+* U...number of upper bits (if integer is cut into 2 values)
 */
-template<typename T, typename P, auto D = -1>
+template<typename T, typename P, auto D = -1, size_t U = 0>
 struct int_type {
-	static const T null = static_cast<T>(D);
+	static const T L = sizeof(T) * 8 - U; //number of lower bits (if integer is cut into 2 values)
+
+	static const T null = static_cast<T>(D); //numm value
 
 	T value{null};
 
@@ -148,6 +151,43 @@ struct int_type {
 	bool has_value() const {
 		return value != null;
 	}
+
+	/**
+	* \brief Set the upper value (if split into two integers).
+	* \param[in] v New upper value.
+	*/
+	void set_upper(T v) {
+		const T LMASK = (1 << L) - 1;
+		value = (value & LMASK) | (value << L);
+	}
+
+	/**
+	* \brief Return the upper value (if split into two integers).
+	* \returns the upper value.
+	*/
+	T get_upper() {
+		return (value >> L);
+	}
+
+	/**
+	* \brief Set the lower value (if split into two integers).
+	* \param[in] v New lower value.
+	*/
+	void set_lower(T v) {
+		const T LMASK = (1 << L) - 1;
+		const T UMASK = ((1 << U) - 1) << L;
+		value = (value & UMASK) | (v & LMASK);
+	}
+
+	/**
+	* \brief Return the lower value (if split into two integers).
+	* \returns the lower value.
+	*/
+	T get_lower() {
+		const T LMASK = (1 << L) - 1;
+		return (value & LMASK);
+	}
+
 };
 
 
