@@ -5,12 +5,7 @@ set(SOURCE test.cpp)
 
 set(HEADERS
   test.h
-  ${INCLUDE}/VTLL.h
-  ${INCLUDE}/IntType.h
-  ${INCLUDE}/VECSUtil.h
-  ${INCLUDE}/VLLT.h
   ${INCLUDE}/VECS.h
-  ${INCLUDE}/VECSIterator.h
 )
 
 add_executable(${TARGET} ${SOURCE} ${HEADERS})
