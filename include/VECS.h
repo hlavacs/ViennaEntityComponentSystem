@@ -11,7 +11,6 @@ namespace vecs {
 		struct VECSComponentContainerBase {
 			std::type_index						m_type_index;
 			std::unordered_map<uint64_t, void*> m_data;
-
 			virtual ~VECSComponentContainerBase() = 0;
 		};
 
@@ -32,6 +31,12 @@ namespace vecs {
 
 		std::unordered_map<std::type_index, std::shared_ptr<VECSComponentContainerBase>> m_components;
 
+		struct VECSEntity {
+			uint64_t m_id;
+			std::vector<std::type_index> m_component_types;
+		};
+
+		std::unordered_map<uint64_t, std::shared_ptr<VECSEntity>> m_entities;
 
 	};
 
