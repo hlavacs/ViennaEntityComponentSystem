@@ -15,13 +15,13 @@
 
 using namespace vecs;
 
-using types = vtll::tl<int, bool, float, double>;
-using sizes = vtll::tl< vtll::tl<int, vtll::vl<100>>, vtll::vl<100>>;
+using types = vtll::tl<size_t, bool, float, double>;
+using sizes = vtll::tl< vtll::tl<size_t, vtll::vl<100> > >;
 VECSSystem<types, 500, sizes> ECS;
 
 void start_test() {
 
-	auto handle = ECS.create<int,bool>(1, true);
+	auto handle = ECS.create<size_t,bool>(1ul, true);
 
 }
 
