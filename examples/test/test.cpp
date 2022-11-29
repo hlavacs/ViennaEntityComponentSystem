@@ -21,6 +21,7 @@ VECSSystem<types, 500, sizes> ECS;
 
 void start_test() {
 
+	auto handle = ECS.create<int,bool>(1, true);
 
 }
 
