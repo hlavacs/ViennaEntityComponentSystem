@@ -15,6 +15,8 @@
 
 using namespace vecs;
 
+using types = vtll::type_list<int, bool, float, double>;
+VECSSystem<types> ECS;
 
 void start_test() {
 

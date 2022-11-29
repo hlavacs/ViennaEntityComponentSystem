@@ -20,10 +20,6 @@ set(EXECUTABLE_OUTPUT_PATH ${CMAKE_HOME_DIRECTORY}/bin)
 set(INCLUDE ${CMAKE_HOME_DIRECTORY}/include)
 set(EXTERNAL ${CMAKE_HOME_DIRECTORY}/external)
 
-include_directories (${CMAKE_HOME_DIRECTORY}/external/glm)
-
-include_directories (${INCLUDE})
-
 add_subdirectory (examples/test)
 
 find_package(Doxygen)
