@@ -29,6 +29,7 @@ namespace vecs {
 		//-----------------------------------------------------------------------------------------------------------------
 		//Component containers
 
+		class VECSGroup;
 
 		/// <summary>
 		/// Bae class for all containers.
@@ -46,21 +47,19 @@ namespace vecs {
 
 		public:
 
-			class VECSGroup;
-
 			/// <summary>
 			/// This container stores a vector of this struct.
 			/// </summary>
 			struct entry_t {
 				uint32_t	m_flat_index;	//Flat index to the group this component's entity belongs to
-				uint32_t	m_index{0};		//Pointer to the index pointing to this component. Used when deleting components (fill empty slots).
+				uint32_t	m_index{0};		//Index of the index pointing to this component. Used when deleting components (fill empty slots).
 				T			m_component{};	//The component data.
 			};
 
 			/// <summary>
 			/// Component container constructor. Reserves up front memory for the components.
 			/// </summary>
-			VECSComponentContainer() : VECSComponentContainerBase() { 
+			VECSComponentContainer(std::vector<VECSGroup*>& fg) : m_flat_groups{ fg }, VECSComponentContainerBase() {
 				m_data.reserve(vtll::front_value < vtll::map<SIZETYPEMAP, T, vtll::vl<100>> >::value );
 			};
 
@@ -102,13 +101,15 @@ namespace vecs {
 			void erase( uint32_t index) {
 				if (m_data.size() - 1 > index) {
 					std::swap(m_data[index], m_data[m_data.size() - 1]);
-					//m_data[index].m_index = index;
+					entry_t& entry = m_data[index];
+					m_flat_groups[entry.m_flat_index]->m_indices[entry.m_index] = index;
 				}
 				m_data.pop_back();
 			}
 
 		private:
-			std::vector<entry_t> m_data;	//The data stored in this container
+			std::vector<VECSGroup*>& m_flat_groups;			//Needed for going from component to group
+			std::vector<entry_t>	 m_data;	//The data stored in this container
 		};
 
 
@@ -225,7 +226,7 @@ namespace vecs {
 				static const int idx = vtll::index_of<TYPELIST, T>::value;
 				types.set(idx);	//Fill the bits of bitset representing the types
 				if (!m_container[idx]) {
-					auto container = std::make_shared<VECSComponentContainer<T>>();
+					auto container = std::make_shared<VECSComponentContainer<T>>(m_flat_groups);
 					m_container[idx] = std::static_pointer_cast<VECSComponentContainerBase>(container);	//Make sure the containers exist
 				}
 			};
