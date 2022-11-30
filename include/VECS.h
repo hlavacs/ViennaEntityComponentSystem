@@ -101,13 +101,17 @@ namespace vecs {
 				return m_data[index];
 			}
 
+			std::vector<entry_t>& data() {
+				return m_data;
+			}
+
 			/// <summary>
 			/// Erase a component. If this is not the last component, then swap it with the last 
 			/// component, so we fill up the hole that is made. This also entails changing the
 			/// index in the VECSGroup that points to this component.
 			/// </summary>
 			/// <param name="index">Index of the component to erase.</param>
-			void erase(uint32_t index, std::vector<VECSEntity>& entities);
+			void erase(uint32_t index, std::vector<VECSEntity>& entities) override;
 
 		private:
 			std::vector<entry_t> m_data;	//The data stored in this container
@@ -143,27 +147,21 @@ namespace vecs {
 				m_component_index_map.reserve(BITS);
 				for (uint32_t i = 0; i < BITS; ++i) {
 					if (types.test(i)) { 
-						m_component_index_map[i] = m_num_indices++;	//Map from bit in bitset (0...BITS-1) to relative component index (0...m_num_indices-1)
+						m_component_index_map.push_back(m_num_indices++);	//Map from bit in bitset (0...BITS-1) to relative component index (0...m_num_indices-1)
 						m_container_map.emplace_back(container[i]);	//Map from index index to pointer to container (for erasing)
 					}
 					else { 
-						m_component_index_map[i] = null_idx; //Do not need this component
+						m_component_index_map.push_back(null_idx); //Do not need this component
 					}
 				}
+				m_num_indices++;	//One more index for entity. If this is the null_idx then the slot is empty
 				m_indices.reserve(m_num_indices * SIZEENTITIES);
 			}
 
 			template<typename... Ts>
 			uint32_t add(uint32_t entity, Ts&&... Args) {
-				uint32_t indices_start;
-				if (m_empty_start != null_idx) {				//Are there empty slots
-					indices_start = m_empty_start;				//Reuse the first one found
-					m_empty_start = m_indices[m_empty_start];	//New start of empty chain
-				}
-				else {
-					indices_start = (uint32_t)m_indices.size();			//Need a new slot at end of the vector
-					m_indices.resize(indices_start + m_num_indices, 0);	//Create new space in the vector for the indices, fill with 0
-				}
+				uint32_t indices_start = (uint32_t)m_indices.size();	//Need a new slot at end of the vector
+				m_indices.resize(indices_start + m_num_indices, 0);		//Create new space in the vector for the indices, fill with 0
 
 				/// <summary>
 				/// This lambda goes through all arguments, and adds them to the respective container they belong into.
@@ -172,17 +170,26 @@ namespace vecs {
 				auto createComponents = [&]<typename T>(T&& Arg) {
 					static const int idx = vtll::index_of<TYPELIST, T>::value;
 					VECSComponentContainer<T>& container = *std::dynamic_pointer_cast<VECSComponentContainer<T>>(m_container[idx]); 
-					m_indices[m_component_index_map[idx]] = container.add(entity, std::forward<T>(Arg));
+					m_indices[indices_start + m_component_index_map[idx]] = container.add(entity, std::forward<T>(Arg));
 				};
 				(createComponents.template operator() < Ts > (std::forward<Ts>(Args)), ...);
 
+				m_indices[indices_start + m_num_indices - 1] = entity; //Last index is the index of the entity owning these components
 				return indices_start;
 			}
 
-			void erase(uint32_t entity_indices_start, std::vector<VECSEntity>& entities) {
-				for (uint32_t i = 0; i < m_num_indices - 1; ++i) { m_container_map[i]->erase(m_indices[entity_indices_start + i], entities); }
-				m_indices[entity_indices_start] = m_empty_start;	//Relink this slot into the empty chain
-				m_empty_start = entity_indices_start;				//Reclaim empty entity later
+			void erase(uint32_t indices_start, std::vector<VECSEntity>& entities) {
+				for (uint32_t i = 0; i < m_num_indices - 1; ++i) {	//Erase the components from the containers
+					m_container_map[i]->erase(m_indices[indices_start + i], entities); 
+				}
+
+				if (indices_start + m_num_indices < m_indices.size() - 1) {			//Last slot? No - move the last slot to fill the gap
+					uint32_t last = m_indices.size() - m_num_indices;				//Index start of last entity
+					uint32_t entity = m_indices[last + m_num_indices - 1];			//This entity is moved to fill the gap
+					for (uint32_t i = 0; i < m_num_indices; ++i) { m_indices[indices_start + i] = m_indices[last + i]; }
+					for (uint32_t i = 0; i < m_num_indices; ++i) { m_indices.pop_back(); }
+					entities[entity].m_indices_start = indices_start;
+				}
 			}
 
 			template<typename T>
@@ -197,7 +204,6 @@ namespace vecs {
 			container_vector&		m_container;				//Container for the components (needed when erasing an entity)
 			container_vector		m_container_map;			//Maps index list (0...) to container pointer
 			std::vector<uint32_t>	m_indices;					//Component type indices + owning entity index
-			uint32_t				m_empty_start{ null_idx };	//Singly linked list of empty slots to be reused later, ends with null_idx
 		};
 
 
@@ -240,10 +246,10 @@ namespace vecs {
 		/// <param name="...Args">Component data to be copied/moved into the component containers.</param>
 		/// <returns>The entity handle.</returns>
 		template<typename... Ts>
-		VECSHandle create(Ts&&... Args) {
+		[[nodiscard]] VECSHandle create(Ts&&... Args) {
 
 			std::bitset<BITS> types;
-
+			
 			/// <summary>
 			/// This lambda goes through all types for the entity, creates a bitset (IDing the group) representing this entity,
 			/// and makes sure all component containers exist.
@@ -269,9 +275,8 @@ namespace vecs {
 				entity_index = (uint32_t)m_entities.size();		//create a new entity
 				m_entities.emplace_back(getGroup(types), entity_index, 0);
 			}
-
-			m_entities[entity_index].m_indices_start = m_entities[entity_index].m_group->add(std::forward<Ts>(Args)...); //Add entity to group
-			
+	
+			m_entities[entity_index].m_indices_start = m_entities[entity_index].m_group->add(entity_index, std::forward<Ts>(Args)...); //Add entity to group
 			return { entity_index, m_entities[entity_index].m_generation }; //Return the handle
 		}
 
@@ -286,7 +291,7 @@ namespace vecs {
 			entity.m_group->erase(entity.m_indices_start, m_entities);		//Erase from group, and also the components
 			entity.m_indices_start = m_empty_start;							//Include into empty list
 			m_empty_start = entity;
-			true;
+			return true;
 		}
 
 		/// <summary>
@@ -301,6 +306,27 @@ namespace vecs {
 			if (entity.m_generation != handle.m_generation) return;	//Is the handle still valid?
 			VECSComponentContainer<T>& container = m_container[vtll::index_of<TYPELIST, T>::value];			//Pointer to the container
 			return { container->entry(entity.m_group->index<T>(entity.m_indices_start)).m_component };
+		}
+
+		template<typename T>
+		std::optional<const T&> const_component(VECSHandle handle) {
+			auto res = component(handle);
+			if (!res) return {};
+			return { res.value() };
+		}
+
+		template<typename T>
+		auto& container() {
+			static const int idx = vtll::index_of<TYPELIST, T>::value;
+			if (!m_container[idx]) {	//Is the container pointer for this component type still zero?
+				auto container = std::make_shared<VECSComponentContainer<T>>(idx);						//No - create one
+				m_container[idx] = std::static_pointer_cast<VECSComponentContainerBase>(container); //Save in vector
+			}
+			return m_container[idx]->container();
+		}
+
+		VECSHandle handle(uint32_t entity) {
+			return { entity, m_entities[entity].m_generation };
 		}
 
 		bool valid(VECSHandle handle) {
@@ -323,6 +349,7 @@ namespace vecs {
 		std::unordered_map<std::bitset<BITS>, VECSGroup>	m_groups;				//Entity groups
 		std::unordered_multimap<uint32_t, VECSGroup*>		m_map_type_to_group;	//Map for going from a component type to groups of entities with them
 	};
+
 
 	//-----------------------------------------------------------------------------------------------------------------
 	//Leftover, this function needs to know groups and entities

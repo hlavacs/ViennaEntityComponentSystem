@@ -21,7 +21,9 @@ VECSSystem<types, 500, sizes> ECS;
 
 void start_test() {
 
-	auto handle = ECS.create<size_t,bool>(1ul, true);
+	auto handle1 = ECS.create<size_t,bool>(1ul, true);
+	auto handle2 = ECS.create<bool, float, double>(true, 1.0f, 2.0);
+	auto handle3 = ECS.create<bool, double>(false, 4.0);
 
 }
 
