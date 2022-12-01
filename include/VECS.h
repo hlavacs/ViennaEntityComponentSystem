@@ -64,7 +64,7 @@ namespace vecs {
 			uint32_t m_number;	//Number in the list of containers. Needed for erasing.
 		public:
 			VECSComponentContainerBase(uint32_t number) : m_number{ number } {};
-			virtual void erase(uint32_t index, std::vector<VECSEntity>& entities) {};	//Erase a component
+			virtual void erase(uint32_t index) {};	//Erase a component
 		};
 
 		using container_vector = std::vector<std::shared_ptr<VECSComponentContainerBase>>;
@@ -143,7 +143,7 @@ namespace vecs {
 			/// index in the VECSGroup that points to this component.
 			/// </summary>
 			/// <param name="index">Index of the component to erase.</param>
-			void erase(uint32_t index, std::vector<VECSEntity>& entities) override;
+			void erase(uint32_t index) override;
 
 		private:
 			VECSSystem<TYPELIST>&	m_system;	//Vector holding entity data
@@ -212,11 +212,11 @@ namespace vecs {
 				return indices_start;
 			}
 
-			void erase(uint32_t indices_start, std::vector<VECSEntity>& entities) {
+			void erase(uint32_t indices_start) {
 				if(indices_start >= m_size * m_num_indices) return;
 
 				for (uint32_t i = 0; i < m_num_indices - 1; ++i) {	//Erase the components from the containers
-					m_container_map[i]->erase(m_indices[indices_start + i], entities); 
+					m_container_map[i]->erase(m_indices[indices_start + i]); 
 				}
 
 				if (indices_start + m_num_indices < m_indices.size() - 1) {			//Last slot? No - move the last slot to fill the gap
@@ -224,7 +224,7 @@ namespace vecs {
 					uint32_t entity = m_indices[last + m_num_indices - 1];			//This entity is moved to fill the gap
 					for (uint32_t i = 0; i < m_num_indices; ++i) { m_indices[indices_start + i] = m_indices[last + i]; }
 					for (uint32_t i = 0; i < m_num_indices; ++i) { m_indices.pop_back(); }
-					entities[entity].m_indices_start = indices_start;
+					m_system.m_entities[entity].m_indices_start = indices_start;
 				}
 				--m_size;
 			}
@@ -313,7 +313,7 @@ namespace vecs {
 			VECSEntity& entity = m_entities[handle.m_entity];
 			if (entity.m_generation != handle.m_generation) return false;	//Is the handle still valid?
 			entity.m_generation++;											//Invalidate all handles to this entity
-			entity.m_group->erase(entity.m_indices_start, m_entities);		//Erase from group, and also the components
+			entity.m_group->erase(entity.m_indices_start);		//Erase from group, and also the components
 			entity.m_indices_start = m_empty_start;							//Include into empty list
 			m_empty_start = handle.m_entity;
 			return true;
@@ -398,11 +398,11 @@ namespace vecs {
 	/// <param name="index">Index of the component to erase.</param>
 	template<typename TL>
 	template<typename T>
-	inline void VECSSystem<TL>::VECSComponentContainer<T>::erase(uint32_t index, std::vector<VECSEntity>& entities) {
+	inline void VECSSystem<TL>::VECSComponentContainer<T>::erase(uint32_t index) {
 		if (m_data.size() - 1 > index) {
 			std::swap(m_data[index], m_data[m_data.size() - 1]);
 			entry_t& entry = m_data[index];
-			auto& entity = entities[entry.m_entity];	//Reference to the entity that owns this component
+			auto& entity = m_system.m_entities[entry.m_entity];	//Reference to the entity that owns this component
 			entity.m_group->m_indices[entity.m_indices_start + entity.m_group->m_component_index_map[this->m_number]] = index; //Reset index
 		}
 		m_data.pop_back();	//Remove last element, which is the component to be removed
