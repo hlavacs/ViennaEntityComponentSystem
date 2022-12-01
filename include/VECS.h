@@ -20,7 +20,7 @@ namespace vecs {
 	/// <typeparam name="SIZEENTITIES">A typelist map, mapping component type to initialized component storage.</typeparam>
 	template<typename TYPELIST>
 	class VECSSystem {
-		template<typename TL> friend class VECSIterator;
+		template<typename TL, typename T> friend class VECSIterator;
 
 	public:
 		static_assert(vtll::unique<TYPELIST>::value, "VECSSystem TYPELIST is not unique!");
@@ -412,55 +412,75 @@ namespace vecs {
 	//-----------------------------------------------------------------------------------------------------------------
 	//Iterator
 
-	template<typename TL>
+	template<typename TL, typename T>
 	class VECSIterator {
 		using group_ptr = VECSSystem<TL>::VECSGroup*;
 
+		template<typename U>
+		using container_ptr = VECSSystem<U>::VECSContainer*;
+
 	public:
 		using difference_type = int64_t;						// Difference type
-		using value_type = VECSSystem<TL>::VECSHandle;			// Value type - use refs to deal with atomics and unique_ptr
+		using value_type = T;									// Value type - use refs to deal with atomics and unique_ptr
 		using pointer = value_type*;							// Pointer to value
 		using reference = value_type&;							// Reference type
 		using iterator_category = std::forward_iterator_tag;	// Forward iterator
 
-		VECSIterator(group_ptr group) noexcept : m_group{ group } {}
-		VECSIterator(const VECSIterator<TL>& v) noexcept = default;	// Copy constructor
-		VECSIterator(VECSIterator<TL>&& v) noexcept = default;		// Move constructor
-		auto operator=(const VECSIterator<TL>& v) noexcept	-> VECSIterator<TL> & = default;	// Copy
-		auto operator=(VECSIterator<TL>&& v) noexcept		-> VECSIterator<TL> & = default;	// Move
+		VECSIterator(group_ptr group) noexcept : m_ptr{ group }, m_dN{ group->m_num_indices }, m_size{ group->m_size } {}
+		VECSIterator(container_ptr<T> container) noexcept : m_ptr{ container }, m_size{ (uint32_t)container->m_data.size() } {}
 
-		auto operator*() noexcept -> value_type { return m_group->handle(m_indices_start); }	// Access the data
-		auto operator*() const noexcept	-> value_type {	return m_group->handle(m_indices_start); }	// Access const data
+		VECSIterator(const VECSIterator<TL,T>& v) noexcept = default;	// Copy constructor
+		VECSIterator(VECSIterator<TL,T>&& v)	  noexcept = default;	// Move constructor
+		auto operator=(const VECSIterator<TL,T>& v) noexcept -> VECSIterator<TL,T> & = default;	// Copy
+		auto operator=(VECSIterator<TL,T>&& v)		noexcept -> VECSIterator<TL,T> & = default;	// Move
+
+		auto operator*() noexcept -> value_type { 		// Access the data
+			if constexpr (std::same_as<value_type, typename VECSSystem<TL>::VECSHandle>) {
+				return m_ptr->handle(m_index);
+			}
+			return {};
+		}
+
+		auto operator*() const noexcept	-> value_type {		// Access const data
+			if constexpr (std::same_as<value_type, typename VECSSystem<TL>::VECSHandle>) {
+				return m_ptr->handle(m_index);
+			} 
+			return {};
+		}
+
 		auto operator->() noexcept { return operator*(); };			// Access
 		auto operator->() const noexcept { return operator*(); };	// Access
 
-		auto operator++() noexcept -> VECSIterator<TL>& { m_indices_start += m_group->m_num_indices; }	// Increase by 1
-		auto operator++(int) noexcept -> VECSIterator<TL> { m_indices_start += m_group->m_num_indices; } // Increase by 1
-		auto operator+=(difference_type N) noexcept	-> VECSIterator<TL>& { 	// Increase by N
-			m_indices_start = std::clamp( m_indices_start + N * m_group->m_num_indices, 0, m_group->m_num_indices * m_group->m_size );
+		auto operator++()    noexcept -> VECSIterator<TL,T>& { m_index += m_dN; }	// Increase by 1
+		auto operator++(int) noexcept -> VECSIterator<TL,T>  { m_index += m_dN; }	// Increase by 1
+		auto operator+=(difference_type N) noexcept	-> VECSIterator<TL,T>& { 		// Increase by N
+			m_index = std::clamp(m_index + N * m_dN, 0, m_dN * m_size );
 		}
-		auto operator+(difference_type N) noexcept	-> VECSIterator<TL> { 	// Increase by N
-			m_indices_start = std::clamp( m_indices_start + N * m_group->m_num_indices, 0, m_group->m_num_indices * m_group->m_size);
-		}
-
-		bool operator!=(const VECSIterator<TL>& i) noexcept {	///< Unequal
-			return m_group != i.m_group || m_indices_start != i.m_indices_start;
+		auto operator+(difference_type N) noexcept	-> VECSIterator<TL,T> { 	// Increase by N
+			m_index = std::clamp(m_index + N * m_dN, 0, m_dN * m_size);
 		}
 
-		friend auto operator==(const VECSIterator<TL>& i1, const VECSIterator<TL>& i2) noexcept -> bool {	///< Equal
-			return i1.m_group == i2.m_group && i1.m_indices_start == i2.m_indices_start;
+		bool operator!=(const VECSIterator<TL,T>& i) noexcept {	///< Unequal
+			return m_ptr != i.m_ptr || m_index != i.m_index;
+		}
+
+		friend auto operator==(const VECSIterator<TL,T>& i1, const VECSIterator<TL,T>& i2) noexcept -> bool {	///< Equal
+			return i1.m_ptr == i2.m_ptr && i1.m_index == i2.m_index;
 		}
 
 	private:
-		group_ptr m_group;
-		uint32_t  m_indices_start{ 0 };
+		using ptr_type = std::conditional_t< std::same_as<T, typename VECSSystem<TL>::VECSHandle>, group_ptr, container_ptr<T> >;
+		ptr_type  m_ptr;
+		uint32_t  m_index{ 0 };
+		uint32_t  m_dN{ 1 };
+		uint32_t  m_size{ 0 };
 	};
 
 
 	//-----------------------------------------------------------------------------------------------------------------
 	//Ranges
 
-	template<typename TL>
+	template<typename TL, typename TTL>
 	class VECSRange {
 		using group_ptr = VECSSystem<TL>::VECSGroup*;
 		std::vector<group_ptr> m_groups;
