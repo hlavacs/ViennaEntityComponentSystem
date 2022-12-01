@@ -86,7 +86,7 @@ namespace vecs {
 			/// This container stores a vector of this struct.
 			/// </summary>
 			struct entry_t {
-				uint32_t	m_entity;		//Index into entity container IDing the entity this component belongs to
+				VECSHandle	m_handle;		//Entity handle
 				T			m_component{};	//The component data.
 			};
 
@@ -104,8 +104,8 @@ namespace vecs {
 			/// <param name="index">Pointer to the index of this component.</param>
 			/// <param name="data">LReference to the component data.</param>
 			/// <returns>The entry of the component.</returns>
-			auto add(uint32_t entity, T& data) -> uint32_t {
-				m_data.emplace_back(entity, data );
+			auto add(VECSHandle handle, T& data) -> uint32_t {
+				m_data.emplace_back(handle, data );
 				return (uint32_t)m_data.size() - 1;
 			}
 
@@ -115,8 +115,8 @@ namespace vecs {
 			/// <param name="index">Pointer to the index of this component.</param>
 			/// <param name="data">RReference to the component data.</param>
 			/// <returns>The entry of the component.</returns>
-			auto add(uint32_t entity, T&& data) -> uint32_t {
-				m_data.emplace_back(entity, std::move(data));
+			auto add(VECSHandle handle, T&& data) -> uint32_t {
+				m_data.emplace_back(handle, std::move(data));
 				return (uint32_t)m_data.size() - 1;
 			}
 
@@ -127,18 +127,6 @@ namespace vecs {
 			/// <returns>Reference to the compoennt.</returns>
 			auto entry( uint32_t index ) -> entry_t& {
 				return m_data[index];
-			}
-
-			auto handle(uint32_t index) -> entry_t& {
-				return system->handle( m_data[index] );
-			}
-
-			/// <summary>
-			/// Get access to a component container
-			/// </summary>
-			/// <returns>Reference to a component container.</returns>
-			auto data() -> std::vector<entry_t>& {
-				return m_data;
 			}
 
 			/// <summary>
@@ -153,7 +141,7 @@ namespace vecs {
 			auto end() -> VECSIterator<TYPELIST, T> { return { this, (uint32_t)m_data.size() }; };
 
 		private:
-			VECSSystem<TYPELIST>&	m_system;	//Vector holding entity data
+			VECSSystem<TYPELIST>&	m_system;	//Need system for erasing
 			std::vector<entry_t>	m_data;		//The data stored in this container
 		};
 
@@ -194,12 +182,12 @@ namespace vecs {
 						m_component_index_map.push_back(null_idx); //Do not need this component
 					}
 				}
-				m_num_indices++;	//One more index for entity. If this is the null_idx then the slot is empty
+				m_num_indices += 2;	//One more index for entity, and one for the generation.
 				m_indices.reserve(m_num_indices * 100);
 			}
 
 			template<typename... Ts>
-			auto add(uint32_t entity, Ts&&... Args) -> uint32_t {
+			auto add(VECSHandle handle, Ts&&... Args) -> uint32_t {
 				uint32_t indices_start = (uint32_t)m_indices.size();	//Need a new slot at end of the vector
 				m_indices.resize(indices_start + m_num_indices, 0);		//Create new space in the vector for the indices, fill with 0
 
@@ -210,11 +198,13 @@ namespace vecs {
 				auto createComponents = [&]<typename T>(T&& Arg) {
 					static const int idx = vtll::index_of<TYPELIST, T>::value;
 					VECSComponentContainer<T>& container = *std::dynamic_pointer_cast<VECSComponentContainer<T>>(m_system.m_container[idx]); 
-					m_indices[indices_start + m_component_index_map[idx]] = container.add(entity, std::forward<T>(Arg));
+					m_indices[indices_start + m_component_index_map[idx]] = container.add(handle, std::forward<T>(Arg));
 				};
 				(createComponents.template operator() < Ts > (std::forward<Ts>(Args)), ...);
 
-				m_indices[indices_start + m_num_indices - 1] = entity; //Last index is the index of the entity owning these components
+				m_indices[indices_start + m_num_indices - 2] = handle.m_entity;		//Store part of handle
+				m_indices[indices_start + m_num_indices - 1] = handle.m_generation; //Store part of handle
+
 				++m_size;
 				return indices_start;
 			}
@@ -222,13 +212,13 @@ namespace vecs {
 			void erase(uint32_t indices_start) {
 				if(indices_start >= m_size * m_num_indices) return;
 
-				for (uint32_t i = 0; i < m_num_indices - 1; ++i) {	//Erase the components from the containers
+				for (uint32_t i = 0; i < m_num_indices - 2; ++i) {	//Erase the components from the containers
 					m_container_map[i]->erase(m_indices[indices_start + i]); 
 				}
 
 				if (indices_start + m_num_indices < m_indices.size() - 1) {			//Last slot? No - move the last slot to fill the gap
 					uint32_t last = (uint32_t)m_indices.size() - m_num_indices;		//Index start of last entity
-					uint32_t entity = m_indices[last + m_num_indices - 1];			//This entity is moved to fill the gap
+					uint32_t entity = m_indices[last + m_num_indices - 2];			//This entity is moved to fill the gap
 					for (uint32_t i = 0; i < m_num_indices; ++i) { m_indices[indices_start + i] = m_indices[last + i]; }
 					for (uint32_t i = 0; i < m_num_indices; ++i) { m_indices.pop_back(); }
 					m_system.m_entities[entity].m_indices_start = indices_start;
@@ -242,7 +232,7 @@ namespace vecs {
 			}
 
 			auto handle(uint32_t indices_start) -> VECSHandle {
-				return m_system.handle( m_indices[indices_start + m_num_indices - 1] );
+				return { m_indices[indices_start + m_num_indices - 2], m_indices[indices_start + m_num_indices - 1] };
 			}
 
 			auto size() -> size_t {
@@ -312,8 +302,9 @@ namespace vecs {
 				m_entities.emplace_back(getGroup(types), entity_index, 0);
 			}
 	
-			m_entities[entity_index].m_indices_start = m_entities[entity_index].m_group->add(entity_index, std::forward<Ts>(Args)...); //Add entity to group
-			return { entity_index, m_entities[entity_index].m_generation }; //Return the handle
+			VECSHandle handle{ entity_index, m_entities[entity_index].m_generation };
+			m_entities[entity_index].m_indices_start = m_entities[entity_index].m_group->add(handle, std::forward<Ts>(Args)...); //Add entity to group
+			return handle; //Return the handle
 		}
 
 		/// <summary>
@@ -364,10 +355,6 @@ namespace vecs {
 			return { recurse.template operator() < Ts... > (recurse) };
 		}
 
-		auto handle(uint32_t entity) -> VECSHandle {
-			return { entity, m_entities[entity].m_generation };
-		}
-
 		bool valid(VECSHandle handle) {
 			return m_entities[handle.m_entity].m_generation == handle.m_generation;
 		}
@@ -405,7 +392,7 @@ namespace vecs {
 		if (m_data.size() - 1 > index) {
 			std::swap(m_data[index], m_data[m_data.size() - 1]);
 			entry_t& entry = m_data[index];
-			auto& entity = m_system.m_entities[entry.m_entity];	//Reference to the entity that owns this component
+			auto& entity = m_system.m_entities[entry.m_handle.m_entity];	//Reference to the entity that owns this component
 			entity.m_group->m_indices[entity.m_indices_start + entity.m_group->m_component_index_map[this->m_number]] = index; //Reset index
 		}
 		m_data.pop_back();	//Remove last element, which is the component to be removed
@@ -440,13 +427,21 @@ namespace vecs {
 		auto operator=(VECSIterator<TL,T>&& v)		noexcept -> VECSIterator<TL,T> & = default;	// Move
 
 		auto operator*() noexcept -> reference { 		// Access the data
-			if constexpr (std::same_as<value_type, typename VECSSystem<TL>::VECSHandle>) { return m_ptr->handle(m_index); }
-			else { return m_ptr->m_data[m_index].m_component; }
+			if constexpr (std::same_as<value_type, typename VECSSystem<TL>::VECSHandle>) { 
+				return m_ptr->handle(m_index); 
+			}
+			else { 
+				return std::make_pair( m_ptr->m_data[m_index].m_component, m_ptr->m_data[m_index].m_handle );
+			}
 		}
 
 		auto operator*() const noexcept	-> reference {		// Access const data
-			if constexpr (std::same_as<value_type, typename VECSSystem<TL>::VECSHandle>) { return m_ptr->handle(m_index); } 
-			else { return m_ptr->m_data[m_index].m_component; }
+			if constexpr (std::same_as<value_type, typename VECSSystem<TL>::VECSHandle>) { 
+				return m_ptr->handle(m_index); 
+			} 
+			else { 
+				return std::make_pair(m_ptr->m_data[m_index].m_component, m_ptr->m_data[m_index].m_handle);
+			}
 		}
 
 		auto operator->() noexcept { return operator*(); };			// Access
