@@ -8,6 +8,8 @@
 #include <bitset> 
 #include <optional> 
 #include <ranges>
+#include <functional>
+#include <tuple>
 #include "VTLL.h"
 
 
@@ -331,41 +333,35 @@ namespace vecs {
 		/// <summary>
 		/// Get a reference to the component of type T of an entity.
 		/// </summary>
-		/// <typeparam name="T">Component type.</typeparam>
+		/// <typeparam name="Ts">Component types.</typeparam>
 		/// <param name="handle">Entity handle.</param>
-		/// <returns>Reference to the component of this entity.</returns>
-		template<typename T>
-		auto component(VECSHandle handle) -> VECSIterator<TYPELIST, T> {
+		/// <returns>Tuple with references to the components of the entity.</returns>
+		template<typename... Ts>
+		auto get(VECSHandle handle) -> std::optional<std::tuple<Ts&...>> {
 			VECSEntity& entity = m_entities[handle.m_entity];
 			if (entity.m_generation != handle.m_generation) return {};		//Is the handle still valid?
-			if (!entity.m_group->m_types.test(vtll::index_of<TYPELIST, T>::value)) return {}; //Does the entity contain the type?
-			auto base = m_container[vtll::index_of<TYPELIST, T>::value];	//Pointer to the container
-			auto container = std::dynamic_pointer_cast<VECSComponentContainer<T>>(base);
-			return VECSIterator<TYPELIST,T>(container.get(), entity.m_group->index<T>(entity.m_indices_start));
-		}
 
-		template<typename T>
-		auto component(VECSHandle handle) const -> VECSIterator<TYPELIST, T> {
-			return component(handle);
-		}
+			auto check = [&]<typename T>() {
+				if (!entity.m_group->m_types.test(vtll::index_of<TYPELIST, T>::value)) return false; //Does the entity contain the type?
+				return true;
+			};
+			if (!(check.template operator() < Ts > () && ...)) return {};
 
-		template<typename T>
-		auto container(VECSHandle handle) -> std::optional<std::reference_wrapper<std::vector<entry_t<T>>>> {
-			static const int idx = vtll::index_of<TYPELIST, T>::value;
-			if (!m_entities[handle.m_entity].m_group->m_types.test(idx)) return {}; //Does the entity contain the type?
-			if (!m_container[idx]) {	//Is the container pointer for this component type still zero?
-				auto container = std::make_shared<VECSComponentContainer<T>>(*this, idx);		//No - create one
-				m_container[idx] = std::static_pointer_cast<VECSComponentContainerBase>(container); //Save in vector
-			}
-			auto container = std::dynamic_pointer_cast<VECSComponentContainer<T>>(m_container[idx]);
-			return container->data();
-		}
+			auto recurse = [&]<typename U, typename... Us>(auto & recurse_ref) {
+				auto base = m_container[vtll::index_of<TYPELIST, U>::value];					//Pointer to the container
+				auto container = std::dynamic_pointer_cast<VECSComponentContainer<U>>(base);	//Cast to correct type
+				uint32_t cidx = entity.m_group->index<U>(entity.m_indices_start);
+				auto& ref = container->entry(cidx).m_component;
 
-		template<typename T>
-		auto const_container(VECSHandle handle) -> std::optional<std::reference_wrapper<const std::vector<entry_t<T>>>> {
-			auto res = container(handle);
-			if (!res) return {};
-			return { res.value() };
+				if constexpr (sizeof...(Us) == 0) {
+					return std::tie( ref );
+				}
+				else {
+					return std::tuple_cat(std::tie(ref), recurse_ref.template operator() < Us... > (recurse_ref));
+				}
+			};
+
+			return { recurse.template operator() < Ts... > (recurse) };
 		}
 
 		auto handle(uint32_t entity) -> VECSHandle {
