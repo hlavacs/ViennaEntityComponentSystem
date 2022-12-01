@@ -512,7 +512,11 @@ namespace vecs {
 				auto f = [&]<typename T, T I>(std::integral_constant<T, I> i) {
 					using type = vtll::Nth_type<type_list, I>;
 					static const int idx = vtll::index_of<TL, type>::value;
-					m_ranges.insert(system.m_map_type_to_group);
+
+					for (auto group : system.m_map_type_to_group[idx]) {
+						m_ranges.insert(group);
+						m_size += group->size();
+					}
 				};
 
 				static_for< int, 0, vtll::size<type_list>::value >(f);
@@ -520,6 +524,7 @@ namespace vecs {
 			else {
 				static const int idx = vtll::index_of<TL, T>::value;
 				m_ranges.insert(system.m_container[idx]);
+				m_size = system.m_container[idx].size();
 			}
 		}
 
@@ -531,6 +536,8 @@ namespace vecs {
 		auto end() noexcept {
 			return m_view.end();
 		}
+
+		uint32_t size() { return m_size; }
 
 	private:
 		using view_type = decltype(std::views::join(std::declval<std::set<ptr_type>&>()));
