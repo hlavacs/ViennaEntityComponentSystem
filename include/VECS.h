@@ -23,7 +23,7 @@ namespace vecs {
 	/// <typeparam name="SIZEENTITIES">A typelist map, mapping component type to initialized component storage.</typeparam>
 	template<typename TYPELIST>
 	class VECSSystem {
-		template<typename TL, typename T> friend class VECSIterator;
+		template<typename TL, typename T, typename... Ts> friend class VECSIterator;
 
 	public:
 		static_assert(vtll::unique<TYPELIST>::value, "VECSSystem TYPELIST is not unique!");
@@ -63,7 +63,7 @@ namespace vecs {
 		/// Base class for all containers.
 		/// </summary>
 		class VECSComponentContainerBase {
-			template<typename TL, typename T> friend class VECSIterator;
+			template<typename TL, typename T, typename... Ts> friend class VECSIterator;
 		protected:
 			uint32_t m_number;	//Number in the list of containers. Needed for erasing.
 		public:
@@ -79,7 +79,7 @@ namespace vecs {
 		/// <typeparam name="T">Type of the component to store in.</typeparam>
 		template<typename T>
 		class VECSComponentContainer : public VECSComponentContainerBase {
-			template<typename TL, typename T> friend class VECSIterator;
+			template<typename TL, typename T, typename... Ts> friend class VECSIterator;
 		public:
 
 			/// <summary>
@@ -402,7 +402,7 @@ namespace vecs {
 	//-----------------------------------------------------------------------------------------------------------------
 	//Iterator
 
-	template<typename TL, typename T>
+	template<typename TL, typename T, typename... Ts>
 	class VECSIterator {
 
 		using group_ptr = typename VECSSystem<TL>::VECSGroup*;
@@ -410,68 +410,81 @@ namespace vecs {
 		template<typename U>
 		using container_ptr = typename VECSSystem<TL>::VECSComponentContainer<U>*;
 
+		using ptr_type = std::conditional_t< (sizeof...(Ts) > 0), group_ptr, container_ptr<T> >;
+
+		using handle = typename VECSSystem<TL>::VECSHandle;
+
+		using vt = std::conditional_t < (sizeof...(Ts) > 0), std::pair< std::tuple<T&, Ts&...>, handle >, std::pair< T&, handle > > ;
+
 	public:
-		using difference_type = int64_t;						// Difference type
-		using value_type = T;									// Value type - use refs to deal with atomics and unique_ptr
-		using pointer = value_type*;							// Pointer to value
-		using reference = value_type&;							// Reference type
-		using iterator_category = std::forward_iterator_tag;	// Forward iterator
+		using difference_type = int64_t;					// Difference type
+		using value_type = vt;								// Value type - use refs to deal with atomics and unique_ptr
+		using pointer = value_type*;						// Pointer to value
+		using reference = value_type&;						// Reference type
+		using iterator_category = std::forward_iterator_tag;// Forward iterator
 
 		VECSIterator() {}
 		VECSIterator(group_ptr group, uint32_t index = 0) noexcept : m_ptr{ group }, m_index{index}, m_dN { group->m_num_indices }, m_size{ group->m_size } {}
 		VECSIterator(container_ptr<T> container, uint32_t index = 0) noexcept : m_ptr{ container }, m_index{ index }, m_size{ (uint32_t)container->m_data.size() } {}
 
-		VECSIterator(const VECSIterator<TL,T>& v) noexcept = default;	// Copy constructor
-		VECSIterator(VECSIterator<TL,T>&& v)	  noexcept = default;	// Move constructor
-		auto operator=(const VECSIterator<TL,T>& v) noexcept -> VECSIterator<TL,T> & = default;	// Copy
-		auto operator=(VECSIterator<TL,T>&& v)		noexcept -> VECSIterator<TL,T> & = default;	// Move
+		VECSIterator(const VECSIterator<TL,T,Ts...>& v) noexcept = default;	// Copy constructor
+		VECSIterator(VECSIterator<TL,T,Ts...>&& v)	  noexcept = default;	// Move constructor
+		auto operator=(const VECSIterator<TL,T,Ts...>& v) noexcept -> VECSIterator<TL,T,Ts...> & = default;	// Copy
+		auto operator=(VECSIterator<TL,T,Ts...>&& v)		noexcept -> VECSIterator<TL,T,Ts...> & = default;	// Move
 
 		auto operator*() noexcept -> reference { 		// Access the data
-			if constexpr (std::same_as<value_type, typename VECSSystem<TL>::VECSHandle>) { 
-				return m_ptr->handle(m_index); 
+			if constexpr (sizeof...(Ts) > 0) {
+				auto recurse = [&]<typename U, typename... Us>(auto & recurse_ref) {
+					auto base = m_ptr->m_system.m_container[vtll::index_of<TL, U>::value];	//Pointer to the container
+					auto container = std::dynamic_pointer_cast<VECSComponentContainer<U>>(base);	//Cast to correct type
+					uint32_t cidx = m_ptr->index<U>(m_index);
+					auto& ref = container->entry(cidx).m_component;
+
+					if constexpr (sizeof...(Us) == 0) {
+						return std::tie(ref);
+					}
+					else {
+						return std::tuple_cat(std::tie(ref), recurse_ref.template operator() < Us... > (recurse_ref));
+					}
+				};
+				return std::make_pair( recurse.template operator() < T, Ts... > (recurse), m_ptr->handle(m_index) );
 			}
 			else { 
-				return std::make_pair( m_ptr->m_data[m_index].m_component, m_ptr->m_data[m_index].m_handle );
+				return std::make_pair( std::ref(m_ptr->m_data[m_index].m_component), m_ptr->m_data[m_index].m_handle );
 			}
 		}
 
 		auto operator*() const noexcept	-> reference {		// Access const data
-			if constexpr (std::same_as<value_type, typename VECSSystem<TL>::VECSHandle>) { 
-				return m_ptr->handle(m_index); 
-			} 
-			else { 
-				return std::make_pair(m_ptr->m_data[m_index].m_component, m_ptr->m_data[m_index].m_handle);
-			}
+			return this->operator*();
 		}
 
 		auto operator->() noexcept { return operator*(); };			// Access
 		auto operator->() const noexcept { return operator*(); };	// Access
 
-		auto operator++()    noexcept -> VECSIterator<TL, T>& { operator+=(1); }	// Increase by 1 - pre-increment
-		auto operator++(int) noexcept -> VECSIterator<TL,T>  { 						// Increase by 1 - post-increment
+		auto operator++()    noexcept -> VECSIterator<TL,T,Ts...>& { operator+=(m_dN); }	// Increase by m_dN - pre-increment
+		auto operator++(int) noexcept -> VECSIterator<TL,T,Ts...>  { 						// Increase by m_dN - post-increment
 			auto cpy{ *this };
-			operator+=(1); 
+			operator+=(m_dN);
 			return cpy;
 		}
-		auto operator+=(difference_type N) noexcept	-> VECSIterator<TL,T>& { 		// Increase by N
+		auto operator+=(difference_type N) noexcept	-> VECSIterator<TL,T,Ts...>& { 		// Increase by N
 			m_index = std::clamp(m_index + N * m_dN, 0, m_dN * m_size );
 			return *this;
 		}
-		auto operator+(difference_type N) noexcept	-> VECSIterator<TL,T> { 	// Increase by N
+		auto operator+(difference_type N) noexcept	-> VECSIterator<TL,T,Ts...> { 	// Increase by N
 			m_index = std::clamp(m_index + N * m_dN, 0, m_dN * m_size);
 			return *this;
 		}
 
-		bool operator!=(const VECSIterator<TL,T>& i) noexcept {	// Unequal
+		bool operator!=(const VECSIterator<TL,T,Ts...>& i) noexcept {	// Unequal
 			return m_ptr != i.m_ptr || m_index != i.m_index;
 		}
 
-		friend auto operator==(const VECSIterator<TL,T>& i1, const VECSIterator<TL,T>& i2) noexcept -> bool {	// Equal
+		friend auto operator==(const VECSIterator<TL,T,Ts...>& i1, const VECSIterator<TL,T,Ts...>& i2) noexcept -> bool {	// Equal
 			return i1.m_ptr == i2.m_ptr && i1.m_index == i2.m_index;
 		}
 
 	private:
-		using ptr_type = std::conditional_t< std::same_as<T, typename VECSSystem<TL>::VECSHandle>, group_ptr, container_ptr<T> >;
 		ptr_type  m_ptr{ nullptr };
 		uint32_t  m_index{ 0 };
 		uint32_t  m_dN{ 1 };
@@ -482,25 +495,24 @@ namespace vecs {
 	//-----------------------------------------------------------------------------------------------------------------
 	//Ranges
 
-	template<typename TL, typename... Ts>
+	template<typename TL, typename T, typename... Ts>
 	class VECSRange {
-		static_assert(sizeof...(Ts) > 1, "VECSRange needs a template type!");
-
-		using type_list = vtll::tl<Ts...>;
-		using T = vtll::front<type_list>;	//First type in list of component types
+		using type_list = vtll::tl<T, Ts...>;
 
 		using group_ptr = typename VECSSystem<TL>::VECSGroup*;
 
 		template<typename U>
 		using container_ptr = typename VECSSystem<TL>::VECSComponentContainer<U>*;
 
-		using ptr_type = std::conditional_t< (sizeof...(Ts) > 1), group_ptr, container_ptr<T> >;
+		using ptr_type = std::conditional_t< (sizeof...(Ts) > 0), group_ptr, container_ptr<T> >;
+
+		using view_type = decltype(std::views::join(std::declval<std::set<ptr_type>&>()));
 
 	public:
 		VECSRange(VECSSystem<TL>& system) {
-			if constexpr (sizeof...(Ts) > 1) {
+			if constexpr (sizeof...(Ts) > 0) {
 
-				auto f = [&]<typename T, T I>(std::integral_constant<T, I> i) {
+				auto f = [&]<typename U, U I>(std::integral_constant<U, I> i) {
 					using type = vtll::Nth_type<type_list, I>;
 					static const int idx = vtll::index_of<TL, type>::value;
 
@@ -531,7 +543,6 @@ namespace vecs {
 		uint32_t size() { return m_size; }
 
 	private:
-		using view_type = decltype(std::views::join(std::declval<std::set<ptr_type>&>()));
 		view_type			m_view;
 		size_t				m_size{ 0 };
 		std::set<ptr_type>  m_ranges;
