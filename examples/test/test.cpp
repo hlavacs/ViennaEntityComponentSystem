@@ -16,8 +16,8 @@
 using namespace vecs;
 
 using types = vtll::tl<size_t, bool, float, double>;
-using sizes = vtll::tl< vtll::tl<size_t, vtll::vl<100> > >;
-VECSSystem<types, 500, sizes> ECS;
+VECSSystem<types> ECS;
+
 
 void start_test() {
 
@@ -30,6 +30,10 @@ void start_test() {
 	auto c = ECS.component<float>(handle1);
 
 	auto d = ECS.container<size_t>(handle1);
+
+	ECS.erase(handle1);
+	bool v = ECS.valid(handle1);
+	a = ECS.component<size_t>(handle1);
 
 }
 
