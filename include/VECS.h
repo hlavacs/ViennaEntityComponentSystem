@@ -22,6 +22,7 @@ namespace vecs {
 	class VECSSystem {
 
 	public:
+		static_assert(vtll::unique<TYPELIST>::value, "VECSSystem TYPELIST is not unique!");
 
 		static const int BITS = vtll::size<TYPELIST>::value;	//Number of bits in the bitset, i.e. number of component types
 		static const uint32_t null_idx = std::numeric_limits<uint32_t>::max(); //Max number is defined to be NULL - no value
@@ -117,6 +118,8 @@ namespace vecs {
 			std::vector<entry_t> m_data;	//The data stored in this container
 		};
 
+		template<typename T>
+		using entry_t = VECSComponentContainer<T>::entry_t;
 
 		//-----------------------------------------------------------------------------------------------------------------
 		//Entity groups
@@ -247,6 +250,7 @@ namespace vecs {
 		/// <returns>The entity handle.</returns>
 		template<typename... Ts>
 		[[nodiscard]] VECSHandle create(Ts&&... Args) {
+			static_assert(vtll::unique<vtll::tl<Ts...>>::value, "VECSSystem::create() arguments are not unique!"); //Check uniqueness
 
 			std::bitset<BITS> types;
 			
@@ -301,28 +305,39 @@ namespace vecs {
 		/// <param name="handle">Entity handle.</param>
 		/// <returns>Reference to the component of this entity.</returns>
 		template<typename T>
-		std::optional<T&> component(VECSHandle handle) {
+		std::optional<std::reference_wrapper<T>> component(VECSHandle handle) {
 			VECSEntity& entity = m_entities[handle.m_entity];
-			if (entity.m_generation != handle.m_generation) return;	//Is the handle still valid?
-			VECSComponentContainer<T>& container = m_container[vtll::index_of<TYPELIST, T>::value];			//Pointer to the container
+			if (entity.m_generation != handle.m_generation) return {};		//Is the handle still valid?
+			if (!entity.m_group->m_types.test(vtll::index_of<TYPELIST, T>::value)) return {}; //Does the entity contain the type?
+			auto base = m_container[vtll::index_of<TYPELIST, T>::value];	//Pointer to the container
+			auto container = std::dynamic_pointer_cast<VECSComponentContainer<T>>(base);
 			return { container->entry(entity.m_group->index<T>(entity.m_indices_start)).m_component };
 		}
 
 		template<typename T>
-		std::optional<const T&> const_component(VECSHandle handle) {
+		std::optional<std::reference_wrapper<const T>> const_component(VECSHandle handle) {
 			auto res = component(handle);
 			if (!res) return {};
 			return { res.value() };
 		}
 
 		template<typename T>
-		auto& container() {
+		std::optional<std::reference_wrapper<std::vector<entry_t<T>>>> container(VECSHandle handle) {
 			static const int idx = vtll::index_of<TYPELIST, T>::value;
+			if (!m_entities[handle.m_entity].m_group->m_types.test(idx)) return {}; //Does the entity contain the type?
 			if (!m_container[idx]) {	//Is the container pointer for this component type still zero?
 				auto container = std::make_shared<VECSComponentContainer<T>>(idx);						//No - create one
 				m_container[idx] = std::static_pointer_cast<VECSComponentContainerBase>(container); //Save in vector
 			}
-			return m_container[idx]->container();
+			auto container = std::dynamic_pointer_cast<VECSComponentContainer<T>>(m_container[idx]);
+			return container->data();
+		}
+
+		template<typename T>
+		std::optional<std::reference_wrapper<const std::vector<entry_t<T>>>> const_container(VECSHandle handle) {
+			auto res = container(handle);
+			if (!res) return {};
+			return { res.value() };
 		}
 
 		VECSHandle handle(uint32_t entity) {
