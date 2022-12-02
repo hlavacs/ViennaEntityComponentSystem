@@ -485,10 +485,13 @@ namespace vecs {
 		auto operator->() noexcept { return operator*(); };			// Access
 		auto operator->() const noexcept { return operator*(); };	// Access
 
-		auto operator++()    noexcept -> VECSIterator<TL, T, Ts...>& { operator+=(m_dN); return *this; }	// Increase by m_dN - pre-increment
+		auto operator++()    noexcept -> VECSIterator<TL, T, Ts...>& { 	// Increase by m_dN - pre-increment
+			operator+=(1); 
+			return *this; 
+		}
 		auto operator++(int) noexcept -> VECSIterator<TL,T,Ts...>  { 						// Increase by m_dN - post-increment
 			auto cpy{ *this };
-			operator+=(m_dN);
+			operator+=(1);
 			return cpy;
 		}
 		auto operator+=(difference_type N) noexcept	-> VECSIterator<TL,T,Ts...>& { 		// Increase by N
@@ -569,20 +572,33 @@ namespace vecs {
 		VECSRange(VECSSystem<TL>& system) noexcept {
 			if constexpr (sizeof...(Ts) > 0) {
 
+				std::bitset<VECSSystem<TL>::BITS> types;
 				auto f = [&]<typename U, U I>(std::integral_constant<U, I> i) {
+					using type = vtll::Nth_type<type_list, I>;
+					types.set(vtll::index_of<TL, type>::value);
+				};
+				vtll::static_for< int, 0, vtll::size<type_list>::value >(f);
+
+				std::set<typename VECSSystem<TL>::VECSGroup*> groups;
+				auto g = [&]<typename U, U I>(std::integral_constant<U, I> i) {
 					using type = vtll::Nth_type<type_list, I>;
 					static const uint32_t idx = vtll::index_of<TL, type>::value;
 
+					std::cout << typeid(type).name() << "\n";
+
 					auto range = system.m_map_type_to_group.equal_range(idx);
 					for (auto it = range.first; it != range.second; ++it) {
-						auto b = VECSIterator<TL, T, Ts...> { system, it->second, 0 };
-						auto e = VECSIterator<TL, T, Ts...> { system, it->second, (uint32_t)it->second->m_size * it->second->m_num_indices };
-						m_ranges.push_back(range_t( b, e ));
-						//m_size += *it.second->size();
+						if ((it->second->m_types & types) == types) { groups.insert(it->second); }
 					}
 				};
+				vtll::static_for< int, 0, vtll::size<type_list>::value >(g);
 
-				vtll::static_for< int, 0, vtll::size<type_list>::value >(f);
+				for (auto* group : groups) {
+					auto b = VECSIterator<TL, T, Ts...>{ system, group, 0 };
+					auto e = VECSIterator<TL, T, Ts...>{ system, group, (uint32_t)group->m_size * group->m_num_indices };
+					m_ranges.push_back(range_t(b, e));
+					//m_size += *it.second->size();
+				}
 			}
 			else {
 				static const uint32_t idx = vtll::index_of<TL, T>::value;
@@ -594,20 +610,20 @@ namespace vecs {
 		}
 
 		auto begin() noexcept {
-			m_view = std::views::join(m_ranges);
-			return m_view.begin();
+			m_view = std::make_shared<decltype(std::views::join(m_ranges))>(std::views::join(m_ranges));
+			return m_view->begin();
 		}
 
 		auto end() noexcept {
-			return m_view.end();
+			return m_view->end();
 		}
 
 		auto size() { return m_size; }
 
 	private:
-		std::vector<range_t>				 m_ranges;
-		decltype(std::views::join(m_ranges)) m_view = std::views::join(m_ranges);
-		size_t								 m_size{ 0 };
+		std::vector<range_t>									m_ranges;
+		std::shared_ptr<decltype(std::views::join(m_ranges))>	m_view;
+		size_t													m_size{ 0 };
 	};
 
 	//static_assert( std::ranges::range<VECSRange<vtll::tl<int>, int>> , "VECSRange");
