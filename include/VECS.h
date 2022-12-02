@@ -170,7 +170,8 @@ namespace vecs {
 		/// Additionally we also store the index of the owning entity.
 		/// </summary>
 		class VECSGroup {
-
+			template<typename TL, typename T, typename... Ts> friend class VECSIterator;
+			template<typename TL, typename T, typename... Ts> friend class VECSRange;
 			template<typename TYPELIST> friend class VECSSystem;
 
 		public:
@@ -207,7 +208,7 @@ namespace vecs {
 				/// The returned indices are stored in the entity's index list.
 				/// </summary>
 				auto createComponents = [&]<typename T>(T&& Arg) {
-					static const int idx = vtll::index_of<TYPELIST, T>::value;
+					static const uint32_t idx = vtll::index_of<TYPELIST, T>::value;
 					VECSComponentContainer<T>& container = *std::dynamic_pointer_cast<VECSComponentContainer<T>>(m_system.m_container[idx]); 
 					m_indices[indices_start + m_component_index_map[idx]] = container.add(handle, std::forward<T>(Arg));
 				};
@@ -250,10 +251,6 @@ namespace vecs {
 				return m_size;
 			}
 
-			auto begin() -> VECSIterator<TYPELIST, VECSHandle> { return { m_system, this, 0 }; };
-			auto end() -> VECSIterator<TYPELIST, VECSHandle> { return { m_system, this, m_size * m_num_indices }; };
-
-
 		private:
 			size_t					m_size{0};
 			uint32_t				m_num_indices{ 0 };		//Number of types of this group, plus 1 for the generation counter
@@ -292,7 +289,7 @@ namespace vecs {
 			/// and makes sure all component containers exist.
 			/// </summary>
 			auto groupType = [&]<typename T>() {
-				static const int idx = vtll::index_of<TYPELIST, T>::value;
+				static const uint32_t idx = vtll::index_of<TYPELIST, T>::value;
 				if (!m_container[idx]) {	//Is the container pointer for this component type still zero?
 					auto container = std::make_shared<VECSComponentContainer<T>>(*this, idx);		//No - create one
 					m_container[idx] = std::static_pointer_cast<VECSComponentContainerBase>(container); //Save in vector
@@ -306,11 +303,11 @@ namespace vecs {
 			if (m_empty_start != null_idx) {		//Reuse an old entity that has been erased previously
 				entity_index = m_empty_start;
 				m_empty_start = m_entities[m_empty_start].m_indices_start;
-				m_entities[entity_index].m_group = getGroup(types);	//Remember the group 
+				m_entities[entity_index].m_group = getGroup<Ts...>(types);	//Remember the group 
 			}
 			else {
 				entity_index = (uint32_t)m_entities.size();		//create a new entity
-				m_entities.emplace_back(getGroup(types), entity_index, 0);
+				m_entities.emplace_back(getGroup<Ts...>(types), entity_index, 0);
 			}
 	
 			VECSHandle handle{ entity_index, m_entities[entity_index].m_generation };
@@ -356,14 +353,27 @@ namespace vecs {
 			return m_entities[handle.m_entity].m_generation == handle.m_generation;
 		}
 
+		template<typename T, typename... Ts>
+		auto range() {
+			return VECSRange<TYPELIST, T, Ts...>(*this);
+		}
+
 	private:
 
+		template<typename... Ts>
 		auto getGroup( std::bitset<BITS>& types) -> VECSGroup* {
 			if (!m_groups.contains(types)) {									//Does the group exist yet?
 				auto res = m_groups.emplace(types, VECSGroup{ types, *this } );	//Create it
-				return &res.first->second;										//Return its address
+
+				auto f = [&]< typename T>() {
+					static const uint32_t idx = vtll::index_of<TYPELIST, T>::value;
+					m_map_type_to_group.insert( std::make_pair( idx, &res.first->second ) );
+				};
+				(f.template operator()<Ts>(), ...);
+
+				return &res.first->second;	//Return its address
 			}
-			return &m_groups.at(types);		//It exists - retrun its address
+			return &m_groups.at(types);		//It exists - return its address
 		}
 
 		template<typename... Ts>
@@ -503,7 +513,7 @@ namespace vecs {
 		ptr_type		m_ptr{ nullptr };
 		uint32_t		m_index{ 0 };
 		uint32_t		m_dN{ 1 };
-		uint32_t		m_size{ 0 };
+		size_t			m_size{ 0 };
 	};
 
 
@@ -561,18 +571,21 @@ namespace vecs {
 
 				auto f = [&]<typename U, U I>(std::integral_constant<U, I> i) {
 					using type = vtll::Nth_type<type_list, I>;
-					static const int idx = vtll::index_of<TL, type>::value;
+					static const uint32_t idx = vtll::index_of<TL, type>::value;
 
-					for (auto group : system.m_map_type_to_group[idx]) {
-						m_ranges.push_back(range_t{ group.begin(), group.end() });
-						m_size += group->size();
+					auto range = system.m_map_type_to_group.equal_range(idx);
+					for (auto it = range.first; it != range.second; ++it) {
+						auto b = VECSIterator<TL, T, Ts...> { system, it->second, 0 };
+						auto e = VECSIterator<TL, T, Ts...> { system, it->second, (uint32_t)it->second->m_size * it->second->m_num_indices };
+						m_ranges.push_back(range_t( b, e ));
+						//m_size += *it.second->size();
 					}
 				};
 
-				static_for< int, 0, vtll::size<type_list>::value >(f);
+				vtll::static_for< int, 0, vtll::size<type_list>::value >(f);
 			}
 			else {
-				static const int idx = vtll::index_of<TL, T>::value;
+				static const uint32_t idx = vtll::index_of<TL, T>::value;
 				auto base = system.m_container[vtll::index_of<TL, T>::value];					//Pointer to the container
 				auto container = std::dynamic_pointer_cast<typename VECSSystem<TL>::VECSComponentContainer<T>>(base);	//Cast to correct type
 				m_ranges.push_back(range_t{ container->begin(), container->end() });
