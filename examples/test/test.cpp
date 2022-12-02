@@ -33,6 +33,10 @@ void start_test() {
 	bool v = ECS.valid(handle1);
 	auto d = ECS.get<size_t>(handle1);
 
+	auto range = VECSRange<types, bool>(ECS);
+	//for (auto it : range) {
+
+	//}
 }
 
 
