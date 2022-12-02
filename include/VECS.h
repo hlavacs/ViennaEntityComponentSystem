@@ -10,8 +10,14 @@
 #include <ranges>
 #include <functional>
 #include <tuple>
+#include <algorithm>
 #include "VTLL.h"
 
+template< class LHS, class RHS >
+concept my_assignable_from =
+	requires(LHS lhs, RHS&& rhs) {
+		{ lhs = std::forward<RHS>(rhs) } -> std::same_as<LHS>;
+};
 
 namespace vecs {
 
@@ -431,22 +437,23 @@ namespace vecs {
 		using value_type = vt;								// Value type - use refs to deal with atomics and unique_ptr
 		using reference = value_type&;						// Reference type
 		using pointer = value_type*;						// Pointer to value
-		using difference_type = int64_t;					// Difference type
 		using iterator_category = std::forward_iterator_tag;// Forward iterator
+		using difference_type = int64_t;					// Difference type
 
 		VECSIterator() noexcept = default;
-		VECSIterator(VECSSystem<TL>& system, group_ptr group, uint32_t index = 0) noexcept : m_system{system}, m_ptr { group }, m_index{ index }, m_dN{ group->m_num_indices }, m_size{ group->m_size } {}
-		VECSIterator(VECSSystem<TL>& system, container_ptr<T> container, uint32_t index = 0) noexcept : m_system{ system }, m_ptr{ container }, m_index{ index }, m_size{ (uint32_t)container->m_data.size() } {}
+		VECSIterator(VECSSystem<TL>& system, group_ptr group, uint32_t index = 0) noexcept : m_system{&system}, m_ptr { group }, m_index{ index }, m_dN{ group->m_num_indices }, m_size{ group->m_size } {}
+		VECSIterator(VECSSystem<TL>& system, container_ptr<T> container, uint32_t index = 0) noexcept : m_system{ &system }, m_ptr{ container }, m_index{ index }, m_size{ (uint32_t)container->m_data.size() } {}
 
 		VECSIterator(const VECSIterator<TL,T,Ts...>& v) noexcept = default;	// Copy constructor
 		VECSIterator(VECSIterator<TL,T,Ts...>&& v)		noexcept = default;	// Move constructor
+
 		auto operator=(const VECSIterator<TL,T,Ts...>& v) noexcept -> VECSIterator<TL,T,Ts...> & = default;	// Copy
 		auto operator=(VECSIterator<TL,T,Ts...>&& v)	  noexcept -> VECSIterator<TL,T,Ts...> & = default;	// Move
 
 		auto operator*() noexcept -> value_type { 		// Access the data
 			if constexpr (sizeof...(Ts) > 0) {
 				typename VECSSystem<TL>::VECSHandle handle = m_ptr->handle(m_index);
-				return std::make_pair( m_system.getTuple<T,Ts...>( m_ptr, m_index ), handle);
+				return std::make_pair( m_system->getTuple<T,Ts...>( m_ptr, m_index ), handle);
 			}
 			else {
 				auto& entry = m_ptr->entry(m_index);
@@ -455,24 +462,31 @@ namespace vecs {
 		}
 
 		auto operator*() const noexcept	-> value_type {		// Access const data
-			return this->operator*();
+			if constexpr (sizeof...(Ts) > 0) {
+				typename VECSSystem<TL>::VECSHandle handle = m_ptr->handle(m_index);
+				return std::make_pair(m_system->getTuple<T, Ts...>(m_ptr, m_index), handle);
+			}
+			else {
+				auto& entry = m_ptr->entry(m_index);
+				return std::make_pair(std::ref(entry.m_component), entry.m_handle);
+			}
 		}
 
 		auto operator->() noexcept { return operator*(); };			// Access
 		auto operator->() const noexcept { return operator*(); };	// Access
 
-		auto operator++()    noexcept -> VECSIterator<TL,T,Ts...>& { operator+=(m_dN); }	// Increase by m_dN - pre-increment
+		auto operator++()    noexcept -> VECSIterator<TL, T, Ts...>& { operator+=(m_dN); return *this; }	// Increase by m_dN - pre-increment
 		auto operator++(int) noexcept -> VECSIterator<TL,T,Ts...>  { 						// Increase by m_dN - post-increment
 			auto cpy{ *this };
 			operator+=(m_dN);
 			return cpy;
 		}
 		auto operator+=(difference_type N) noexcept	-> VECSIterator<TL,T,Ts...>& { 		// Increase by N
-			m_index = std::clamp(m_index + N * m_dN, 0, m_dN * m_size );
+			m_index = std::clamp((uint32_t)(m_index + N * m_dN), (uint32_t)0, (uint32_t)(m_dN * m_size));
 			return *this;
 		}
 		auto operator+(difference_type N) noexcept	-> VECSIterator<TL,T,Ts...> { 	// Increase by N
-			m_index = std::clamp(m_index + N * m_dN, 0, m_dN * m_size);
+			m_index = std::clamp((uint32_t)(m_index + N * m_dN), (uint32_t)0, (uint32_t)(m_dN * m_size));
 			return *this;
 		}
 
@@ -485,12 +499,16 @@ namespace vecs {
 		}
 
 	private:
-		VECSSystem<TL>& m_system;
-		ptr_type  m_ptr{ nullptr };
-		uint32_t  m_index{ 0 };
-		uint32_t  m_dN{ 1 };
-		uint32_t  m_size{ 0 };
+		VECSSystem<TL>* m_system;
+		ptr_type		m_ptr{ nullptr };
+		uint32_t		m_index{ 0 };
+		uint32_t		m_dN{ 1 };
+		uint32_t		m_size{ 0 };
 	};
+
+
+	//using it = VECSIterator< vtll::tl<int>, int>;
+	//static_assert(std::assignable_from< it&, it>, "Iterator");
 
 
 	//-----------------------------------------------------------------------------------------------------------------
@@ -508,23 +526,27 @@ namespace vecs {
 		using ptr_type = std::conditional_t< (sizeof...(Ts) > 0), group_ptr, container_ptr<T> >;
 
 		struct range_t {
-			using iter_type = std::vector<int>::iterator; //VECSIterator<TL, T, Ts...>
-			iter_type	m_begin{};
-			iter_type	m_end{};
-			size_t		m_size{ 0 };
+			VECSIterator<TL, T, Ts...>	m_begin{};
+			VECSIterator<TL, T, Ts...>	m_end{};
+			size_t						m_size{ 0 };
 
-			range_t() = default;
-			range_t(const iter_type& b, const iter_type& e) noexcept : m_begin{ b }, m_end{ e }, m_size{ 0 } {};
-			range_t(iter_type&& b, iter_type&& e) noexcept : m_begin{ b }, m_end{ e }, m_size{ 0 } {};
+			range_t() noexcept = default;
+			range_t(const VECSIterator<TL, T, Ts...>& b, const VECSIterator<TL, T, Ts...>& e) noexcept : m_begin{ b }, m_end{ e }, m_size{ 0 } {};
+			range_t(VECSIterator<TL, T, Ts...>&& b, VECSIterator<TL, T, Ts...>&& e) noexcept : m_begin{ b }, m_end{ e }, m_size{ 0 } {};
 			range_t(const range_t&) = default;
 			range_t(range_t&&) = default;
+			auto operator=(const range_t& v) noexcept -> range_t & = default;
+			auto operator=(range_t&& v) noexcept -> range_t & = default;
 
 			auto begin() noexcept { return m_begin; };
 			auto end() noexcept { return m_end; };
 			auto size() const noexcept { return m_size; };
 		};
+		//ranges::range<T>&& std::same_as<ranges::iterator_t<T>, ranges::sentinel_t<T>>;
 
-		using view_type = decltype(std::views::join(std::declval<std::vector<range_t>>()));
+		static_assert( std::ranges::common_range<range_t> , "range_t");
+
+		//using view_type = decltype(std::views::join( std::declval< std::vector<range_t> >() ));
 
 	public:
 		VECSRange() noexcept = default;
@@ -542,7 +564,7 @@ namespace vecs {
 					static const int idx = vtll::index_of<TL, type>::value;
 
 					for (auto group : system.m_map_type_to_group[idx]) {
-						m_ranges.insert(group);
+						m_ranges.push_back(range_t{ group.begin(), group.end() });
 						m_size += group->size();
 					}
 				};
@@ -551,8 +573,10 @@ namespace vecs {
 			}
 			else {
 				static const int idx = vtll::index_of<TL, T>::value;
-				//m_ranges.insert(system.m_container[idx]);
-				//m_size = system.m_container[idx].size();
+				auto base = system.m_container[vtll::index_of<TL, T>::value];					//Pointer to the container
+				auto container = std::dynamic_pointer_cast<typename VECSSystem<TL>::VECSComponentContainer<T>>(base);	//Cast to correct type
+				m_ranges.push_back(range_t{ container->begin(), container->end() });
+				//m_size = container->size();
 			}
 		}
 
@@ -568,12 +592,12 @@ namespace vecs {
 		auto size() { return m_size; }
 
 	private:
-		view_type				m_view;
-		size_t					m_size{ 0 };
-		std::vector<std::vector<int>>	m_ranges;
+		std::vector<range_t>				 m_ranges;
+		decltype(std::views::join(m_ranges)) m_view = std::views::join(m_ranges);
+		size_t								 m_size{ 0 };
 	};
 
-	template<typename TL, typename T, typename... Ts>
-	class VECSRangeD : public VECSRange<TL, T, Ts...> {};
+	//static_assert( std::ranges::range<VECSRange<vtll::tl<int>, int>> , "VECSRange");
+
 
 }

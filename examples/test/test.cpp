@@ -34,9 +34,9 @@ void start_test() {
 	auto d = ECS.get<size_t>(handle1);
 
 	auto range = VECSRange<types, bool>(ECS);
-	//for (auto it : range) {
+	for (auto it : range) {
 
-	//}
+	}
 }
 
 
