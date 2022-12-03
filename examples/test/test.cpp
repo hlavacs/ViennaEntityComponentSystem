@@ -30,7 +30,7 @@ void start_test() {
 	auto handle5 = ECS.create<bool, float, double>(true, 11.0f, 102.0);
 	auto handle6 = ECS.create<bool, double>(false, 103.0);
 
-	/*for (auto it : ECS.range<size_t, bool>()) {
+	for (auto it : ECS.range<size_t, bool>()) {
 		auto val = it;
 		std::cout << std::get<0>(val.first) << "\n";
 	}
@@ -67,7 +67,7 @@ void start_test() {
 		auto val = it;
 		std::cout << std::get<1>(val.first) << "\n";
 	}
-	*/
+	
 }
 
 

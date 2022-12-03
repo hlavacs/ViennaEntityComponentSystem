@@ -145,8 +145,8 @@ namespace vecs {
 			/// <param name="index">Index of the component to erase.</param>
 			void erase(uint32_t index) override;
 
-			//auto begin() -> VECSIterator<INTL, OUTL, T> { return { m_system, this, 0 }; };
-			//auto end()   -> VECSIterator<INTL, OUTL T> { return { m_system, this, (uint32_t)m_data.size() }; };
+			auto begin() -> VECSIterator<INTL, OUTL, T> { return { m_system, this, 0 }; };
+			auto end()   -> VECSIterator<INTL, OUTL, T> { return { m_system, this, (uint32_t)m_data.size() }; };
 
 		private:
 			VECSSystem<INTL,OUTL>&	m_system;	//Need system for erasing
@@ -350,10 +350,10 @@ namespace vecs {
 			return m_entities[handle.m_entity].m_generation == handle.m_generation;
 		}
 
-		//template<typename T, typename... Ts>
-		//auto range() {
-		//	return VECSRange<INTL, OUTL T, Ts...>(*this);
-		//}
+		template<typename T, typename... Ts>
+		auto range() {
+			return VECSRange<INTL, OUTL, T, Ts...>(*this);
+		}
 
 	private:
 
@@ -425,7 +425,7 @@ namespace vecs {
 
 	//-----------------------------------------------------------------------------------------------------------------
 	//Iterator
-	/*
+	
 	template<typename INTL, typename OUTL, typename T, typename... Ts>
 	class VECSIterator {
 
@@ -509,7 +509,7 @@ namespace vecs {
 		}
 
 	private:
-		VECSSystem<TINTL,OUTL>* m_system;
+		VECSSystem<INTL,OUTL>*	m_system;
 		ptr_type				m_ptr{ nullptr };
 		uint32_t				m_index{ 0 };
 		uint32_t				m_dN{ 1 };
@@ -622,7 +622,7 @@ namespace vecs {
 		std::shared_ptr<decltype(std::views::join(m_ranges))>	m_view;
 		size_t													m_size{ 0 };
 	};
-	*/
+	
 	//static_assert( std::ranges::range<VECSRange<vtll::tl<int>, int>> , "VECSRange");
 
 
