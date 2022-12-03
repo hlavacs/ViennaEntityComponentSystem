@@ -252,6 +252,7 @@ namespace vecs {
 			size_t					m_size{0};
 			uint32_t				m_num_indices{ 0 };		//Number of types of this group, plus 1 for the generation counter
 			std::bitset<BITSOUTL>	m_types;				//One bit for each type in the type list
+
 			std::vector<uint32_t>	m_component_index_map;	//Map type index in type list to index in index list
 			VECSSystem<INTL,OUTL>&	m_system;				//Reference to the vector of entities in the system
 			container_vector		m_container_map;		//Maps index list (0...) to container pointer
@@ -263,7 +264,7 @@ namespace vecs {
 		//The VECS main member functions and data
 
 		/// <summary>
-		/// VECS main class constructor. Creates empty shared ptrs for the containers.
+		/// VECS main class constructor. Creates empty shared ptrs for the outgroup containers.
 		/// </summary>
 		VECSSystem() {
 			m_container.resize(BITSOUTL, nullptr); //We have enough space for the shared pointers, but containers do not exist yet
@@ -279,7 +280,7 @@ namespace vecs {
 		[[nodiscard]] auto create(Ts&&... Args) -> VECSHandle {
 			static_assert(vtll::unique<vtll::tl<Ts...>>::value, "VECSSystem::create() arguments are not unique!"); //Check uniqueness
 
-			std::bitset<BITSOUTL> types;
+			std::bitset<BITSOUTL> outtypes;
 			
 			/// <summary>
 			/// This lambda goes through all types for the entity, creates a bitset (IDing the group) representing this entity,
@@ -291,7 +292,7 @@ namespace vecs {
 					auto container = std::make_shared<VECSComponentContainer<T>>(*this, idx);		//No - create one
 					m_container[idx] = std::static_pointer_cast<VECSComponentContainerBase>(container); //Save in vector
 				}
-				types.set(vtll::index_of<OUTL, T>::value);	//Fill the bits of bitset representing the types
+				outtypes.set(vtll::index_of<OUTL, T>::value);	//Fill the bits of bitset representing the types
 			};
 			(groupType.template operator() < Ts > (), ...); //Create bitset representing the group and create necessary containers
 
@@ -300,11 +301,11 @@ namespace vecs {
 			if (m_empty_start != null_idx) {		//Reuse an old entity that has been erased previously
 				entity_index = m_empty_start;
 				m_empty_start = m_entities[m_empty_start].m_indices_start;
-				m_entities[entity_index].m_group = getGroup<Ts...>(types);	//Remember the group 
+				m_entities[entity_index].m_group = getGroup<Ts...>(outtypes);	//Remember the group 
 			}
 			else {
 				entity_index = (uint32_t)m_entities.size();		//create a new entity
-				m_entities.emplace_back(getGroup<Ts...>(types), entity_index, 0);
+				m_entities.emplace_back(getGroup<Ts...>(outtypes), entity_index, 0);
 			}
 	
 			VECSHandle handle{ entity_index, m_entities[entity_index].m_generation };
