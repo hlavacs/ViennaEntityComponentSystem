@@ -144,6 +144,8 @@ namespace vecs {
 			/// <param name="index">Index of the component to erase.</param>
 			void erase(uint32_t index) override;
 
+			size_t size() { return m_data.size(); }
+
 			auto begin() -> VECSIterator<LOTL, GOTL, T> { return { m_system, this, 0 }; };
 			auto end()   -> VECSIterator<LOTL, GOTL, T> { return { m_system, this, (uint32_t)m_data.size() }; };
 
@@ -538,11 +540,11 @@ namespace vecs {
 		struct range_t {
 			VECSIterator<LOTL, GOTL, T, Ts...>	m_begin{};
 			VECSIterator<LOTL, GOTL, T, Ts...>	m_end{};
-			size_t						m_size{ 0 };
+			size_t								m_size{ 0 };
 
 			range_t() noexcept = default;
-			range_t(const VECSIterator<LOTL, GOTL, T, Ts...>& b, const VECSIterator<LOTL, GOTL, T, Ts...>& e) noexcept : m_begin{ b }, m_end{ e }, m_size{ 0 } {};
-			range_t(VECSIterator<LOTL, GOTL, T, Ts...>&& b, VECSIterator<LOTL, GOTL, T, Ts...>&& e) noexcept : m_begin{ b }, m_end{ e }, m_size{ 0 } {};
+			range_t(const VECSIterator<LOTL, GOTL, T, Ts...>& b, const VECSIterator<LOTL, GOTL, T, Ts...>& e, size_t size) noexcept : m_begin{ b }, m_end{ e }, m_size{ size } {};
+			range_t(VECSIterator<LOTL, GOTL, T, Ts...>&& b, VECSIterator<LOTL, GOTL, T, Ts...>&& e, size_t size) noexcept : m_begin{ b }, m_end{ e }, m_size{ size } {};
 			range_t(const range_t&) = default;
 			range_t(range_t&&) = default;
 			auto operator=(const range_t& v) noexcept -> range_t & = default;
@@ -593,16 +595,18 @@ namespace vecs {
 				for (auto* group : groups) {
 					auto b = VECSIterator<LOTL, GOTL, T, Ts...>{ system, group, 0 };
 					auto e = VECSIterator<LOTL, GOTL, T, Ts...>{ system, group, (uint32_t)group->m_size * group->m_num_indices };
-					m_ranges.push_back(range_t(b, e));
-					//m_size += *it.second->size();
+					m_ranges.push_back(range_t(b, e, group->size()));
+					m_size += group->size();
 				}
 			}
 			else {
 				static const uint32_t idx = vtll::index_of<GOTL, T>::value;
 				auto base = system.m_container[vtll::index_of<GOTL, T>::value];					//Pointer to the container
-				auto container = std::dynamic_pointer_cast<typename VECSSystem<LOTL,GOTL>::VECSComponentContainer<T>>(base);	//Cast to correct type
-				m_ranges.push_back(range_t{ container->begin(), container->end() });
-				//m_size = container->size();
+				if (base) {
+					auto container = std::dynamic_pointer_cast<typename VECSSystem<LOTL, GOTL>::VECSComponentContainer<T>>(base);	//Cast to correct type
+					m_ranges.push_back(range_t{ container->begin(), container->end(), container->size()});
+					m_size = container->size();
+				}
 			}
 		}
 
