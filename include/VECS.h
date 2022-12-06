@@ -249,10 +249,12 @@ namespace vecs {
 				return m_size;
 			}
 
+
 		private:
 			VECSSystem<LOTL,GOTL>&	m_system;				//Reference to the vector of entities in the system
 			size_t					m_size{0};
-			uint32_t				m_num_indices{ 0 };		//Number of types of this group, plus 1 for the generation counter
+			uint32_t				m_num_indices{ 0 };		//Number of types of this group, plus 2 for the ent / generation counter
+			std::vector<VECSHandle> m_handles;
 
 			std::bitset<BITSGOTL>	m_gl_types;				//One bit for each type in the type list
 			std::vector<uint32_t>	m_gl_component_index_map;	//Map type index in type list to index in index list
