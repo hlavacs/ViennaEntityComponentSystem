@@ -25,7 +25,10 @@ _deps
 **/*.dir
 **/*.dir/*
 **/*.cmake
-**/*.depend 
+**/*.depend
+*.tcl
+*.ninja
+
 
 # MSVC cmake project files
 ALL_BUILD.vcxproj
