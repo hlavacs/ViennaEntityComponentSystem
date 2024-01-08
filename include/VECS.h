@@ -174,7 +174,7 @@ namespace vecs {
 
 	template<typename TL>
 	auto VecsSystem<TL>::valid(const VecsHandle&& handle) -> bool {
-		auto ent = m_entities.template get<0>( vllt::stack_index_t{ handle.get_index() } );
+		auto ent = m_entities.template get<0>( stack_index_t{ handle.get_index() } );
 		if( ent.has_value() && ent.value().get().m_index.get_generation() == handle.get_generation() ) return true;
 		return false;
 	}
@@ -182,9 +182,16 @@ namespace vecs {
 
 	//-----------------------------------------------------------------------------------------------------------------
 
+	class VecsArchetype {
+		//template<typename TL, typename T, typename... Ts> friend class VecsIterator;
+		//template<typename TL, typename T, typename... Ts> friend class VecsSRange;
+		//template<typename TL> friend class VecsSystem;
 
+	public:
 
+	private:
 
+	}
 
 
 } //namespace

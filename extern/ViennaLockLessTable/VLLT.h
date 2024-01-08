@@ -376,8 +376,8 @@ namespace vllt {
 	//---------------------------------------------------------------------------------------------------
 
 
-	using stack_index_t = vsty::strong_type_t<uint32_t, vsty::counter<>, std::integral_constant<uint32_t, std::numeric_limits<uint32_t>::max()>>;
-	using stack_diff_t = vsty::strong_type_t<int32_t, vsty::counter<>, std::integral_constant<int32_t, std::numeric_limits<int32_t>::max()>>;
+	using stack_index_t = vsty::strong_type_t<uint64_t, vsty::counter<>, std::integral_constant<uint32_t, std::numeric_limits<uint32_t>::max()>>;
+	using stack_diff_t = vsty::strong_type_t<int64_t, vsty::counter<>, std::integral_constant<int32_t, std::numeric_limits<int32_t>::max()>>;
 
 
 	/////
