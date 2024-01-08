@@ -29,7 +29,9 @@ _deps
 *.tcl
 *.ninja
 *.ninja_deps
-*.ninja_logs
+*.ninja_log
+*.exe
+*.pdb
 
 
 # MSVC cmake project files
