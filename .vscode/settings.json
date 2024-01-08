@@ -70,7 +70,22 @@
         "thread": "cpp",
         "variant": "cpp",
         "functional": "cpp",
-        "random": "cpp"
+        "random": "cpp",
+        "unordered_map": "cpp",
+        "bitset": "cpp",
+        "chrono": "cpp",
+        "cstdarg": "cpp",
+        "coroutine": "cpp",
+        "forward_list": "cpp",
+        "list": "cpp",
+        "resumable": "cpp",
+        "set": "cpp",
+        "unordered_set": "cpp",
+        "future": "cpp",
+        "sstream": "cpp",
+        "typeindex": "cpp",
+        "xhash": "cpp",
+        "xtree": "cpp"
     },
     "cmake.configureOnOpen": false
 }

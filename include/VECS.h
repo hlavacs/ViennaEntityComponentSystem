@@ -2,6 +2,7 @@
 
 #include <typeinfo>
 #include <typeindex>
+#include <type_traits>
 #include <unordered_map>
 #include <set>
 #include <unordered_set>
@@ -11,13 +12,175 @@
 #include <functional>
 #include <tuple>
 #include <algorithm>
+#include <limits>
 
 #include "VTLL.h"
-
-
+#include "VSTY.h"
+#include "VLLT.h"
 
 
 namespace vecs {
+
+	const size_t NBITS = 40;
+
+	/// <summary>
+	/// A VecsIndex is a 64-bit integer, with the first NBITS bits encoding the index
+	/// of the index, and the rest encoding a generation counter. The generation counter is incremented each time the index
+	/// is erased, so that old indices can be detected.
+	/// </summary>	
+	struct VecsIndex : public vsty::strong_type_t< uint64_t, vsty::counter<>, std::integral_constant<uint64_t, std::numeric_limits<uint64_t>::max()> > {
+		uint64_t get_index() { return get_bits(0, NBITS); }
+		uint64_t get_generation() { return get_bits(NBITS); }
+		void set_index(const uint64_t&& index) { return set_bits( std::forward<const uint64_t>(index), 0, NBITS); }
+		void set_generation(const uint64_t&& index) { return set_bits( std::forward<const uint64_t>(index), NBITS); }
+	};
+
+	template<auto Phantom = vsty::counter<>>
+	struct handle_t : public VecsIndex{};
+	using VecsHandle = handle_t<>; /// This is to prevent accidentally using a VecsIndex as a handle.
+
+	/// <summary>
+	/// The main ECS class.
+	/// </summary>
+	/// <typeparam name="TL">A typelist storing all possible component types. Types MUST be UNIQUE!</typeparam>
+	/// <typeparam name="NBITS">Number of bits for the index in the 64-bit handle. The rest are used for generation.</typeparam>
+	template<typename TL>
+	class VecsSystem {
+		//template<typename TL, typename T, typename... Ts> friend class VecsIterator;
+		//template<typename TL, typename T, typename... Ts> friend class VecsRange;
+
+		static_assert(vtll::unique<TL>::value, "VecsSystem types are not unique!");
+		static const int BITSTL = vtll::size<TL>::value;	//Number of bits in the bitset, i.e. number of component types ingroup
+
+		class VecsArchetype;
+
+		/// <summary>
+		/// An enity is a list of components stored in an archetype. The VecsHandle indexes into the entity map storing VecsEntity structs.
+		/// A VecsEntity points to an archetype, and has a VecsIndex, which also holds the generation counter.
+		/// </summary>
+		struct VecsEntity {
+			std::shared_ptr<VecsArchetype> m_archetype;	//The group this entity belongs to.
+			VecsIndex m_index; //Index of the entity in the archetype. It is also used to point to the next free slot.
+		};
+
+	public:	
+		using VecsHandle = handle_t<>; /// This is to prevent accidentally using a VecsIndex as a handle.
+
+		VecsSystem(){};
+		auto erase(VecsHandle handle) -> bool;
+		auto valid(VecsHandle handle) -> bool;
+
+		template<typename... Ts>
+		[[nodiscard]] auto create(Ts&&... Args) -> VecsHandle;
+
+		template<typename... Ts> 
+		[[nodiscard]] auto get(VecsHandle handle) -> std::optional<std::tuple<Ts&...>>;
+
+	private:
+		vllt::VlltStack< vtll::tl<VecsEntity>, 1<<10, false > m_entities; //Container for all entities
+		VecsIndex m_empty_start{}; //Index of first empty entity to reuse
+		std::unordered_map<std::bitset<BITSTL>, std::shared_ptr<VecsArchetype>> m_archetypes; //Entity groups
+		std::unordered_multimap<size_t, std::shared_ptr<VecsArchetype>> m_map_type_to_group;	//Map for going from a component type to groups of entities with them
+	};
+
+
+	/// <summary>
+	/// Create a new entity.
+	/// </summary>
+	/// <typeparam name="...Ts">Types of the components of this entity.</typeparam>
+	/// <param name="...Args">Component data to be copied/moved into the component containers.</param>
+	/// <returns>The entity handle.</returns>
+	template<typename TL>
+	template<typename... Ts>
+	[[nodiscard]] auto VecsSystem<TL>::create(Ts&&... Args) -> VecsHandle {
+		static_assert(vtll::unique<vtll::tl<Ts...>>::value, "VecsSystem::create() arguments are not unique!"); //Check uniqueness
+		/*std::bitset<BITSGOTL> outtypes;
+		
+		/// <summary>
+		/// This lambda goes through all types for the entity, creates a bitset (IDing the group) representing this entity,
+		/// and makes sure all component containers exist.
+		/// </summary>
+		auto groupType = [&]<typename T>() {
+			static const uint32_t idx = vtll::index_of<GOTL, T>::value;
+			if (!m_container[idx]) {	//Is the container pointer for this component type still zero?
+				auto container = std::make_shared<VecsComponentContainer<T>>(*this, idx);		//No - create one
+				m_container[idx] = std::static_pointer_cast<VecsComponentContainerBase>(container); //Save in vector
+			}
+			outtypes.set(vtll::index_of<GOTL, T>::value);	//Fill the bits of bitset representing the types
+		};
+		(groupType.template operator() < Ts > (), ...); //Create bitset representing the group and create necessary containers
+		//Create the entity, or reuse an old one.
+		uint32_t entity_index;
+		if (m_empty_start != null_idx) {		//Reuse an old entity that has been erased previously
+			entity_index = m_empty_start;
+			m_empty_start = m_entities[m_empty_start].m_index;
+			m_entities[entity_index].m_group = getGroup<Ts...>(outtypes);	//Remember the group 
+		}
+		else {
+			entity_index = (uint32_t)m_entities.size();		//create a new entity
+			m_entities.emplace_back(getGroup<Ts...>(outtypes), entity_index, 0);
+		}
+
+		VecsHandle handle{ entity_index, m_entities[entity_index].m_generation };
+		m_entities[entity_index].m_index = m_entities[entity_index].m_group->add(handle, std::forward<Ts>(Args)...); //Add entity to group
+		return handle; //Return the handle
+		*/
+		return {};
+	}
+
+
+	/// <summary>
+	/// Erase an entity by its handle.
+	/// </summary>
+	/// <param name="handle">The handle of the entity to be erased.</param>
+	template<typename TL>
+	auto VecsSystem<TL>::erase(VecsHandle handle) -> bool {
+		/*
+		VecsEntity& entity = m_entities[handle.m_entity];
+		if (entity.m_generation != handle.m_generation) return false;	//Is the handle still valid?
+		entity.m_generation++;						//Invalidate all handles to this entity
+		entity.m_group->erase(entity.m_index);		//Erase from group, and also the components
+		entity.m_index = m_empty_start;				//Include into empty list
+		m_empty_start = handle.m_entity;
+		return true;
+		*/
+	}
+
+
+	/// <summary>
+	/// Get a reference to the component of type T of an entity.
+	/// </summary>
+	/// <typeparam name="Ts">Component types.</typeparam>
+	/// <param name="handle">Entity handle.</param>
+	/// <returns>Tuple with references to the components of the entity.</returns>
+	template<typename TL>
+	template<typename... Ts>
+	auto VecsSystem<TL>::get(VecsHandle handle) -> std::optional<std::tuple<Ts&...>> {
+		/*
+		VecsEntity& entity = m_entities[handle.m_entity];
+		if (entity.m_generation != handle.m_generation) return {};		//Is the handle still valid?
+		auto check = [&]<typename T>() {
+			if (!entity.m_group->m_gl_types.test(vtll::index_of<GOTL, T>::value)) return false; //Does the entity contain the type?
+			return true;
+		};
+		if (!(check.template operator() < Ts > () && ...)) return {};
+		return { getTuple<Ts...>(entity.m_group, entity.m_index) };
+		*/
+	}
+
+
+
+	template<typename TL>
+	auto VecsSystem<TL>::valid(VecsHandle handle) -> bool {
+		return true;
+		//return m_entities[handle.m_entity].m_generation == handle.m_generation;
+	}
+
+
+
+
+#ifdef XXX
+namespace vecsOLD {
 
 	/// <summary>
 	/// The main ECS class.
@@ -638,3 +801,4 @@ namespace vecs {
 }
 
 
+#endif
