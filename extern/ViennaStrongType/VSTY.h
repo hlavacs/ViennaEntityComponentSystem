@@ -2,7 +2,11 @@
 
 #include <limits>
 #include <utility>
+#include <string>
 #include <cassert>
+#include <iostream>
+#include <iomanip>
+#include <format>
 
 namespace vsty {
 
