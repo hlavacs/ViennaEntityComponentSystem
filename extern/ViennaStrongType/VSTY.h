@@ -2,6 +2,7 @@
 
 #include <limits>
 #include <utility>
+#include <cassert>
 
 namespace vsty {
 
@@ -9,7 +10,6 @@ namespace vsty {
 	concept Hashable = requires(T a) {
 		{ std::hash<T>{}(a) } -> std::convertible_to<std::size_t>;
 	};
-
 
 	/**
 	* \brief General strong type
@@ -22,8 +22,8 @@ namespace vsty {
     struct strong_type_t {
         strong_type_t() noexcept requires (std::is_same_v<D, void>) = default;					//default constructible
         strong_type_t() noexcept requires (!std::is_same_v<D, void>) { m_value = D::value; };	//explicit from a NULL value
-        explicit strong_type_t(const T& v) noexcept { m_value = v; };	//explicit from type T
-        explicit strong_type_t(T&& v) noexcept { m_value = v; };	//explicit from type T
+        explicit strong_type_t(const T& val) noexcept { m_value = val; };	//explicit from type T
+        explicit strong_type_t(T&& val) noexcept { m_value = val; };	//explicit from type T
 
         explicit strong_type_t(const T& v1, const T& v2, size_t number_bits1) noexcept requires std::unsigned_integral<T> { 
 			set_bits(std::forward<const T>(v1), 0ull, number_bits1); 
@@ -69,7 +69,16 @@ namespace vsty {
 
 			T umask = first_bit + number_bits < nbits ? static_cast<T>(~0ull) << (first_bit + number_bits) : 0;
 			T lmask = first_bit > 0ull ? (1ull << first_bit) - 1 : 0ull;			
+
+			//std::cout << "\nnew value          = " << std::setfill('0') << std::setw(16) << std::hex << value << std::dec << " first_bit = " << first_bit << " number_bits = " << number_bits <<  std::endl;
+			//std::cout << "  m_value          = " << std::setfill('0') << std::setw(16) << std::hex << m_value << std::endl;
+			//std::cout << "    umask          = " << std::setfill('0') << std::setw(16) << std::hex << umask << std::endl;
+			//std::cout << "    lmask          = " << std::setfill('0') << std::setw(16) << std::hex << lmask << std::endl;
+			//std::cout << "    value          = " << std::setfill('0') << std::setw(16) << std::hex << value << std::endl;
+			//std::cout << "value << first_bit = " << std::setfill('0') << std::setw(16) << std::hex << (value << first_bit) << std::endl;
+
 			m_value = (m_value & (umask | lmask)) | ((value << first_bit) & ~umask & ~lmask);
+			//std::cout << "  m_value          = " << std::setfill('0') << std::setw(16) << std::hex << m_value << std::endl;
 		}
 
 		void set_bits(const T&& value, const size_t first_bit) requires std::unsigned_integral<T> {

@@ -10,13 +10,7 @@
 
 #include "VECS.h"
 
-#include <future>
-
-using namespace vecs;
-
-using ingroup = vtll::tl<>;
 using outgroup = vtll::tl<size_t, bool, float, double>;
-//VECSSystem<ingroup, outgroup> ECS;
 
 
 void start_test() {
@@ -73,6 +67,8 @@ void start_test() {
 
 int main() {
 
-	start_test();
+	//start_test();
 
+	return 0;
 }
+
