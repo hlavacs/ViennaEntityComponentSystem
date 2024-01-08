@@ -28,11 +28,11 @@ namespace vecs {
 	/// of the index, and the rest encoding a generation counter. The generation counter is incremented each time the index
 	/// is erased, so that old indices can be detected.
 	/// </summary>
-	struct VecsIndex : public vsty::strong_type_t< uint64_t, vsty::counter<>, ::std::integral_constant<uint64_t, ::std::numeric_limits<uint64_t>::max()> > {
+	struct VecsIndex : public vsty::strong_type_t< uint64_t, vsty::counter<>, std::integral_constant<uint64_t, std::numeric_limits<uint64_t>::max()> > {
 		uint64_t get_index() { return get_bits(0, NBITS); }
 		uint64_t get_generation() { return get_bits(NBITS); }
-		void set_index(const uint64_t&& index) { return set_bits( ::std::forward<const uint64_t>(index), 0, NBITS); }
-		void set_generation(const uint64_t&& index) { return set_bits( ::std::forward<const uint64_t>(index), NBITS); }
+		void set_index(const uint64_t&& index) { return set_bits( std::forward<const uint64_t>(index), 0, NBITS); }
+		void set_generation(const uint64_t&& index) { return set_bits( std::forward<const uint64_t>(index), NBITS); }
 	};
 
 	template<auto Phantom = vsty::counter<>>

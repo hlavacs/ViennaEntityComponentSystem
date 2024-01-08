@@ -28,6 +28,8 @@ _deps
 **/*.depend
 *.tcl
 *.ninja
+*.ninja_deps
+*.ninja_logs
 
 
 # MSVC cmake project files
