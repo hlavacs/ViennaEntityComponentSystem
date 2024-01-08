@@ -191,7 +191,7 @@ namespace vecs {
 
 	private:
 
-	}
+	};
 
 
 } //namespace
