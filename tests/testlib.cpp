@@ -67,6 +67,8 @@ void start_test() {
 
 int main() {
 
+	vecs::VecsSystem<vtll::tl<int>> ECS{};
+
 	//start_test();
 
 	return 0;

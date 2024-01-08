@@ -23,21 +23,24 @@ namespace vecs {
 
 	const size_t NBITS = 40;
 
+	using vllt::stack_index_t;
+	using generation_t = vsty::strong_type_t< uint64_t, vsty::counter<>, std::integral_constant<uint64_t, std::numeric_limits<uint64_t>::max()> >;
+
 	/// <summary>
 	/// A VecsIndex is a 64-bit integer, with the first NBITS bits encoding the index
 	/// of the index, and the rest encoding a generation counter. The generation counter is incremented each time the index
 	/// is erased, so that old indices can be detected.
 	/// </summary>
 	struct VecsIndex : public vsty::strong_type_t< uint64_t, vsty::counter<>, std::integral_constant<uint64_t, std::numeric_limits<uint64_t>::max()> > {
-		uint64_t get_index() { return get_bits(0, NBITS); }
-		uint64_t get_generation() { return get_bits(NBITS); }
-		void set_index(const uint64_t&& index) { return set_bits( std::forward<const uint64_t>(index), 0, NBITS); }
-		void set_generation(const uint64_t&& index) { return set_bits( std::forward<const uint64_t>(index), NBITS); }
+		stack_index_t get_index() const { return stack_index_t{ get_bits(0, NBITS) }; }
+		generation_t get_generation() const { return generation_t{ get_bits(NBITS) }; }
+		void set_index( stack_index_t index) { return set_bits( (uint32_t)index, 0, NBITS ); }
+		void set_generation( stack_index_t index) { return set_bits( (uint32_t)index, NBITS ); }
 	};
 
-	template<auto Phantom = vsty::counter<>>
-	struct handle_t : public VecsIndex{};
+	template<auto Phantom = vsty::counter<>> struct handle_t : public VecsIndex{};
 	using VecsHandle = handle_t<>; /// This is to prevent accidentally using a VecsIndex as a handle.
+
 
 	/// <summary>
 	/// The main ECS class.
@@ -64,11 +67,10 @@ namespace vecs {
 		};
 
 	public:	
-		using VecsHandle = handle_t<>; /// This is to prevent accidentally using a VecsIndex as a handle.
 
-		VecsSystem(){};
-		auto erase(VecsHandle handle) -> bool;
-		auto valid(VecsHandle handle) -> bool;
+		VecsSystem(){ valid( VecsHandle{}); };
+		auto erase(const VecsHandle&& handle) -> bool;
+		auto valid(const VecsHandle&& handle) -> bool;
 
 		template<typename... Ts>
 		[[nodiscard]] auto create(Ts&&... Args) -> VecsHandle;
@@ -134,7 +136,7 @@ namespace vecs {
 	/// </summary>
 	/// <param name="handle">The handle of the entity to be erased.</param>
 	template<typename TL>
-	auto VecsSystem<TL>::erase(VecsHandle handle) -> bool {
+	auto VecsSystem<TL>::erase(const VecsHandle&& handle) -> bool {
 		/*
 		VecsEntity& entity = m_entities[handle.m_entity];
 		if (entity.m_generation != handle.m_generation) return false;	//Is the handle still valid?
@@ -171,12 +173,22 @@ namespace vecs {
 
 
 	template<typename TL>
-	auto VecsSystem<TL>::valid(VecsHandle handle) -> bool {
-		return true;
-		//return m_entities[handle.m_entity].m_generation == handle.m_generation;
+	auto VecsSystem<TL>::valid(const VecsHandle&& handle) -> bool {
+		auto ent = m_entities.template get<0>( vllt::stack_index_t{ handle.get_index() } );
+		if( ent.has_value() && ent.value().get().m_index.get_generation() == handle.get_generation() ) return true;
+		return false;
 	}
 
-}
+
+	//-----------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+} //namespace
+
 
 
 
