@@ -265,8 +265,6 @@ namespace vecs {
 		}
 		VecsArchetypeIndex arch_index = std::dynamic_pointer_cast<VecsArchetype<TL, vtll::tl<Ts...>>>(archetype_ptr)->insert(std::forward<Ts>(Args)...);
 
-		VecsEntity new_entity{ archetype_ptr, arch_index };
-
 		VecsHandleIndex handle_index = m_empty_start.load();
 		VecsEntity *entity_ptr{nullptr};
 		if( handle_index.has_value() ) { //there is a free slot to make use of
@@ -287,7 +285,7 @@ namespace vecs {
 		VecsHandle result;
 		result.set_index( handle_index.get_index() );
 		result.set_generation( generation_t { generation.value() + 1 } );
-		return result;
+		return {result};
 	}
 
 
