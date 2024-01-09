@@ -21,14 +21,19 @@
 
 namespace vecs {
 
+	using namespace vllt;
+
+	template<typename TL> class VecsSystem;
+	template<typename TL> class VecsArchetypeBase;
+	template<typename TL, typename AL> class VecsArchetype;
+
 	const size_t NBITS = 40;
 
-	using vllt::stack_index_t;
 	using generation_t = vsty::strong_type_t< uint64_t, vsty::counter<>, std::integral_constant<uint64_t, std::numeric_limits<uint64_t>::max()> >;
 
 	/// <summary>
 	/// A VecsIndex is a 64-bit integer, with the first NBITS bits encoding the index
-	/// of the index, and the rest encoding a generation counter. The generation counter is incremented each time the index
+	/// of the uint64_t, and the rest encoding a generation counter. The generation counter is incremented each time the index
 	/// is erased, so that old indices can be detected.
 	/// </summary>
 	struct VecsIndex : public vsty::strong_type_t< uint64_t, vsty::counter<>, std::integral_constant<uint64_t, std::numeric_limits<uint64_t>::max()> > {
@@ -53,145 +58,187 @@ namespace vecs {
 		//template<typename TL, typename T, typename... Ts> friend class VecsRange;
 
 		static_assert(vtll::unique<TL>::value, "VecsSystem types are not unique!");
-		static const int BITSTL = vtll::size<TL>::value;	//Number of bits in the bitset, i.e. number of component types ingroup
+		static const size_t BITSTL = vtll::size<TL>::value;	//Number of bits in the bitset, i.e. number of component types ingroup
 
-		class VecsArchetype;
+		template<typename T> class VecsArchetypeBase;
 
 		/// <summary>
 		/// An enity is a list of components stored in an archetype. The VecsHandle indexes into the entity map storing VecsEntity structs.
 		/// A VecsEntity points to an archetype, and has a VecsIndex, which also holds the generation counter.
 		/// </summary>
 		struct VecsEntity {
-			std::shared_ptr<VecsArchetype> m_archetype;	//The group this entity belongs to.
+			std::shared_ptr<VecsArchetypeBase<TL>> m_archetype;	//The group this entity belongs to.
 			VecsIndex m_index; //Index of the entity in the archetype. It is also used to point to the next free slot.
 		};
 
 	public:	
+		using optional_ref_tuple = std::optional< vtll::to_ref_tuple<TL> >;
 
 		VecsSystem(){ valid( VecsHandle{}); };
 		auto erase(const VecsHandle&& handle) -> bool;
 		auto valid(const VecsHandle&& handle) -> bool;
 
 		template<typename... Ts>
-		[[nodiscard]] auto create(Ts&&... Args) -> VecsHandle;
+			requires (vtll::unique<vtll::tl<Ts...>>::value) 
+		[[nodiscard]] auto insert(Ts&&... Args) -> VecsHandle;
 
 		template<typename... Ts> 
-		[[nodiscard]] auto get(VecsHandle handle) -> std::optional<std::tuple<Ts&...>>;
+		[[nodiscard]] auto get(VecsHandle handle) -> optional_ref_tuple;
 
 	private:
 		vllt::VlltStack< vtll::tl<VecsEntity>, 1<<10, false > m_entities; //Container for all entities
 		VecsIndex m_empty_start{}; //Index of first empty entity to reuse
-		std::unordered_map<std::bitset<BITSTL>, std::shared_ptr<VecsArchetype>> m_archetypes; //Entity groups
-		std::unordered_multimap<size_t, std::shared_ptr<VecsArchetype>> m_map_type_to_group;	//Map for going from a component type to groups of entities with them
+		std::unordered_map<std::bitset<BITSTL>, std::shared_ptr<VecsArchetypeBase<TL>>> m_archetypes; //Entity groups
+		std::unordered_multimap<size_t, std::shared_ptr<VecsArchetypeBase<TL>>> m_map_type_to_archetype;	//Map for going from a component type to groups of entities with them
 	};
 
 
-	/// <summary>
-	/// Create a new entity.
-	/// </summary>
-	/// <typeparam name="...Ts">Types of the components of this entity.</typeparam>
-	/// <param name="...Args">Component data to be copied/moved into the component containers.</param>
-	/// <returns>The entity handle.</returns>
-	template<typename TL>
-	template<typename... Ts>
-	[[nodiscard]] auto VecsSystem<TL>::create(Ts&&... Args) -> VecsHandle {
-		static_assert(vtll::unique<vtll::tl<Ts...>>::value, "VecsSystem::create() arguments are not unique!"); //Check uniqueness
-		/*std::bitset<BITSGOTL> outtypes;
-		
-		/// <summary>
-		/// This lambda goes through all types for the entity, creates a bitset (IDing the group) representing this entity,
-		/// and makes sure all component containers exist.
-		/// </summary>
-		auto groupType = [&]<typename T>() {
-			static const uint32_t idx = vtll::index_of<GOTL, T>::value;
-			if (!m_container[idx]) {	//Is the container pointer for this component type still zero?
-				auto container = std::make_shared<VecsComponentContainer<T>>(*this, idx);		//No - create one
-				m_container[idx] = std::static_pointer_cast<VecsComponentContainerBase>(container); //Save in vector
-			}
-			outtypes.set(vtll::index_of<GOTL, T>::value);	//Fill the bits of bitset representing the types
-		};
-		(groupType.template operator() < Ts > (), ...); //Create bitset representing the group and create necessary containers
-		//Create the entity, or reuse an old one.
-		uint32_t entity_index;
-		if (m_empty_start != null_idx) {		//Reuse an old entity that has been erased previously
-			entity_index = m_empty_start;
-			m_empty_start = m_entities[m_empty_start].m_index;
-			m_entities[entity_index].m_group = getGroup<Ts...>(outtypes);	//Remember the group 
-		}
-		else {
-			entity_index = (uint32_t)m_entities.size();		//create a new entity
-			m_entities.emplace_back(getGroup<Ts...>(outtypes), entity_index, 0);
-		}
-
-		VecsHandle handle{ entity_index, m_entities[entity_index].m_generation };
-		m_entities[entity_index].m_index = m_entities[entity_index].m_group->add(handle, std::forward<Ts>(Args)...); //Add entity to group
-		return handle; //Return the handle
-		*/
-		return {};
-	}
-
-
-	/// <summary>
-	/// Erase an entity by its handle.
-	/// </summary>
-	/// <param name="handle">The handle of the entity to be erased.</param>
 	template<typename TL>
 	auto VecsSystem<TL>::erase(const VecsHandle&& handle) -> bool {
-		/*
-		VecsEntity& entity = m_entities[handle.m_entity];
-		if (entity.m_generation != handle.m_generation) return false;	//Is the handle still valid?
-		entity.m_generation++;						//Invalidate all handles to this entity
-		entity.m_group->erase(entity.m_index);		//Erase from group, and also the components
-		entity.m_index = m_empty_start;				//Include into empty list
-		m_empty_start = handle.m_entity;
-		return true;
-		*/
+
 	}
 
-
-	/// <summary>
-	/// Get a reference to the component of type T of an entity.
-	/// </summary>
-	/// <typeparam name="Ts">Component types.</typeparam>
-	/// <param name="handle">Entity handle.</param>
-	/// <returns>Tuple with references to the components of the entity.</returns>
 	template<typename TL>
 	template<typename... Ts>
-	auto VecsSystem<TL>::get(VecsHandle handle) -> ::std::optional<std::tuple<Ts&...>> {
-		/*
-		VecsEntity& entity = m_entities[handle.m_entity];
-		if (entity.m_generation != handle.m_generation) return {};		//Is the handle still valid?
-		auto check = [&]<typename T>() {
-			if (!entity.m_group->m_gl_types.test(vtll::index_of<GOTL, T>::value)) return false; //Does the entity contain the type?
-			return true;
-		};
-		if (!(check.template operator() < Ts > () && ...)) return {};
-		return { getTuple<Ts...>(entity.m_group, entity.m_index) };
-		*/
+	[[nodiscard]] auto VecsSystem<TL>::get(VecsHandle handle) -> optional_ref_tuple {
+		auto ent = m_entities.template get<0>( stack_index_t{ handle.get_index() } );
+		if( !ent.has_value() || ent.value().get().m_index.get_generation() != handle.get_generation() ) return {};
+		VecsEntity& entity = ent.value().get();
+		return { entity->m_archetype->get<Ts...>(entity.m_index) };
 	}
-
-
 
 	template<typename TL>
 	auto VecsSystem<TL>::valid(const VecsHandle&& handle) -> bool {
 		auto ent = m_entities.template get<0>( stack_index_t{ handle.get_index() } );
-		if( ent.has_value() && ent.value().get().m_index.get_generation() == handle.get_generation() ) return true;
-		return false;
+		if( !ent.has_value() || ent.value().get().m_index.get_generation() != handle.get_generation() ) return false;
+		return true;
 	}
 
 
 	//-----------------------------------------------------------------------------------------------------------------
+	//Archetypes
 
-	class VecsArchetype {
+	template<typename TL>
+	class VecsArchetypeBase {
+		static_assert(vtll::unique<TL>::value, "VecsArchetype types are not unique!");
+		static const size_t BITSTL = vtll::size<TL>::value;	//Number of bits in the bitset, i.e. number of component types ingroup
+	
+	public:
+		using optional_ref_tuple = VecsSystem<TL>::optional_ref_tuple;
+
+		VecsArchetypeBase(VecsSystem<TL>& system, std::bitset<BITSTL> types) : m_system{system}, m_types{types} {};
+
+		template<typename... Ts>
+		[[nodiscard]] auto get(VecsHandle handle) -> optional_ref_tuple;
+
+	private:
+		virtual auto get_pointers(stack_index_t index ) -> bool = 0; //Get pointers to the components in the archetype, fill into m_components
+
+		VecsSystem<TL>&	m_system; //Reference to the the system
+		std::bitset<BITSTL> m_types; //One bit for each type in the type list
+		std::vector<void*> m_component_ptrs{ BITSTL, nullptr }; //The data stored in this group
+	};
+
+
+	template<typename TL>
+	template<typename... Ts>
+	auto VecsArchetypeBase<TL>::get(VecsHandle handle) -> optional_ref_tuple {
+		auto ent = m_entities.template get<0>( stack_index_t{ handle.get_index() } );
+		if( !ent.has_value() || ent.value().get().m_index.get_generation() != handle.get_generation() ) return {};
+		VecsEntity& entity = ent.value().get();
+		get_pointers(entity.m_index.get_index());	//Get pointers to the components in the archetype, fill into m_component_ptrs
+
+		optional_ref_tuple tuple;
+		vtll::static_for<size_t, 0, vtll::size<vtll::tl<Ts...>>::value >( // Loop over all components
+			[&](auto i) { 
+				using T = vtll::type_at<vtll::tl<Ts...>, i>; //Get type of component
+				static const size_t idx = vtll::index_of<TL, T>::value; //Get index of component in type list
+				if(!m_types.test(idx)) return {}; //Does the entity contain the type? If not, return empty tuple
+				std::get<i>(tuple) = std::ref( *static_cast<T*>(m_component_ptrs[idx]) ); //Get pointer to component
+			} 
+		);
+		return { tuple };
+	}
+
+
+	template<typename TL, typename AL>
+	class VecsArchetype : public VecsArchetypeBase<TL> {
 		//template<typename TL, typename T, typename... Ts> friend class VecsIterator;
 		//template<typename TL, typename T, typename... Ts> friend class VecsSRange;
 		//template<typename TL> friend class VecsSystem;
 
+		using VecsArchetypeBase<TL>::BITSTL;
+		using VecsArchetypeBase<TL>::m_system;
+		using VecsArchetypeBase<TL>::m_types;
+		using VecsArchetypeBase<TL>::m_num_types;
+		using VecsArchetypeBase<TL>::m_component_ptrs;
+
+		static_assert(vtll::unique<AL>::value, "VecsArchetype types are not unique!");
+		using AAL = vtll::cat<AL, VecsHandle>;	//Typelist of all component types in the archetype, plus the handle
+
 	public:
+		VecsArchetype(VecsSystem<TL>& system, std::bitset<BITSTL> types);
+
+		template<typename... Ts>
+			requires (vtll::unique<vtll::tl<Ts...>>::value) 
+		[[nodiscard]] auto insert(Ts&&... Args) -> VecsHandle;
 
 	private:
+		virtual auto get_pointers(stack_index_t index) -> bool override; //Get pointers to the components in the archetype, fill into m_components
 
+		VlltStack<AAL> m_data; //The data stored in this archetype
 	};
+
+
+	template<typename TL, typename AL>
+	VecsArchetype<TL, AL>::VecsArchetype(VecsSystem<TL>& system, std::bitset<BITSTL> types) : 
+		VecsArchetypeBase(system), m_types{ types }, m_num_types{ 0 } {}
+
+
+	template<typename TL, typename AL>
+	auto VecsArchetype<TL, AL>::get_pointers( stack_index_t index ) -> bool {
+		auto tuple = m_data.get(index);
+		vtll::static_for<size_t, 0, vtll::size<AL>::value >( // Loop over all components
+			[&](auto i) { 
+				using T = vtll::type_at<AL, i>; //Get type of component
+				static const size_t idx = vtll::index_of<TL, T>::value; //Get index of component in type list
+				m_component_ptrs[idx] = &std::get<i>(tuple); //Get pointer to component
+			} 
+		);
+		return true;
+	}
+
+
+	//-----------------------------------------------------------------------------------------------------------------
+	//Leftovers
+
+	template<typename TL>
+	template<typename... Ts>
+		requires (vtll::unique<vtll::tl<Ts...>>::value) 
+	[[nodiscard]] auto VecsSystem<TL>::insert(Ts&&... Args) -> VecsHandle { 
+		std::bitfield<BITSTL> bits;
+
+		auto groupType = [&]<typename T>() {
+			static const uint32_t idx = vtll::index_of<TL, T>::value;
+			bits.set(idx);	//Fill the bits of bitset representing the types
+		};
+		(groupType.template operator() < Ts > (), ...); //Create bitset representing the group and create necessary containers
+
+		std::shared_ptr<VecsArchetypeBase<TL>> archetype;
+		if( !m_archetypes.contains(bits) ) {
+			auto res = m_archetypes.emplace(bits, std::make_shared<VecsArchetype<TL, vtll::tl<Ts...>>>( *this, bits ) );	//Create it
+			archetype = res.first->second;
+			auto f = [&]< typename T>() {
+				static const size_t idx = vtll::index_of<TL, T>::value;
+				m_map_type_to_archetype.insert( std::make_pair( idx, archetype ) );
+			};
+			(f.template operator()<Ts>(), ...);
+		} else {
+			archetype = m_archetypes.at(bits);
+		}
+
+		return static_cast< std::shared_ptr<VecsArchetype<TL, vtll::tl<Ts...>>> >(archetype)->insert(std::forward<Ts>(Args...));
+	}
 
 
 } //namespace
