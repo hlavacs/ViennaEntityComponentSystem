@@ -1,5 +1,4 @@
-#ifndef VTLL_H
-#define VTLL_H
+#pragma once
 
 #include <tuple>
 #include <variant>
@@ -1848,5 +1847,3 @@ namespace vtll {
 }
 
 
-
-#endif

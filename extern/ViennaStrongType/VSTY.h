@@ -29,14 +29,10 @@ namespace vsty {
         explicit strong_type_t(const T& val) noexcept { m_value = val; };	//explicit from type T
         explicit strong_type_t(T&& val) noexcept { m_value = val; };	//explicit from type T
 
-        explicit strong_type_t(const T& v1, const T& v2, size_t number_bits1) noexcept requires std::unsigned_integral<T> { 
-			set_bits(std::forward<const T>(v1), 0ull, number_bits1); 
-			set_bits(std::forward<const T>(v2), number_bits1);
-		}
-
-        explicit strong_type_t(T&& v1, T&& v2, size_t number_bits1) noexcept requires std::unsigned_integral<T> { 
-			set_bits(std::forward<T>(v1), 0ULL, number_bits1); 
-			set_bits(std::forward<T>(v2), number_bits1); 	
+		template<typename U, typename V>
+        explicit strong_type_t(U val1, V val2, size_t number_bits1) noexcept requires std::unsigned_integral<T> { 
+			set_bits(val1, 0ull, number_bits1); 
+			set_bits(val2, number_bits1);
 		}
 
         strong_type_t( strong_type_t<T, P, D> const &) noexcept = default;		//copy constructible
@@ -66,7 +62,9 @@ namespace vsty {
 
 		//-----------------------------------------------------------------------------------
 
-		void set_bits(const T&& value, const size_t first_bit, const size_t number_bits) requires std::unsigned_integral<T> {
+		template<typename U>
+		void set_bits(U val, size_t first_bit, const size_t number_bits) requires std::unsigned_integral<T> {
+			T value = static_cast<T>(val);
 			uint32_t nbits = sizeof(T) * 8;
 			assert(first_bit + number_bits <= nbits);
 			if( number_bits >= nbits) { m_value = value; return; }
@@ -85,11 +83,12 @@ namespace vsty {
 			//std::cout << "  m_value          = " << std::setfill('0') << std::setw(16) << std::hex << m_value << std::endl;
 		}
 
-		void set_bits(const T&& value, const size_t first_bit) requires std::unsigned_integral<T> {
-			return set_bits(std::forward<const T>(value), first_bit, sizeof(T) * 8ull - first_bit);
+		template<typename U>
+		void set_bits(U value, size_t first_bit) requires std::unsigned_integral<T> {
+			return set_bits(value, first_bit, sizeof(T) * 8ull - first_bit);
 		}
 
-		auto get_bits(const size_t first_bit, const size_t number_bits) const noexcept -> T requires std::unsigned_integral<T>  {
+		auto get_bits(size_t first_bit, size_t number_bits) const noexcept -> T requires std::unsigned_integral<T>  {
 			uint32_t nbits = sizeof(T) * 8;
 			assert(first_bit < nbits && first_bit + number_bits <= nbits);
 			if( number_bits == nbits) return m_value;
@@ -97,11 +96,11 @@ namespace vsty {
 			return val;
 		}
 
-		auto get_bits(const size_t first_bit) const noexcept -> T requires std::unsigned_integral<T>  {
+		auto get_bits(size_t first_bit) const noexcept -> T requires std::unsigned_integral<T>  {
 			return get_bits(first_bit, sizeof(T) * 8ull - first_bit);
 		}
 
-		auto get_bits_signed(const size_t first_bit, const size_t number_bits) const noexcept -> T requires std::unsigned_integral<T>  {
+		auto get_bits_signed(size_t first_bit, size_t number_bits) const noexcept -> T requires std::unsigned_integral<T>  {
 			auto value = get_bits(first_bit, number_bits);
 			if( value & (1ull << (number_bits - 1))) {
 				value |= static_cast<T>(~0ull) << number_bits;
@@ -109,7 +108,7 @@ namespace vsty {
 			return value;
 		}
 
-		auto get_bits_signed(const size_t first_bit) const noexcept -> T requires std::unsigned_integral<T>  {
+		auto get_bits_signed(size_t first_bit) const noexcept -> T requires std::unsigned_integral<T>  {
 			return get_bits_signed(first_bit, sizeof(T) * 8ull - first_bit);
 		}
 
