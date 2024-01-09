@@ -264,7 +264,7 @@ namespace vecs {
 		};
 		(groupType.template operator() < Ts > (), ...);
 
-		std::shared_ptr<VecsArchetypeBase<TL>> archetype_ptr; //create a new archetype is necessary
+		std::shared_ptr<VecsArchetypeBase<TL>> archetype_ptr; //create a new archetype if necessary
 		using archetype = VecsArchetype<TL, vtll::tl<Ts...>>;
 		if( !m_archetypes.contains(bits) ) {
 			auto res = m_archetypes.emplace(bits, std::make_shared<archetype>( *this, bits ) );	//Create it
@@ -276,12 +276,11 @@ namespace vecs {
 			};
 			(f.template operator()<Ts>(), ...);
 		} else {
-			//archetype_ptr = m_archetypes.at(bits); //It exists - return its address
+			archetype_ptr = m_archetypes.at(bits); //archetype already exists - return its address
 		}
 		auto ptr = std::dynamic_pointer_cast<archetype>(archetype_ptr);
 		VecsArchetypeIndex arch_index = ptr->insert(std::forward<Ts>(Args)...);
 	
-		/*
 		VecsHandleIndex handle_index = m_empty_start.load();
 		VecsEntity *entity_ptr{nullptr};
 		if( handle_index.has_value() ) { //there is a free slot to make use of
@@ -294,17 +293,17 @@ namespace vecs {
 			}
 		}
 		else {
-			handle_index.set_index( m_entities.push( VecsEntity{ archetype_ptr, arch_index } ) );
 			entity_ptr = get_entity(handle_index);
 		}
+	
 		auto generation = entity_ptr->m_index.m_handle_index.get_generation();
 
 		VecsHandle result;
 		result.set_index( handle_index.get_index() );
 		result.set_generation( generation_t { generation.value() + 1 } );
 		return {result};
-		*/
-		return {};
+		
+		//return {};
 	}
 
 
