@@ -43,27 +43,23 @@ namespace vecs {
 	/// of the uint64_t, and the rest encoding a generation counter. The generation counter is incremented each time the index
 	/// is erased, so that old indices can be detected.
 	/// </summary>
-	struct index_t : public vsty::strong_type_t< uint64_t, vsty::counter<>, std::integral_constant<uint64_t, std::numeric_limits<uint64_t>::max()> > {
+	struct VecsIndex : public vsty::strong_type_t< uint64_t, vsty::counter<>, std::integral_constant<uint64_t, std::numeric_limits<uint64_t>::max()> > {
 		stack_index_t get_index() const { return stack_index_t{ get_bits(0, NBITS) }; }
 		generation_t get_generation() const { return generation_t{ get_bits(NBITS) }; }
 		void set_index( stack_index_t index) { return set_bits( (uint32_t)index, 0, NBITS ); }
 		void set_generation( generation_t gen) { return set_bits( (uint32_t)gen, NBITS ); }
-		index_t() = default;
-		index_t( stack_index_t index, generation_t gen) { set_index(index); set_generation(gen); }
-		index_t( stack_index_t index) { set_index(index); set_generation( generation_t{0ULL} ); }
+		stack_index_t increase_index() { set_bits( (uint32_t)get_index() + 1, 0, NBITS); return get_index(); }
+		generation_t increase_generation() { set_bits( (uint32_t)get_generation() + 1, NBITS); return get_generation(); }
+		VecsIndex() = default;
+		explicit VecsIndex( stack_index_t index, generation_t gen) { set_index(index); set_generation(gen); }
+		explicit VecsIndex( stack_index_t index) { set_index(index); set_generation( generation_t{0ULL} ); }
 	};
 
-	template<auto Phantom = vsty::counter<>> struct handle_index_t : public index_t{};
-	using VecsHandleIndex = handle_index_t<>; 
-
-	template<auto Phantom = vsty::counter<>> struct archetype_index_t : public index_t{};
-	using VecsArchetypeIndex = archetype_index_t<>;
-
-	template<auto Phantom = vsty::counter<>> struct handle_t : public index_t{};
-	using VecsHandle = handle_t<>; 
-
-	union VecsEntityIndex { VecsHandleIndex m_handle_index; VecsArchetypeIndex m_archetype_index; }; //can be used for both handles and archetypes
-
+	struct VecsHandle : public VecsIndex {  
+		VecsHandle() = default;
+		explicit VecsHandle( stack_index_t index, generation_t gen) { set_index(index); set_generation(gen); }
+		explicit VecsHandle( stack_index_t index) { set_index(index); set_generation( generation_t{0ULL} ); }
+	};
 
 	//-----------------------------------------------------------------------------------------------------------------
 
@@ -87,7 +83,7 @@ namespace vecs {
 		/// </summary>
 		struct VecsEntity {
 			std::shared_ptr<VecsArchetypeBase<TL>> m_archetype_ptr;	//The group this entity belongs to.
-			VecsEntityIndex m_index; //Index of the entity in the archetype. It is also used to point to the next free slot.
+			VecsIndex m_index; //Index of the entity in the archetype. It is also used to point to the next free slot.
 		};
 
 	public:	
@@ -96,7 +92,7 @@ namespace vecs {
 
 		VecsSystem(){};
 		inline auto erase(VecsHandle handle) -> bool;
-		inline auto valid(VecsHandle handle) -> bool { return get_entity(std::forward<const VecsHandle>(handle)) != nullptr; };
+		inline auto valid(VecsHandle handle) -> bool { return get_entity_from_handle(std::forward<const VecsHandle>(handle)) != nullptr; };
 
 		template<typename... Ts> requires has_all_types<TL, Ts...>	//Check that all types are in the type list
 		[[nodiscard]] auto insert(Ts&&... Args) -> VecsHandle;
@@ -106,11 +102,11 @@ namespace vecs {
 
 
 	private:
-		inline auto get_entity(VecsHandle handle) -> VecsEntity*;
-		inline auto get_entity(VecsHandleIndex index) -> VecsEntity*;
+		inline auto get_entity_from_handle(VecsHandle handle) -> VecsEntity*;
+		inline auto get_entity_from_index(VecsIndex index) -> VecsEntity*;
 
 		vllt::VlltStack< vtll::tl<VecsEntity>, 1<<10, false > m_entities; //Container for all entities
-		std::atomic<VecsHandleIndex> m_empty_start{}; //Index of first empty entity to reuse, initialized to NULL value
+		std::atomic<VecsIndex> m_empty_start{}; //Index of first empty entity to reuse, initialized to NULL value
 		std::unordered_map<std::bitset<BITSTL>, std::shared_ptr<VecsArchetypeBase<TL>>> m_archetypes; //Entity groups
 		std::unordered_multimap<size_t, std::shared_ptr<VecsArchetypeBase<TL>>> m_map_type_to_archetype;	//Map for going from a component type to groups of entities with them
 	};
@@ -125,21 +121,21 @@ namespace vecs {
 	template<typename TL>
 	template<typename... Ts>
 	[[nodiscard]] auto VecsSystem<TL>::get(VecsHandle handle) -> optional_ref_tuple<Ts...> {
-		auto entity_ptr = get_entity(handle);
+		auto entity_ptr = get_entity_from_handle(handle);
 		if( !entity_ptr ) return {};
 		return(entity_ptr->m_archetype_ptr->get<Ts...>(entity_ptr->m_index.m_archetype_index));
 	}
 
 
 	template<typename TL>
-	inline auto VecsSystem<TL>::get_entity(VecsHandle handle) -> VecsEntity* {
+	inline auto VecsSystem<TL>::get_entity_from_handle(VecsHandle handle) -> VecsEntity* {
 		auto entity = m_entities.template get<0>( stack_index_t{ handle.get_index() } );
-		if( !entity.has_value() || entity.value().get().m_index.m_handle_index.get_generation() != handle.get_generation() ) return nullptr;
+		if( !entity.has_value() || entity.value().get().m_index.get_generation() != handle.get_generation() ) return nullptr;
 		return &entity.value().get();
 	}
 
 	template<typename TL>
-	inline auto VecsSystem<TL>::get_entity(VecsHandleIndex index) -> VecsEntity* {
+	inline auto VecsSystem<TL>::get_entity_from_index(VecsIndex index) -> VecsEntity* {
 		auto entity = m_entities.template get<0>( stack_index_t{ index.get_index() } );
 		if( !entity.has_value()) return nullptr;
 		return &entity.value().get();
@@ -217,7 +213,7 @@ namespace vecs {
 		VecsArchetype(VecsSystem<TL>& system, std::bitset<BITSTL> types) : VecsArchetypeBase<TL>{ system, types } {};
 
 		template<typename... Ts> requires has_all_types<TL, Ts...>	//Check that all types are in the type list
-		[[nodiscard]] auto insert(Ts&&... Args) -> VecsArchetypeIndex;
+		[[nodiscard]] auto insert(Ts&&... Args) -> VecsIndex;
 
 	private:
 		virtual auto get_pointers(stack_index_t index, component_ptrs_t& component_ptrs) -> bool override; //Get pointers to the components in the archetype, fill into m_components
@@ -227,9 +223,9 @@ namespace vecs {
 
 	template<typename TL, typename AL>
 	template<typename... Ts> requires has_all_types<TL, Ts...>	//Check that all types are in the type list
-	[[nodiscard]] auto VecsArchetype<TL, AL>::insert(Ts&&... Args) -> VecsArchetypeIndex { 
+	[[nodiscard]] auto VecsArchetype<TL, AL>::insert(Ts&&... Args) -> VecsIndex { 
 		stack_index_t idx = m_data.push( std::forward<Ts>(Args)..., VecsHandle{} );
-		VecsArchetypeIndex aidx{ };
+		VecsIndex aidx{ };
 		aidx.set_index( idx );
 		return aidx; 
 	}
@@ -278,32 +274,25 @@ namespace vecs {
 		} else {
 			archetype_ptr = m_archetypes.at(bits); //archetype already exists - return its address
 		}
-		auto ptr = std::dynamic_pointer_cast<archetype>(archetype_ptr);
-		VecsArchetypeIndex arch_index = ptr->insert(std::forward<Ts>(Args)...);
+		VecsIndex arch_index = std::dynamic_pointer_cast<archetype>(archetype_ptr)->insert(std::forward<Ts>(Args)...);
 	
-		VecsHandleIndex handle_index = m_empty_start.load();
+		VecsIndex handle_index = m_empty_start.load();
 		VecsEntity *entity_ptr{nullptr};
 		if( handle_index.has_value() ) { //there is a free slot to make use of
-			entity_ptr = get_entity(handle_index);
-			VecsHandleIndex new_handle_index = entity_ptr->m_index.m_handle_index; //Get the next free slot
+			entity_ptr = get_entity_from_index(handle_index);
+			VecsIndex new_handle_index = entity_ptr->m_index; //Get the next free slot
 			while( handle_index.has_value() 
 				&& !m_empty_start.compare_exchange_weak( handle_index, new_handle_index ) ) {
-					entity_ptr = get_entity(handle_index);
-					new_handle_index = entity_ptr->m_index.m_handle_index;
+					entity_ptr = get_entity_from_index(handle_index);
+					new_handle_index = entity_ptr->m_index;
 			}
 		}
 		else {
-			entity_ptr = get_entity(handle_index);
+			stack_index_t stack_index = m_entities.push( VecsEntity{ archetype_ptr, arch_index } ); //Create a new entity
+			entity_ptr = get_entity_from_index( VecsIndex{ stack_index } );
 		}
 	
-		auto generation = entity_ptr->m_index.m_handle_index.get_generation();
-
-		VecsHandle result;
-		result.set_index( handle_index.get_index() );
-		result.set_generation( generation_t { generation.value() + 1 } );
-		return {result};
-		
-		//return {};
+		return VecsHandle{handle_index.get_index(), entity_ptr->m_index.increase_generation()};
 	}
 
 
