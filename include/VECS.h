@@ -70,8 +70,6 @@ namespace vecs {
 	/// <typeparam name="NBITS">Number of bits for the index in the 64-bit handle. The rest are used for generation.</typeparam>
 	template<typename TL>
 	class VecsSystem {
-		//template<typename TL, typename T, typename... Ts> friend class VecsIterator;
-		//template<typename TL, typename T, typename... Ts> friend class VecsRange;
 
 	protected:
 		static_assert(vtll::unique<TL>::value, "VecsSystem types are not unique!");
@@ -136,7 +134,6 @@ namespace vecs {
 		} else {
 			archetype_ptr = m_archetypes.at(bits); //archetype already exists - return its address
 		}
-		VecsIndex arch_index = std::dynamic_pointer_cast<archetype>(archetype_ptr)->insert(std::forward<Ts>(Args)...);
 	
 		VecsIndex handle_index = m_empty_start.load();
 		VecsEntity *entity_ptr{nullptr};
@@ -150,11 +147,14 @@ namespace vecs {
 			}
 		}
 		else {
-			handle_index = VecsIndex{ m_entities.push( VecsEntity{ archetype_ptr, arch_index } ) };
+			handle_index = VecsIndex{ m_entities.push( VecsEntity{ archetype_ptr, VecsIndex{stack_index_t{0}, generation_t{0}} } ) };
 			entity_ptr = get_entity_from_index( handle_index );
 		}
 	
-		return VecsHandle{handle_index.get_index(), entity_ptr->m_index.get_generation()};
+		VecsHandle handle{ handle_index.get_index(), entity_ptr->m_index.get_generation() };
+		VecsIndex arch_index = std::dynamic_pointer_cast<archetype>(archetype_ptr)->insert(handle, std::forward<Ts>(Args)...);
+		entity_ptr->m_index = arch_index;
+		return handle;
 	}
 
 	template<typename TL>
@@ -162,8 +162,10 @@ namespace vecs {
 		auto entity_ptr = get_entity_from_handle(handle);
 		if( !entity_ptr ) return false;
 		entity_ptr->m_index.increase_generation(); //Increase the generation counter to invalidate any handle
-		auto res = entity_ptr->m_archetype_ptr->erase(entity_ptr->m_index);
-		if( !res ) return false;
+		
+		VecsHandle moved = entity_ptr->m_archetype_ptr->erase(entity_ptr->m_index);
+		auto entity_moved_ptr = get_entity_from_handle(moved);
+		//if( !res ) return false;
 
 		VecsIndex old_handle_index = m_empty_start.load();
 		VecsIndex new_handle_index{ old_handle_index.get_index() };
@@ -238,14 +240,12 @@ namespace vecs {
 		template<typename... Ts>
 		[[nodiscard]] inline auto get(VecsIndex index) -> optional_ref_tuple<Ts...>;
 
-		template<typename... Ts> requires has_all_types<TL, Ts...>	//Check that all types are in the type list
-		inline auto erase(VecsIndex index) -> optional_ref_tuple<Ts...>; //Erase the entity at the given index
+		virtual inline auto erase(VecsIndex index) -> VecsHandle = 0; //Erase the entity at the given index
 
 		inline auto bitset() -> std::bitset<BITSTL> { return m_types; } //Get the bitset representing the types
 
 	protected:
 		virtual inline auto get_pointers(stack_index_t index, component_ptrs_t& component_ptrs ) -> bool = 0; //Get pointers to the components in the archetype, fill into m_components
-		virtual inline auto erase(stack_index_t index) -> bool = 0; //Erase the entity at the given index
 
 		VecsSystem<TL>&	m_system; //Reference to the the system
 		std::bitset<BITSTL> m_types; //One bit for each type in the type list
@@ -260,15 +260,6 @@ namespace vecs {
 		return { std::tie( *static_cast<Ts*>(component_ptrs[vtll::index_of<TL, Ts>::value])... ) };
 	}
 
-	template<typename TL>
-	template<typename... Ts> requires has_all_types<TL, Ts...>	//Check that all types are in the type list
-	inline auto VecsArchetypeBase<TL>::erase(VecsIndex index) -> optional_ref_tuple<Ts...> {
-		auto tuple = get<Ts...>(index);
-		if( !tuple.has_value() ) return {};
-		erase(index.get_index());
-		return tuple;
-	}
-
 
 	//-----------------------------------------------------------------------------------------------------------------
 	//VecsArchetype
@@ -276,38 +267,35 @@ namespace vecs {
 
 	template<typename TL, typename... As>
 	class VecsArchetype : public VecsArchetypeBase<TL> {
-		//template<typename TL, typename T, typename... Ts> friend class VecsIterator;
-		//template<typename TL, typename T, typename... Ts> friend class VecsSRange;
-		//template<typename TL> friend class VecsSystem;
 
 	protected:
 		using AL = vtll::tl<As...>;	//Typelist of all component types in the archetype
+		static_assert(vtll::unique<AL>::value, "VecsArchetype types are not unique!");
+		using AAL = vtll::cat<AL, vtll::tl<VecsHandle> >;	//Typelist of all component types in the archetype, plus the handle
 
 		using VecsArchetypeBase<TL>::BITSTL;
 		using VecsArchetypeBase<TL>::m_system;
 		using VecsArchetypeBase<TL>::m_types;
 		using typename VecsArchetypeBase<TL>::component_ptrs_t;
 
-		static_assert(vtll::unique<AL>::value, "VecsArchetype types are not unique!");
-		using AAL = vtll::cat<AL, vtll::tl<VecsHandle> >;	//Typelist of all component types in the archetype, plus the handle
-
 	public:
 		VecsArchetype(VecsSystem<TL>& system, std::bitset<BITSTL> types) : VecsArchetypeBase<TL>{ system, types } {};
 
 		template<typename... Ts> requires has_all_types<TL, Ts...>	//Check that all types are in the type list
-		[[nodiscard]] inline auto insert(Ts&&... Args) -> VecsIndex;
+		[[nodiscard]] inline auto insert(VecsHandle handle, Ts&&... Args) -> VecsIndex;
+
+		inline auto erase(VecsIndex index) -> VecsHandle override;
 
 	private:
 		virtual inline auto get_pointers(stack_index_t index, component_ptrs_t& component_ptrs) -> bool override; //Get pointers to the components in the archetype, fill into m_components
-		inline auto erase(stack_index_t index) -> bool override;
 
 		VlltStack<AAL> m_data; //The data stored in this archetype
 	};
 
 	template<typename TL, typename... As>
 	template<typename... Ts> requires has_all_types<TL, Ts...>	//Check that all types are in the type list
-	[[nodiscard]] inline auto VecsArchetype<TL, As...>::insert(Ts&&... Args) -> VecsIndex { 
-		return VecsIndex{ m_data.push( std::forward<Ts>(Args)..., VecsHandle{} ) };
+	[[nodiscard]] inline auto VecsArchetype<TL, As...>::insert(VecsHandle handle, Ts&&... Args) -> VecsIndex { 
+		return VecsIndex{ m_data.push( std::forward<Ts>(Args)..., handle ) };
 	}
 
 	template<typename TL, typename... As>
@@ -325,14 +313,242 @@ namespace vecs {
 	}
 
 	template<typename TL, typename... As>
-	inline auto VecsArchetype<TL, As...>::erase(stack_index_t index) -> bool {
-		if( m_data.size() <= index ) return false;
-		m_data.erase(index);
-		return true;
+	inline auto VecsArchetype<TL, As...>::erase(VecsIndex index) -> VecsHandle {
+		if( m_data.size() <= index ) return {};
+		m_data.erase(index.get_index());
+
+		if( index <= m_data.size() ) { //there was a swap -> get handle of swapped entity
+			auto tuple = m_data.get_tuple(index.get_index());
+			if( !tuple.has_value() ) return {};
+			return std::get<vtll::size<AAL>::value - 1>(tuple.value());
+		}
+		return {};
 	}
 
 
 
+	//-----------------------------------------------------------------------------------------------------------------
+	//Iterator
+
+
+	template<typename TL, typename T, typename... Ts>
+	class VecsIterator {
+
+
+	};
+
+
+	template<typename TL, typename T, typename... Ts>
+	class VecsRange {
+
+	};
+
+
+/*
+	//-----------------------------------------------------------------------------------------------------------------
+	//Iterator
+	
+	template<typename LOTL, typename GOTL, typename T, typename... Ts>
+	class VECSIterator {
+
+		using group_ptr = typename VECSSystem<LOTL, GOTL>::VECSGroup*;
+
+		template<typename U>
+		using container_ptr = typename VECSSystem<LOTL, GOTL>::VECSComponentContainer<U>*;
+
+		using ptr_type = std::conditional_t< (sizeof...(Ts) > 0), group_ptr, container_ptr<T> >;
+
+		using handle = typename VECSSystem<LOTL, GOTL>::VECSHandle;
+
+		using vt = std::conditional_t < (sizeof...(Ts) > 0), std::pair< std::tuple<T&, Ts&...>, handle >, std::pair< T&, handle > > ;
+
+	public:
+		using value_type = vt;								// Value type - use refs to deal with atomics and unique_ptr
+		using reference = value_type&;						// Reference type
+		using pointer = value_type*;						// Pointer to value
+		using iterator_category = std::forward_iterator_tag;// Forward iterator
+		using difference_type = int64_t;					// Difference type
+
+		VECSIterator() noexcept = default;
+		VECSIterator(VECSSystem<LOTL,GOTL>& system, group_ptr group, uint32_t index = 0) noexcept : m_system{&system}, m_ptr { group }, m_index{ index }, m_dN{ group->m_num_indices }, m_size{ group->m_size } {}
+		VECSIterator(VECSSystem<LOTL,GOTL>& system, container_ptr<T> container, uint32_t index = 0) noexcept : m_system{ &system }, m_ptr{ container }, m_index{ index }, m_size{ (uint32_t)container->m_data.size() } {}
+
+		VECSIterator(const VECSIterator<LOTL,GOTL,T,Ts...>& v) noexcept = default;	// Copy constructor
+		VECSIterator(VECSIterator<LOTL,GOTL,T,Ts...>&& v)		noexcept = default;	// Move constructor
+
+		auto operator=(const VECSIterator<LOTL,GOTL,T,Ts...>& v) noexcept -> VECSIterator<LOTL,GOTL,T,Ts...> & = default;	// Copy
+		auto operator=(VECSIterator<LOTL,GOTL,T,Ts...>&& v)	  noexcept -> VECSIterator<LOTL,GOTL,T,Ts...> & = default;	// Move
+
+		auto operator*() noexcept -> value_type { 		// Access the data
+			if constexpr (sizeof...(Ts) > 0) {
+				typename VECSSystem<LOTL,GOTL>::VECSHandle handle = m_ptr->handle(m_index);
+				return std::make_pair( m_system->getTuple<T,Ts...>( m_ptr, m_index ), handle);
+			}
+			else {
+				auto& entry = m_ptr->entry(m_index);
+				return std::make_pair( std::ref(entry.m_component), entry.m_handle );
+			}
+		}
+
+		auto operator*() const noexcept	-> value_type {		// Access const data
+			if constexpr (sizeof...(Ts) > 0) {
+				typename VECSSystem<LOTL,GOTL>::VECSHandle handle = m_ptr->handle(m_index);
+				return std::make_pair(m_system->getTuple<T, Ts...>(m_ptr, m_index), handle);
+			}
+			else {
+				auto& entry = m_ptr->entry(m_index);
+				return std::make_pair(std::ref(entry.m_component), entry.m_handle);
+			}
+		}
+
+		auto operator->() noexcept { return operator*(); };			// Access
+		auto operator->() const noexcept { return operator*(); };	// Access
+
+		auto operator++()    noexcept -> VECSIterator<LOTL,GOTL,T,Ts...>& { 	// Increase by m_dN - pre-increment
+			operator+=(1); 
+			return *this; 
+		}
+		auto operator++(int) noexcept -> VECSIterator<LOTL,GOTL,T,Ts...>  { 						// Increase by m_dN - post-increment
+			auto cpy{ *this };
+			operator+=(1);
+			return cpy;
+		}
+		auto operator+=(difference_type N) noexcept	-> VECSIterator<LOTL,GOTL,T,Ts...>& { 		// Increase by N
+			m_index = std::clamp((uint32_t)(m_index + N * m_dN), (uint32_t)0, (uint32_t)(m_dN * m_size));
+			return *this;
+		}
+		auto operator+(difference_type N) noexcept	-> VECSIterator<LOTL,GOTL,T,Ts...> { 	// Increase by N
+			m_index = std::clamp((uint32_t)(m_index + N * m_dN), (uint32_t)0, (uint32_t)(m_dN * m_size));
+			return *this;
+		}
+
+		bool operator!=(const VECSIterator<LOTL,GOTL,T,Ts...>& i) noexcept {	// Unequal
+			return m_ptr != i.m_ptr || m_index != i.m_index;
+		}
+
+		friend auto operator==(const VECSIterator<LOTL,GOTL,T,Ts...>& i1, const VECSIterator<LOTL,GOTL,T,Ts...>& i2) noexcept -> bool {	// Equal
+			return i1.m_ptr == i2.m_ptr && i1.m_index == i2.m_index;
+		}
+
+	private:
+		VECSSystem<LOTL,GOTL>*	m_system;
+		ptr_type				m_ptr{ nullptr };
+		uint32_t				m_index{ 0 };
+		uint32_t				m_dN{ 1 };
+		size_t					m_size{ 0 };
+	};
+
+
+	//using it = VECSIterator< vtll::tl<int>, int>;
+	//static_assert(std::assignable_from< it&, it>, "Iterator");
+
+
+	//-----------------------------------------------------------------------------------------------------------------
+	//Ranges
+
+	template<typename LOTL, typename GOTL, typename T, typename... Ts>
+	class VECSRange {
+		using type_list = vtll::tl<T, Ts...>;
+
+		using group_ptr = typename VECSSystem<LOTL,GOTL>::VECSGroup*;
+
+		template<typename U>
+		using container_ptr = typename VECSSystem<LOTL,GOTL>::VECSComponentContainer<U>*;
+
+		using ptr_type = std::conditional_t< (sizeof...(Ts) > 0), group_ptr, container_ptr<T> >;
+
+		struct range_t {
+			VECSIterator<LOTL, GOTL, T, Ts...>	m_begin{};
+			VECSIterator<LOTL, GOTL, T, Ts...>	m_end{};
+			size_t								m_size{ 0 };
+
+			range_t() noexcept = default;
+			range_t(const VECSIterator<LOTL, GOTL, T, Ts...>& b, const VECSIterator<LOTL, GOTL, T, Ts...>& e, size_t size) noexcept : m_begin{ b }, m_end{ e }, m_size{ size } {};
+			range_t(VECSIterator<LOTL, GOTL, T, Ts...>&& b, VECSIterator<LOTL, GOTL, T, Ts...>&& e, size_t size) noexcept : m_begin{ b }, m_end{ e }, m_size{ size } {};
+			range_t(const range_t&) = default;
+			range_t(range_t&&) = default;
+			auto operator=(const range_t& v) noexcept -> range_t & = default;
+			auto operator=(range_t&& v) noexcept -> range_t & = default;
+
+			auto begin() noexcept { return m_begin; };
+			auto end() noexcept { return m_end; };
+			auto size() const noexcept { return m_size; };
+		};
+		//ranges::range<T>&& std::same_as<ranges::iterator_t<T>, ranges::sentinel_t<T>>;
+
+		static_assert( std::ranges::common_range<range_t> , "range_t");
+
+		//using view_type = decltype(std::views::join( std::declval< std::vector<range_t> >() ));
+
+	public:
+		VECSRange() noexcept = default;
+		VECSRange(const VECSRange<LOTL, GOTL, T, Ts...>&) noexcept = default;
+		VECSRange(VECSRange<LOTL, GOTL, T, Ts...>&&) noexcept = default;
+
+		auto operator=(const VECSRange<LOTL, GOTL, T, Ts...>& v) noexcept -> VECSRange<LOTL, GOTL,T,Ts...> & = default;
+		auto operator=(VECSRange<LOTL, GOTL, T, Ts...>&& v) noexcept -> VECSRange<LOTL, GOTL, T, Ts...> & = default;
+
+		VECSRange(VECSSystem<LOTL,GOTL>& system) noexcept {
+			if constexpr (sizeof...(Ts) > 0) {
+
+				std::bitset<VECSSystem<LOTL,GOTL>::BITSGOTL> types;
+				auto f = [&]<typename U, U I>(std::integral_constant<U, I> i) {
+					using type = vtll::Nth_type<type_list, I>;
+					types.set(vtll::index_of<GOTL, type>::value);
+				};
+				vtll::static_for< int, 0, vtll::size<type_list>::value >(f);
+
+				std::set<typename VECSSystem<LOTL, GOTL>::VECSGroup*> groups;
+				auto g = [&]<typename U, U I>(std::integral_constant<U, I> i) {
+					using type = vtll::Nth_type<type_list, I>;
+					static const uint32_t idx = vtll::index_of<GOTL, type>::value;
+
+					std::cout << typeid(type).name() << "\n";
+
+					auto range = system.m_map_type_to_group.equal_range(idx);
+					for (auto it = range.first; it != range.second; ++it) {
+						if ((it->second->m_gl_types & types) == types) { groups.insert(it->second); }
+					}
+				};
+				vtll::static_for< int, 0, vtll::size<type_list>::value >(g);
+
+				for (auto* group : groups) {
+					auto b = VECSIterator<LOTL, GOTL, T, Ts...>{ system, group, 0 };
+					auto e = VECSIterator<LOTL, GOTL, T, Ts...>{ system, group, (uint32_t)group->m_size * group->m_num_indices };
+					m_ranges.push_back(range_t(b, e, group->size()));
+					m_size += group->size();
+				}
+			}
+			else {
+				static const uint32_t idx = vtll::index_of<GOTL, T>::value;
+				auto base = system.m_container[vtll::index_of<GOTL, T>::value];					//Pointer to the container
+				if (base) {
+					auto container = std::dynamic_pointer_cast<typename VECSSystem<LOTL, GOTL>::VECSComponentContainer<T>>(base);	//Cast to correct type
+					m_ranges.push_back(range_t{ container->begin(), container->end(), container->size()});
+					m_size = container->size();
+				}
+			}
+		}
+
+		auto begin() noexcept {
+			m_view = std::make_shared<decltype(std::views::join(m_ranges))>(std::views::join(m_ranges));
+			return m_view->begin();
+		}
+
+		auto end() noexcept {
+			return m_view->end();
+		}
+
+		auto size() { return m_size; }
+
+	private:
+		std::vector<range_t>									m_ranges;
+		std::shared_ptr<decltype(std::views::join(m_ranges))>	m_view;
+		size_t													m_size{ 0 };
+	};
+	
+	//static_assert( std::ranges::range<VECSRange<vtll::tl<int>, int>> , "VECSRange");
+*/
 
 
 } //namespace
