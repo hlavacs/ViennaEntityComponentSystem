@@ -440,9 +440,10 @@ namespace vllt {
 		//-------------------------------------------------------------------------------------------
 		//remove and swap data
 
-		inline auto pop() noexcept		-> tuple_opt_t;	///< Remove the last row, call destructor on components
-		inline auto clear() noexcept	-> size_t;	///< Set the number if rows to zero - effectively clear the table, call destructors
+		inline auto pop() noexcept		-> tuple_opt_t; ///< Remove the last row, call destructor on components
+		inline auto clear() noexcept	-> size_t; ///< Set the number if rows to zero - effectively clear the table, call destructors
 		inline auto swap(stack_index_t n1, stack_index_t n2) noexcept -> void;	///< Swap contents of two rows
+		inline auto erase(stack_index_t n1) -> tuple_opt_t; ///< Remove a row, call destructor on components
 
 	protected:
 
@@ -631,7 +632,13 @@ namespace vllt {
 		return;
 	}
 
-
+	template<typename DATA, size_t N0, bool ROW, size_t MINSLOTS, size_t NUMBITS1>
+	inline auto VlltStack<DATA, N0, ROW, MINSLOTS, NUMBITS1>::erase(stack_index_t n1) -> tuple_opt_t {
+		auto n2 = size() - 1;
+		if (n1 == n2) return pop();
+		swap(n1, stack_index_t{ n2 });
+		return pop();
+	}
 
 
 	//----------------------------------------------------------------------------------------------------

@@ -46,7 +46,13 @@ void start_test( auto & ECS) {
 		std::cout << "value3: " << std::get<0>(tuple) << " " << std::get<1>(tuple) << " " << std::get<2>(tuple) << std::endl;
 	}
 
-
+	ECS.erase(handle1);
+	auto value4 = ECS.template get<int,char,std::string>(handle1);
+	if( value4.has_value() ) {
+		auto tuple = value4.value();
+		std::cout << "value4: " << std::get<0>(tuple) << " " << std::get<1>(tuple) << " " << std::get<2>(tuple) << std::endl;
+	}
+	
 }
 
 
