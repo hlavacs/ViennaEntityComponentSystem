@@ -288,8 +288,7 @@ namespace vecs {
 			}
 		}
 		else {
-			stack_index_t stack_index = m_entities.push( VecsEntity{ archetype_ptr, arch_index } ); //Create a new entity
-			entity_ptr = get_entity_from_index( VecsIndex{ stack_index } );
+			entity_ptr = get_entity_from_index( VecsIndex{ m_entities.push( VecsEntity{ archetype_ptr, arch_index } ) } );
 		}
 	
 		return VecsHandle{handle_index.get_index(), entity_ptr->m_index.increase_generation()};
