@@ -1575,6 +1575,33 @@ namespace vtll {
 		"The implementation of ptr_to_ref_tuple is bad");
 
 	//-------------------------------------------------------------------------
+	//ref_tuple_to_ptr_tuple: turn a tuple of references into a tuple of pointers
+
+	namespace detail {
+		template<typename ...T, size_t... I>
+		auto ref_to_ptr_tuple_detail(const std::tuple<T&...>& t, std::index_sequence<I...>) {
+			return std::tuple(&std::get<I>(t)...);
+		}
+	}
+
+	template<typename ...T>
+	auto ref_tuple_to_ptr_tuple(const std::tuple<T&...>& t) {
+		return detail::ref_to_ptr_tuple_detail<T...>(t, std::make_index_sequence<sizeof...(T)>{});
+	}
+
+	namespace detail::ex2 {
+		int i;
+		double d;
+		char c;
+		auto tup1 = std::tie(i, d, c);
+		auto tup2 = ref_tuple_to_ptr_tuple(tup1);
+	}
+
+	static_assert(
+		std::is_same_v< decltype(detail::ex2::tup2), std::tuple<int*, double*, char*> >,
+		"The implementation of ref_tuple_to_ptr_tuple is bad");
+
+	//-------------------------------------------------------------------------
 	//is_same_tuple: test whether two tuples are the same (Note: Clang does not accept strings as tuple elements)
 
 	template <typename T>
