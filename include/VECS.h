@@ -239,17 +239,7 @@ namespace vecs {
 	auto VecsArchetypeBase<TL>::get(VecsIndex index) -> optional_ref_tuple<Ts...> {
 		component_ptrs_t component_ptrs;
 		if(!get_pointers(index.get_index(), component_ptrs)) return {};	//Get pointers to the components in the archetype, fill into m_component_ptrs
-
-		ptr_tuple<Ts...> tuple;
-		vtll::static_for<size_t, 0, vtll::size< vtll::tl<Ts...> >::value >( // Loop over all components
-			[&](auto i) { 
-				using T = vtll::Nth_type<vtll::tl<Ts...>, i>; //Get type of component
-				static const size_t idx = vtll::index_of<TL, T>::value; //Get index of component in type list
-				if(!m_types.test(idx)) return; //Does the entity contain the type? If not, return empty tuple
-				std::get<i>(tuple) = static_cast<T*>(component_ptrs[idx]); //Get pointer to component
-			} 
-		);
-		return { vtll::ptr_to_ref_tuple(tuple) };
+		return { std::tie( *static_cast<Ts*>(component_ptrs[vtll::index_of<TL, Ts>::value])... ) };
 	}
 
 
@@ -300,6 +290,12 @@ namespace vecs {
 				component_ptrs[idx] = &std::get<i>(tuple.value()); //Get pointer to component
 			} 
 		);
+
+		//(  component_ptrs[idx] = &std::get<i>(tuple.value()) , ...)
+
+		//return { std::tie( *static_cast<Ts*>(component_ptrs[vtll::index_of<TL, Ts>::value])... ) };
+
+
 		return true;
 	}
 
