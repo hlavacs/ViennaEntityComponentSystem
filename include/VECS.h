@@ -55,6 +55,11 @@ namespace vecs {
 		explicit VecsIndex( stack_index_t index) { set_index(index); set_generation( generation_t{0ULL} ); }
 	};
 
+	/// <summary>
+	/// A VecsHandle is a 64-bit integer, with the first NBITS bits encoding the index
+	/// of the uint64_t, and the rest encoding a generation counter. The generation counter is incremented each time the index
+	/// is erased, so that old indices can be detected.
+	/// </summary>
 	struct VecsHandle : public VecsIndex {  
 		VecsHandle() = default;
 		explicit VecsHandle( stack_index_t index, generation_t gen) { set_index(index); set_generation(gen); }
@@ -355,9 +360,8 @@ namespace vecs {
 	template<typename... Ts> requires has_all_types<TL, Ts...>
 	[[nodiscard]] inline auto VecsArchetype<TL, As...>::insert_from_pointers(VecsHandle handle, component_ptrs_t& component_ptrs, Ts&&... Args) -> VecsIndex {
 		
-		//change pointers to new args
 		auto f = [&](auto&& Arg) { component_ptrs[vtll::index_of<TL, std::decay_t<decltype(Arg)>>::value ] = &Arg; };
-		( f( std::forward<Ts>(Args) ), ... );
+		( f( std::forward<Ts>(Args) ), ... ); //change pointers to new args
 
 		//call push with pointers as arguments
 		stack_index_t index = m_data.push( std::forward<As>( *static_cast<As*>(component_ptrs[vtll::index_of<TL, As>::value]))..., handle );

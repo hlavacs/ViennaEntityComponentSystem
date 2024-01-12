@@ -87,5 +87,56 @@
         "xhash": "cpp",
         "xtree": "cpp"
     },
-    "cmake.configureOnOpen": false
+    "cmake.configureOnOpen": false,
+
+    "doxdocgen.generic.authorEmail": "helmut.hlavacs@univie.ac.at",
+    "doxdocgen.generic.authorName": "Helmut Hlavacs",
+    "doxdocgen.generic.commandSuggestionAddPrefix": true,
+    "doxdocgen.file.copyrightTag": [
+        "@copyright Copyright (c) {year} Blue Bear"
+    ],
+    "doxdocgen.file.customTag": [
+        "****************************(C) COPYRIGHT {year} Blue Bear****************************",
+        "@file{indent:12}{file}",
+        "@brief{indent:12}",
+        "",
+        "@note{indent:12}",
+        "@history:",
+        "  Version{indent:12}Date{indent:28}Author{indent:44}Modification{indent:60}Email",
+        "  V1.0.0{indent:12}{date}{indent:28}{author}{indent:44}{indent:60}{email}",
+        "",
+        "@verbatim",
+        "==============================================================================",
+        "",
+        "==============================================================================",
+        "@endverbatim",
+        "****************************(C) COPYRIGHT {year} Blue Bear****************************",
+    ],
+    "doxdocgen.file.versionTag": "@version 1.0",
+    "doxdocgen.generic.dateFormat": "MMM-DD-YYYY",
+    // 文件注释的组成及其排序
+    "doxdocgen.file.fileOrder": [
+    
+        // "file",      // @file
+        // "brief", // @brief 简介
+        // "author",    // 作者
+        // "version",   // 版本
+        // "date",      // 日期
+        // "empty", // 空行
+        // "copyright",// 版权
+        // "empty",
+        "custom"    // 自定义
+    ],
+    "doxdocgen.generic.customTags":[
+        "@retval{indent:16}",
+    ],
+    "doxdocgen.generic.order": [
+        "brief",
+        "param",
+        "return",
+        "custom",
+    ],
+    "doxdocgen.generic.paramTemplate": "@param[in/out/in,out]{indent:17}{param}:",
+    "doxdocgen.generic.briefTemplate": "@brief{indent:17}",
+    "doxdocgen.generic.returnTemplate": "@return{indent:17}{type}"
 }

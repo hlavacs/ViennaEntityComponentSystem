@@ -20,14 +20,7 @@ add_subdirectory(extern)
 if (${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
   include(CTest)
   add_subdirectory(tests)
+  add_subdirectory(docs)
 endif ()
 
 
-find_package(Doxygen)
-if (DOXYGEN_FOUND)
-  set(DOXYGEN_USE_MDFILE_AS_MAINPAGE "README.md")
-  doxygen_add_docs(doxygen
-    ${CMAKE_SOURCE_DIR}/README.md
-    ${CMAKE_SOURCE_DIR}/include
-  )
-endif(DOXYGEN_FOUND)
