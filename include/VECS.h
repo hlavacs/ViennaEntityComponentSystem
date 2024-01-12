@@ -180,7 +180,7 @@ namespace vecs {
 	[[nodiscard]] auto VecsSystem<TL>::get(VecsHandle handle) -> optional_ref_tuple<Ts...> {
 		auto entity_ptr = get_entity_from_handle(handle);
 		if( !entity_ptr ) return {};
-		if( bitset<Ts...>() != entity_ptr->m_archetype_ptr->bitset() ) return {}; //Check that the types match
+		//if( bitset<Ts...>() != entity_ptr->m_archetype_ptr->bitset() ) return {}; //Check that the types match
 		return entity_ptr->m_archetype_ptr->template get<Ts...>(entity_ptr->m_index);
 	}
 
@@ -205,6 +205,7 @@ namespace vecs {
 		VecsIndex new_index = new_archtetype_ptr->insert_from_pointers(handle, component_ptrs, std::forward<As>(Args)...); //Insert the new components into the archetype
 
 		entity_ptr->m_archetype_ptr->erase(entity_ptr->m_index); //Erase the old components from the archetype
+		entity_ptr->m_archetype_ptr = new_archtetype_ptr; //Update the archetype of the entity
 		entity_ptr->m_index = new_index; //Update the index of the entity
 		return true;
 	}

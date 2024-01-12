@@ -53,7 +53,7 @@ void start_test( auto & ECS) {
 	assert(value4.has_value() == false);
 
 	{
-		ECS.template transform<int,std::string>(handle3, std::string("NNNNNNNN") );
+		ECS.template transform<int,std::string>(handle3, 2, std::string("NNNNNNNN") );
 		auto value3 = ECS.template get<int,std::string>(handle3);
 		if( value3.has_value() ) {
 			auto tuple = value3.value();	
