@@ -26,9 +26,6 @@ namespace vecs {
 	using stack_index_t = vllt::stack_index_t;
 	using generation_t = vsty::strong_type_t< uint64_t, vsty::counter<>, std::integral_constant<uint64_t, std::numeric_limits<uint64_t>::max()> >;
 
-	template<typename DATA, size_t N0 = 1 << 10, bool ROW = true, size_t MINSLOTS = 16, size_t NUMBITS1 = 40>
-	using VlltStack = vllt::VlltStack<DATA, N0, ROW, MINSLOTS, NUMBITS1>;
-
 	template<typename TL> class VecsSystem;
 	template<typename TL> class VecsArchetypeBase;
 	template<typename TL, typename... As> class VecsArchetype;
@@ -335,7 +332,7 @@ namespace vecs {
 
 		virtual inline auto get_pointers(stack_index_t index, component_ptrs_t& component_ptrs) -> bool override; //Get pointers to the components in the archetype, fill into m_components
 
-		VlltStack<AAL> m_data; //The data stored in this archetype
+		vllt::VlltStack<AAL> m_data; //The data stored in this archetype
 	};
 
 	template<typename TL, typename... As>
