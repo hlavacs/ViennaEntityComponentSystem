@@ -109,7 +109,7 @@ namespace vecs {
 
 	private:
 		template<typename... Ts> requires has_all_types<TL, Ts...>	//Check that all types are in the type list
-		inline auto get_archetype() -> std::shared_ptr<VecsArchetypeBase<TL>>;
+		inline auto get_archetype() -> std::shared_ptr<VecsArchetype<TL, Ts...>>;
 		inline auto get_new_entity() -> std::pair<VecsIndex, VecsEntity*>;
 		inline auto get_entity_from_handle(VecsHandle handle) -> VecsEntity*;
 		inline auto get_entity_from_index(VecsIndex index) -> VecsEntity*;
@@ -170,17 +170,14 @@ namespace vecs {
 		auto entity_ptr = get_entity_from_handle(handle);
 		if( !entity_ptr ) return false;
 
-		std::shared_ptr<VecsArchetypeBase<TL>> new_archtetype_ptr = get_archetype<Ts...>(); //Get the archetype for the types
+		std::shared_ptr<VecsArchetype<TL, Ts...>> new_archtetype_ptr = get_archetype<Ts...>(); //Get the archetype for the types
 		if(new_archtetype_ptr == entity_ptr->m_archetype_ptr) return false; //No change in archetype
 
 		component_ptrs_t component_ptrs;
 		entity_ptr->m_archetype_ptr->get_pointers(entity_ptr->m_index.get_index(), component_ptrs); //Get pointers to the components in the archetype, fill into m_component_ptrs
 		
-		VecsIndex new_index = 
-			std::dynamic_pointer_cast<VecsArchetype<TL, Ts...>>(new_archtetype_ptr)->
-				insert_from_pointers(handle, component_ptrs, std::forward<As>(Args)...); //Insert the new components into the archetype
+		VecsIndex new_index = new_archtetype_ptr->insert_from_pointers(handle, component_ptrs, std::forward<As>(Args)...); //Insert the new components into the archetype
 
-		
 		entity_ptr->m_archetype_ptr->erase(entity_ptr->m_index); //Erase the old components from the archetype
 		entity_ptr->m_index = new_index; //Update the index of the entity
 		return true;
@@ -188,7 +185,7 @@ namespace vecs {
 
 	template<typename TL>
 	template<typename... Ts> requires has_all_types<TL, Ts...>	//Check that all types are in the type list
-	inline auto VecsSystem<TL>::get_archetype() -> std::shared_ptr<VecsArchetypeBase<TL>> {
+	inline auto VecsSystem<TL>::get_archetype() -> std::shared_ptr<VecsArchetype<TL, Ts...>> {
 		std::bitset<BITSTL> types = bitset<Ts...>();	//Create bitset representing the archetype
 		std::shared_ptr<VecsArchetypeBase<TL>> archetype_ptr; //create a new archetype if necessary
 		if( !m_archetypes.contains(types) ) {
@@ -203,7 +200,7 @@ namespace vecs {
 		} else {
 			archetype_ptr = m_archetypes.at(types); //archetype already exists - return its address
 		}
-		return archetype_ptr;
+		return std::dynamic_pointer_cast<VecsArchetype<TL, Ts...>>(archetype_ptr);
 	}
 
 	template<typename TL>
@@ -348,9 +345,7 @@ namespace vecs {
 		if( !tuple.has_value() ) return false;
 		vtll::static_for<size_t, 0, vtll::size<AL>::value >( // Loop over all components
 			[&](auto i) { 
-				using T = vtll::Nth_type<AL, i>; //Get type of component
-				static const auto idx = vtll::index_of<TL, T>::value; //Get index of component in type list
-				component_ptrs[idx] = &std::get<i>(tuple.value()); //Get pointer to component
+				component_ptrs[vtll::index_of<TL, vtll::Nth_type<AL, i>>::value] = &std::get<i>(tuple.value()); //Get pointer to component
 			} 
 		);
 		return true;
@@ -358,13 +353,16 @@ namespace vecs {
 
 	template<typename TL, typename... As>
 	template<typename... Ts> requires has_all_types<TL, Ts...>
-	[[nodiscard]] inline auto VecsArchetype<TL, As...>::insert_from_pointers(VecsHandle handle, component_ptrs_t& ptr, Ts&&... Args) -> VecsIndex {
-		//stack_index_t index = m_data.push( std::forward<Ts>(Args)..., handle );
-		auto f = [&]<typename T>(T&& Arg) {
-			static const auto idx = vtll::index_of<TL, T>::value;
+	[[nodiscard]] inline auto VecsArchetype<TL, As...>::insert_from_pointers(VecsHandle handle, component_ptrs_t& component_ptrs, Ts&&... Args) -> VecsIndex {
+		
+		//change pointers to new args
+		auto f = [&](auto&& Arg) { component_ptrs[vtll::index_of<TL, std::decay_t<decltype(Arg)>>::value ] = &Arg; };
+		( f( std::forward<Ts>(Args) ), ... );
 
-		}; //( f.template operator()<Ts>(std::forward<Ts>(Arg))... );
-		return {}; // VecsIndex{ index };
+		//call push with pointers as arguments
+		stack_index_t index = m_data.push( std::forward<As>( *static_cast<As*>(component_ptrs[vtll::index_of<TL, As>::value]))..., handle );
+
+		return VecsIndex{ index }; //return index
 	}
 
 	template<typename TL, typename... As>
