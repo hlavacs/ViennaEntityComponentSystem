@@ -359,7 +359,12 @@ namespace vecs {
 	template<typename TL, typename... As>
 	template<typename... Ts> requires has_all_types<TL, Ts...>
 	[[nodiscard]] inline auto VecsArchetype<TL, As...>::insert_from_pointers(VecsHandle handle, component_ptrs_t& ptr, Ts&&... Args) -> VecsIndex {
-		return {};
+		//stack_index_t index = m_data.push( std::forward<Ts>(Args)..., handle );
+		auto f = [&]<typename T>(T&& Arg) {
+			static const auto idx = vtll::index_of<TL, T>::value;
+
+		}; //( f.template operator()<Ts>(std::forward<Ts>(Arg))... );
+		return {}; // VecsIndex{ index };
 	}
 
 	template<typename TL, typename... As>
