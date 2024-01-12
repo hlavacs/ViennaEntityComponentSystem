@@ -19,26 +19,26 @@ void start_test( auto & ECS) {
 	vecs::VecsIndex i1{handle};
 	//vecs::VecsHandle h1{index};  //compiler error
 
-	auto handle1 = ECS.template insert<int,char,std::string>(0, 'a', "ABAB");
+	auto handle1 = ECS.template insert<int,float,std::string>(0, 4.5f, std::string("ABAB"));
 	assert(ECS.valid(handle1));
 
-	auto handle2 = ECS.template insert<int,char,std::string,float,double>(1, 'b', "CCCCDDD", 1.0f, 2.0);
+	auto handle2 = ECS.template insert<int,std::string,float,double>(1, "CCCCDDD", 1.0f, 2.0);
 	assert(ECS.valid(handle2));
 
 	auto handle3 = ECS.template insert<std::string,float,double>("EEFFF", 3.0f, 4.0);
 	assert(ECS.valid(handle3));
 
 	{
-		auto value1 = ECS.template get<int,char,std::string>(handle1);
+		auto value1 = ECS.template get<int,std::string>(handle1);
 		if( value1.has_value() )  {
 			auto tuple = value1.value();
-			std::cout << "value1:: " << std::get<0>(tuple) << " " << std::get<1>(tuple) << " " << std::get<2>(tuple) << std::endl;
+			std::cout << "value1:: " << std::get<0>(tuple) << " " << std::get<1>(tuple) << " " << std::endl;
 		}	
 
-		auto value2 = ECS.template get<int,char,std::string,float,double>(handle2);
+		auto value2 = ECS.template get<int,std::string,float,double>(handle2);
 		if( value2.has_value() ) {
 			auto tuple = value2.value();
-			std::cout << "value2: " << std::get<0>(tuple) << " " << std::get<1>(tuple) << " " << std::get<2>(tuple) << " " << std::get<3>(tuple) << " " << std::get<4>(tuple) << std::endl;
+			std::cout << "value2: " << std::get<0>(tuple) << " " << std::get<1>(tuple) << " " << std::get<2>(tuple) << " " << std::get<3>(tuple) << " " << std::endl;
 		}
 
 		auto value3 = ECS.template get<std::string,float,double>(handle3);
@@ -49,10 +49,17 @@ void start_test( auto & ECS) {
 	}
 	
 	assert( ECS.erase(handle1) );
-	auto value4 = ECS.template get<int,char,std::string>(handle1);
+	auto value4 = ECS.template get<int,std::string>(handle1);
 	assert(value4.has_value() == false);
 
-	ECS.template transform<int,char,std::string>(handle2);
+	{
+		ECS.template transform<int,std::string>(handle3, std::string("NNNNNNNN") );
+		auto value3 = ECS.template get<int,std::string>(handle3);
+		if( value3.has_value() ) {
+			auto tuple = value3.value();	
+			std::cout << "value3: " << std::get<0>(tuple) << " " << std::get<1>(tuple) << " " << std::endl;	
+		}
+	}
 	
 }
 
@@ -60,7 +67,7 @@ void start_test( auto & ECS) {
 
 int main() {
 
-	vecs::VecsSystem<vtll::tl<int, char, std::string, float, double>> ECS{};
+	vecs::VecsSystem<vtll::tl<int, std::string, float, double>> ECS{};
 
 	start_test( ECS );
 

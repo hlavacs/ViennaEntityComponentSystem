@@ -14,6 +14,7 @@
 #include <tuple>
 #include <algorithm>
 #include <limits>
+#include <cassert>
 
 #include "VTLL.h"
 #include "VSTY.h"
@@ -31,7 +32,8 @@ namespace vecs {
 	template<typename TL, typename... As> class VecsArchetype;
 
 	template<typename TL, typename... Ts>
-	concept has_all_types = ((vtll::unique<vtll::tl<Ts...>>::value) && vtll::has_all_types<TL, vtll::tl<Ts...>>::value);
+	concept has_all_types = ((vtll::unique< vtll::tl<Ts... > >::value) && 
+							vtll::has_all_types<TL, vtll::tl<Ts...> >::value);
 
 	const size_t NBITS = 40;
 
@@ -66,15 +68,16 @@ namespace vecs {
 	//-----------------------------------------------------------------------------------------------------------------
 
 	/// <summary>
-	/// The main ECS class.
+	/// The main ECS class. It stores entities in archetypes, which are groups of entities with the same component types.
+	///  - Entities are stored in a VlltStack, and indexed by a VecsHandle. The handle is a 64-bit integer, with the first NBITS bits encoding the index,
+	///	and the rest encoding a generation counter. The generation counter is incremented each time the index is erased, so that old indices can be detected.
 	/// </summary>
 	/// <typeparam name="TL">A typelist storing all possible component types. Types MUST be UNIQUE!</typeparam>
-	/// <typeparam name="NBITS">Number of bits for the index in the 64-bit handle. The rest are used for generation.</typeparam>
 	template<typename TL>
 	class VecsSystem {
 
 	protected:
-		static_assert(vtll::unique<TL>::value, "VecsSystem types are not unique!");
+		static_assert(vtll::unique<std::decay_t<TL>>::value, "VecsSystem types are not unique!");
 		static const size_t BITSTL = vtll::size<TL>::value;	//Number of bits in the bitset, i.e. number of component types ingroup
 
 		/// <summary>
@@ -103,29 +106,34 @@ namespace vecs {
 		[[nodiscard]] auto insert(Ts&&... Args) -> VecsHandle;
 
 		template<typename... Ts> 
-		[[nodiscard]] auto get(VecsHandle handle) -> optional_ref_tuple<Ts...>;
+		[[nodiscard]] auto get(VecsHandle handle) -> optional_ref_tuple<Ts...>; //Get a tuple of references to the components of the entity
 
-		template<typename... Ts, typename... As> requires (has_all_types<TL, Ts...> && has_all_types<TL, As...>)
-		auto transform(VecsHandle handle, As&&... Args) -> bool;
+		template<typename... Ts, typename... As> requires has_all_types<vtll::tl<Ts...>, As...>
+		auto transform(VecsHandle handle, As&&... Args) -> bool; //Transform the entity into a new archetype, adding or removing components
 
 
 	private:
 		template<typename... Ts> requires has_all_types<TL, Ts...>	//Check that all types are in the type list
-		inline auto get_archetype() -> std::shared_ptr<VecsArchetype<TL, Ts...>>;
-		inline auto get_new_entity() -> std::pair<VecsIndex, VecsEntity*>;
-		inline auto get_entity_from_handle(VecsHandle handle) -> VecsEntity*;
-		inline auto get_entity_from_index(VecsIndex index) -> VecsEntity*;
+		inline auto get_archetype() -> std::shared_ptr<VecsArchetype<TL, Ts...>>; //Get the archetype for the types
+		inline auto get_new_entity() -> std::pair<VecsIndex, VecsEntity*>; //Get a new entity slot, and a pointer to it
+		inline auto get_entity_from_handle(VecsHandle handle) -> VecsEntity*; //Get a pointer to the entity from the handle
+		inline auto get_entity_from_index(VecsIndex index) -> VecsEntity*; //Get a pointer to the entity from the index
 
 		template<typename... Ts> requires has_all_types<TL, Ts...>	//compute the bitset representing the types
 		constexpr inline auto bitset() -> std::bitset<BITSTL>;
 
 		vllt::VlltStack< vtll::tl<VecsEntity>, 1<<10, false > m_entities; //Container for all entities
 		std::atomic<VecsIndex> m_empty_start{}; //Index of first empty entity to reuse, initialized to NULL value
-		std::unordered_map<std::bitset<BITSTL>, std::shared_ptr<VecsArchetypeBase<TL>>> m_archetypes; //Entity groups
-		std::unordered_multimap<size_t, std::shared_ptr<VecsArchetypeBase<TL>>> m_map_type_to_archetype;	//Map for going from a component type to groups of entities with them
+		std::unordered_map<std::bitset<BITSTL>, std::shared_ptr<VecsArchetypeBase<TL>>> m_archetypes; //Entity archetypes, indexed by bitset representing the types
+		std::unordered_multimap<size_t, std::shared_ptr<VecsArchetypeBase<TL>>> m_map_type_to_archetype; //Map for going from a component type to archetype of entities with them
 	};
 
 
+	/// <brief>
+	/// Insert a new entity into the system, with the given components. The components are forwarded to the constructor of the components.
+	/// </brief>
+	/// <param name="Args">The components to insert</param>
+	/// <returns>A handle to the inserted entity</returns>
 	template<typename TL>
 	template<typename... Ts> requires has_all_types<TL, Ts...>	//Check that all types are in the type list
 	[[nodiscard]] auto VecsSystem<TL>::insert(Ts&&... Args) -> VecsHandle { 
@@ -136,13 +144,18 @@ namespace vecs {
 		return handle; 
 	}
 
+	/// <brief>
+	/// Erase the entity with the given handle
+	/// </brief>
+	/// <param name="handle">The handle of the entity to erase</param>
+	/// <returns>True if the entity was erased, false if the handle was invalid</returns>
 	template<typename TL>
 	inline auto VecsSystem<TL>::erase(VecsHandle handle) -> bool {
-		auto entity_ptr = get_entity_from_handle(handle);
+		auto entity_ptr = get_entity_from_handle(handle); //Get a pointer to the entity from the handle
 		if( !entity_ptr ) return false;
 		entity_ptr->m_index.increase_generation(); //Increase the generation counter to invalidate any handle
 		
-		VecsHandle moved = entity_ptr->m_archetype_ptr->erase(entity_ptr->m_index);
+		VecsHandle moved = entity_ptr->m_archetype_ptr->erase(entity_ptr->m_index); //Erase the entity from the archetype, and get the handle of the entity that was moved to the erased entity's slot
 		auto entity_moved_ptr = get_entity_from_handle(moved);
 		//if( !res ) return false;
 
@@ -157,6 +170,11 @@ namespace vecs {
 		return true;
 	}
 
+	/// <brief>
+	/// Get a tuple of references to the components of the entity with the given handle
+	/// </brief>
+	/// <param name="handle">The handle of the entity to get</param>
+	/// <returns>A tuple of references to the components of the entity</returns>
 	template<typename TL>
 	template<typename... Ts>
 	[[nodiscard]] auto VecsSystem<TL>::get(VecsHandle handle) -> optional_ref_tuple<Ts...> {
@@ -166,8 +184,14 @@ namespace vecs {
 		return entity_ptr->m_archetype_ptr->template get<Ts...>(entity_ptr->m_index);
 	}
 
+	/// <brief>
+	/// Transform the entity with the given handle into a new archetype, adding or removing components
+	/// </brief>
+	/// <param name="handle">The handle of the entity to transform</param>
+	/// <param name="Args">The components to insert</param>
+	/// <returns>True if the entity was transformed, false if the handle was invalid</returns>
 	template<typename TL>
-	template<typename... Ts, typename... As> requires (has_all_types<TL, Ts...> && has_all_types<TL, As...>)
+	template<typename... Ts, typename... As> requires has_all_types<vtll::tl<Ts...>, As...>
 	inline auto VecsSystem<TL>::transform(VecsHandle handle, As&&... Args) -> bool {
 		auto entity_ptr = get_entity_from_handle(handle);
 		if( !entity_ptr ) return false;
@@ -175,7 +199,7 @@ namespace vecs {
 		std::shared_ptr<VecsArchetype<TL, Ts...>> new_archtetype_ptr = get_archetype<Ts...>(); //Get the archetype for the types
 		if(new_archtetype_ptr == entity_ptr->m_archetype_ptr) return false; //No change in archetype
 
-		component_ptrs_t component_ptrs;
+		component_ptrs_t component_ptrs{nullptr};
 		entity_ptr->m_archetype_ptr->get_pointers(entity_ptr->m_index.get_index(), component_ptrs); //Get pointers to the components in the archetype, fill into m_component_ptrs
 		
 		VecsIndex new_index = new_archtetype_ptr->insert_from_pointers(handle, component_ptrs, std::forward<As>(Args)...); //Insert the new components into the archetype
@@ -185,6 +209,12 @@ namespace vecs {
 		return true;
 	}
 
+	/// <brief>
+	/// Get the archetype for the given types
+	/// </brief>
+	/// <param name="handle">The handle of the entity to transform</param>
+	/// <param name="Args">The components to insert</param>
+	/// <returns>True if the entity was transformed, false if the handle was invalid</returns>
 	template<typename TL>
 	template<typename... Ts> requires has_all_types<TL, Ts...>	//Check that all types are in the type list
 	inline auto VecsSystem<TL>::get_archetype() -> std::shared_ptr<VecsArchetype<TL, Ts...>> {
@@ -205,6 +235,10 @@ namespace vecs {
 		return std::dynamic_pointer_cast<VecsArchetype<TL, Ts...>>(archetype_ptr);
 	}
 
+	/// <brief>
+	/// Get a new entity slot, and a pointer to it
+	/// </brief>
+	/// <returns>A pair of the index of the new entity slot, and a pointer to it</returns>
 	template<typename TL>
 	inline auto VecsSystem<TL>::get_new_entity() -> std::pair<VecsIndex, VecsEntity*> {
 		VecsIndex handle_index = m_empty_start.load();
@@ -225,6 +259,11 @@ namespace vecs {
 		return {handle_index, entity_ptr};
 	}
 
+	/// <brief>
+	/// Get a pointer to the entity from the handle
+	/// </brief>
+	/// <param name="handle">The handle of the entity to get</param>
+	/// <returns>A pointer to the entity</returns>
 	template<typename TL>
 	inline auto VecsSystem<TL>::get_entity_from_handle(VecsHandle handle) -> VecsEntity* {
 		auto entity = m_entities.template get<0>( stack_index_t{ handle.get_index() } );
@@ -232,6 +271,11 @@ namespace vecs {
 		return &entity.value().get();
 	}
 
+	/// <brief>
+	/// Get a pointer to the entity from the index
+	/// </brief>
+	/// <param name="index">The index of the entity to get</param>
+	/// <returns>A pointer to the entity</returns>
 	template<typename TL>
 	inline auto VecsSystem<TL>::get_entity_from_index(VecsIndex index) -> VecsEntity* {
 		auto entity = m_entities.template get<0>( stack_index_t{ index.get_index() } );
@@ -239,6 +283,10 @@ namespace vecs {
 		return &entity.value().get();
 	}
 
+	/// <brief>
+	/// Compute the bitset representing the types
+	/// </brief>
+	/// <returns>The bitset representing the types</returns>
 	template<typename TL>
 	template<typename... Ts> requires has_all_types<TL, Ts...>
 	constexpr inline auto VecsSystem<TL>::bitset() -> std::bitset<BITSTL> {
@@ -255,6 +303,10 @@ namespace vecs {
 	//-----------------------------------------------------------------------------------------------------------------
 	//VecsArchetypeBase
 
+	/// <summary>
+	/// The base class for archetypes. It stores entities with the same component types.
+	/// </summary>
+	/// <typeparam name="TL">A typelist storing all possible component types. Types MUST be UNIQUE!</typeparam>
 	template<typename TL>
 	class VecsArchetypeBase {
 		friend class VecsSystem<TL>;
@@ -265,13 +317,13 @@ namespace vecs {
 		using component_ptrs_t = VecsSystem<TL>::component_ptrs_t;
 
 	public:
-		template<typename... Ts> requires has_all_types<TL, Ts...>	//Check that all types are in the type list
+		template<typename... Ts> requires has_all_types<TL, Ts...>	//A tuple of pointers to the components
 		using ptr_tuple = vtll::to_ptr_tuple< vtll::tl<Ts...> >;
 
-		template<typename... Ts> requires has_all_types<TL, Ts...>	//Check that all types are in the type list
+		template<typename... Ts> requires has_all_types<TL, Ts...>	//A tuple of references to the components
 		using ref_tuple = vtll::to_ref_tuple< vtll::tl<Ts...> >;
 
-		template<typename... Ts> requires has_all_types<TL, Ts...>	//Check that all types are in the type list
+		template<typename... Ts> requires has_all_types<TL, Ts...>	//An optional tuple of references to the components
 		using optional_ref_tuple = std::optional< ref_tuple<Ts...> >;
 
 		VecsArchetypeBase(VecsSystem<TL>& system, std::bitset<BITSTL> types) : m_system{system}, m_types{types} {};
@@ -290,7 +342,11 @@ namespace vecs {
 		std::bitset<BITSTL> m_types; //One bit for each type in the type list
 	};
 
-
+	/// <brief>
+	/// Get a tuple of references to the components of the entity with the given index
+	/// </brief>
+	/// <param name="index">The index of the entity to get</param>
+	/// <returns>A tuple of references to the components of the entity</returns>
 	template<typename TL>
 	template<typename... Ts>
 	inline auto VecsArchetypeBase<TL>::get(VecsIndex index) -> optional_ref_tuple<Ts...> {
@@ -303,7 +359,11 @@ namespace vecs {
 	//-----------------------------------------------------------------------------------------------------------------
 	//VecsArchetype
 
-
+	/// <summary>
+	/// An archetype. It stores entities with the same component types.
+	/// </summary>
+	/// <typeparam name="TL">A typelist storing all possible component types. Types MUST be UNIQUE!</typeparam>
+	/// <typeparam name="As">The component types stored in the archetype</typeparam>
 	template<typename TL, typename... As>
 	class VecsArchetype : public VecsArchetypeBase<TL> {
 		friend class VecsSystem<TL>;
@@ -335,12 +395,25 @@ namespace vecs {
 		vllt::VlltStack<AAL> m_data; //The data stored in this archetype
 	};
 
+
+	/// <brief>
+	/// Insert a new entity into the archetype, with the given components. The components are forwarded to the constructor of the components.
+	/// </brief>
+	/// <param name="handle">Handle of the new entity.</param>
+	/// <param name="Args">The components to insert.</param>
+	/// <returns>A handle to the inserted entity.</returns>	
 	template<typename TL, typename... As>
 	template<typename... Ts> requires has_all_types<TL, Ts...>	//Check that all types are in the type list
 	[[nodiscard]] inline auto VecsArchetype<TL, As...>::insert(VecsHandle handle, Ts&&... Args) -> VecsIndex { 
 		return VecsIndex{ m_data.push( std::forward<Ts>(Args)..., handle ) };
 	}
 
+	/// <brief>
+	/// Get pointers to the components in the archetype, fill into m_components
+	/// </brief>
+	/// <param name="index">The index of the entity to get</param>
+	/// <param name="component_ptrs">The array to fill with pointers to the components</param>
+	/// <returns>True if the entity was found, false otherwise</returns>
 	template<typename TL, typename... As>
 	inline auto VecsArchetype<TL, As...>::get_pointers( stack_index_t index, component_ptrs_t& component_ptrs ) -> bool {
 		auto tuple = m_data.get_tuple(index);
@@ -353,12 +426,23 @@ namespace vecs {
 		return true;
 	}
 
+	/// <brief>
+	/// Insert a new entity into the archetype, with the given components. The components are forwarded to the constructor of the components.
+	/// </brief>
+	/// <param name="handle">Handle of the new entity.</param>
+	/// <param name="Args">The components to insert.</param>
+	/// <returns>A handle to the inserted entity.</returns>
 	template<typename TL, typename... As>
 	template<typename... Ts> requires has_all_types<TL, Ts...>
 	[[nodiscard]] inline auto VecsArchetype<TL, As...>::insert_from_pointers(VecsHandle handle, component_ptrs_t& component_ptrs, Ts&&... Args) -> VecsIndex {
 		
-		auto f = [&](auto&& Arg) { component_ptrs[vtll::index_of<TL, std::decay_t<decltype(Arg)>>::value ] = &Arg; };
+		auto f = [&](auto&& Arg) { component_ptrs[vtll::index_of<TL, std::decay_t<decltype(Arg)>>::value] = &Arg; };
 		( f( std::forward<Ts>(Args) ), ... ); //change pointers to new args
+
+		bool res = true;
+		auto g = [&]<typename T>() { res = res && component_ptrs[vtll::index_of<TL,T>::value ] != nullptr; };
+		( g.template operator()<As>(), ... ); //check that all pointers are valid	
+		assert( ((void)"Type has no value!\n", res) ); //all pointers must be valid
 
 		//call push with pointers as arguments
 		stack_index_t index = m_data.push( std::forward<As>( *static_cast<As*>(component_ptrs[vtll::index_of<TL, As>::value]))..., handle );
@@ -366,6 +450,11 @@ namespace vecs {
 		return VecsIndex{ index }; //return index
 	}
 
+	/// <brief>
+	/// Erase the entity at the given index
+	/// </brief>
+	/// <param name="index">The index of the entity to erase</param>
+	/// <returns>The handle of the entity that was moved to the erased entity's slot</returns>
 	template<typename TL, typename... As>
 	inline auto VecsArchetype<TL, As...>::erase(VecsIndex index) -> VecsHandle {
 		if( m_data.size() <= index ) return {};
