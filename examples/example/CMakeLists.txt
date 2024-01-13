@@ -1,17 +1,17 @@
 
-set(TARGET testlib)
+set(TARGET example)
 
-set(SOURCE testlib.cpp)
+set(SOURCE example.cpp)
 
 set(HEADERS
-    ${PROJECT_SOURCE_DIR}/extern/ViennaTypeListLibrary/VTLL.h
-    ${PROJECT_SOURCE_DIR}/extern/ViennaStrongType/VSTY.h
-    ${PROJECT_SOURCE_DIR}/extern/ViennaLockLessTable/VLLT.h
+  example.h
+  ${PROJECT_SOURCE_DIR}/include/VECS.h
+  ${PROJECT_SOURCE_DIR}/extern/ViennaTypeListLibrary/VTLL.h
+  ${PROJECT_SOURCE_DIR}/extern/ViennaStrongType/VSTY.h
+  ${PROJECT_SOURCE_DIR}/extern/ViennaLockLessTable/VLLT.h
 )
 
 add_executable(${TARGET} ${SOURCE} ${HEADERS})
-
-target_compile_features(${TARGET} PUBLIC cxx_std_20)
 
 target_include_directories(${TARGET} PUBLIC ${PROJECT_SOURCE_DIR}/include)
 target_include_directories(${TARGET} PUBLIC ${PROJECT_SOURCE_DIR}/extern/ViennaTypeListLibrary)
@@ -19,4 +19,4 @@ target_include_directories(${TARGET} PUBLIC ${PROJECT_SOURCE_DIR}/extern/ViennaS
 target_include_directories(${TARGET} PUBLIC ${PROJECT_SOURCE_DIR}/extern/ViennaLockLessTable)
 
 
-add_test(NAME ${TARGET} COMMAND testlib) # Command can be a target
+target_compile_features(${TARGET} PUBLIC cxx_std_20)

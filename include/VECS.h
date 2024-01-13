@@ -21,6 +21,7 @@
 #include "VLLT.h"
 
 
+
 namespace vecs {
 
 	//for handles
@@ -488,6 +489,44 @@ namespace vecs {
 	};
 
 
+	//-----------------------------------------------------------------------------------------------------------------
+	//Entity Manager
+
+
+	/// <summary>
+	/// A VecsEntityManager is a container for VecsSystems. It is used to manage the lifetime of entities.
+	/// </summary>
+	/// <typeparam name="GL">A typelist holding comonent types, the user of the gmae engine wants to use. Types MUST be UNIQUE!</typeparam>
+	/// <typeparam name="SL">A typelist holding comonent types, the game engine wants to use. Types MUST be UNIQUE!</typeparam>
+	template<typename GL, typename SL>
+		requires vtll::unique<vtll::cat<GL, SL>>::value
+	class VecsEntityManagerBase {
+		using TL = vtll::cat<GL, SL>;	//Typelist of all component types including from game and from engine
+		
+	public:
+		VecsEntityManagerBase() = default;
+
+	private:
+		VecsSystem<TL> m_system;
+	};
+
+
+	#ifndef VecsUserEntityComponentList
+	#define VecsUserEntityComponentList vtll::tl<>
+	#endif
+
+	#ifndef VecsSystemEntityComponentList
+	#define VecsSystemEntityComponentList vtll::tl<>
+	#endif
+
+	using VecsEntityManager = VecsEntityManagerBase<  VecsUserEntityComponentList, VecsSystemEntityComponentList >;
+	
+}
+
+
+
+
+
 /*
 	//-----------------------------------------------------------------------------------------------------------------
 	//Iterator
@@ -695,6 +734,6 @@ namespace vecs {
 */
 
 
-} //namespace
+
 
 

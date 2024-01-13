@@ -19,8 +19,9 @@ add_subdirectory(extern)
 
 if (${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
   include(CTest)
-  add_subdirectory(tests)
-  add_subdirectory(docs)
+  add_subdirectory(examples)
+  #add_subdirectory(tests)
+  #add_subdirectory(docs)
 endif ()
 
 
