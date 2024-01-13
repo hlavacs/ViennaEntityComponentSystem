@@ -1689,6 +1689,32 @@ namespace vtll {
 
 
 	//-------------------------------------------------------------------------
+	//tuple_to_parameter_pack: turn values in a tuple into a parameter pack - for demonstration purposes only
+
+	namespace detail4 {
+		constexpr auto f = [](auto... args) {
+			return std::make_tuple(args...);
+		};
+	}
+
+	namespace detail {
+		template<typename T, size_t... Is>
+		constexpr auto tuple_to_parameter_pack_impl(T&& tup, std::index_sequence<Is...>) {
+			return detail4::f(std::get<Is>(tup)...);
+		}
+	}
+
+	template <typename T>
+	constexpr auto tuple_to_parameter_pack(T&& tup) {
+		return detail::tuple_to_parameter_pack_impl(std::forward<T>(tup), std::make_integer_sequence<size_t, std::tuple_size_v<T>>{ });
+	}
+
+	static_assert(
+		is_same_tuple( tuple_to_parameter_pack(std::make_tuple(1, 4.5, 'C', 5.0f)),   std::make_tuple(1, 4.5, 'C', 5.0f) )
+			, "The implementation of tuple_to_parameter_pack is bad" );
+
+
+	//-------------------------------------------------------------------------
 	//value list algorithms
 
 
