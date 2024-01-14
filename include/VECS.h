@@ -554,11 +554,14 @@ namespace vecs {
 		VecsSystem<TL> m_system;
 	};
 
+
 	template<typename GL, typename SL> requires vtll::unique<vtll::cat<GL, SL>>::value
 	template<typename... Ts> requires has_all_types<GL, Ts...>	//Check that all types are in the GAME USER type list
-	[[nodiscard]] auto VecsEntityManagerBase<GL, SL>::insert(Ts&&... Args) -> VecsHandle { 
-		//insert code here
-		return m_system.insert(std::forward<Ts>(Args)...); 
+	[[nodiscard]] auto VecsEntityManagerBase<GL, SL>::insert(Ts&&... Args) -> VecsHandle {
+		vtll::to_tuple<SL> system_values{}; //insert the system values into this tuple
+		return [&]<typename... Us>( std::tuple<Us...> A ) {
+			return m_system.insert( std::move( std::get<Us>(A) )... );
+		} ( std::tuple_cat( std::tuple(Args...), system_values  )  );
 	};
 
 
