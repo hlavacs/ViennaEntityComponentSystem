@@ -119,7 +119,8 @@ namespace vecs {
 		using optional_ref_tuple = std::optional< ref_tuple<Ts...> >;
 
 		using component_ptrs_t = std::array<void*, vtll::size<TL>::value>;
-
+		
+		using push_callback_t = std::optional<std::function<void(const stack_index_t)>>; ///< Callback function that is called when a new row is pushed
 	
 		inline auto erase(VecsHandle handle) -> bool;
 		inline auto valid(VecsHandle handle) -> bool { return get_entity_from_handle(std::forward<const VecsHandle>(handle)) != nullptr; };
@@ -164,7 +165,11 @@ namespace vecs {
 		auto [handle_index, entity_ptr] = get_new_entity(); //Get a new entity slot, and a pointer to it	
 		entity_ptr->m_archetype_ptr = get_archetype<Ts...>(); //Get the archetype for the types
 		VecsHandle handle{ handle_index.get_index(), entity_ptr->m_index.get_generation() }; //Create a handle to the entity
-		entity_ptr->m_index = std::dynamic_pointer_cast<VecsArchetype<TL, Ts...>>(entity_ptr->m_archetype_ptr)->insert(handle, std::forward<Ts>(Args)...);
+
+		push_callback_t f = [&](const stack_index_t index) { //Callback function that is called when a new row is pushed
+			entity_ptr->m_index.set_index( index ); //Update the index of the entity
+		};
+		auto v = std::dynamic_pointer_cast<VecsArchetype<TL, Ts...>>(entity_ptr->m_archetype_ptr)->insert({f}, handle, std::forward<Ts>(Args)...);
 		return handle; 
 	}
 
@@ -408,11 +413,14 @@ namespace vecs {
 		using VecsArchetypeBase<TL>::m_types;
 		using component_ptrs_t = VecsSystem<TL>::component_ptrs_t;
 
+		using push_callback_t = typename VecsSystem<TL>::push_callback_t; ///< Callback function that is called when a new row is pushed
+
+
 	public:
 		VecsArchetype(VecsSystem<TL>& system, std::bitset<BITSTL> types) : VecsArchetypeBase<TL>{ system, types } {};
 
 		template<typename... Ts> requires has_all_types<TL, Ts...>	//Check that all types are in the type list
-		[[nodiscard]] inline auto insert(VecsHandle handle, Ts&&... Args) -> VecsIndex;
+		[[nodiscard]] inline auto insert(push_callback_t f, VecsHandle handle, Ts&&... Args) -> VecsIndex;
 
 		inline auto erase(VecsIndex index) -> VecsHandle override;
 
@@ -434,8 +442,8 @@ namespace vecs {
 	/// <returns>A handle to the inserted entity.</returns>	
 	template<typename TL, typename... As>
 	template<typename... Ts> requires has_all_types<TL, Ts...>	//Check that all types are in the type list
-	[[nodiscard]] inline auto VecsArchetype<TL, As...>::insert(VecsHandle handle, Ts&&... Args) -> VecsIndex { 
-		return VecsIndex{ m_data.push( std::forward<Ts>(Args)..., VecsHandleContainer{handle} ) };
+	[[nodiscard]] inline auto VecsArchetype<TL, As...>::insert(push_callback_t f, VecsHandle handle, Ts&&... Args) -> VecsIndex { 
+		return VecsIndex{ m_data.push_callback( f, std::forward<Ts>(Args)..., VecsHandleContainer{handle} ) };
 	}
 
 	/// <brief>

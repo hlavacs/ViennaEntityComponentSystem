@@ -21,6 +21,10 @@ void start_test( auto & ECS) {
 
 	auto handle1 = ECS.template insert<int,float,std::string>(0, 4.5f, std::string("ABAB"));
 	assert(ECS.valid(handle1));
+	auto handle1a = ECS.template insert<int,float,std::string>(2, 5.5f, std::string("ffff"));
+	assert(ECS.valid(handle1a));
+	auto handle1b = ECS.template insert<int,float,std::string>(3, 6.5f, std::string("hhhhh"));
+	assert(ECS.valid(handle1b));
 
 	auto handle2 = ECS.template insert<int,std::string,float,double>(1, "CCCCDDD", 1.0f, 2.0);
 	assert(ECS.valid(handle2));

@@ -19,6 +19,7 @@
 #include <string>
 #include <cstdlib>
 #include <random>
+#include <functional>
 
 #include "VTLL.h"
 #include "VSTY.h"
@@ -415,6 +416,8 @@ namespace vllt {
 		using typename VlltTable<DATA, N0, ROW, MINSLOTS>::block_ptr_t;
 		using typename VlltTable<DATA, N0, ROW, MINSLOTS>::block_map_t;
 
+		using push_callback_t = std::optional<std::function<void(const stack_index_t)>>; ///< Callback function that is called when a new row is pushed
+
 		VlltStack(size_t r = 1 << 16, std::pmr::memory_resource* mr = std::pmr::new_delete_resource()) noexcept;
 
 		//-------------------------------------------------------------------------------------------
@@ -432,6 +435,10 @@ namespace vllt {
 
 		//-------------------------------------------------------------------------------------------
 		//add data
+
+		template<typename... Cs>
+			requires std::is_same_v<vtll::tl<std::decay_t<Cs>...>, vtll::remove_atomic<DATA>>
+		inline auto push_callback(push_callback_t f, Cs&&... data) noexcept -> stack_index_t;	///< Push new component data to the end of the table
 
 		template<typename... Cs>
 			requires std::is_same_v<vtll::tl<std::decay_t<Cs>...>, vtll::remove_atomic<DATA>>
@@ -530,7 +537,7 @@ namespace vllt {
 	template<typename DATA, size_t N0, bool ROW, size_t MINSLOTS, size_t NUMBITS1>
 	template<typename... Cs>
 		requires std::is_same_v<vtll::tl<std::decay_t<Cs>...>, vtll::remove_atomic<DATA>>
-	inline auto VlltStack<DATA, N0, ROW, MINSLOTS, NUMBITS1>::push(Cs&&... data) noexcept -> stack_index_t {
+	inline auto VlltStack<DATA, N0, ROW, MINSLOTS, NUMBITS1>::push_callback(push_callback_t f, Cs&&... data) noexcept -> stack_index_t {
 		//increase size.m_diff to announce your demand for a new slot -> slot is now reserved for you
 		slot_size_t size = m_size_cnt.load();	///< Make sure that no other thread is popping currently
 		while (stack_diff(size) < 0 || !m_size_cnt.compare_exchange_weak(size, slot_size_t{ stack_size(size), stack_diff(size) + 1, NUMBITS1 } )) {
@@ -543,10 +550,19 @@ namespace vllt {
 		//make sure there is enough space in the block VECTOR - if not then change the old map to a larger map
 		insert(table_index_t{stack_size(size) + stack_diff(size)}, nullptr, std::forward<Cs>(data)...); ///< Make sure there are enough MINSLOTS for blocks
 
+		if(f.has_value()) f.value()( stack_index_t{ stack_size(size) + stack_diff(size) } ); ///< Call callback function
+
 		slot_size_t new_size = slot_size_t{ stack_size(size), stack_diff(size) + 1, NUMBITS1 };	///< Increase size to validate the new row
 		while (!m_size_cnt.compare_exchange_weak(new_size, slot_size_t{ stack_size(new_size) + 1, stack_diff(new_size) - 1, NUMBITS1 } ));
 
 		return stack_index_t{ stack_size(size) + stack_diff(size) };	///< Return index of new entry
+	}
+
+	template<typename DATA, size_t N0, bool ROW, size_t MINSLOTS, size_t NUMBITS1>
+	template<typename... Cs>
+		requires std::is_same_v<vtll::tl<std::decay_t<Cs>...>, vtll::remove_atomic<DATA>>
+	inline auto VlltStack<DATA, N0, ROW, MINSLOTS, NUMBITS1>::push(Cs&&... data) noexcept -> stack_index_t {
+		return push_callback( {}, std::forward<Cs>(data)...);
 	}
 
 	/////
