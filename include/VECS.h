@@ -203,7 +203,10 @@ namespace vecs {
 	[[nodiscard]] auto VecsSystem<TL>::get(VecsHandle handle) -> optional_ref_tuple<Ts...> {
 		auto entity_ptr = get_entity_from_handle(handle);
 		if( !entity_ptr ) return {};
-		//if( bitset<Ts...>() != entity_ptr->m_archetype_ptr->bitset() ) return {}; //Check that the types match
+
+		auto bits = bitset<Ts...>(); //Create bitset representing the types
+		if( (entity_ptr->m_archetype_ptr->bitset() & bits) != bits ) return {}; //Check that all types are in the type list
+
 		return entity_ptr->m_archetype_ptr->template get<Ts...>(entity_ptr->m_index);
 	}
 
@@ -558,10 +561,16 @@ namespace vecs {
 	template<typename GL, typename SL> requires vtll::unique<vtll::cat<GL, SL>>::value
 	template<typename... Ts> requires has_all_types<GL, Ts...>	//Check that all types are in the GAME USER type list
 	[[nodiscard]] auto VecsEntityManagerBase<GL, SL>::insert(Ts&&... Args) -> VecsHandle {
+		
 		vtll::to_tuple<SL> system_values{}; //insert the system values into this tuple
-		return [&]<typename... Us>( std::tuple<Us...> A ) {
+		
+		VecsHandle handle = [&]<typename... Us>( std::tuple<Us...> A ) {
 			return m_system.insert( std::move( std::get<Us>(A) )... );
 		} ( std::tuple_cat( std::tuple(Args...), system_values  )  );
+
+		//Do somthing with the new handle here
+
+		return handle;
 	};
 
 
