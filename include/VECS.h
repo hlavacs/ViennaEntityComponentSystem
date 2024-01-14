@@ -28,9 +28,7 @@ namespace vecs {
 	using stack_index_t = vllt::stack_index_t;
 	using generation_t = vsty::strong_type_t< uint64_t, vsty::counter<>, std::integral_constant<uint64_t, std::numeric_limits<uint64_t>::max()> >;
 
-
-
-	const size_t NBITS = 40;
+	const size_t NBITS = 46;
 
 	/// <summary>
 	/// A VecsIndex is a 64-bit integer, with the first NBITS bits encoding the index
