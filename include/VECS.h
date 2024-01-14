@@ -28,14 +28,7 @@ namespace vecs {
 	using stack_index_t = vllt::stack_index_t;
 	using generation_t = vsty::strong_type_t< uint64_t, vsty::counter<>, std::integral_constant<uint64_t, std::numeric_limits<uint64_t>::max()> >;
 
-	template<typename TL> requires vtll::unique<TL>::value class VecsSystem;
-	template<typename TL> class VecsArchetypeBase;
-	template<typename TL, typename... As> class VecsArchetype;
-	template<typename GL, typename SL> requires vtll::unique<vtll::cat<GL, SL>>::value class VecsEntityManagerBase;
 
-	template<typename TL, typename... Ts>
-	concept has_all_types = ((vtll::unique< vtll::tl<Ts... > >::value) && 
-							vtll::has_all_types<TL, vtll::tl<Ts...> >::value);
 
 	const size_t NBITS = 40;
 
@@ -67,6 +60,19 @@ namespace vecs {
 		explicit VecsHandle( stack_index_t index) { set_index(index); set_generation( generation_t{0ULL} ); }
 	};
 
+	template<typename TL, typename... Ts>
+	concept has_all_types = ((vtll::unique< vtll::tl<Ts... > >::value) && 
+							vtll::has_all_types<TL, vtll::tl<Ts...> >::value);
+
+	template<typename TL>
+	concept unique_and_no_handle = (vtll::unique<TL>::value && !vtll::has_type<TL, VecsHandle>::value);
+
+	template<typename TL> requires vtll::unique<TL>::value class VecsSystem;
+	template<typename TL> class VecsArchetypeBase;
+	template<typename TL, typename... As> class VecsArchetype;
+	template<typename GL, typename SL> requires vtll::unique<vtll::cat<GL, SL>>::value class VecsEntityManagerBase;
+
+
 	//-----------------------------------------------------------------------------------------------------------------
 
 	/// <summary>
@@ -75,8 +81,7 @@ namespace vecs {
 	///	and the rest encoding a generation counter. The generation counter is incremented each time the index is erased, so that old indices can be detected.
 	/// </summary>
 	/// <typeparam name="TL">A typelist storing all possible component types. Types MUST be UNIQUE!</typeparam>
-	template<typename TL>
-		requires vtll::unique<TL>::value
+	template<typename TL> requires vtll::unique<TL>::value
 	class VecsSystem {
 
 	protected:
@@ -93,6 +98,8 @@ namespace vecs {
 		};
 
 	public:	
+		using TTL = vtll::cat<TL, vtll::tl<VecsHandle> >;	//Typelist of all component types in the archetype, plus the handle
+
 		template<typename... Ts> requires has_all_types<TL, Ts...>	//Check that all types are in the type list
 		using ref_tuple = vtll::to_ref_tuple< vtll::tl<Ts...> >;
 
@@ -321,6 +328,8 @@ namespace vecs {
 		using component_ptrs_t = VecsSystem<TL>::component_ptrs_t;
 
 	public:
+		using TTL = VecsSystem<TL>::TTL;	//Typelist of all component types in the archetype, plus the handle
+
 		template<typename... Ts> requires has_all_types<TL, Ts...>	//A tuple of pointers to the components
 		using ptr_tuple = vtll::to_ptr_tuple< vtll::tl<Ts...> >;
 
@@ -377,6 +386,7 @@ namespace vecs {
 		static_assert(vtll::unique<AL>::value, "VecsArchetype types are not unique!");
 		using AAL = vtll::cat<AL, vtll::tl<VecsHandle> >;	//Typelist of all component types in the archetype, plus the handle
 
+		using typename VecsArchetypeBase<TL>::TTL;	//Typelist of all component types in the archetype, plus the handle
 		using VecsArchetypeBase<TL>::BITSTL;
 		using VecsArchetypeBase<TL>::m_system;
 		using VecsArchetypeBase<TL>::m_types;
