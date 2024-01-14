@@ -526,9 +526,10 @@ namespace vecs {
 	template<typename GL, typename SL>
 		requires vtll::unique<vtll::cat<GL, SL>>::value
 	class VecsEntityManagerBase {
-		using TL = vtll::cat<GL, SL>;	//Typelist of all component types including from game and from engine
 		
 	public:
+		using TL = vtll::cat<GL, SL>;	//Typelist of all component types including from game and from engine
+
 		template<typename... Ts> requires has_all_types<TL, Ts...>	//Check that all types are in the type list
 		using ref_tuple = vtll::to_ref_tuple< vtll::tl<Ts...> >; //A tuple of references to the components
 
@@ -541,7 +542,7 @@ namespace vecs {
 		inline auto valid(VecsHandle handle) -> bool { return m_system.valid(handle); }; //Check if the handle is valid
 
 		template<typename... Ts> requires has_all_types<GL, Ts...>	//Check that all types are in the GAME USER type list
-		[[nodiscard]] auto insert(Ts&&... Args) -> VecsHandle { return m_system.insert(std::forward<Ts>(Args)...); };
+		[[nodiscard]] auto insert(Ts&&... Args) -> VecsHandle; // { return m_system.insert(std::forward<Ts>(Args)...); };
 
 		template<typename... Ts> requires has_all_types<TL, Ts...>	//Check that all types are in the type list
 		[[nodiscard]] auto get(VecsHandle handle) -> optional_ref_tuple<Ts...> { return m_system.template get<Ts...>(handle); }; //Get a tuple of references to the components of the entity
@@ -551,6 +552,13 @@ namespace vecs {
 
 	private:
 		VecsSystem<TL> m_system;
+	};
+
+	template<typename GL, typename SL> requires vtll::unique<vtll::cat<GL, SL>>::value
+	template<typename... Ts> requires has_all_types<GL, Ts...>	//Check that all types are in the GAME USER type list
+	[[nodiscard]] auto VecsEntityManagerBase<GL, SL>::insert(Ts&&... Args) -> VecsHandle { 
+		//insert code here
+		return m_system.insert(std::forward<Ts>(Args)...); 
 	};
 
 
