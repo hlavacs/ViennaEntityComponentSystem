@@ -38,10 +38,10 @@ namespace vecs {
 	struct VecsIndex : public vsty::strong_type_t< uint64_t, vsty::counter<>, std::integral_constant<uint64_t, std::numeric_limits<uint64_t>::max()> > {
 		stack_index_t get_index() const { return stack_index_t{ get_bits(0, NBITS) }; }
 		generation_t get_generation() const { return generation_t{ get_bits(NBITS) }; }
-		void set_index( stack_index_t index) { return set_bits( (uint32_t)index, 0, NBITS ); }
-		void set_generation( generation_t gen) { return set_bits( (uint32_t)gen, NBITS ); }
-		stack_index_t increase_index() { set_bits( (uint32_t)get_index() + 1, 0, NBITS); return get_index(); }
-		generation_t increase_generation() { set_bits( (uint32_t)get_generation() + 1, NBITS); return get_generation(); }
+		void set_index( stack_index_t index) { return set_bits( (uint64_t)index, 0, NBITS ); }
+		void set_generation( generation_t gen) { return set_bits( (uint64_t)gen, NBITS ); }
+		stack_index_t increase_index() { set_bits( (uint64_t)get_index() + 1, 0, NBITS); return get_index(); }
+		generation_t increase_generation() { set_bits( (uint64_t)get_generation() + 1, NBITS); return get_generation(); }
 		VecsIndex() = default;
 		explicit VecsIndex( stack_index_t index, generation_t gen) { set_index(index); set_generation(gen); }
 		explicit VecsIndex( stack_index_t index) { set_index(index); set_generation( generation_t{0ULL} ); }
@@ -62,8 +62,13 @@ namespace vecs {
 	concept has_all_types = ((vtll::unique< vtll::tl<Ts... > >::value) && 
 							vtll::has_all_types<TL, vtll::tl<Ts...> >::value);
 
+	struct VecsHandleContainer { VecsHandle m_handle; };
+
 	template<typename TL>
-	concept unique_and_no_handle = (vtll::unique<TL>::value && !vtll::has_type<TL, VecsHandle>::value);
+	using VecsAddHandleContainer = vtll::cat< TL, vtll::tl<VecsHandleContainer> >;
+
+	template<typename TL>
+	concept unique_and_no_handle = (vtll::unique<TL>::value && !vtll::has_type<TL, VecsHandleContainer>::value);
 
 	template<typename TL> requires unique_and_no_handle<TL> class VecsSystem;
 	template<typename TL> class VecsArchetypeBase;
@@ -113,7 +118,7 @@ namespace vecs {
 		template<typename... Ts> requires has_all_types<TL, Ts...>	//Check that all types are in the type list
 		[[nodiscard]] auto insert(Ts&&... Args) -> VecsHandle;
 
-		template<typename... Ts> 
+		template<typename... Ts> requires has_all_types< VecsAddHandleContainer<TL>, Ts...>
 		[[nodiscard]] auto get(VecsHandle handle) -> optional_ref_tuple<Ts...>; //Get a tuple of references to the components of the entity
 
 		template<typename... Ts, typename... As> requires has_all_types<vtll::tl<Ts...>, As...>
@@ -165,11 +170,10 @@ namespace vecs {
 		
 		VecsHandle moved = entity_ptr->m_archetype_ptr->erase(entity_ptr->m_index); //Erase the entity from the archetype, and get the handle of the entity that was moved to the erased entity's slot
 		auto entity_moved_ptr = get_entity_from_handle(moved);
-		//if( !res ) return false;
+		if( entity_moved_ptr ) entity_moved_ptr->m_index.set_index( entity_ptr->m_index.get_index() ); //Update the index of the moved entity
 
 		VecsIndex old_handle_index = m_empty_start.load();
 		VecsIndex new_handle_index{ old_handle_index.get_index() };
-
 		while( old_handle_index.has_value() 
 			&& !m_empty_start.compare_exchange_weak( old_handle_index, new_handle_index ) ) {
 			new_handle_index.set_index( old_handle_index.get_index() );
@@ -184,7 +188,7 @@ namespace vecs {
 	/// <param name="handle">The handle of the entity to get</param>
 	/// <returns>A tuple of references to the components of the entity</returns>
 	template<typename TL> requires unique_and_no_handle<TL>
-	template<typename... Ts>
+	template<typename... Ts> requires has_all_types< VecsAddHandleContainer<TL>, Ts...>
 	[[nodiscard]] auto VecsSystem<TL>::get(VecsHandle handle) -> optional_ref_tuple<Ts...> {
 		auto entity_ptr = get_entity_from_handle(handle);
 		if( !entity_ptr ) return {};
@@ -382,7 +386,7 @@ namespace vecs {
 	protected:
 		using AL = vtll::tl<As...>;	//Typelist of all component types in the archetype
 		static_assert(vtll::unique<AL>::value, "VecsArchetype types are not unique!");
-		using AAL = vtll::cat<AL, vtll::tl<VecsHandle> >;	//Typelist of all component types in the archetype, plus the handle
+		using AAL = VecsAddHandleContainer<AL>;	//Typelist of all component types in the archetype, plus the handle
 
 		using typename VecsArchetypeBase<TL>::TTL;	//Typelist of all component types in the archetype, plus the handle
 		using VecsArchetypeBase<TL>::BITSTL;
@@ -417,7 +421,7 @@ namespace vecs {
 	template<typename TL, typename... As>
 	template<typename... Ts> requires has_all_types<TL, Ts...>	//Check that all types are in the type list
 	[[nodiscard]] inline auto VecsArchetype<TL, As...>::insert(VecsHandle handle, Ts&&... Args) -> VecsIndex { 
-		return VecsIndex{ m_data.push( std::forward<Ts>(Args)..., handle ) };
+		return VecsIndex{ m_data.push( std::forward<Ts>(Args)..., VecsHandleContainer{handle} ) };
 	}
 
 	/// <brief>
@@ -457,7 +461,7 @@ namespace vecs {
 		assert( ((void)"Type has no value!\n", res) ); //all pointers must be valid
 
 		//call push with pointers as arguments
-		stack_index_t index = m_data.push( std::forward<As>( *static_cast<As*>(component_ptrs[vtll::index_of<TL, As>::value]))..., handle );
+		stack_index_t index = m_data.push( std::forward<As>( *static_cast<As*>(component_ptrs[vtll::index_of<TL, As>::value]))..., VecsHandleContainer{ handle } );
 
 		return VecsIndex{ index }; //return index
 	}
@@ -475,7 +479,7 @@ namespace vecs {
 		if( index <= m_data.size() ) { //there was a swap -> get handle of swapped entity
 			auto tuple = m_data.get_tuple(index.get_index());
 			if( !tuple.has_value() ) return {};
-			return std::get<vtll::size<AAL>::value - 1>(tuple.value());
+			return std::get< vtll::index_of<AAL,VecsHandleContainer>::value >(tuple.value()).m_handle;
 		}
 		return {};
 	}
