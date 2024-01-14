@@ -65,7 +65,7 @@ namespace vecs {
 	template<typename TL>
 	concept unique_and_no_handle = (vtll::unique<TL>::value && !vtll::has_type<TL, VecsHandle>::value);
 
-	template<typename TL> requires vtll::unique<TL>::value class VecsSystem;
+	template<typename TL> requires unique_and_no_handle<TL> class VecsSystem;
 	template<typename TL> class VecsArchetypeBase;
 	template<typename TL, typename... As> class VecsArchetype;
 	template<typename GL, typename SL> requires vtll::unique<vtll::cat<GL, SL>>::value class VecsEntityManagerBase;
@@ -79,7 +79,7 @@ namespace vecs {
 	///	and the rest encoding a generation counter. The generation counter is incremented each time the index is erased, so that old indices can be detected.
 	/// </summary>
 	/// <typeparam name="TL">A typelist storing all possible component types. Types MUST be UNIQUE!</typeparam>
-	template<typename TL> requires vtll::unique<TL>::value
+	template<typename TL> requires unique_and_no_handle<TL>
 	class VecsSystem {
 
 	protected:
@@ -142,7 +142,7 @@ namespace vecs {
 	/// </brief>
 	/// <param name="Args">The components to insert</param>
 	/// <returns>A handle to the inserted entity</returns>
-	template<typename TL> requires vtll::unique<TL>::value
+	template<typename TL> requires unique_and_no_handle<TL>
 	template<typename... Ts> requires has_all_types<TL, Ts...>	//Check that all types are in the type list
 	[[nodiscard]] auto VecsSystem<TL>::insert(Ts&&... Args) -> VecsHandle { 
 		auto [handle_index, entity_ptr] = get_new_entity(); //Get a new entity slot, and a pointer to it	
@@ -157,7 +157,7 @@ namespace vecs {
 	/// </brief>
 	/// <param name="handle">The handle of the entity to erase</param>
 	/// <returns>True if the entity was erased, false if the handle was invalid</returns>
-	template<typename TL> requires vtll::unique<TL>::value
+	template<typename TL> requires unique_and_no_handle<TL>
 	inline auto VecsSystem<TL>::erase(VecsHandle handle) -> bool {
 		auto entity_ptr = get_entity_from_handle(handle); //Get a pointer to the entity from the handle
 		if( !entity_ptr ) return false;
@@ -183,7 +183,7 @@ namespace vecs {
 	/// </brief>
 	/// <param name="handle">The handle of the entity to get</param>
 	/// <returns>A tuple of references to the components of the entity</returns>
-	template<typename TL> requires vtll::unique<TL>::value
+	template<typename TL> requires unique_and_no_handle<TL>
 	template<typename... Ts>
 	[[nodiscard]] auto VecsSystem<TL>::get(VecsHandle handle) -> optional_ref_tuple<Ts...> {
 		auto entity_ptr = get_entity_from_handle(handle);
@@ -198,7 +198,7 @@ namespace vecs {
 	/// <param name="handle">The handle of the entity to transform</param>
 	/// <param name="Args">The components to insert</param>
 	/// <returns>True if the entity was transformed, false if the handle was invalid</returns>
-	template<typename TL> requires vtll::unique<TL>::value
+	template<typename TL> requires unique_and_no_handle<TL>
 	template<typename... Ts, typename... As> requires has_all_types<vtll::tl<Ts...>, As...>
 	inline auto VecsSystem<TL>::transform(VecsHandle handle, As&&... Args) -> bool {
 		auto entity_ptr = get_entity_from_handle(handle);
@@ -224,7 +224,7 @@ namespace vecs {
 	/// <param name="handle">The handle of the entity to transform</param>
 	/// <param name="Args">The components to insert</param>
 	/// <returns>True if the entity was transformed, false if the handle was invalid</returns>
-	template<typename TL> requires vtll::unique<TL>::value
+	template<typename TL> requires unique_and_no_handle<TL>
 	template<typename... Ts> requires has_all_types<TL, Ts...>	//Check that all types are in the type list
 	inline auto VecsSystem<TL>::get_archetype() -> std::shared_ptr<VecsArchetype<TL, Ts...>> {
 		std::bitset<BITSTL> types = bitset<Ts...>();	//Create bitset representing the archetype
@@ -248,7 +248,7 @@ namespace vecs {
 	/// Get a new entity slot, and a pointer to it
 	/// </brief>
 	/// <returns>A pair of the index of the new entity slot, and a pointer to it</returns>
-	template<typename TL> requires vtll::unique<TL>::value
+	template<typename TL> requires unique_and_no_handle<TL>
 	inline auto VecsSystem<TL>::get_new_entity() -> std::pair<VecsIndex, VecsEntity*> {
 		VecsIndex handle_index = m_empty_start.load();
 		VecsEntity *entity_ptr{nullptr};
@@ -273,7 +273,7 @@ namespace vecs {
 	/// </brief>
 	/// <param name="handle">The handle of the entity to get</param>
 	/// <returns>A pointer to the entity</returns>
-	template<typename TL> requires vtll::unique<TL>::value
+	template<typename TL> requires unique_and_no_handle<TL>
 	inline auto VecsSystem<TL>::get_entity_from_handle(VecsHandle handle) -> VecsEntity* {
 		auto entity = m_entities.template get<0>( stack_index_t{ handle.get_index() } );
 		if( !entity.has_value() || entity.value().get().m_index.get_generation() != handle.get_generation() ) return nullptr;
@@ -285,7 +285,7 @@ namespace vecs {
 	/// </brief>
 	/// <param name="index">The index of the entity to get</param>
 	/// <returns>A pointer to the entity</returns>
-	template<typename TL> requires vtll::unique<TL>::value
+	template<typename TL> requires unique_and_no_handle<TL>
 	inline auto VecsSystem<TL>::get_entity_from_index(VecsIndex index) -> VecsEntity* {
 		auto entity = m_entities.template get<0>( stack_index_t{ index.get_index() } );
 		if( !entity.has_value()) return nullptr;
@@ -296,7 +296,7 @@ namespace vecs {
 	/// Compute the bitset representing the types
 	/// </brief>
 	/// <returns>The bitset representing the types</returns>
-	template<typename TL> requires vtll::unique<TL>::value
+	template<typename TL> requires unique_and_no_handle<TL>
 	template<typename... Ts> requires has_all_types<TL, Ts...>
 	constexpr inline auto VecsSystem<TL>::bitset() -> std::bitset<BITSTL> {
 		std::bitset<BITSTL> bits;
