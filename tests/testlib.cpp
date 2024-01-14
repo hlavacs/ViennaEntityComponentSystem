@@ -8,9 +8,9 @@
 #include <numeric>
 #include <mutex>
 
-#include "VECS.h"
+#define VecsUserEntityComponentList vtll::tl<int, std::string, float, double>
 
-using outgroup = vtll::tl<size_t, bool, float, double>;
+#include "VECS.h"
 
 
 void start_test( auto & ECS) {
@@ -67,7 +67,7 @@ void start_test( auto & ECS) {
 
 int main() {
 
-	vecs::VecsSystem<vtll::tl<int, std::string, float, double>> ECS{};
+	vecs::VecsEntityManager ECS{};
 
 	start_test( ECS );
 

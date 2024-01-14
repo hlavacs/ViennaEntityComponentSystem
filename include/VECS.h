@@ -75,6 +75,14 @@ namespace vecs {
 	template<typename TL, typename... As> class VecsArchetype;
 	template<typename GL, typename SL> requires vtll::unique<vtll::cat<GL, SL>>::value class VecsEntityManagerBase;
 
+	#ifndef VecsUserEntityComponentList
+	#define VecsUserEntityComponentList vtll::tl<>
+	#endif
+
+	#ifndef VecsSystemEntityComponentList
+	#define VecsSystemEntityComponentList vtll::tl<>
+	#endif
+
 
 	//-----------------------------------------------------------------------------------------------------------------
 
@@ -86,6 +94,7 @@ namespace vecs {
 	/// <typeparam name="TL">A typelist storing all possible component types. Types MUST be UNIQUE!</typeparam>
 	template<typename TL> requires unique_and_no_handle<TL>
 	class VecsSystem {
+		friend class VecsEntityManagerBase< VecsUserEntityComponentList, VecsSystemEntityComponentList >;
 
 	protected:
 		static_assert(vtll::unique<std::decay_t<TL>>::value, "VecsSystem types are not unique!");
@@ -111,7 +120,7 @@ namespace vecs {
 
 		using component_ptrs_t = std::array<void*, vtll::size<TL>::value>;
 
-		VecsSystem(){};
+	
 		inline auto erase(VecsHandle handle) -> bool;
 		inline auto valid(VecsHandle handle) -> bool { return get_entity_from_handle(std::forward<const VecsHandle>(handle)) != nullptr; };
 
@@ -126,6 +135,8 @@ namespace vecs {
 
 
 	private:
+		VecsSystem(){};
+
 		template<typename... Ts> requires has_all_types<TL, Ts...>	//Check that all types are in the type list
 		inline auto get_archetype() -> std::shared_ptr<VecsArchetype<TL, Ts...>>; //Get the archetype for the types
 		inline auto get_new_entity() -> std::pair<VecsIndex, VecsEntity*>; //Get a new entity slot, and a pointer to it
@@ -524,38 +535,29 @@ namespace vecs {
 		template<typename... Ts> requires has_all_types<TL, Ts...>	//Check that all types are in the type list
 		using optional_ref_tuple = std::optional< ref_tuple<Ts...> >; //An optional tuple of references to the components
 
-		VecsEntityManagerBase() = default;
+		VecsEntityManagerBase() { };
 
-		inline auto erase(VecsHandle handle) -> bool { m_system.erase(handle); }; //Erase the entity with the given handle
-		inline auto valid(VecsHandle handle) -> bool { m_system.valid(handle); }; //Check if the handle is valid
+		inline auto erase(VecsHandle handle) -> bool { return m_system.erase(handle); }; //Erase the entity with the given handle
+		inline auto valid(VecsHandle handle) -> bool { return m_system.valid(handle); }; //Check if the handle is valid
 
-		template<typename... Ts> requires has_all_types<GL, Ts...>	//Check that all types are in the type list
+		template<typename... Ts> requires has_all_types<GL, Ts...>	//Check that all types are in the GAME USER type list
 		[[nodiscard]] auto insert(Ts&&... Args) -> VecsHandle { return m_system.insert(std::forward<Ts>(Args)...); };
 
-		template<typename... Ts> 
-		[[nodiscard]] auto get(VecsHandle handle) -> optional_ref_tuple<Ts...> { return m_system.get<Ts...>(handle); }; //Get a tuple of references to the components of the entity
+		template<typename... Ts> requires has_all_types<TL, Ts...>	//Check that all types are in the type list
+		[[nodiscard]] auto get(VecsHandle handle) -> optional_ref_tuple<Ts...> { return m_system.template get<Ts...>(handle); }; //Get a tuple of references to the components of the entity
 
 		template<typename... Ts, typename... As> requires has_all_types<vtll::tl<Ts...>, As...>
-		auto transform(VecsHandle handle, As&&... Args) -> bool { return m_system.transform<Ts...>(handle, std::forward<As>(Args)...); }; //Transform the entity into a new archetype, adding or removing components
+		auto transform(VecsHandle handle, As&&... Args) -> bool { return m_system.template transform<Ts...>(handle, std::forward<As>(Args)...); }; //Transform the entity into a new archetype, adding or removing components
 
 	private:
 		VecsSystem<TL> m_system;
 	};
 
 
-
-
-
-	#ifndef VecsUserEntityComponentList
-	#define VecsUserEntityComponentList vtll::tl<>
-	#endif
-
-	#ifndef VecsSystemEntityComponentList
-	#define VecsSystemEntityComponentList vtll::tl<>
-	#endif
-
 	using VecsEntityManager = VecsEntityManagerBase<  VecsUserEntityComponentList, VecsSystemEntityComponentList >;
 	
+
+
 }
 
 
