@@ -38,8 +38,8 @@ namespace vecs {
 	struct VecsIndex : public vsty::strong_type_t< uint64_t, vsty::counter<>, std::integral_constant<uint64_t, std::numeric_limits<uint64_t>::max()> > {
 		stack_index_t get_index() const { return stack_index_t{ get_bits(0, NBITS) }; }
 		generation_t get_generation() const { return generation_t{ get_bits(NBITS) }; }
-		void set_index( stack_index_t index) { return set_bits( (uint64_t)index, 0, NBITS ); }
-		void set_generation( generation_t gen) { return set_bits( (uint64_t)gen, NBITS ); }
+		auto set_index( stack_index_t index) { return set_bits( (uint64_t)index, 0, NBITS ); }
+		auto set_generation( generation_t gen) { return set_bits( (uint64_t)gen, NBITS ); }
 		stack_index_t increase_index() { set_bits( (uint64_t)get_index() + 1, 0, NBITS); return get_index(); }
 		generation_t increase_generation() { set_bits( (uint64_t)get_generation() + 1, NBITS); return get_generation(); }
 		VecsIndex() = default;

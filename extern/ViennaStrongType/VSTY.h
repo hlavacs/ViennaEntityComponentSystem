@@ -63,11 +63,11 @@ namespace vsty {
 		//-----------------------------------------------------------------------------------
 
 		template<typename U>
-		void set_bits(U val, size_t first_bit, const size_t number_bits) requires std::unsigned_integral<T> {
+		auto set_bits(U val, size_t first_bit, const size_t number_bits) requires std::unsigned_integral<T> {
 			T value = static_cast<T>(val);
 			uint32_t nbits = sizeof(T) * 8;
 			assert(first_bit + number_bits <= nbits);
-			if( number_bits >= nbits) { m_value = value; return; }
+			if( number_bits >= nbits) { m_value = value; return T{}; }
 
 			T umask = first_bit + number_bits < nbits ? static_cast<T>(~0ull) << (first_bit + number_bits) : 0;
 			T lmask = first_bit > 0ull ? (1ull << first_bit) - 1 : 0ull;			
@@ -80,11 +80,12 @@ namespace vsty {
 			//std::cout << "value << first_bit = " << std::setfill('0') << std::setw(16) << std::hex << (value << first_bit) << std::endl;
 
 			m_value = (m_value & (umask | lmask)) | ((value << first_bit) & ~umask & ~lmask);
+			return m_value;
 			//std::cout << "  m_value          = " << std::setfill('0') << std::setw(16) << std::hex << m_value << std::endl;
 		}
 
 		template<typename U>
-		void set_bits(U value, size_t first_bit) requires std::unsigned_integral<T> {
+		auto set_bits(U value, size_t first_bit) requires std::unsigned_integral<T> {
 			return set_bits(value, first_bit, sizeof(T) * 8ull - first_bit);
 		}
 
