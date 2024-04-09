@@ -73,15 +73,6 @@ namespace vecs {
 	template<typename TL> requires unique_and_no_handle<TL> class VecsSystem;
 	template<typename TL> class VecsArchetypeBase;
 	template<typename TL, typename... As> class VecsArchetype;
-	template<typename GL, typename SL> requires vtll::unique<vtll::cat<GL, SL>>::value class VecsEntityManagerBase;
-
-	/*#ifndef VecsUserEntityComponentList
-	#define VecsUserEntityComponentList vtll::tl<>
-	#endif
-
-	#ifndef VecsSystemEntityComponentList
-	#define VecsSystemEntityComponentList vtll::tl<>
-	#endif */
 
 
 	//-----------------------------------------------------------------------------------------------------------------
@@ -94,7 +85,6 @@ namespace vecs {
 	/// <typeparam name="TL">A typelist storing all possible component types. Types MUST be UNIQUE!</typeparam>
 	template<typename TL> requires unique_and_no_handle<TL>
 	class VecsSystem {
-		//friend class VecsEntityManagerBase< VecsUserEntityComponentList, VecsSystemEntityComponentList >;
 
 	protected:
 		static_assert(vtll::unique<std::decay_t<TL>>::value, "VecsSystem types are not unique!");

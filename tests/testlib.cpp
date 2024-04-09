@@ -8,10 +8,10 @@
 #include <numeric>
 #include <mutex>
 
-#define VecsUserEntityComponentList vtll::tl<int, std::string, float, double>
 
 #include "VECS.h"
 
+using VecsUserEntityComponentList = vtll::tl<int, std::string, float, double>;
 
 void start_test( auto & ECS) {
 	vecs::VecsIndex index{};
