@@ -319,6 +319,48 @@ namespace vtll {
 		std::is_same_v< cat< type_list<double, int>, type_list<char, float>, type_list<int, float> >, type_list<double, int, char, float, int, float> >,
 		"The implementation of cat is bad");
 
+
+	//-------------------------------------------------------------------------
+	//sublist: extract a sublist from a type list
+
+	namespace detail {
+		template <typename Seq, size_t S, size_t E>
+		struct sublist_impl;
+
+		template <template <typename...> typename Seq, typename... Ts, size_t S, size_t E>
+		requires (E<S)
+		struct sublist_impl<Seq<Ts...>, S, E> {
+			using type = Seq<>;
+		};
+
+		template <template <typename...> typename Seq, size_t S, size_t E>
+		struct sublist_impl<Seq<>, S, E> {
+			using type = Seq<>;
+		};
+
+		template <typename Seq, size_t S, size_t E>
+		requires (S<=E)
+		struct sublist_impl<Seq, S, E> {
+			using type = cat< type_list< Nth_type<Seq, S> >, typename sublist_impl<Seq, S + 1, E>::type >;
+		};
+	}
+
+	template <typename Seq, size_t S, size_t E>
+	using sublist = typename detail::sublist_impl<Seq, S, E>::type;
+
+	static_assert(
+		std::is_same_v< sublist< type_list<double, char, bool, double>, 1, 2 >, type_list<char, bool> >,
+		"The implementation of sublist is bad");
+
+	static_assert(
+		std::is_same_v< sublist< type_list<double, char, bool, double, int, float>, 0, 5 >, type_list<double, char, bool, double, int, float> >,
+		"The implementation of sublist is bad");
+
+	static_assert(
+		std::is_same_v< sublist< type_list<double, char, bool, double, int, float>, 3, 5 >, type_list<double, int, float> >,
+		"The implementation of sublist is bad");
+
+
 	//-------------------------------------------------------------------------
 	//app: append a parameter pack to a type list
 
@@ -352,6 +394,26 @@ namespace vtll {
 	static_assert(
 		std::is_same_v< to_ref< type_list<double, int> >, type_list<double&, int&> >,
 		"The implementation of to_ref is bad");
+
+	//-------------------------------------------------------------------------
+	//to_const_ref: turn list elements into const references
+
+	namespace detail {
+		template <typename Seq>
+		struct to_const_ref_impl;
+
+		template <template <typename...> typename Seq, typename... Ts>
+		struct to_const_ref_impl<Seq<Ts...>> {
+			using type = Seq<const Ts&...>;
+		};
+	}
+
+	template <typename Seq>
+	using to_const_ref = typename detail::to_const_ref_impl<Seq>::type;
+
+	static_assert(
+		std::is_same_v< to_const_ref< type_list<double, int> >, type_list<const double&, const int&> >,
+		"The implementation of to_const_ref is bad");
 
 	//-------------------------------------------------------------------------
 	//to_ptr: turn list elements into pointers
@@ -1498,6 +1560,32 @@ namespace vtll {
 	static_assert(
 		std::is_same_v< to_ref_tuple<type_list<double, int>>, std::tuple<double&, int&> >,
 		"The implementation of to_ref_tuple is bad");
+
+	//-------------------------------------------------------------------------
+	//to_const_ref_tuple: turn a list into a tuple of const reference types. when creating such tuples, use std::ref as a wrapper for the elements!
+
+	namespace detail {
+		template<typename Seq>
+		struct to_const_ref_tuple_impl;
+
+		template<template <typename...> class Seq>
+		struct to_const_ref_tuple_impl<Seq<>> {
+			using type = std::tuple<>;
+		};
+
+		template<template <typename...> class Seq, typename... Ts>
+		struct to_const_ref_tuple_impl<Seq<Ts...>> {
+			using type = std::tuple<const Ts&...>;
+		};
+	}
+	template <typename Seq>
+	using to_const_ref_tuple = typename detail::to_const_ref_tuple_impl<Seq>::type;
+
+	static_assert(
+		std::is_same_v< to_const_ref_tuple<type_list<double, int>>, std::tuple<const double&, const int&> >,
+		"The implementation of to_const_ref_tuple is bad");
+
+
 
 	//-------------------------------------------------------------------------
 	//to_rvref_tuple: turn a list into a tuple of reference types. when creating such tuples, use std::ref as a wrapper for the elements!

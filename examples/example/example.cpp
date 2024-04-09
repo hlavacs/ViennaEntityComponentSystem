@@ -10,7 +10,7 @@ using namespace vecs;
 
 
 void run() {
-	VecsEntityManager manager;
+	//VecsSystem manager;
 
 	
 	

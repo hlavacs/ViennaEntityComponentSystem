@@ -71,7 +71,7 @@ void start_test( auto & ECS) {
 
 int main() {
 
-	vecs::VecsEntityManager ECS{};
+	vecs::VecsSystem<VecsUserEntityComponentList> ECS{};
 
 	start_test( ECS );
 
