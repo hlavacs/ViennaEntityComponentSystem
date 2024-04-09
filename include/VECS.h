@@ -47,6 +47,17 @@ namespace vecs {
 		explicit VecsIndex( table_index_t index) { set_index(index); set_generation( generation_t{0ULL} ); }
 	};
 
+	/*using VecsIndex1 = vsty::strong_type_t< uint64_t, vsty::counter<>, std::integral_constant<uint64_t, std::numeric_limits<uint64_t>::max()> >;
+	auto get_index(VecsIndex i) { return table_index_t{ i.get_bits(0, NBITS) }; }
+	auto get_generation(VecsIndex i) { return generation_t{ i.get_bits(NBITS) }; }
+	auto set_index(VecsIndex& i, table_index_t index) { return i.set_bits( (uint64_t)index, 0, NBITS ); }
+	auto set_generation(VecsIndex& i, generation_t gen) { return i.set_bits( (uint64_t)gen, NBITS ); }
+	auto increase_index(VecsIndex& i) { i.set_bits( (uint64_t)get_index(i) + 1, 0, NBITS); return get_index(i); }
+	auto increase_generation(VecsIndex& i) { i.set_bits( (uint64_t)get_generation(i) + 1, NBITS); return get_generation(i); }
+	auto create_index(table_index_t index, generation_t gen) { VecsIndex i; set_index(i, index), set_generation(i, gen); return i;}
+	auto create_index(table_index_t index) { VecsIndex i; set_index(i, index), set_generation(i, generation_t{0}); return i;}
+	*/
+
 	/// <summary>
 	/// A VecsHandle is a 64-bit integer, with the first NBITS bits encoding the index
 	/// of the uint64_t, and the rest encoding a generation counter. The generation counter is incremented each time the index
@@ -57,6 +68,8 @@ namespace vecs {
 		explicit VecsHandle( table_index_t index, generation_t gen) { set_index(index); set_generation(gen); }
 		explicit VecsHandle( table_index_t index) { set_index(index); set_generation( generation_t{0ULL} ); }
 	};
+	//using VecsHandle1 = VecsIndex1;
+
 
 	template<typename TL, typename... Ts>
 	concept has_all_types = ((vtll::unique< vtll::tl<Ts... > >::value) && 
