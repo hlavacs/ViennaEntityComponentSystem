@@ -7,6 +7,8 @@
 #include <iostream>
 #include <iomanip>
 #include <format>
+#include <memory>
+#include <atomic>
 
 namespace vsty {
 

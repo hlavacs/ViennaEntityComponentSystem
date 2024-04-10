@@ -7,6 +7,8 @@
 #include <tuple>
 #include <vector>
 #include <optional>
+#include <atomic>
+#include <type_traits>
 
 /***********************************************************************************
 * 

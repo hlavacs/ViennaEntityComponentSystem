@@ -22,6 +22,7 @@
 #include <cstddef>  // for std::ptrdiff_t
 #include <iterator> // for std::random_access_iterator_tag
 #include <compare>
+#include <memory>
 
 
 #include "VTLL.h"
@@ -321,7 +322,7 @@ namespace vllt {
 
 		if constexpr (FAIR) {
 			if( m_starving.load()==-1 ) m_starving.wait(-1); //wait until pushes are done and pulls have a chance to catch up
-			if( stack_diff(m_size_cnt.load()) < -4 ) m_starving.store(1); //if pops are starving the pushes, then prevent pulls 
+			if( table_diff(m_size_cnt.load()) < -4 ) m_starving.store(1); //if pops are starving the pushes, then prevent pulls 
 		}
 		//increase size.m_diff to announce your demand for a new slot -> slot is now reserved for you
 		slot_size_t size = m_size_cnt.load();	///< Make sure that no other thread is popping currently
@@ -634,7 +635,7 @@ namespace vllt {
 		inline auto pop_back() noexcept requires OWNER { return m_table.pop_back(); }; 
 
 		inline auto clear() noexcept -> size_t requires OWNER { return m_table.clear(); };
-		inline auto swap(table_index_t other) noexcept -> void requires OWNER { m_table.swap(m_n, other); };	
+		inline auto swap(table_index_t lhs, table_index_t rhs) noexcept -> void requires OWNER { m_table.swap(lhs, rhs); };	
 		
 		inline auto erase(table_index_t n) -> tuple_value_t requires OWNER { return m_table.erase(n); }
 
@@ -732,7 +733,7 @@ namespace vllt {
 			if constexpr (SYNC == VLLT_SYNC_DEBUG) { assert( m_table.m_num_views.load() == 0 ); }
 		};
 
-		~VlltStaticStack() : m_table{ table } {
+		~VlltStaticStack() {
 			if constexpr (SYNC == VLLT_SYNC_EXTERNAL) return;
 			m_table.m_num_stacks.fetch_sub(1);
 		};
@@ -742,7 +743,7 @@ namespace vllt {
 		template<typename... Cs>
 			requires std::is_same_v<vtll::tl<std::decay_t<Cs>...>, vtll::remove_atomic<DATA>>
 		inline auto push_back(Cs&&... data) -> table_index_t { 
-			return m_table.push_back(callback, std::forward<Cs>(data)...); 
+			return m_table.push_back(std::forward<Cs>(data)...); 
 		};
 
 		inline auto pop_back() noexcept -> std::optional< tuple_value_t > { return m_table.pop_back(); }; 
