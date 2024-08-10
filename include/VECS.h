@@ -31,6 +31,7 @@ namespace vecs
 			~VecsComponentMapBase() = default;
 			virtual void* get(VecsHandle handle) = 0;
 			virtual void erase(VecsHandle handle) = 0;
+			virtual bool empty() = 0;
 		};
 
 		template<typename T>
@@ -43,6 +44,10 @@ namespace vecs
 
 			virtual void erase(VecsHandle handle) {
 				m_components.erase(handle);
+			};
+
+			virtual bool empty() {
+				return m_components.empty();
 			};
 		};
 
@@ -95,15 +100,19 @@ namespace vecs
 			return *((T*)m_component_maps[ti]->get(handle));
 		}
 
-		template<typename T>
+		template<typename... Ts>
 		void erase(VecsHandle handle) {
 			assert(exists(handle));
 			m_entities.erase(handle);
-			std::type_index ti = std::type_index(typeid(T));
-			m_component_maps[ti]->erase(handle);
-			if(m_component_maps[ti].empty()) {
-				m_component_maps.erase(ti);
-			}
+
+			auto func = [&](VecsHandle handle, auto ti) {
+				m_component_maps[ti]->erase(handle);
+				if(m_component_maps[ti]->empty()) {
+					m_component_maps.erase(ti);
+				}
+			};
+
+			(func(handle, std::type_index(typeid(Ts))), ...);
 		}
 
 		template<>
