@@ -36,9 +36,20 @@ int main() {
     system.erase<void>(h2);
     b2 = system.exists(h2);
 
+
+    system.create(1, 10.0f, 10.0);
+    system.create(2, 20.0f );
+    system.create(3, 30.0);
+    system.create(4, 40.0f, 40.0);
+    system.create(5);
+    system.create(6, 60.0f, 60.0);
+
     auto& comp = system.components<int>();
     for( auto& i : comp ) {
         std::cout << i.second << std::endl;
+        if( system.has<float>(i.first) ) {
+            std::cout << "Has float " << system.get<float>(i.first) << std::endl;
+        }
     }
 
 
