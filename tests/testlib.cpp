@@ -22,7 +22,7 @@ int main() {
     auto h2 = system.create(5, 6.9f, 7.3);
     bool b2 = system.exists(h2);
     auto t2 = system.types(h2);
-    auto v2 = system.get<float>(h2);
+    auto [v2a, v2b] = system.get<float, double>(h2);
 
     bool b2a = system.has<int>(h2);
     bool b2b = system.has<float>(h2);
