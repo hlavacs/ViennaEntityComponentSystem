@@ -55,6 +55,10 @@ namespace vecs
 		VecsSystem() = default;
 		virtual ~VecsSystem() = default;
 
+		bool null(VecsHandle handle) {
+			return handle == 0;
+		}
+
 		template<typename... Ts>
 		requires ((sizeof...(Ts) > 0) && (vtll::unique<vtll::tl<Ts...>>::value))
 		[[nodiscard]]
@@ -79,10 +83,7 @@ namespace vecs
 		bool has(VecsHandle handle) {
 			assert(handle);
 			auto it = m_entities.find(handle);
-			if( it == m_entities.end() ) {
-				return false;
-			}
-			return it->second.find(std::type_index(typeid(T))) != it->second.end();
+			return it != m_entities.end() && it->second.find(std::type_index(typeid(T))) != it->second.end();
 		}
 
 		const auto& types(VecsHandle handle) {
@@ -91,21 +92,30 @@ namespace vecs
 		}
 
 		template<typename T>
-		T& get(VecsHandle handle) {
+		[[nodiscard]]
+		auto get(VecsHandle handle) -> T& {
 			assert(exists(handle));
 			auto ti = std::type_index(typeid(T));
 			if( m_component_maps.find(ti) ==  m_component_maps.end() ) {
 				m_component_maps[ti] = std::make_unique<VecsComponentMap<T>>();
 			}
-			return *((T*)m_component_maps[ti]->get(handle));
+			return *static_cast<T*>(m_component_maps[ti]->get(handle));
+		}
+
+		template<typename... Ts>
+		requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value))
+		[[nodiscard]]
+		auto get(VecsHandle handle) -> std::tuple<Ts&...> {
+			return std::tuple<Ts&...>(get<Ts>(handle)...);
 		}
 
 		template<typename... Ts>
 		void erase(VecsHandle handle) {
-			assert(exists(handle));
-			m_entities.erase(handle);
+			assert( (has<Ts>(handle) && ...) );
+			auto& entt = m_entities.find(handle)->second;
 
-			auto func = [&](VecsHandle handle, auto ti) {
+			auto func = [&](VecsHandle handle, auto&& ti) {
+				entt.erase(ti);
 				m_component_maps[ti]->erase(handle);
 				if(m_component_maps[ti]->empty()) {
 					m_component_maps.erase(ti);
@@ -113,6 +123,10 @@ namespace vecs
 			};
 
 			(func(handle, std::type_index(typeid(Ts))), ...);
+
+			if( entt.empty() ) {
+				m_entities.erase(handle);
+			}
 		}
 
 		template<>
