@@ -32,6 +32,7 @@ namespace vecs
 			virtual void* get(VecsHandle handle) = 0;
 			virtual void erase(VecsHandle handle) = 0;
 			virtual bool empty() = 0;
+			virtual void* components() = 0;
 		};
 
 		template<typename T>
@@ -49,6 +50,11 @@ namespace vecs
 			virtual bool empty() {
 				return m_components.empty();
 			};
+
+			virtual void* components() {
+				return &m_components;
+			};
+
 		};
 
 	public:
@@ -117,9 +123,6 @@ namespace vecs
 			auto func = [&](VecsHandle handle, auto&& ti) {
 				entt.erase(ti);
 				m_component_maps[ti]->erase(handle);
-				if(m_component_maps[ti]->empty()) {
-					m_component_maps.erase(ti);
-				}
 			};
 
 			(func(handle, std::type_index(typeid(Ts))), ...);
@@ -136,6 +139,16 @@ namespace vecs
 				m_component_maps[it]->erase(handle);
 			}
 			m_entities.erase(handle);
+		}
+
+
+		template<typename T>
+		[[nodiscard]]
+		const std::unordered_map<VecsHandle, T>& components() {
+			if(m_component_maps.find(std::type_index(typeid(T)) ) == m_component_maps.end()) {
+				m_component_maps[std::type_index(typeid(T))] = std::make_unique<VecsComponentMap<T>>();
+			}
+			return *((const std::unordered_map<VecsHandle, T>*) m_component_maps[std::type_index(typeid(T))]->components());
 		}
 
 	private:

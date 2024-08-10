@@ -36,7 +36,10 @@ int main() {
     system.erase<void>(h2);
     b2 = system.exists(h2);
 
-
+    auto& comp = system.components<int>();
+    for( auto& i : comp ) {
+        std::cout << i.second << std::endl;
+    }
 
 
     return 0;   
