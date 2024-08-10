@@ -15,6 +15,7 @@
 #include <set>
 #include <any>
 #include <cassert>
+#include <VTLL.h>
 
 
 using namespace std::chrono_literals;
@@ -50,7 +51,7 @@ namespace vecs
 		virtual ~VecsSystem() = default;
 
 		template<typename... Ts>
-		requires (sizeof...(Ts) > 0)
+		requires ((sizeof...(Ts) > 0) && (vtll::unique<vtll::tl<Ts...>>::value))
 		[[nodiscard]]
 		VecsHandle create( Ts&&... component ) {
 			VecsHandle handle{ ++m_next_id };

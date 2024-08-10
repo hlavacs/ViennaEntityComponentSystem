@@ -24,7 +24,10 @@ elseif(CMAKE_COMPILER_IS_GNUCXX)
 endif()
 
 set(INCLUDE ${CMAKE_HOME_DIRECTORY}/include)
-set(EXTERNAL ${CMAKE_HOME_DIRECTORY}/external)
+set(EXTERN ${CMAKE_HOME_DIRECTORY}/extern)
+
+include_directories (${EXTERN}/ViennaTypeListLibrary/include)
+
 
 
 # Testing
