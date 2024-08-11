@@ -65,10 +65,10 @@ namespace vecs
 		[[nodiscard]]
 		VecsHandle create( Ts&&... component ) {
 			VecsHandle handle{ ++m_next_id };
-			(m_entities[handle].insert(std::type_index(typeid(Ts))), ...);
+			(m_entities[handle].insert(type<Ts>()), ...);
 
 			auto func = [&](VecsHandle handle, auto&& v) {
-				get<std::decay_t<decltype(v)>>(handle) = v;
+				*ptr<std::decay_t<decltype(v)>>(handle) = v;
 			};
 
 			(func(handle, component), ...);
@@ -84,7 +84,7 @@ namespace vecs
 		bool has(VecsHandle handle) {
 			assert(handle);
 			auto it = m_entities.find(handle);
-			return it != m_entities.end() && it->second.find(std::type_index(typeid(T))) != it->second.end();
+			return it != m_entities.end() && it->second.find(type<T>()) != it->second.end();
 		}
 
 		const auto& types(VecsHandle handle) {
@@ -94,20 +94,27 @@ namespace vecs
 
 		template<typename T>
 		[[nodiscard]]
-		auto get(VecsHandle handle) -> T& {
+		auto get(VecsHandle handle) -> T {
 			assert(exists(handle));
-			auto ti = std::type_index(typeid(T));
-			if( m_component_maps.find(ti) ==  m_component_maps.end() ) {
-				m_component_maps[ti] = std::make_unique<VecsComponentMap<T>>();
-			}
-			return *static_cast<T*>(m_component_maps[ti]->get(handle));
+			return *ptr<T>(handle);
 		}
 
 		template<typename... Ts>
 		requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value))
 		[[nodiscard]]
-		auto get(VecsHandle handle) -> std::tuple<Ts&...> {
-			return std::tuple<Ts&...>(get<Ts>(handle)...);
+		auto get(VecsHandle handle) -> std::tuple<Ts...> {
+			return std::tuple<Ts...>(get<Ts>(handle)...);
+		}
+
+		void put(VecsHandle handle, auto&& v) {
+			assert(exists(handle));
+			*ptr<std::decay_t<decltype(v)>>(handle) = v;
+		}
+
+		template<typename... Ts>
+		requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value))
+		void put(VecsHandle handle, Ts&&... vs) {
+			(put(handle, vs), ...);
 		}
 
 		template<typename... Ts>
@@ -140,14 +147,27 @@ namespace vecs
 		template<typename T>
 		[[nodiscard]]
 		const std::unordered_map<VecsHandle, T>& components() {
-			auto ti = std::type_index(typeid(T));
-			if(m_component_maps.find(ti) == m_component_maps.end()) {
-				m_component_maps[ti] = std::make_unique<VecsComponentMap<T>>();
+			if(m_component_maps.find(type<T>()) == m_component_maps.end()) {
+				m_component_maps[type<T>()] = std::make_unique<VecsComponentMap<T>>();
 			}
-			return *((const std::unordered_map<VecsHandle, T>*) m_component_maps[ti]->components());
+			return *((const std::unordered_map<VecsHandle, T>*) m_component_maps[type<T>()]->components());
 		}
 
 	private:
+
+		template<typename T>
+		std::type_index type() {
+			return std::type_index(typeid(std::decay_t<T>));
+		}
+
+		template<typename T>
+		auto ptr(VecsHandle handle) -> T* {
+			if( m_component_maps.find(type<T>()) ==  m_component_maps.end() ) {
+				m_component_maps[type<T>()] = std::make_unique<VecsComponentMap<T>>();
+			}
+			return static_cast<T*>(m_component_maps[type<T>()]->get(handle));
+		}
+
 		std::size_t m_next_id{0};
 		std::unordered_map<VecsHandle, std::set<std::type_index>> m_entities;
 		std::unordered_map<std::type_index, std::unique_ptr<VecsComponentMapBase>> m_component_maps;
