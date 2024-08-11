@@ -113,6 +113,12 @@ namespace vecs
 
 		template<typename... Ts>
 		requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value))
+		void put(VecsHandle handle, std::tuple<Ts&&...> v) {
+			(put(handle, std::get<Ts>(v)), ...);
+		}
+
+		template<typename... Ts>
+		requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value))
 		void put(VecsHandle handle, Ts&&... vs) {
 			(put(handle, vs), ...);
 		}
