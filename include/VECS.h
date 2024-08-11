@@ -20,6 +20,20 @@
 
 using namespace std::chrono_literals;
 
+namespace std {
+	template<>
+	struct hash<std::set<std::type_index>> {
+		std::size_t operator()(const std::set<std::type_index>& v) const {
+			std::size_t seed = 0;
+			for( auto& it : v ) {
+				seed ^= std::hash<std::type_index>{}(it) + 0x9e3779b9 + (seed<<6) + (seed>>2);
+			}
+			return seed;
+		}
+	};
+}
+
+
 namespace vecs
 {
 	using VecsHandle = std::size_t;
@@ -35,6 +49,7 @@ namespace vecs
 			virtual void* get(VecsHandle handle) = 0;
 			virtual void erase(VecsHandle handle) = 0;
 			virtual void* data() = 0;
+			virtual void copy(void* from, void* to) = 0;
 		};
 
 		template<typename T>
@@ -64,6 +79,16 @@ namespace vecs
 			virtual void* data() {
 				return &m_data;
 			};
+
+			virtual void copy(void* from, void* to) {
+				*((T*)to) = *((T*)from);
+			};
+
+		};
+
+		struct VecsArchetype {
+				std::set<std::type_index> m_types;
+				std::map<std::type_index, std::unique_ptr<VecsComponentMapBase>> m_maps;
 		};
 
 	public:
@@ -186,7 +211,10 @@ namespace vecs
 
 		std::size_t m_next_id{0};
 		std::unordered_map<VecsHandle, std::set<std::type_index>> m_entities;
-		std::unordered_map<std::type_index, std::unique_ptr<VecsComponentMapBase>> m_component_maps;
+		std::unordered_map<std::type_index, std::unique_ptr<VecsComponentMapBase>> m_component_maps; //get rid of this
+
+		std::unordered_map<std::size_t, VecsArchetype> m_archetypes;
+		std::unordered_map<std::type_index, std::size_t> m_archetype_index;
 	};
 
 }
