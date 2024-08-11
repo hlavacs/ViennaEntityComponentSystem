@@ -24,6 +24,9 @@ namespace vecs
 {
 	using VecsHandle = std::size_t;
 
+	template <typename> struct is_tuple : std::false_type {};
+	template <typename ...Ts> struct is_tuple<std::tuple<Ts...>> : std::true_type {};
+
 	class VecsSystem {
 	private:
 	
@@ -106,14 +109,16 @@ namespace vecs
 			return std::tuple<Ts...>(get<Ts>(handle)...);
 		}
 
-		void put(VecsHandle handle, auto&& v) {
+		template<typename T>
+		requires (!is_tuple<T>::value)
+		void put(VecsHandle handle, T&& v) {
 			assert(exists(handle));
 			*ptr<std::decay_t<decltype(v)>>(handle) = v;
 		}
 
 		template<typename... Ts>
-		requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value))
-		void put(VecsHandle handle, std::tuple<Ts&&...> v) {
+		requires (vtll::unique<vtll::tl<Ts...>>::value)
+		void put(VecsHandle handle, std::tuple<Ts...>& v) {
 			(put(handle, std::get<Ts>(v)), ...);
 		}
 

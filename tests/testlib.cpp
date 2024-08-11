@@ -24,6 +24,13 @@ int main() {
     auto t2 = system.types(h2);
     auto [v2a, v2b] = system.get<float, double>(h2);
 
+    system.put(h2, 50, 69.0f, 73.0);
+    auto tup = system.get<float, double>(h2);
+    std::get<float>(tup) = 101.0f;    
+    std::get<double>(tup) = 102.0;    
+    system.put(h2, tup);
+    tup = system.get<float, double>(h2);
+
     bool b2a = system.has<int>(h2);
     bool b2b = system.has<float>(h2);
     bool b2c = system.has<double>(h2);
