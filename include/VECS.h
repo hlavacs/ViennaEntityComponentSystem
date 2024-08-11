@@ -88,7 +88,7 @@ namespace vecs
 
 		struct VecsArchetype {
 				std::set<std::type_index> m_types;
-				std::map<std::type_index, std::unique_ptr<VecsComponentMapBase>> m_maps;
+				std::map<std::type_index, std::unique_ptr<VecsComponentMapBase>> m_component_maps;
 		};
 
 	public:
