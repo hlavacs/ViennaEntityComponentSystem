@@ -139,10 +139,6 @@ namespace vecs
 			};
 
 			(func(handle, std::type_index(typeid(Ts))), ...);
-
-			if( entt.empty() ) {
-				m_entities.erase(handle);
-			}
 		}
 
 		template<>
