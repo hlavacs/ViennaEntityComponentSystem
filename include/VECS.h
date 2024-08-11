@@ -48,7 +48,7 @@ namespace vecs
 					m_index[handle] = m_data.size();
 					m_data.push_back(std::make_pair(handle, T{}));
 				}
-				return (void*)(&m_data[m_index[handle]]);
+				return &m_data[m_index[handle]];
 			};
 
 			virtual void erase(VecsHandle handle) {
@@ -64,21 +64,20 @@ namespace vecs
 			virtual void* data() {
 				return &m_data;
 			};
-
 		};
 
 	public:
 		VecsSystem() = default;
 		virtual ~VecsSystem() = default;
 
-		bool null(VecsHandle handle) {
-			return handle == 0;
+		bool valid(VecsHandle handle) {
+			return handle != 0;
 		}
 
 		template<typename... Ts>
 		requires ((sizeof...(Ts) > 0) && (vtll::unique<vtll::tl<Ts...>>::value))
 		[[nodiscard]]
-		VecsHandle create( Ts&&... component ) {
+		auto create( Ts&&... component ) -> VecsHandle{
 			VecsHandle handle{ ++m_next_id };
 			(m_entities[handle].insert(type<Ts>()), ...);
 
@@ -91,13 +90,13 @@ namespace vecs
 		}
 
 		bool exists(VecsHandle handle) {
-			assert(handle);
+			assert(valid(handle));
 			return m_entities.find(handle) != m_entities.end();
 		}
 
 		template<typename T>
 		bool has(VecsHandle handle) {
-			assert(handle);
+			assert(valid(handle));
 			auto it = m_entities.find(handle);
 			return it != m_entities.end() && it->second.find(type<T>()) != it->second.end();
 		}
@@ -153,8 +152,7 @@ namespace vecs
 			(func(handle, std::type_index(typeid(Ts))), ...);
 		}
 
-		template<>
-		void erase<void>(VecsHandle handle) {
+		void erase(VecsHandle handle) {
 			assert(exists(handle));
 			for( auto& it : m_entities.find(handle)->second ) {
 				m_component_maps[it]->erase(handle);
@@ -162,10 +160,9 @@ namespace vecs
 			m_entities.erase(handle);
 		}
 
-
 		template<typename T>
 		[[nodiscard]]
-		const std::vector<std::pair<VecsHandle, T>>& data() {
+		auto data() -> const std::vector<std::pair<VecsHandle, T>>& {
 			if(m_component_maps.find(type<T>()) == m_component_maps.end()) {
 				m_component_maps[type<T>()] = std::make_unique<VecsComponentMap<T>>();
 			}
@@ -175,7 +172,7 @@ namespace vecs
 	private:
 
 		template<typename T>
-		std::type_index type() {
+		auto type() -> std::type_index {
 			return std::type_index(typeid(std::decay_t<T>));
 		}
 

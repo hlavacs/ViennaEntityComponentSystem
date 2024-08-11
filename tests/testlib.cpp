@@ -16,7 +16,7 @@ int main() {
     auto t1 = system.types(h1);
     auto v1 = system.get<int>(h1);
     bool b1a = system.has<int>(h1);
-    system.erase<void>(h1);
+    system.erase(h1);
     b1 = system.exists(h1);
 
     auto h2 = system.create(5, 6.9f, 7.3);
@@ -40,7 +40,7 @@ int main() {
     b2b = system.has<float>(h2);
     b2c = system.has<double>(h2);
 
-    system.erase<void>(h2);
+    system.erase(h2);
     b2 = system.exists(h2);
 
 
