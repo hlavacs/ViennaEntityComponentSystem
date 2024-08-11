@@ -214,7 +214,7 @@ namespace vecs
 		std::unordered_map<std::type_index, std::unique_ptr<VecsComponentMapBase>> m_component_maps; //get rid of this
 
 		std::unordered_map<std::size_t, VecsArchetype> m_archetypes;
-		std::unordered_map<std::type_index, std::size_t> m_archetype_index;
+		std::unordered_multimap<std::type_index, std::size_t> m_archetype_index;
 	};
 
 }
