@@ -70,7 +70,7 @@ namespace vecs
 				std::size_t index = m_index[handle];
 				std::size_t last = m_data.size() - 1;
 				if( index < last ) {
-					m_data[index] = m_data[last];
+					m_data[index] = std::move(m_data[last]);
 					m_index[m_data[last].first] = index;
 				}
 				m_data.pop_back();
@@ -82,6 +82,10 @@ namespace vecs
 
 			virtual void copy(void* from, void* to) {
 				*((T*)to) = *((T*)from);
+			};
+
+			virtual void move(void* from, void* to) {
+				*((T*)to) = std::move(*((T*)from));
 			};
 
 		};
@@ -210,10 +214,10 @@ namespace vecs
 		}
 
 		std::size_t m_next_id{0};
-		std::unordered_map<VecsHandle, std::set<std::type_index>> m_entities;
+		std::unordered_map<VecsHandle, std::set<std::type_index>> m_entities; //should have ref to archetype instead of set
 		std::unordered_map<std::type_index, std::unique_ptr<VecsComponentMapBase>> m_component_maps; //get rid of this
 
-		std::unordered_map<std::size_t, VecsArchetype> m_archetypes;
+		std::unordered_map<std::size_t, VecsArchetype> m_archetypes; //TODO: archetype 
 		std::unordered_multimap<std::type_index, std::size_t> m_archetype_index;
 	};
 
