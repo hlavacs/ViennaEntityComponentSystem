@@ -50,6 +50,7 @@ namespace vecs
 			virtual void erase(VecsHandle handle) = 0;
 			virtual void* data() = 0;
 			virtual void copy(void* from, void* to) = 0;
+			virtual void move(void* from, void* to) = 0;
 		};
 
 		template<typename T>
