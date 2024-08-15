@@ -95,8 +95,29 @@ namespace vecs
 		};
 
 		struct Archetype {
-				std::set<std::type_index> m_types;
-				std::map<std::type_index, std::unique_ptr<ComponentMapBase>> m_maps;
+			std::set<std::type_index> m_types;
+			std::map<std::type_index, std::unique_ptr<ComponentMapBase>> m_maps;
+
+			template<typename... Ts>
+			Archetype() {
+				auto func = [&]<typename T>() {
+					m_maps[type<T>()] = std::make_unique<ComponentMap<T>>();
+					m_types.insert(type<T>());
+				};
+
+				(func.template operator()<Ts>(), ...);
+			}
+
+			template<typename T>
+			auto type() -> std::type_index {
+				return std::type_index(typeid(std::decay_t<T>));
+			}
+
+			template<typename T>
+			auto ptr(Handle handle) -> T* {
+				assert( m_maps.find(type<T>()) !=  m_maps.end() );
+				return &(std::any_cast<std::pair<Handle,T>*>(m_maps[type<T>()]->get(handle)))->second;
+			}
 		};
 
 	public:
@@ -108,7 +129,7 @@ namespace vecs
 		template<typename... Ts>
 		requires ((sizeof...(Ts) > 0) && (vtll::unique<vtll::tl<Ts...>>::value))
 		[[nodiscard]]
-		auto create( Ts&&... component ) -> Handle{
+		auto create( Ts&&... component ) -> Handle {
 			Handle handle{ ++m_next_id };
 			(m_entities[handle].insert(type<Ts>()), ...);
 
