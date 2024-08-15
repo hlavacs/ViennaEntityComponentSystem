@@ -100,8 +100,6 @@ namespace vecs
 		};
 
 	public:
-		Registry() = default;
-		virtual ~Registry() = default;
 
 		bool valid(Handle handle) {
 			return handle != 0;
