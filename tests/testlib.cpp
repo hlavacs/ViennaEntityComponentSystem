@@ -5,13 +5,11 @@
 #include <utility>
 #include "VECS.h"
 
-using namespace vecs;
-
 
 int main() {
-    VecsSystem system;
+    vecs::System system;
 
-    VecsHandle h1 = system.create(5);
+    vecs::Handle h1 = system.create(5);
     bool b1 = system.exists(h1);
     auto t1 = system.types(h1);
     auto v1 = system.get<int>(h1);
