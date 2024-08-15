@@ -41,7 +41,7 @@ namespace vecs
 	template <typename> struct is_tuple : std::false_type {};
 	template <typename ...Ts> struct is_tuple<std::tuple<Ts...>> : std::true_type {};
 
-	class System {
+	class Registry {
 	private:
 	
 		struct ComponentMapBase {
@@ -100,8 +100,8 @@ namespace vecs
 		};
 
 	public:
-		System() = default;
-		virtual ~System() = default;
+		Registry() = default;
+		virtual ~Registry() = default;
 
 		bool valid(Handle handle) {
 			return handle != 0;

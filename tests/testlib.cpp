@@ -7,7 +7,7 @@
 
 
 int main() {
-    vecs::System system;
+    vecs::Registry system;
 
     vecs::Handle h1 = system.create(5);
     bool b1 = system.exists(h1);
