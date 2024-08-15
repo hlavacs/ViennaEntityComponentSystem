@@ -99,7 +99,7 @@ namespace vecs
 			std::map<std::type_index, std::unique_ptr<ComponentMapBase>> m_maps;
 
 			template<typename... Ts>
-				requires ((sizeof...(Ts) > 0) && (vtll::unique<vtll::tl<Ts...>>::value))
+				requires (vtll::unique<vtll::tl<Ts...>>::value)
 			Archetype() {
 				auto func = [&]<typename T>() {
 					m_maps[type<T>()] = std::make_unique<ComponentMap<T>>();
@@ -109,7 +109,7 @@ namespace vecs
 				(func.template operator()<Ts>(), ...);
 			}
 
-			template<typename T, bool ADD = true>
+			template<typename T, bool ADD>
 			Archetype(const Archetype& other) {
 				m_types = other.m_types;
 				if constexpr(ADD) {
