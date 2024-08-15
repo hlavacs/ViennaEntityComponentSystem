@@ -51,6 +51,7 @@ namespace vecs
 			virtual void* data() = 0;
 			virtual void copy(void* from, void* to) = 0;
 			virtual void move(void* from, void* to) = 0;
+			virtual std::unique_ptr<VecsComponentMapBase> clone() = 0;
 		};
 
 		template<typename T>
@@ -89,6 +90,9 @@ namespace vecs
 				*((T*)to) = std::move(*((T*)from));
 			};
 
+			virtual std::unique_ptr<VecsComponentMapBase> clone() {
+				return std::make_unique<VecsComponentMap<T>>();
+			};
 		};
 
 		struct VecsArchetype {
