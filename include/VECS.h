@@ -44,51 +44,82 @@ namespace vecs
 	class VecsSystem {
 	private:
 	
-		struct VecsComponentMapBase {
-			~VecsComponentMapBase() = default;
-			virtual void* get(VecsHandle handle) = 0;
-			virtual void erase(VecsHandle handle) = 0;
-			virtual void* data() = 0;
-			virtual void copy(void* from, void* to) = 0;
-			virtual void move(void* from, void* to) = 0;
+		class VecsComponentMapBase {
+
+		public:
+			std::function<void()> create;
+			std::function<void()> destroy;
+
+			std::function<void*(VecsHandle)> get;
+			std::function<void(void*,void*)> copy;
+			std::function<void(void*,void*)> move;
+			std::function<void(VecsHandle)> erase;
+			void* data(){ return m_data; };
+
+			VecsComponentMapBase( VecsComponentMapBase& r) {
+				create = r.create;
+				destroy = r.destroy;
+				get = r.get;
+				copy = r.copy;
+				move = r.move;
+				erase = r.erase;
+				create();
+			};
+
+			~VecsComponentMapBase() { destroy(); };
+
+		protected:
+			VecsComponentMapBase() = default;
+			void* m_data;
+			std::unordered_map<VecsHandle, std::size_t> m_index;
 		};
 
 		template<typename T>
-		struct VecsComponentMap : VecsComponentMapBase {
+		class VecsComponentMap : public VecsComponentMapBase {
 
-			std::unordered_map<VecsHandle, std::size_t> m_index;
-			std::vector<std::pair<VecsHandle, T>> m_data;
+		public:
+			using VecsComponentMapVector = std::vector<std::pair<VecsHandle, T>>;
 
-			virtual void* get(VecsHandle handle) {
-				if( m_index.find(handle) == m_index.end() ) {
-					m_index[handle] = m_data.size();
-					m_data.push_back(std::make_pair(handle, T{}));
-				}
-				return &m_data[m_index[handle]];
-			};
+			VecsComponentMap() {
+				VecsComponentMapBase::create = [&](){
+					m_data = new std::vector<std::pair<VecsHandle, T>>();
+				};
+				VecsComponentMapBase::create();
 
-			virtual void erase(VecsHandle handle) {
-				std::size_t index = m_index[handle];
-				std::size_t last = m_data.size() - 1;
-				if( index < last ) {
-					m_data[index] = std::move(m_data[last]);
-					m_index[m_data[last].first] = index;
-				}
-				m_data.pop_back();
-			};
+				VecsComponentMapBase::destroy = [&](){
+					delete (std::vector<std::pair<VecsHandle, T>>*) data();
+				};
+				
+				VecsComponentMapBase::get = [&](VecsHandle handle) {
+					auto dataptr = (VecsComponentMapVector*)data();
 
-			virtual void* data() {
-				return &m_data;
-			};
+					if( m_index.find(handle) == m_index.end() ) {
+						m_index[handle] = dataptr->size();
+						dataptr->push_back(std::make_pair(handle, T{}));
+					}
+					return &(*dataptr)[m_index[handle]];
+				};
 
-			virtual void copy(void* from, void* to) {
-				*((T*)to) = *((T*)from);
-			};
+				VecsComponentMapBase::copy = [](void* from, void* to) {
+					*((T*)to) = *((T*)from);
+				};
 
-			virtual void move(void* from, void* to) {
-				*((T*)to) = std::move(*((T*)from));
-			};
+				VecsComponentMapBase::move = [](void* from, void* to) {
+					*((T*)to) = std::move(*((T*)from));
+				};
 
+				VecsComponentMapBase::erase = [&](VecsHandle handle) {
+					auto dataptr = (VecsComponentMapVector*)data();
+
+					std::size_t index = m_index[handle];
+					std::size_t last = dataptr->size() - 1;
+					if( index < last ) {
+						(*dataptr)[index] = std::move( (*dataptr)[last] );
+						m_index[(*dataptr)[last].first] = index;
+					}
+					dataptr->pop_back();
+				};
+			}
 		};
 
 		struct VecsArchetype {
