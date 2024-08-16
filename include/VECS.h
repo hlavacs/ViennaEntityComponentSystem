@@ -15,6 +15,8 @@
 #include <set>
 #include <any>
 #include <cassert>
+#include <bitset>
+#include <algorithm>    // std::sort
 #include <VTLL.h>
 
 
@@ -31,6 +33,19 @@ namespace std {
 			return seed;
 		}
 	};
+
+	template<>
+	struct hash<std::vector<std::size_t>> {
+		std::size_t operator()(std::vector<std::size_t>& hashes) const {
+			std::size_t seed = 0;
+			std::sort(hashes.begin(), hashes.end());
+			for( auto& v : hashes ) {
+				seed ^= v + 0x9e3779b9 + (seed<<6) + (seed>>2);
+			}
+			return seed;
+		}
+	};
+
 }
 
 
@@ -56,7 +71,7 @@ namespace vecs
 		template<typename T>
 		struct ComponentMap : ComponentMapBase {
 
-			std::unordered_map<Handle, std::size_t> m_index;
+			std::unordered_map<Handle, std::size_t> m_index;  //TODO: delete this
 			std::vector<std::pair<Handle, T>> m_data;
 
 			virtual std::any get(Handle handle) {
@@ -95,8 +110,8 @@ namespace vecs
 		};
 
 		struct Archetype {
-			std::set<std::type_index> m_types;
-			std::map<std::type_index, std::unique_ptr<ComponentMapBase>> m_maps;
+			std::vector<std::type_index> m_types;
+			std::unordered_map<std::type_index, std::unique_ptr<ComponentMapBase>> m_maps;
 
 			template<typename... Ts>
 				requires (vtll::unique<vtll::tl<Ts...>>::value)
@@ -261,8 +276,9 @@ namespace vecs
 		std::unordered_map<Handle, std::set<std::type_index>> m_entities; //should have ref to archetype instead of set
 		std::unordered_map<std::type_index, std::unique_ptr<ComponentMapBase>> m_component_maps; //get rid of this
 
-		std::unordered_map<std::size_t, Archetype> m_archetypes; //TODO: archetype 
-		std::unordered_multimap<std::type_index, std::size_t> m_archetype_index;
+		std::unordered_map<Handle, std::pair<Archetype*, std::size_t>> m_entities2; //Archetype and index in archetype
+		std::unordered_map<std::size_t, std::unique_ptr<Archetype>> m_archetypes; //Mapping hash(set of type index) to archetype
+		std::unordered_map<std::type_index, std::set<Archetype*>> m_has_types; //Mapping type index to archetype
 	};
 
 }
