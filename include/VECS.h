@@ -61,6 +61,7 @@ namespace vecs
 	
 		struct ComponentMapBase {
 			~ComponentMapBase() = default;
+			virtual std::size_t insert(Handle handle, std::any v) = 0;
 			virtual std::any get(Handle handle) = 0;
 			virtual void erase(Handle handle) = 0;
 			virtual std::any data() = 0;
@@ -73,6 +74,11 @@ namespace vecs
 
 			std::unordered_map<Handle, std::size_t> m_index;  //TODO: delete this
 			std::vector<std::pair<Handle, T>> m_data;
+
+			virtual std::size_t insert(Handle handle, std::any v) {
+				m_data.push_back(std::make_pair(handle, std::any_cast<T>(v)));
+				return m_data.size() - 1;
+			};
 
 			virtual std::any get(Handle handle) {
 				if( m_index.find(handle) == m_index.end() ) {
