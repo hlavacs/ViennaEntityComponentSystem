@@ -56,6 +56,12 @@ namespace vecs
 	template <typename> struct is_tuple : std::false_type {};
 	template <typename ...Ts> struct is_tuple<std::tuple<Ts...>> : std::true_type {};
 
+
+	template<typename T>
+	auto type() -> std::type_index {
+		return std::type_index(typeid(std::decay_t<T>));
+	}
+
 	class Registry {
 	private:
 	
@@ -116,7 +122,7 @@ namespace vecs
 		};
 
 		struct Archetype {
-			std::vector<std::type_index> m_types;
+			std::vector<std::type_index> m_types;	//must be sorted
 			std::unordered_map<std::type_index, std::unique_ptr<ComponentMapBase>> m_maps;
 
 			template<typename... Ts>
@@ -126,6 +132,7 @@ namespace vecs
 					m_maps[type<T>()] = std::make_unique<ComponentMap<T>>();
 					m_types.insert(type<T>());
 				};
+				std::sort(m_types.begin(), m_types.end());
 
 				(func.template operator()<Ts>(), ...);
 			}
@@ -133,15 +140,19 @@ namespace vecs
 			template<typename T, bool ADD>
 			Archetype(const Archetype& other) {
 				m_types = other.m_types;
-				if constexpr(ADD) {
-					m_types.insert(type<T>());
+				if constexpr (ADD) {
+					assert(std::find(m_types.begin(), m_types.end(), type<T>()) == m_types.end());
+					m_types.push_back(type<T>());
+					std::sort(m_types.begin(), m_types.end());
 					m_maps[type<T>()] = std::make_unique<ComponentMap<T>>();
 				} else {
-					m_types.erase(type<T>());
+					auto it = std::find(m_types.begin(), m_types.end(), type<T>());
+					assert(it != m_types.end());
+					m_types.erase(it);
 				}
 
 				for( auto& it : other.m_maps ) {
-					if constexpr(!ADD) {
+					if constexpr (!ADD) {
 						if( it.first == type<T>() ) {
 							continue;
 						}
@@ -151,14 +162,15 @@ namespace vecs
 			}
 
 			template<typename T>
-			auto type() -> std::type_index {
-				return std::type_index(typeid(std::decay_t<T>));
+			auto map() -> ComponentMap<T>* {
+				assert( m_maps.find(type<T>()) !=  m_maps.end() );
+				return static_cast<ComponentMap<T>*>(m_maps[type<T>()].get());
 			}
 
 			template<typename T>
 			auto ptr(Handle handle) -> T* {
 				assert( m_maps.find(type<T>()) !=  m_maps.end() );
-				return &(std::any_cast<std::pair<Handle,T>*>(m_maps[type<T>()]->get(handle)))->second;
+				return &(std::any_cast<std::pair<Handle,T>*>(map<T>()->get(handle)))->second;
 			}
 		};
 
@@ -264,11 +276,6 @@ namespace vecs
 		}
 
 	private:
-
-		template<typename T>
-		auto type() -> std::type_index {
-			return std::type_index(typeid(std::decay_t<T>));
-		}
 
 		template<typename T>
 		auto ptr(Handle handle) -> T* {
