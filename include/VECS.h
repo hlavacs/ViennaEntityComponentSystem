@@ -65,11 +65,13 @@ namespace vecs
 	class Registry {
 	private:
 	
+		//----------------------------------------------------------------------------------------------
+
 		struct ComponentMapBase {
 			~ComponentMapBase() = default;
 			virtual std::size_t insert(Handle handle, std::any v) = 0;
-			virtual std::any get(Handle handle) = 0;
-			virtual void erase(Handle handle) = 0;
+			virtual std::any get(std::size_t index) = 0;
+			virtual Handle erase(std::size_t index) = 0;
 			virtual std::any data() = 0;
 			virtual void move(std::any from, std::any to) = 0;
 			virtual std::unique_ptr<ComponentMapBase> create() = 0;
@@ -77,8 +79,6 @@ namespace vecs
 
 		template<typename T>
 		struct ComponentMap : ComponentMapBase {
-
-			std::unordered_map<Handle, std::size_t> m_index;  //TODO: delete this
 			std::vector<std::pair<Handle, T>> m_data;
 
 			virtual std::size_t insert(Handle handle, std::any v) {
@@ -86,22 +86,20 @@ namespace vecs
 				return m_data.size() - 1;
 			};
 
-			virtual std::any get(Handle handle) {
-				if( m_index.find(handle) == m_index.end() ) {
-					m_index[handle] = m_data.size();
-					m_data.push_back(std::make_pair(handle, T{}));
-				}
-				return &m_data[m_index[handle]];
+			virtual std::any get(std::size_t index) {
+				assert(index < m_data.size());
+				return &m_data[index];
 			};
 
-			virtual void erase(Handle handle) {
-				std::size_t index = m_index[handle];
+			virtual Handle erase(std::size_t index) {
+				Handle ret{0};
 				std::size_t last = m_data.size() - 1;
 				if( index < last ) {
+					ret = m_data[last].first;
 					m_data[index] = std::move(m_data[last]);
-					m_index[m_data[last].first] = index;
 				}
 				m_data.pop_back();
+				return ret;
 			};
 
 			virtual std::any data() {
@@ -121,6 +119,8 @@ namespace vecs
 			};
 		};
 
+		//----------------------------------------------------------------------------------------------
+
 		struct Archetype {
 			std::vector<std::type_index> m_types;	//must be sorted
 			std::unordered_map<std::type_index, std::unique_ptr<ComponentMapBase>> m_maps;
@@ -132,7 +132,6 @@ namespace vecs
 					m_maps[type<T>()] = std::make_unique<ComponentMap<T>>();
 					m_types.insert(type<T>());
 				};
-				std::sort(m_types.begin(), m_types.end());
 
 				(func.template operator()<Ts>(), ...);
 			}
@@ -143,7 +142,6 @@ namespace vecs
 				if constexpr (ADD) {
 					assert(std::find(m_types.begin(), m_types.end(), type<T>()) == m_types.end());
 					m_types.push_back(type<T>());
-					std::sort(m_types.begin(), m_types.end());
 					m_maps[type<T>()] = std::make_unique<ComponentMap<T>>();
 				} else {
 					auto it = std::find(m_types.begin(), m_types.end(), type<T>());
@@ -166,52 +164,83 @@ namespace vecs
 				assert( m_maps.find(type<T>()) !=  m_maps.end() );
 				return static_cast<ComponentMap<T>*>(m_maps[type<T>()].get());
 			}
-
-			template<typename T>
-			auto ptr(Handle handle) -> T* {
-				assert( m_maps.find(type<T>()) !=  m_maps.end() );
-				return &(std::any_cast<std::pair<Handle,T>*>(map<T>()->get(handle)))->second;
-			}
 		};
+
+		struct ArchetypeIndex {
+			Archetype* m_archetype;
+			size_t m_index;
+		};
+
+		//----------------------------------------------------------------------------------------------
 
 	public:
 
+		/// @brief Test if a handle is valid, i.e., not 0.
+		/// @param handle 
+		/// @return true if the handle is valid, else false.
 		bool valid(Handle handle) {
 			return handle != 0;
 		}
 
+		/// @brief Create an entity with components.
+		/// @tparam ...Ts The types of the components.
+		/// @param ...component The new values.
+		/// @return Handle of new entity.
 		template<typename... Ts>
 		requires ((sizeof...(Ts) > 0) && (vtll::unique<vtll::tl<Ts...>>::value))
 		[[nodiscard]]
 		auto create( Ts&&... component ) -> Handle {
 			Handle handle{ ++m_next_id };
-			(m_entities[handle].insert(type<Ts>()), ...);
 
+			std::vector<std::type_index> types = {type<Ts>()...};
+			auto it = m_archetypes.find(&types);
+			if( it == m_archetypes.end() ) {
+				m_archetypes[&types] = std::make_unique<Archetype( std::forward<Ts>(component)... )>;
+				it = m_archetypes.find(&types);
+			}
+
+			size_t index{0};
 			auto func = [&](Handle handle, auto&& v) {
-				*ptr<std::decay_t<decltype(v)>>(handle) = v;
+				size_t nindex = it.second->map<std::decay_t<decltype(v)>>.insert(handle, v);
+				assert(index == 0 || index == nindex);
+				index = nindex;
 			};
-
 			(func(handle, component), ...);
+			m_entities[handle] = { it, index };
 			return handle;
 		}
 
+		/// @brief Test if an entity exists.
+		/// @param handle The handle of the entity.
+		/// @return true if the entity exists, else false.
 		bool exists(Handle handle) {
 			assert(valid(handle));
 			return m_entities.find(handle) != m_entities.end();
 		}
 
+		/// @brief Test if an entity has a component.
+		/// @tparam T The type of the component.
+		/// @param handle The handle of the entity.
+		/// @return true if the entity has the component, else false.
 		template<typename T>
 		bool has(Handle handle) {
 			assert(valid(handle));
-			auto it = m_entities.find(handle);
-			return it != m_entities.end() && it->second.find(type<T>()) != it->second.end();
+			return 	m_entities.find(handle) != m_entities.end() && 
+					m_entities[handle].m_archetype->m_types.find(type<T>()) != m_entities[handle].m_archetype->m_types.end();
 		}
 
+		/// @brief Get the types of the components of an entity.
+		/// @param handle The handle of the entity.
+		/// @return A vector of type indices of the components.
 		const auto& types(Handle handle) {
 			assert(exists(handle));
-			return m_entities[handle];
+			return m_entities[handle].m_archetype->m_types;
 		}
 
+		/// @brief Get component value of an entity.
+		/// @tparam T The type of the component.
+		/// @param handle The handle of the entity.	
+		/// @return The component value.
 		template<typename T>
 		[[nodiscard]]
 		auto get(Handle handle) -> T {
@@ -251,8 +280,9 @@ namespace vecs
 			auto& entt = m_entities.find(handle)->second;
 
 			auto func = [&](Handle handle, auto&& ti) {
-				entt.erase(ti);
-				m_component_maps[ti]->erase(handle);
+				entt.second.first->map<std::decay_t<decltype(ti)>>.erase(entt.second.second);
+				m_entities[ti]->erase(handle);
+
 			};
 
 			(func(handle, std::type_index(typeid(Ts))), ...);
@@ -261,7 +291,7 @@ namespace vecs
 		void erase(Handle handle) {
 			assert(exists(handle));
 			for( auto& it : m_entities.find(handle)->second ) {
-				m_component_maps[it]->erase(handle);
+				m_entities[it]->erase(handle);
 			}
 			m_entities.erase(handle);
 		}
@@ -269,28 +299,31 @@ namespace vecs
 		template<typename T>
 		[[nodiscard]]
 		auto data() -> const std::vector<std::pair<Handle, T>>& {
-			if(m_component_maps.find(type<T>()) == m_component_maps.end()) {
-				m_component_maps[type<T>()] = std::make_unique<ComponentMap<T>>();
-			}
-			return *std::any_cast< std::vector<std::pair<Handle, T>>* > (m_component_maps[type<T>()]->data());
+			return *std::any_cast< std::vector<std::pair<Handle, T>>* > (m_entities[type<T>()].m_archetype->data());
 		}
 
 	private:
 
 		template<typename T>
 		auto ptr(Handle handle) -> T* {
-			if( m_component_maps.find(type<T>()) ==  m_component_maps.end() ) {
-				m_component_maps[type<T>()] = std::make_unique<ComponentMap<T>>();
+			auto it = m_entities.find(handle);
+			assert(it != m_entities.end());
+			auto& [arch, index] = it->second;
+
+			if( arch->m_maps.find(type<T>()) == arch->m_maps.end() ) {
+				arch->m_maps[type<T>()] = std::make_unique<ComponentMap<T>>();
+
 			}
-			return &(std::any_cast<std::pair<Handle,T>*>(m_component_maps[type<T>()]->get(handle)))->second;
+
+			return &(std::any_cast<std::pair<Handle,T>*>(m_entities[type<T>()]->get(handle)))->second;
 		}
 
 		std::size_t m_next_id{0};
-		std::unordered_map<Handle, std::set<std::type_index>> m_entities; //should have ref to archetype instead of set
-		std::unordered_map<std::type_index, std::unique_ptr<ComponentMapBase>> m_component_maps; //get rid of this
+		//std::unordered_map<Handle, std::set<std::type_index>> m_entities; //should have ref to archetype instead of set
+		//std::unordered_map<std::type_index, std::unique_ptr<ComponentMapBase>> m_component_maps; //get rid of this
 
-		std::unordered_map<Handle, std::pair<Archetype*, std::size_t>> m_entities2; //Archetype and index in archetype
-		std::unordered_map<std::size_t, std::unique_ptr<Archetype>> m_archetypes; //Mapping hash(set of type index) to archetype
+		std::unordered_map<Handle, ArchetypeIndex> m_entities; //Archetype and index in archetype
+		std::unordered_map<std::vector<std::type_index>*, std::unique_ptr<Archetype>> m_archetypes; //Mapping vector of type index to archetype
 		std::unordered_map<std::type_index, std::set<Archetype*>> m_has_types; //Mapping type index to archetype
 	};
 
