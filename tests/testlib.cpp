@@ -49,13 +49,13 @@ int main() {
     system.create(5);
     system.create(6, 60.0f, 60.0);
 
-    auto& comp = system.data<int>();
+    /*auto& comp = system.data<int>();
     for( auto& i : comp ) {
         std::cout << i.second << std::endl;
         if( system.has<float>(i.first) ) {
             std::cout << "Has float " << system.get<float>(i.first) << std::endl;
         }
-    }
+    }*/
 
 
     return 0;   
