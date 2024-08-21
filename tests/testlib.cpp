@@ -10,13 +10,14 @@ int main() {
     vecs::Registry system;
 
     vecs::Handle h1 = system.create(5);
-    bool b1 = system.exists(h1);
+    /*bool b1 = system.exists(h1);
     auto t1 = system.types(h1);
     auto v1 = system.get<int>(h1);
     bool b1a = system.has<int>(h1);
     system.erase(h1);
     b1 = system.exists(h1);
 
+    /*
     auto h2 = system.create(5, 6.9f, 7.3);
     bool b2 = system.exists(h2);
     auto t2 = system.types(h2);
@@ -49,6 +50,9 @@ int main() {
     system.create(5);
     system.create(6, 60.0f, 60.0);
 
+    */
+
+   
     /*auto& comp = system.data<int>();
     for( auto& i : comp ) {
         std::cout << i.second << std::endl;

@@ -69,17 +69,25 @@ namespace vecs
 
 		class ComponentMapBase {
 		public:
+			ComponentMapBase() = default;
 			~ComponentMapBase() = default;
+			
+			template<typename T> 
+			std::size_t insert(Handle handle, T&& v) {
+				return static_cast<ComponentMap<T>*>(this)->insert(handle, std::forward<T>(v));
+			}
+
 			virtual Handle erase(std::size_t index) = 0;
-			virtual void move(std::any from, std::any to) = 0;
+			virtual void move(ComponentMapBase* other, size_t from) = 0;
 			virtual size_t size() = 0;
 			virtual std::unique_ptr<ComponentMapBase> create() = 0;
 		};
 
 		template<typename T>
 		class ComponentMap : public ComponentMapBase {
-
 		public:
+
+			ComponentMap() = default;
 
 			struct Entry {
 				Handle m_handle;
@@ -100,7 +108,7 @@ namespace vecs
 				return m_data;
 			};
 
-			virtual Handle erase(std::size_t index) {
+			virtual Handle erase(std::size_t index) override {
 				Handle ret{0};
 				std::size_t last = m_data.size() - 1;
 				if( index < last ) {
@@ -111,19 +119,15 @@ namespace vecs
 				return ret;
 			};
 
-			virtual void move(std::any from, size_t to) {
-				if constexpr (std::is_move_assignable_v<T>) {
-					m_data[to] = std::move(*std::any_cast<Entry*>(from));
-				} else {
-					m_data[to] = *std::any_cast<Entry*>(from);
-				}
+			virtual void move(ComponentMapBase* other, size_t from) override{
+				m_data.push_back( static_cast<ComponentMap<T>*>(other)->get(from) );
 			};
 
-			virtual size_t size() {
+			virtual size_t size() override {
 				return m_data.size();
 			}
 
-			virtual std::unique_ptr<ComponentMapBase> create() {
+			virtual std::unique_ptr<ComponentMapBase> create() override{
 				return std::make_unique<ComponentMap<T>>();
 			};
 
@@ -139,15 +143,20 @@ namespace vecs
 
 			/// @brief Constructor, called if a new entity should be created with components, and the archetype does not exist yet.
 			/// @tparam ...Ts 
+			/// @param handle The handle of the entity.
+			/// @param ...values The values of the components.
 			template<typename... Ts>
 				requires (vtll::unique<vtll::tl<Ts...>>::value)
-			Archetype() {
-				auto func = [&]<typename T>() {
+			Archetype( Handle handle, Ts&& ...values ) {
+
+				auto func = [&]( auto&& v ) {
+					using T = std::decay_t<decltype(v)>;
 					m_maps[type<T>()] = std::make_unique<ComponentMap<T>>();
-					m_types.insert(type<T>());
+					m_maps[type<T>()]->insert(handle, std::forward<T>(v));
+					m_types.push_back(type<T>());
 				};
 
-				(func.template operator()<Ts>(), ...);
+				(func( std::forward<Ts>(values) ), ...);
 			}
 
 			/// @brief Constructor, called if the components of an entity are changed, but the new archetype does not exist yet.
@@ -157,31 +166,33 @@ namespace vecs
 			/// @param value Pointer to a new component value if component is added, or nullptr if the component is removed.
 			template<typename T>
 			Archetype(Archetype& other, size_t index, T* value) {
-				m_types = other.m_types;
-				if (value) {
+				m_types = other.m_types; //make a copy of the types
+				if (value != nullptr) { //add a new component
 					assert(std::find(m_types.begin(), m_types.end(), type<T>()) == m_types.end());
-					m_types.push_back(type<T>());
-					m_maps[type<T>()] = std::make_unique<ComponentMap<T>>();
-				} else {
+					m_types.push_back(type<T>()); //add the new type
+					m_maps[type<T>()] = std::make_unique<ComponentMap<T>>(); //add the new component map
+					m_maps[type<T>()]->insert(other.m_maps[type<T>()]->get(index).m_handle, *value); //insert the new value
+				} else {	//remove a component
 					auto it = std::find(m_types.begin(), m_types.end(), type<T>());
 					assert(it != m_types.end());
-					m_types.erase(it);
+					m_types.erase(it); //remove the type from the list
+					m_maps[type<T>()]->erase(index); //erase the value
 				}
 
-				for( auto& it : other.m_maps ) {
-					if (value) {
-						if( it.first == type<T>() ) {
-							continue;
-						}
+				//copy the other components
+				for( auto& it : other.m_maps ) { //go through all maps
+					if( it.first != type<T>() ) {  //skip the new component or deleted old component
+						m_maps[it.first] = it.second->create(); //make a component map like this one
+						m_maps[type<T>()]->move(it.second.get(), index); //insert the new value
+						it.second->erase(index); //erase the old value
 					}
-					m_maps[it.first] = it.second->create();
 				}
 			}
 
 			/// @brief Get the types of the components.
 			/// @return A vector of type indices.
 			[[nodiscard]]
-			const auto& types() {
+			auto& types() {
 				return m_types;
 			}
 
@@ -189,7 +200,7 @@ namespace vecs
 			/// @param ti The type index of the component.
 			/// @return true if the archetype has the component, else false.
 			[[nodiscard]]
-			bool has(std::type_index ti) {
+			bool has(const std::type_index ti) {
 				return (std::find(m_types.begin(), m_types.end(), ti) != std::end(m_types));
 			}
 
@@ -284,12 +295,11 @@ namespace vecs
 			std::vector<std::type_index> types = {type<Ts>()...};
 			auto it = m_archetypes.find(&types);
 			if( it == m_archetypes.end() ) {
-			//	m_archetypes[&types] = std::make_unique<Archetype( std::forward<Ts>(component)... )>;
-				it = m_archetypes.find(&types);
+				m_archetypes[&types] = std::make_unique<Archetype>( handle, std::forward<Ts>(component)... );
+				return handle;
 			}
 
 			auto index = it->second->create(handle, std::forward<Ts>(component)...);
-
 			//m_entities[handle] = { it, index };
 			return handle;
 		}
