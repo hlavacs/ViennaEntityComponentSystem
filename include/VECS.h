@@ -103,8 +103,9 @@ namespace vecs
 			/// @param handle The handle of the entity.
 			/// @param v The component value.
 			/// @return The index of the component value in the map.
-			[[nodiscard]] auto insert(Handle handle, T&& v) -> std::size_t {
-				m_data.emplace_back( handle, v );
+			[[nodiscard]] auto insert(Handle handle, auto&& v) -> std::size_t {
+				using T = std::decay_t<decltype(v)>;
+				m_data.emplace_back( handle, std::forward<T>(v) );
 				return m_data.size() - 1;
 			};
 
@@ -201,7 +202,7 @@ namespace vecs
 					assert(std::find(m_types.begin(), m_types.end(), type<T>()) == m_types.end());
 					m_types.push_back(type<T>()); //add the new type
 					auto map = std::make_unique<ComponentMap<std::decay_t<T>>>(); //create the new component map
-					m_maps[type<T>()]->insert(map->get(index).m_handle, *value); //insert the new value
+					map->insert( handle, *value ); //insert the new value
 					m_maps[type<T>()] = std::move(map); //move to the map list
 				} else {	//remove a component
 					auto it = std::find(m_types.begin(), m_types.end(), type<T>());
@@ -292,6 +293,36 @@ namespace vecs
 			}
 
 		private:
+
+			template<typename... Ts>
+			void removeComponents(Archetype& other, Handle handle, Ts*... value) {
+
+				auto func = [&](auto&& v) {
+					using T = std::decay_t<decltype(v)>;
+					auto it = std::find(m_types.begin(), m_types.end(), type<T>());
+					assert(it != m_types.end());
+					m_types.erase(it); //remove the type from the list
+				};
+
+				(func( value ), ...);
+			}
+
+			template<typename... Ts>
+			void addComponents(Archetype& other, Handle handle, Ts*... value) {
+				size_t index = other.m_index[handle]; //get the index of the entity in the old archetype
+				m_types = other.m_types; //make a copy of the types
+
+				auto func = [&](auto&& v) {
+					using T = std::decay_t<decltype(v)>;
+					assert( std::find(m_types.begin(), m_types.end(), type<Ts>()) == m_types.end());
+					m_types.push_back(type<T>()); //add the new type
+					auto map = std::make_unique<ComponentMap<std::decay_t<T>>>(); //create the new component map
+					map->insert( handle, *value ); //insert the new value
+					m_maps[type<T>()] = std::move(map); //move to the map list
+				};
+
+				(func( value ), ...);
+			}
 
 			/// @brief Test if all component maps have the same size.
 			/// @return  true if all component maps have the same size, else false.

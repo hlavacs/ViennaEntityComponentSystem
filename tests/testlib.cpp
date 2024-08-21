@@ -27,7 +27,8 @@ int main() {
     std::get<float>(tup) = 101.0f;    
     std::get<double>(tup) = 102.0;    
     system.put(h2, tup);
-    tup = system.get<float, double>(h2);
+    auto tup2 = system.get<int, float, double>(h2);
+    int ii = std::get<int>(tup2);
 
     bool b2a = system.has<int>(h2);
     bool b2b = system.has<float>(h2);
