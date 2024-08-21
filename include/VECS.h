@@ -77,7 +77,7 @@ namespace vecs
 				return static_cast<ComponentMap<T>*>(this)->insert(handle, std::forward<T>(v));
 			}
 
-			virtual Handle erase(std::size_t index) = 0;
+			virtual std::optional<Handle> erase(std::size_t index) = 0;
 			virtual void move(ComponentMapBase* other, size_t from) = 0;
 			virtual size_t size() = 0;
 			virtual std::unique_ptr<ComponentMapBase> create() = 0;
@@ -108,11 +108,11 @@ namespace vecs
 				return m_data;
 			};
 
-			virtual Handle erase(std::size_t index) override {
-				Handle ret{0};
+			virtual std::optional<Handle> erase(std::size_t index) override {
+				std::optional<Handle> ret{std::nullopt};
 				std::size_t last = m_data.size() - 1;
 				if( index < last ) {
-					ret = m_data[last].m_handle;
+					ret = { m_data[last].m_handle };
 					m_data[index] = std::move(m_data[last]);
 				}
 				m_data.pop_back();
@@ -176,7 +176,6 @@ namespace vecs
 					auto it = std::find(m_types.begin(), m_types.end(), type<T>());
 					assert(it != m_types.end());
 					m_types.erase(it); //remove the type from the list
-					m_maps[type<T>()]->erase(index); //erase the value
 				}
 
 				//copy the other components
@@ -184,9 +183,9 @@ namespace vecs
 					if( it.first != type<T>() ) {  //skip the new component or deleted old component
 						m_maps[it.first] = it.second->create(); //make a component map like this one
 						m_maps[type<T>()]->move(it.second.get(), index); //insert the new value
-						it.second->erase(index); //erase the old value
 					}
 				}
+				other.erase(index); //erase the old entity
 			}
 
 			/// @brief Get the types of the components.
@@ -214,16 +213,15 @@ namespace vecs
 			[[nodiscard]]
 			auto create( Handle handle, Ts&&... component ) -> size_t {
 				size_t index{0};
-				bool first{true};
+
 				auto func = [&](auto&& v) {
 					using T = std::decay_t<decltype(v)>;
 					auto* map = (ComponentMap<T>*)(m_maps[type<T>()].get());
-					size_t nindex = map->insert(handle, std::forward<T>(v));
-					assert(first || index == nindex);
-					index = nindex;
-					first = false;
+					index = map->insert(handle, std::forward<T>(v));
 				};
 				(func(component), ...);
+				assert(validate());
+				m_index[handle] = index;
 				return index;
 			}
 
@@ -244,7 +242,13 @@ namespace vecs
 			/// @return The handle of the entity that was moved ove the erased one so its index can be changed.
 			[[nodiscard]]
 			Handle erase(std::size_t index) {
-				
+				std::optional<Handle> handle{std::nullopt};
+				for( auto& it : m_maps ) {
+					handle = it.second->erase(index);
+				}
+				if( handle.has_value() ) {
+					m_index[handle.value()] = index;
+				}
 			}
 
 			/// @brief Get the data of the components.
@@ -258,18 +262,24 @@ namespace vecs
 			}*/
 
 		private:
+			bool validate() {
+				bool first{true};
+				size_t sz{0};
+				for( auto& it : m_maps ) {
+					size_t s = it.second->size();
+					if( first && s == sz) {
+						sz = s;
+						first = false;
+					} else return false;
+				}
+				return true;
+			}
+
+			std::unordered_map<Handle, size_t> m_index; //index of entity in archetype
 			std::vector<std::type_index> m_types;
 			std::unordered_map<std::type_index, std::unique_ptr<ComponentMapBase>> m_maps;
 		};
 
-
-		//----------------------------------------------------------------------------------------------
-
-
-		struct ArchetypeIndex {
-			Archetype* m_archetype;
-			size_t m_index;
-		};
 
 		//----------------------------------------------------------------------------------------------
 
@@ -327,7 +337,7 @@ namespace vecs
 		/// @return A vector of type indices of the components.
 		const auto& types(Handle handle) {
 			assert(exists(handle));
-			return m_entities[handle].m_archetype->types();
+			return m_entities[handle]->types();
 		}
 
 		/// @brief Get component value of an entity.
@@ -415,7 +425,7 @@ namespace vecs
 		//std::unordered_map<Handle, std::set<std::type_index>> m_entities; //should have ref to archetype instead of set
 		//std::unordered_map<std::type_index, std::unique_ptr<ComponentMapBase>> m_component_maps; //get rid of this
 
-		std::unordered_map<Handle, ArchetypeIndex> m_entities; //Archetype and index in archetype
+		std::unordered_map<Handle, Archetype*> m_entities; //Archetype and index in archetype
 		std::unordered_map<std::vector<std::type_index>*, std::unique_ptr<Archetype>> m_archetypes; //Mapping vector of type index to archetype
 		std::unordered_map<std::type_index, std::set<Archetype*>> m_types; //Mapping type index to archetype
 	};
