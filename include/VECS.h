@@ -175,7 +175,6 @@ namespace vecs
 			Archetype( Handle handle, Ts&& ...values ) {
 
 				size_t index{0};
-
 				auto func = [&]( auto&& v ) {
 					using T = std::decay_t<decltype(v)>;
 					m_maps[type<T>()] = std::make_unique<ComponentMap<T>>();
@@ -260,10 +259,10 @@ namespace vecs
 			/// @param index The index of the entity in the archetype.
 			/// @return The component value.
 			template<typename T>
-			[[nodiscard]] auto get(std::size_t index) -> T& {
-				assert(std::find(m_types.begin(), m_types.end(), type<T>()) != std::end(m_types) 
-						&& m_maps.find(type<T>()) != m_maps.end() 
-						&& index < m_maps[type<T>()]->size());
+			[[nodiscard]] auto get(Handle handle) -> T& {
+				assert(std::find(m_types.begin(), m_types.end(), type<T>()) != std::end(m_types) && m_maps.find(type<T>()) != m_maps.end() ); 
+				size_t index = m_index[handle];
+				assert( index < m_maps[type<T>()]->size());
 				return static_cast<ComponentMap<std::decay_t<T>>*>(m_maps[type<T>()].get())->get(index).m_value;
 			}
 
