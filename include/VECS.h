@@ -73,9 +73,9 @@ namespace vecs
 			ComponentMapBase() = default;
 			~ComponentMapBase() = default;
 			
-			template<typename T> 
-			size_t insert(Handle handle, T&& v) {
-				return static_cast<ComponentMap<std::decay_t<T>>*>(this)->insert(handle, std::forward<std::decay_t<T>>(v));
+			size_t insert(Handle handle, auto&& v) {
+				using T = std::decay_t<decltype(v)>;
+				return static_cast<ComponentMap<T>*>(this)->insert(handle, std::forward<T>(v));
 			}
 
 			virtual auto erase(std::size_t index) -> std::optional<Handle> = 0;
@@ -174,14 +174,19 @@ namespace vecs
 				requires (vtll::unique<vtll::tl<Ts...>>::value)
 			Archetype( Handle handle, Ts&& ...values ) {
 
+				size_t index{0};
+
 				auto func = [&]( auto&& v ) {
 					using T = std::decay_t<decltype(v)>;
 					m_maps[type<T>()] = std::make_unique<ComponentMap<T>>();
-					m_maps[type<T>()]->insert(handle, std::forward<T>(v));
+					index = m_maps[type<T>()]->insert(handle, std::forward<T>(v));
 					m_types.push_back(type<T>());
 				};
 
 				(func( std::forward<Ts>(values) ), ...);
+
+				m_index[handle] = index;
+				assert(validate());
 			}
 
 			/// @brief Constructor, called if the components of an entity are changed, but the new archetype does not exist yet.
@@ -256,7 +261,9 @@ namespace vecs
 			/// @return The component value.
 			template<typename T>
 			[[nodiscard]] auto get(std::size_t index) -> T& {
-				assert(std::find(m_types.begin(), m_types.end(), type<T>()) != std::end(m_types) && index < m_maps[type<T>()]->size());
+				assert(std::find(m_types.begin(), m_types.end(), type<T>()) != std::end(m_types) 
+						&& m_maps.find(type<T>()) != m_maps.end() 
+						&& index < m_maps[type<T>()]->size());
 				return static_cast<ComponentMap<std::decay_t<T>>*>(m_maps[type<T>()].get())->get(index).m_value;
 			}
 
@@ -286,12 +293,15 @@ namespace vecs
 			}
 
 		private:
+
+			/// @brief Test if all component maps have the same size.
+			/// @return  true if all component maps have the same size, else false.
 			bool validate() {
 				bool first{true};
 				size_t sz{0};
 				for( auto& it : m_maps ) {
 					size_t s = it.second->size();
-					if( first && s == sz) {
+					if( first || s == sz) {
 						sz = s;
 						first = false;
 					} else return false;
@@ -299,8 +309,8 @@ namespace vecs
 				return true;
 			}
 
+			std::vector<std::type_index> m_types; //types of components
 			std::unordered_map<Handle, size_t> m_index; //index of entity in archetype
-			std::vector<std::type_index> m_types;
 			std::unordered_map<std::type_index, std::unique_ptr<ComponentMapBase>> m_maps;
 		};
 
@@ -427,6 +437,9 @@ namespace vecs
 			(put(handle, vs), ...);
 		}
 
+		/// @brief Erase components from an entity.
+		/// @tparam Ts The types of the components.
+		/// @param handle The handle of the entity.
 		template<typename... Ts>
 		void erase(Handle handle) {
 			assert( (has<Ts>(handle) && ...) );
@@ -441,12 +454,12 @@ namespace vecs
 			(func(handle, std::type_index(typeid(Ts))), ...);*/
 		}
 
-		/// @brief Erase an entity.
+		/// @brief Erase an entity from the registry.
 		/// @param handle The handle of the entity.
 		void erase(Handle handle) {
 			assert(exists(handle));
-			m_entities[handle]->erase(handle);
-			m_entities.erase(handle);
+			m_entities[handle]->erase(handle); //erase the entity from the archetype
+			m_entities.erase(handle); //erase the entity from the entity list
 		}
 
 		//template<typename T>
