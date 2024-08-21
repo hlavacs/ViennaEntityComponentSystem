@@ -247,26 +247,27 @@ namespace vecs
 				return index; //return the index of the new entity in the archetype
 			}
 
-			/// @brief Get component value of an entity.
+			/// @brief Get component value of an entity. 
 			/// @tparam T The type of the component.
 			/// @param index The index of the entity in the archetype.
 			/// @return The component value.
 			template<typename T>
-			[[nodiscard]] T get(std::size_t index) {
+			[[nodiscard]] auto get(std::size_t index) -> T& {
 				assert(std::find(m_types.begin(), m_types.end(), type<T>()) != std::end(m_types) && index < m_maps[type<T>()]->size());
 				return static_cast<ComponentMap<T>*>(m_maps[type<T>()].get())->get(index).m_value;
 			}
 
 			/// @brief Erase all components of an entity.
 			/// @param index The index of the entity in the archetype.
-			/// @return The handle of the entity that was moved ove the erased one so its index can be changed.
-			[[nodiscard]] auto erase(std::size_t index) -> Handle {
-				std::optional<Handle> handle{std::nullopt};
+			/// @return The handle of the entity that was moved over the erased one so its index can be changed.
+			void erase(Handle handle) {
+				size_t index = m_index[handle];
+				std::optional<Handle> hd{std::nullopt};
 				for( auto& it : m_maps ) {
-					handle = it.second->erase(index); //should always be the same handle
+					hd = it.second->erase(index); //should always be the same handle
 				}
-				if( handle.has_value() ) { //an entity was moved to fill the empty slot in the vector
-					m_index[handle.value()] = index; //update the index of the moved entity
+				if( hd.has_value() ) { //an entity was moved to fill the empty slot in the vector
+					m_index[hd.value()] = index; //update the index of the moved entity
 				}
 				assert(validate());
 			}
@@ -360,39 +361,65 @@ namespace vecs
 			return m_entities[handle]->types();
 		}
 
-		/// @brief Get component value of an entity.
+		/// @brief Get component value of an entity. If the component does not exist, it will be created.
+		/// This might result in moving the entity to another archetype.
 		/// @tparam T The type of the component.
 		/// @param handle The handle of the entity.	
 		/// @return The component value.
 		template<typename T>
-		[[nodiscard]]
-		auto get(Handle handle) -> T {
-			assert(exists(handle));
+		[[nodiscard]] auto get(Handle handle) -> T {
+			assert(has<T>(handle));
 			return m_entities[handle]->get<T>(handle);
 		}
 
+		/// @brief Get component values of an entity.
+		/// @tparam Ts The types of the components.
+		/// @param handle The handle of the entity.
+		/// @return A tuple of the component values.
 		template<typename... Ts>
-		requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value))
-		[[nodiscard]]
-		auto get(Handle handle) -> std::tuple<Ts...> {
+			requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value))
+		[[nodiscard]] auto get(Handle handle) -> std::tuple<Ts...> {
 			return std::tuple<Ts...>(get<Ts>(handle)...);
 		}
 
+		/// @brief Put a new component value to an entity. If the entity does not have the component, it will be created.
+		/// This might result in moving the entity to another archetype.
+		/// @tparam T The type of the component.
+		/// @param handle The handle of the entity.
+		/// @param v The new value.
 		template<typename T>
-		requires (!is_tuple<T>::value)
+			requires (!is_tuple<T>::value)
 		void put(Handle handle, T&& v) {
 			assert(exists(handle));
-			//*ptr<std::decay_t<decltype(v)>>(handle) = v;
+			if(!has<T>(handle)) {
+				auto typ = m_entities[handle]->types();
+				typ.push_back(type<T>());
+				auto it = m_archetypes.find(&typ);
+				if( it == m_archetypes.end() ) {
+					m_archetypes[&typ] = std::make_unique<Archetype>( *m_entities[handle], m_entities[handle]->m_index[handle], &v );
+					m_entities[handle] = m_archetypes[&typ].get();
+					return;
+				}	
+			}
+			m_entities[handle]->get<T>(handle) = v; //get the component value and assign the new value
 		}
 
+		/// @brief Put new component values to an entity.
+		/// @tparam Ts The types of the components.
+		/// @param handle The handle of the entity.
+		/// @param v The new values in a tuple
 		template<typename... Ts>
-		requires (vtll::unique<vtll::tl<Ts...>>::value)
+			requires (vtll::unique<vtll::tl<Ts...>>::value)
 		void put(Handle handle, std::tuple<Ts...>& v) {
 			(put(handle, std::get<Ts>(v)), ...);
 		}
 
+		/// @brief Put new component values to an entity.
+		/// @tparam Ts The types of the components.
+		/// @param handle The handle of the entity.
+		/// @param ...vs The new values.
 		template<typename... Ts>
-		requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value))
+			requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value))
 		void put(Handle handle, Ts&&... vs) {
 			(put(handle, vs), ...);
 		}
@@ -411,12 +438,12 @@ namespace vecs
 			(func(handle, std::type_index(typeid(Ts))), ...);*/
 		}
 
+		/// @brief Erase an entity.
+		/// @param handle The handle of the entity.
 		void erase(Handle handle) {
 			assert(exists(handle));
-			/*for( auto& it : m_entities.find(handle)->second ) {
-				m_entities[it]->erase(handle);
-			}
-			m_entities.erase(handle);*/
+			m_entities[handle]->erase(handle);
+			m_entities.erase(handle);
 		}
 
 		//template<typename T>
