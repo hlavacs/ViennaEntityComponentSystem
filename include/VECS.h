@@ -75,7 +75,7 @@ namespace vecs
 			
 			template<typename T> 
 			size_t insert(Handle handle, T&& v) {
-				return static_cast<ComponentMap<T>*>(this)->insert(handle, std::forward<T>(v));
+				return static_cast<ComponentMap<std::decay_t<T>>*>(this)->insert(handle, std::forward<std::decay_t<T>>(v));
 			}
 
 			virtual auto erase(std::size_t index) -> std::optional<Handle> = 0;
@@ -87,6 +87,7 @@ namespace vecs
 		/// @brief A map of components of the same type.
 		/// @tparam T The value type for this comoonent map.
 		template<typename T>
+			requires std::same_as<T, std::decay_t<T>>
 		class ComponentMap : public ComponentMapBase {
 		public:
 
@@ -103,7 +104,7 @@ namespace vecs
 			/// @param v The component value.
 			/// @return The index of the component value in the map.
 			[[nodiscard]] auto insert(Handle handle, T&& v) -> std::size_t {
-				m_data.push_back( { handle, v } );
+				m_data.emplace_back( handle, v );
 				return m_data.size() - 1;
 			};
 
@@ -124,12 +125,12 @@ namespace vecs
 			/// @brief Erase a component from the vector.
 			/// @param index The index of the component value in the map.
 			/// @return The handle of the entity that was moved over the erased one so its index can be changed, or nullopt
-			[[nodiscard]] virtual auto erase(std::size_t index) -> std::optional<Handle> override {
+			[[nodiscard]] virtual auto erase(size_t index) -> std::optional<Handle> override {
 				std::optional<Handle> ret{std::nullopt};
-				std::size_t last = m_data.size() - 1;
+				size_t last = m_data.size() - 1;
 				if( index < last ) {
 					ret = { m_data[last].m_handle }; //return the handle of the last entity that was moved over the erased one
-					m_data[index] = std::move(m_data[last]);
+					m_data[index] = m_data[last]; //move the last entity to the erased one
 				}
 				m_data.pop_back(); //erase the last entity
 				return ret;
@@ -139,7 +140,7 @@ namespace vecs
 			/// @param other The other map.
 			/// @param from The index of the component in the other map.
 			virtual size_t move(ComponentMapBase* other, size_t from) override {
-				m_data.push_back( static_cast<ComponentMap<T>*>(other)->get(from) );
+				m_data.push_back( static_cast<ComponentMap<std::decay_t<T>>*>(other)->get(from) );
 				return m_data.size() - 1;
 			};
 
@@ -189,13 +190,15 @@ namespace vecs
 			/// @param index The index of the entity in the old archetype.
 			/// @param value Pointer to a new component value if component is added, or nullptr if the component is removed.
 			template<typename T>
-			Archetype(Archetype& other, size_t index, T* value) {
+			Archetype(Archetype& other, Handle handle, T* value) {
+				size_t index = other.m_index[handle]; //get the index of the entity in the old archetype
 				m_types = other.m_types; //make a copy of the types
 				if (value != nullptr) { //add a new component
 					assert(std::find(m_types.begin(), m_types.end(), type<T>()) == m_types.end());
 					m_types.push_back(type<T>()); //add the new type
-					m_maps[type<T>()] = std::make_unique<ComponentMap<T>>(); //add the new component map
-					m_maps[type<T>()]->insert(other.m_maps[type<T>()]->get(index).m_handle, *value); //insert the new value
+					auto map = std::make_unique<ComponentMap<std::decay_t<T>>>(); //create the new component map
+					m_maps[type<T>()]->insert(map->get(index).m_handle, *value); //insert the new value
+					m_maps[type<T>()] = std::move(map); //move to the map list
 				} else {	//remove a component
 					auto it = std::find(m_types.begin(), m_types.end(), type<T>());
 					assert(it != m_types.end());
@@ -238,7 +241,7 @@ namespace vecs
 
 				auto func = [&](auto&& v) {
 					using T = std::decay_t<decltype(v)>;
-					auto* map = static_cast<ComponentMap<T>*>(m_maps[type<T>()].get());
+					auto* map = static_cast<ComponentMap<std::decay_t<T>>*>(m_maps[type<T>()].get());
 					index = map->insert(handle, std::forward<T>(v));
 				};
 				(func( std::forward<Ts>(value) ), ...); //insert all components
@@ -254,7 +257,7 @@ namespace vecs
 			template<typename T>
 			[[nodiscard]] auto get(std::size_t index) -> T& {
 				assert(std::find(m_types.begin(), m_types.end(), type<T>()) != std::end(m_types) && index < m_maps[type<T>()]->size());
-				return static_cast<ComponentMap<T>*>(m_maps[type<T>()].get())->get(index).m_value;
+				return static_cast<ComponentMap<std::decay_t<T>>*>(m_maps[type<T>()].get())->get(index).m_value;
 			}
 
 			/// @brief Erase all components of an entity.
@@ -396,7 +399,7 @@ namespace vecs
 				typ.push_back(type<T>());
 				auto it = m_archetypes.find(&typ);
 				if( it == m_archetypes.end() ) {
-					m_archetypes[&typ] = std::make_unique<Archetype>( *m_entities[handle], m_entities[handle]->m_index[handle], &v );
+					m_archetypes[&typ] = std::make_unique<Archetype>( *m_entities[handle], handle, &v );
 					m_entities[handle] = m_archetypes[&typ].get();
 					return;
 				}	
