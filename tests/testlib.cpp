@@ -10,7 +10,7 @@ int main() {
     vecs::Registry system;
 
     vecs::Handle h1 = system.create(5);
-    /*bool b1 = system.exists(h1);
+    bool b1 = system.exists(h1);
     auto t1 = system.types(h1);
     auto v1 = system.get<int>(h1);
     bool b1a = system.has<int>(h1);
