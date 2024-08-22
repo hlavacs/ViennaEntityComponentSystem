@@ -60,6 +60,16 @@ namespace vecs
 
 	template<typename... Ts>
 		requires (vtll::unique<vtll::tl<Ts...>>::value)
+	auto typevector() -> std::vector<size_t> {
+		auto ret = std::vector<size_t>{type<Ts>()...};
+		if constexpr( !vtll::has_type< vtll::tl<Ts...>, Handle>::value ) {
+			ret.push_back(type<Handle>());
+		}
+		return ret;
+	}
+
+	template<typename... Ts>
+		requires (vtll::unique<vtll::tl<Ts...>>::value)
 	class Iterator;
 
 	template<typename... Ts>
