@@ -52,12 +52,11 @@ int main() {
 
    
     auto view = system.view<int, float>();
-    /*for( auto& i : comp ) {
-        std::cout << i.second << std::endl;
-        if( system.has<float>(i.first) ) {
-            std::cout << "Has float " << system.get<float>(i.first) << std::endl;
-        }
-    }*/
+
+    for( auto it : view ) {
+        auto [i, f, handle] = it;
+        std::cout << "Handle: "<< handle << " int: " << i << " float:" << f << std::endl;
+    }
 
 
     return 0;   

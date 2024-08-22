@@ -70,6 +70,7 @@ namespace vecs
 	/// @brief A registry for entities and components.
 	class Registry {
 
+		template<typename... Ts> requires (vtll::unique<vtll::tl<Ts...>>::value) friend class Iterator;
 		template<typename... Ts> requires (vtll::unique<vtll::tl<Ts...>>::value) friend class View;
 
 	private:
@@ -340,6 +341,11 @@ namespace vecs
 				return it->second.get();
 			}
 
+			/// @brief Get the number of entites in this archetype.
+			/// @return The number of entities.
+			size_t size() {
+				return m_maps.begin()->second->size();
+			}
 
 		private:
 
@@ -544,8 +550,34 @@ namespace vecs
 	public:
 		Iterator(std::vector<Registry::Archetype*>& arch, size_t archidx) : m_archetypes{arch}, m_archidx{archidx} {}
 
+		auto operator++() {
+			if( ++m_entidx == m_archetypes[m_archidx]->m_maps.begin()->second->size() ) {
+				++m_archidx;
+				m_entidx = 0;
+			}
+			return *this;
+		}
+
+		auto operator*() {
+			
+			Handle handle;
+
+			auto func = [&]<typename T>() {
+				handle = static_cast<Registry::ComponentMap<T>*>(m_archetypes[m_archidx]->m_maps[type<T>()].get())->get(m_entidx).m_handle;
+				return static_cast<Registry::ComponentMap<T>*>(m_archetypes[m_archidx]->m_maps[type<T>()].get())->get(m_entidx).m_value;
+			};
+
+			auto tup = std::tuple<Ts...>(func.template operator()<Ts>()...);
+			return std::tuple_cat( tup, std::make_tuple(handle) );
+		}
+
+		auto operator!=(const Iterator& other) {
+			return m_archidx != other.m_archidx || m_entidx != other.m_entidx;
+		}
+
 	private:
 		size_t m_archidx{0};
+		size_t m_entidx{0};
 		std::vector<Registry::Archetype*>& m_archetypes;
 	};
 
@@ -563,12 +595,15 @@ namespace vecs
 			m_archetypes.clear();
 			for( auto& it : m_system.m_archetypes ) {
 				bool found{true};
-				for( auto& ti : it.first ) {
-					if( std::find(std::begin(ti), std::end(), ti) == std::end(vtll::tl<Ts...>) ) {
+				auto arch = it.second.get();
+
+				auto func = [&]<typename T>() {
+					if( std::find(arch->m_types.begin(), arch->m_types.end(), type<T>()) == arch->m_types.end() ) {
 						found = false;
-						break;
 					}
-				}
+				};
+				(func.template operator()<Ts>(), ...);
+
 				if( found ) m_archetypes.push_back(it.second.get());
 			}
 			return Iterator<Ts...>{m_archetypes, 0};
