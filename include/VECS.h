@@ -227,7 +227,7 @@ namespace vecs
 				m_types = other.m_types; //make a copy of the types
 
 				auto func = [&](auto* v) {
-					using T = std::decay_t<decltype(v)>;
+					using T = std::decay_t<std::remove_pointer_t<decltype(v)>>;
 					auto it = std::find(m_types.begin(), m_types.end(), type<T>());
 					assert(it != m_types.end());
 					m_types.erase(it); //remove the type from the list
@@ -488,8 +488,8 @@ namespace vecs
 			auto it = m_archetypes.find(&typ); //find the new archetype if possible
 			if( it == m_archetypes.end() ) { //if the archetype does not exist, create it
 				auto map = std::make_unique<Archetype>( ActionRemove{}, *entt, handle, (Ts*)nullptr... );
-				//m_entities[handle] = map.get();
-				//m_archetypes[&typ] = std::move(map);
+				m_entities[handle] = map.get();
+				m_archetypes[&typ] = std::move(map);
 				return;
 			}
 			m_entities[handle] = it->second.get();
