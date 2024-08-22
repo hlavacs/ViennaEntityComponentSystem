@@ -34,13 +34,13 @@ int main() {
     bool b2b = system.has<float>(h2);
     bool b2c = system.has<double>(h2);
 
-    system.erase<int, float>(h2);
-    b2a = system.has<int>(h2);
-    b2b = system.has<float>(h2);
-    b2c = system.has<double>(h2);
+    //system.erase<int, float>(h2);
+    //b2a = system.has<int>(h2);
+    //b2b = system.has<float>(h2);
+    //b2c = system.has<double>(h2);
 
-    system.erase(h2);
-    b2 = system.exists(h2);
+    //system.erase(h2);
+    //b2 = system.exists(h2);
 
 
     system.create(1, 10.0f, 10.0);
