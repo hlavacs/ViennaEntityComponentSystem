@@ -55,7 +55,7 @@ int main() {
 
     for( auto it : view ) {
         auto [i, f, handle] = it;
-        std::cout << "Handle: "<< handle << " int: " << i << " float:" << f << std::endl;
+        std::cout << "Handle: "<< handle << " int: " << i << " float: " << f << std::endl;
     }
 
 
