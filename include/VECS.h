@@ -384,7 +384,7 @@ namespace vecs
 		/// @param ...component The new values.
 		/// @return Handle of new entity.
 		template<typename... Ts>
-			requires ((sizeof...(Ts) > 0) && (vtll::unique<vtll::tl<Ts...>>::value))
+			requires ((sizeof...(Ts) > 0) && (vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
 		[[nodiscard]] auto create( Ts&&... component ) -> Handle {
 			Handle handle{ ++m_next_handle };
 
@@ -475,7 +475,7 @@ namespace vecs
 		/// @param handle The handle of the entity.
 		/// @param v The new values in a tuple
 		template<typename... Ts>
-			requires (vtll::unique<vtll::tl<Ts...>>::value)
+			requires (vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
 		void put(Handle handle, std::tuple<Ts...>& v) {
 			(put(handle, std::get<Ts>(v)), ...);
 		}
@@ -485,7 +485,7 @@ namespace vecs
 		/// @param handle The handle of the entity.
 		/// @param ...vs The new values.
 		template<typename... Ts>
-			requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value))
+			requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
 		void put(Handle handle, Ts&&... vs) {
 			(put(handle, vs), ...);
 		}
@@ -494,6 +494,7 @@ namespace vecs
 		/// @tparam Ts The types of the components.
 		/// @param handle The handle of the entity.
 		template<typename... Ts>
+			requires (vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
 		void erase(Handle handle) {
 			assert( (has<Ts>(handle) && ...) );
 			auto entt = m_entities.find(handle)->second; //get the archetype of the entity
