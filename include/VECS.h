@@ -24,24 +24,11 @@ using namespace std::chrono_literals;
 
 namespace std {
 	template<>
-	struct hash<std::set<std::type_index>> {
-		std::size_t operator()(const std::set<std::type_index>& v) const {
+	struct hash<std::vector<size_t>*> {
+		std::size_t operator()(std::vector<std::size_t>* hashes) const {
 			std::size_t seed = 0;
-			for( auto& it : v ) {
-				seed ^= std::hash<std::type_index>{}(it) + 0x9e3779b9 + (seed<<6) + (seed>>2);
-			}
-			return seed;
-		}
-	};
-
-	template<>
-	struct hash<std::vector<std::type_index>*> {
-		std::size_t operator()(const std::vector<std::type_index>* types) const {
-			std::size_t seed = 0;
-			std::vector<size_t> hashes(types->size());
-			std::transform(types->begin(), types->end(), hashes.begin(), [](auto& v) { return v.hash_code(); });
-			std::sort(hashes.begin(), hashes.end());
-			for( auto& v : hashes ) {
+			std::sort(hashes->begin(), hashes->end());
+			for( auto& v : *hashes ) {
 				seed ^= v + 0x9e3779b9 + (seed<<6) + (seed>>2);
 			}
 			return seed;
@@ -49,9 +36,9 @@ namespace std {
 	};
 
 	template<>
-	struct hash<std::vector<std::type_index>&> {
-		std::size_t operator()(const std::vector<std::type_index>& types) const {
-			return std::hash<std::vector<std::type_index>*>{}(&types);
+	struct hash<std::vector<size_t>&> {
+		std::size_t operator()(std::vector<size_t>& types) const {
+			return std::hash<std::vector<size_t>*>{}(&types);
 		}
 	};
 
@@ -67,8 +54,8 @@ namespace vecs
 
 
 	template<typename T>
-	auto type() -> std::type_index {
-		return std::type_index(typeid(std::decay_t<T>));
+	auto type() -> std::size_t {
+		return std::type_index(typeid(std::decay_t<T>)).hash_code();
 	}
 
 	class Registry {
@@ -266,7 +253,7 @@ namespace vecs
 			/// @brief Test if the archetype has a component.
 			/// @param ti The type index of the component.
 			/// @return true if the archetype has the component, else false.
-			[[nodiscard]] bool has(const std::type_index& ti) {
+			[[nodiscard]] bool has(const size_t ti) {
 				return (std::find(m_types.begin(), m_types.end(), ti) != std::end(m_types));
 			}
 
@@ -331,7 +318,7 @@ namespace vecs
 			/// @brief Get the data of the components.
 			/// @param ti Type index of the component.
 			/// @return Pointer to the component map base class.
-			auto map(std::type_index ti) -> ComponentMapBase* {
+			auto map(size_t ti) -> ComponentMapBase* {
 				auto it = m_maps.find(ti);
 				assert(it != m_maps.end());
 				return it->second.get();
@@ -355,9 +342,9 @@ namespace vecs
 				return true;
 			}
 
-			std::vector<std::type_index> m_types; //types of components
+			std::vector<size_t> m_types; //types of components
 			std::unordered_map<Handle, size_t> m_index; //index of entity in archetype
-			std::unordered_map<std::type_index, std::unique_ptr<ComponentMapBase>> m_maps;
+			std::unordered_map<size_t, std::unique_ptr<ComponentMapBase>> m_maps;
 		};
 
 
@@ -381,7 +368,7 @@ namespace vecs
 		[[nodiscard]] auto create( Ts&&... component ) -> Handle {
 			Handle handle{ ++m_next_id };
 
-			std::vector<std::type_index> types = {type<Ts>()...};
+			std::vector<std::size_t> types = {type<Ts>()...};
 			auto it = m_archetypes.find(&types);
 			if( it == m_archetypes.end() ) {
 				m_archetypes[&types] = std::make_unique<Archetype>( ActionCreate{}, handle, std::forward<Ts>(component)... );
@@ -526,8 +513,8 @@ namespace vecs
 	private:
 		std::size_t m_next_id{0};
 		std::unordered_map<Handle, Archetype*> m_entities; //Archetype and index in archetype
-		std::unordered_map<std::vector<std::type_index>*, std::unique_ptr<Archetype>> m_archetypes; //Mapping vector of type index to archetype
-		//std::unordered_map<std::type_index, std::set<Archetype*>> m_types; //Mapping type index to archetype
+		std::unordered_map<std::vector<size_t>*, std::unique_ptr<Archetype>> m_archetypes; //Mapping vector of type index to archetype
+		//std::unordered_map<size_t, std::set<Archetype*>> m_types; //Mapping type index to archetype
 	};
 
 }

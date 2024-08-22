@@ -29,23 +29,24 @@ int main() {
     system.put(h2, tup);
     auto tup2 = system.get<int, float, double>(h2);
     int ii = std::get<int>(tup2);
+    std::cout << ii << std::endl;
 
     bool b2a = system.has<int>(h2);
     bool b2b = system.has<float>(h2);
     bool b2c = system.has<double>(h2);
 
-    //system.erase<int, float>(h2);
-    //b2a = system.has<int>(h2);
-    //b2b = system.has<float>(h2);
-    //b2c = system.has<double>(h2);
+    system.erase<int, float>(h2);
+    b2a = system.has<int>(h2);
+    b2b = system.has<float>(h2);
+    b2c = system.has<double>(h2);
 
-    //system.erase(h2);
-    //b2 = system.exists(h2);
+    system.erase(h2);
+    b2 = system.exists(h2);
 
 
     system.create(1, 10.0f, 10.0);
     system.create(2, 20.0f );
-    system.create(3, 30.0);
+    system.create(3, 30.0, "AAA");
     system.create(4, 40.0f, 40.0);
     system.create(5);
     system.create(6, 60.0f, 60.0);
