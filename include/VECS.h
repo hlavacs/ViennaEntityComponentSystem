@@ -212,7 +212,6 @@ namespace vecs
 			/// @param index The index of the entity in the old archetype.
 			/// @param value Pointer to a new component value if component is added, or nullptr if the component is removed.
 			template<typename... Ts>
-				requires (!std::is_pointer<Ts>::value && ...)
 			Archetype( ActionInsert i, Archetype& other, Handle handle, Ts&&... value) {
 				size_t index = other.m_index[handle]; //get the index of the entity in the old archetype
 				m_types = other.m_types; //make a copy of the types
@@ -238,7 +237,6 @@ namespace vecs
 			}
 
 			template<typename... Ts>
-				//requires (std::is_pointer<Ts>::value && ...)
 			Archetype(ActionRemove r, Archetype& other, Handle handle, Ts*... value) {
 				size_t index = other.m_index[handle]; //get the index of the entity in the old archetype
 				m_types = other.m_types; //make a copy of the types
@@ -388,7 +386,7 @@ namespace vecs
 		template<typename... Ts>
 			requires ((sizeof...(Ts) > 0) && (vtll::unique<vtll::tl<Ts...>>::value))
 		[[nodiscard]] auto create( Ts&&... component ) -> Handle {
-			Handle handle{ ++m_next_id };
+			Handle handle{ ++m_next_handle };
 
 			std::vector<std::size_t> types = {type<Ts>()...};
 			auto it = m_archetypes.find(&types);
@@ -525,18 +523,19 @@ namespace vecs
 			m_entities.erase(handle); //erase the entity from the entity list
 		}
 
+		/// @brief Get a view of entities with specific components.
+		/// @tparam ...Ts The types of the components.
+		/// @return A view of the entity components
 		template<typename... Ts>
 			requires (vtll::unique<vtll::tl<Ts...>>::value)
-		[[nodiscard]] decltype(auto) view() {
+		[[nodiscard]] auto view() {
 			return View<Ts...>{*this};
 		}
 
-
 	private:
-		std::size_t m_next_id{0};
+		std::size_t m_next_handle{0};	//next handle to be assigned	
 		std::unordered_map<Handle, Archetype*> m_entities; //Archetype and index in archetype
 		std::unordered_map<std::vector<size_t>*, std::unique_ptr<Archetype>> m_archetypes; //Mapping vector of type index to archetype
-		//std::unordered_map<size_t, std::set<Archetype*>> m_types; //Mapping type index to archetype
 	};
 
 	
@@ -559,16 +558,13 @@ namespace vecs
 		}
 
 		auto operator*() {
-			
 			Handle handle;
-
 			auto func = [&]<typename T>() {
-				handle = static_cast<Registry::ComponentMap<T>*>(m_archetypes[m_archidx]->m_maps[type<T>()].get())->get(m_entidx).m_handle;
-				return static_cast<Registry::ComponentMap<T>*>(m_archetypes[m_archidx]->m_maps[type<T>()].get())->get(m_entidx).m_value;
+				auto entt = static_cast<Registry::ComponentMap<T>*>(m_archetypes[m_archidx]->m_maps[type<T>()].get())->get(m_entidx);
+				handle = entt.m_handle;
+				return entt.m_value;
 			};
-
-			auto tup = std::tuple<Ts...>(func.template operator()<Ts>()...);
-			return std::tuple_cat( tup, std::make_tuple(handle) );
+			return std::tuple_cat( std::tuple<Ts...>(func.template operator()<Ts>()...), std::make_tuple(handle) );
 		}
 
 		auto operator!=(const Iterator& other) {
