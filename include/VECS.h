@@ -58,7 +58,20 @@ namespace vecs
 		return std::type_index(typeid(std::decay_t<T>)).hash_code();
 	}
 
+	template<typename... Ts>
+		requires (vtll::unique<vtll::tl<Ts...>>::value)
+	class Iterator;
+
+	template<typename... Ts>
+		requires (vtll::unique<vtll::tl<Ts...>>::value)
+	class View;
+
+
+	/// @brief A registry for entities and components.
 	class Registry {
+
+		template<typename... Ts> requires (vtll::unique<vtll::tl<Ts...>>::value) friend class View;
+
 	private:
 	
 		//----------------------------------------------------------------------------------------------
@@ -164,6 +177,9 @@ namespace vecs
 		struct ActionRemove{};
 
 		class Archetype {
+
+			template<typename... Ts> requires (vtll::unique<vtll::tl<Ts...>>::value) friend class View;
+			template<typename... Ts> requires (vtll::unique<vtll::tl<Ts...>>::value) friend class Iterator;
 
 		public:
 
@@ -503,11 +519,11 @@ namespace vecs
 			m_entities.erase(handle); //erase the entity from the entity list
 		}
 
-		//template<typename T>
-		//[[nodiscard]]
-		//decltype(auto) data() {
-		//	return m_archetypes[type<T>()]->data<T>();
-		//}
+		template<typename... Ts>
+			requires (vtll::unique<vtll::tl<Ts...>>::value)
+		[[nodiscard]] decltype(auto) view() {
+			return View<Ts...>{*this};
+		}
 
 
 	private:
@@ -515,6 +531,56 @@ namespace vecs
 		std::unordered_map<Handle, Archetype*> m_entities; //Archetype and index in archetype
 		std::unordered_map<std::vector<size_t>*, std::unique_ptr<Archetype>> m_archetypes; //Mapping vector of type index to archetype
 		//std::unordered_map<size_t, std::set<Archetype*>> m_types; //Mapping type index to archetype
+	};
+
+	
+	//----------------------------------------------------------------------------------------------
+
+
+	template<typename... Ts>
+		requires (vtll::unique<vtll::tl<Ts...>>::value)
+	class Iterator {
+
+	public:
+		Iterator(std::vector<Registry::Archetype*>& arch, size_t archidx) : m_archetypes{arch}, m_archidx{archidx} {}
+
+	private:
+		size_t m_archidx{0};
+		std::vector<Registry::Archetype*>& m_archetypes;
+	};
+
+
+	//----------------------------------------------------------------------------------------------
+
+	template<typename... Ts>
+		requires (vtll::unique<vtll::tl<Ts...>>::value)
+	class View {
+
+	public:
+		View(Registry& system) : m_system{system} {}
+
+		auto begin() {
+			m_archetypes.clear();
+			for( auto& it : m_system.m_archetypes ) {
+				bool found{true};
+				for( auto& ti : it.first ) {
+					if( std::find(std::begin(ti), std::end(), ti) == std::end(vtll::tl<Ts...>) ) {
+						found = false;
+						break;
+					}
+				}
+				if( found ) m_archetypes.push_back(it.second.get());
+			}
+			return Iterator<Ts...>{m_archetypes, 0};
+		}
+
+		auto end() {
+			return Iterator<Ts...>{m_archetypes, m_archetypes.size()};
+		}
+
+	private:
+		Registry& m_system;
+		std::vector<Registry::Archetype*> m_archetypes;
 	};
 
 }
