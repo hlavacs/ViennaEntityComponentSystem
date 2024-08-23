@@ -601,17 +601,12 @@ namespace vecs
 		auto begin() {
 			m_archetypes.clear();
 			for( auto& it : m_system.m_archetypes ) {
-				bool found{true};
 				auto arch = it.second.get();
-
 				auto func = [&]<typename T>() {
-					if( std::find(arch->m_types.begin(), arch->m_types.end(), type<T>()) == arch->m_types.end() ) {
-						found = false;
-					}
+					if( std::find(arch->m_types.begin(), arch->m_types.end(), type<T>()) == arch->m_types.end() ) return false;
+					return true;
 				};
-				(func.template operator()<Ts>(), ...);
-
-				if( found ) m_archetypes.push_back(it.second.get());
+				if( (func.template operator()<Ts>() && ...) ) m_archetypes.push_back(it.second.get());
 			}
 			return Iterator<Ts...>{m_archetypes, 0};
 		}
