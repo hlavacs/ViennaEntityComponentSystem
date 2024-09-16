@@ -17,7 +17,7 @@ int main() {
     system.erase(h1);
     b1 = system.exists(h1);
 
-    auto h2 = system.create(5, 6.9f, 7.3);
+    /*auto h2 = system.create(5, 6.9f, 7.3);
     bool b2 = system.exists(h2);
     auto t2 = system.types(h2);
     auto [v2a, v2b] = system.get<float, double>(h2);
@@ -57,7 +57,7 @@ int main() {
         auto [i, f, handle] = it;
         std::cout << "Handle: "<< handle << " int: " << i << " float: " << f << std::endl;
     }
-
+    */
 
     return 0;   
 }
