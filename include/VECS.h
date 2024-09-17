@@ -259,6 +259,7 @@ namespace vecs
 					auto* map = static_cast<ComponentMap<std::decay_t<T>>*>(m_maps[type<T>()].get());
 					map->insert(std::forward<T>(v));
 				};
+				func(handle); //insert the handle
 				(func( std::forward<Ts>(value) ), ...); //insert all components
 				m_index[handle] = size() - 1; //store the index of the new entity in the archetype
 				assert(validate()); //all component maps should have the same size
@@ -317,6 +318,21 @@ namespace vecs
 				return m_maps.begin()->second->size();
 			}
 
+						/// @brief Test if all component maps have the same size.
+			/// @return  true if all component maps have the same size, else false.
+			bool validate() {
+				bool first{true};
+				size_t sz{0};
+				for( auto& it : m_maps ) {
+					size_t s = it.second->size();
+					if( first || s == sz) {
+						sz = s;
+						first = false;
+					} else return false;
+				}
+				return true;
+			}
+
 		private:
 
 			/// @brief Add a new component to the archetype.
@@ -332,27 +348,12 @@ namespace vecs
 
 			/// @brief Test if all component maps have the same size.
 			/// @return  Index of the entity in the archetype.
-			size_t move( auto& types, size_t other_index, auto& other) {
+			void move( auto& types, size_t other_index, auto& other) {
 				for( auto& it : types ) { //go through all maps
-					m_maps[it] = other.map[it]->create(); //make a component map like this one
+					m_maps[it] = other.map(it)->create(); //make a component map like this one
 					m_maps[it]->move(other.map(it), other_index); //insert the new value
 				}
 				other.erase(other_index); //erase the old entity
-			}
-
-			/// @brief Test if all component maps have the same size.
-			/// @return  true if all component maps have the same size, else false.
-			bool validate() {
-				bool first{true};
-				size_t sz{0};
-				for( auto& it : m_maps ) {
-					size_t s = it.second->size();
-					if( first || s == sz) {
-						sz = s;
-						first = false;
-					} else return false;
-				}
-				return true;
 			}
 
 			std::vector<size_t> m_types; //types of components
@@ -526,6 +527,12 @@ namespace vecs
 			return View<Ts...>{*this};
 		}
 
+		void validate() {
+			for( auto& it : m_archetypes ) {
+				assert(it.second->validate());
+			}
+		}
+
 	private:
 		std::size_t m_next_handle{0};	//next handle to be assigned	
 		std::unordered_map<Handle, Archetype*> m_entities; //Archetype and index in archetype
@@ -552,13 +559,7 @@ namespace vecs
 		}
 
 		auto operator*() {
-			Handle handle;
-			auto func = [&]<typename T>() {
-				auto entt = static_cast<Registry::ComponentMap<T>*>(m_archetypes[m_archidx]->m_maps[type<T>()].get())->get(m_entidx);
-				handle = entt.m_handle;
-				return entt.m_value;
-			};
-			return std::tuple_cat( std::tuple<Ts...>(func.template operator()<Ts>()...), std::make_tuple(handle) );
+			return std::make_tuple(static_cast<Registry::ComponentMap<Ts>*>(m_archetypes[m_archidx]->m_maps[type<Ts>()].get())->get(m_entidx)...);
 		}
 
 		auto operator!=(const Iterator& other) {
