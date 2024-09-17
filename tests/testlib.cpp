@@ -60,12 +60,12 @@ int main() {
     assert( !system.exists(h2) );
     system.validate();
 
-    system.create(1, 10.0f, 10.0);
-    system.create(2, 20.0f );
-    system.create(3, 30.0, "AAA");
-    system.create(4, 40.0f, 40.0);
-    system.create(5);
-    system.create(6, 60.0f, 60.0);
+    auto hd1 = system.create(1, 10.0f, 10.0);
+    auto hd2 = system.create(2, 20.0f );
+    auto hd3 = system.create(3, 30.0, "AAA");
+    auto hd4 = system.create(4, 40.0f, 40.0);
+    auto hd5 = system.create(5);
+    auto hd6 = system.create(6, 60.0f, 60.0);
 
     for( auto handle : system.view<vecs::Handle>() ) {
         std::cout << "Handle: "<< handle << std::endl;
