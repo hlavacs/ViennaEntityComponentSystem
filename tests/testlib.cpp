@@ -52,6 +52,8 @@ int main() {
     assert( !system.has<int>(h2) );
     assert( !system.has<float>(h2) );
     assert( system.has<double>(h2) );
+    system.erase<double>(h2); //remove also the last component
+    assert( system.exists(h2)); //check that the entity still exists
     system.validate();
 
     system.erase(h2);
@@ -65,11 +67,16 @@ int main() {
     system.create(5);
     system.create(6, 60.0f, 60.0);
 
-    for( auto it : system.view<vecs::Handle, int, float>() ) {
-        auto [handle, i, f] = it;
+    for( auto handle : system.view<vecs::Handle>() ) {
+        std::cout << "Handle: "<< handle << std::endl;
+    }
+
+    for( auto [handle, i, f] : system.view<vecs::Handle, int, float>() ) {
         std::cout << "Handle: "<< handle << " int: " << i << " float: " << f << std::endl;
     }
 
+    system.clear();
+    assert( system.size() == 0 );
 
     return 0;   
 }

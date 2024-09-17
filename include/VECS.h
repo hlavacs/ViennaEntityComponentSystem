@@ -102,6 +102,7 @@ namespace vecs
 			virtual void move(ComponentMapBase* other, size_t from) = 0;
 			virtual auto size() -> size_t= 0;
 			virtual auto create() -> std::unique_ptr<ComponentMapBase> = 0;
+			virtual void clear() = 0;
 		};
 
 		/// @brief A map of components of the same type.
@@ -165,6 +166,10 @@ namespace vecs
 			[[nodiscard]] virtual auto create() -> std::unique_ptr<ComponentMapBase> override {
 				return std::make_unique<ComponentMap<T>>();
 			};
+
+			void clear() override {
+				m_data.clear();
+			}
 
 		private:
 			std::vector<T> m_data; //vector of component values
@@ -318,7 +323,14 @@ namespace vecs
 				return m_maps.begin()->second->size();
 			}
 
-						/// @brief Test if all component maps have the same size.
+			void clear() {
+				for( auto& map : m_maps ) {
+					map.second->clear();
+				}
+				m_index.clear();
+			}
+
+			/// @brief Test if all component maps have the same size.
 			/// @return  true if all component maps have the same size, else false.
 			bool validate() {
 				bool first{true};
@@ -365,6 +377,12 @@ namespace vecs
 		//----------------------------------------------------------------------------------------------
 
 	public:
+
+		/// @brief Get the number of entities in the system.
+		/// @return The number of entities.
+		size_t size() {
+			return m_entities.size();
+		}
 
 		/// @brief Test if a handle is valid, i.e., not 0.
 		/// @param handle 
@@ -518,6 +536,14 @@ namespace vecs
 			m_entities.erase(handle); //erase the entity from the entity list
 		}
 
+		/// @brief Clear the registry by removing all entities.
+		void clear() {
+			for( auto& arch : m_archetypes ) {
+				arch.second->clear();
+			}
+			m_entities.clear();
+		}
+
 		/// @brief Get a view of entities with specific components.
 		/// @tparam ...Ts The types of the components.
 		/// @return A view of the entity components
@@ -527,10 +553,14 @@ namespace vecs
 			return View<Ts...>{*this};
 		}
 
+		/// @brief Validate the registry by checking if all component maps have the same size.
 		void validate() {
-			for( auto& it : m_archetypes ) {
-				assert(it.second->validate());
+			size_t sz{0};
+			for( auto& arch : m_archetypes ) {
+				sz += arch.second->size();
+				assert(arch.second->validate());
 			}
+			assert(sz == size());
 		}
 
 	private:
@@ -543,23 +573,37 @@ namespace vecs
 	//----------------------------------------------------------------------------------------------
 
 
+	/// @brief Used for iterating over entity components.
+	/// @tparam ...Ts Choose the types of the components you want the entities to have.
 	template<typename... Ts>
 		requires (vtll::unique<vtll::tl<Ts...>>::value)
 	class Iterator {
 
 	public:
+		/// @brief Iterator constructor saving a list of archetypes and the current index.
+		/// @param arch List of archetypes. 
+		/// @param archidx First archetype index.
 		Iterator(std::vector<Registry::Archetype*>& arch, size_t archidx) : m_archetypes{arch}, m_archidx{archidx} {}
 
+		/// @brief Prefix increment operator.
 		auto operator++() {
-			if( ++m_entidx == m_archetypes[m_archidx]->m_maps.begin()->second->size() ) {
-				++m_archidx;
-				m_entidx = 0;
+			if( ++m_entidx >= m_archetypes[m_archidx]->m_maps.begin()->second->size() ) {
+				do {
+					++m_archidx;
+					m_entidx = 0;
+				} while( m_archidx < m_archetypes.size() && m_archetypes[m_archidx]->m_maps.begin()->second->size() == 0 );
 			}
 			return *this;
 		}
 
+		/// @brief Access the content the iterator points to.
 		auto operator*() {
-			return std::make_tuple(static_cast<Registry::ComponentMap<Ts>*>(m_archetypes[m_archidx]->m_maps[type<Ts>()].get())->get(m_entidx)...);
+			auto tup = std::make_tuple(static_cast<Registry::ComponentMap<Ts>*>(m_archetypes[m_archidx]->m_maps[type<Ts>()].get())->get(m_entidx)...);
+			if constexpr (sizeof...(Ts) == 1) {
+				return std::get<0>(tup);
+			} else {
+				return tup;
+			}
 		}
 
 		auto operator!=(const Iterator& other) {

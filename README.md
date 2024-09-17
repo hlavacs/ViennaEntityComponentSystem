@@ -53,7 +53,7 @@ COmponent values and their types are automatically determined by the function pa
 
 Do not forget to use type names that describe the intent of the new type, not its type itself. So if you need another integer for storing the height of a person, name it *height_t* rather than *myint_t*.
 
-You can check whether an entity still exists by calling *exists()*. You can get a vector with type_index integers holding a list of component types that a given entity has by calling *types()*. You can check whether an entity has a specific component type *T* by calling *has<T>()*. You can erase an entity and all its components by calling *erase()*. You can also erase individual components *T1, T2, ...* by calling *erase<T1, T2, ...>()*.
+You can check whether an entity still exists by calling *exists()*. You can get a vector with type_index integers holding a list of component types that a given entity has by calling *types()*. You can check whether an entity has a specific component type *T* by calling *has<T>()*. You can erase an entity and all its components by calling *erase()*. You can also erase individual components *T1, T2, ...* by calling *erase<T1, T2, ...>()*. Note that it is perfectly fine to remove all components from an entity. This does not remove the entity itself, and you can afterwards add new components to it.
 
 ```C
     vecs::Handle h1 = system.create(5); //create a new entity with one int component
@@ -69,6 +69,8 @@ You can check whether an entity still exists by calling *exists()*. You can get 
     assert( !system.has<int>(h2) ); //check whether the components are gone
     assert( !system.has<float>(h2) );
     assert( system.has<double>(h2) );
+    system.erase<double>(h2); //remove also the last component
+    assert( system.exists(h2)); //check that the entity still exists
 ```
 
 Accessing components can be done by calling *get()*. This causes the values of the components to be copied. If you access only one component, the return value is not embedded into a *tuple*. If you access more than one component, then a tuple is returned holding the component values. You can easily access all component values by using C++17 "structured binding".
@@ -98,11 +100,14 @@ You can update the value of a component by calling *put()*. You can call put usi
     assert( fvalue == 666.9f && dvalue == 777.3);    //check the values
 ```
 
-You can iterate over all components of a given type creating a view. The view covers all entities that hold all components of the specified types, and you can iterate over them using a standard C++ for loop. The following example creates a view for the types vecs::Handle, int and float, then iterates over all entities having these components:
+You can iterate over all components of a given type creating a view. The view covers all entities that hold all components of the specified types, and you can iterate over them using a standard C++ for loop. The following example creates views with one or three tyes and then iterates over all entities having these components:
 
 ```C
-    for( auto it : system.view<vecs::Handle, int, float>() ) {
-        auto [handle, i, f] = it;
+    for( auto handle : system.view<vecs::Handle>() ) { //iterate over ALL entities
+        std::cout << "Handle: "<< handle << std::endl;
+    }
+
+    for( auto [handle, i, f] : system.view<vecs::Handle, int, float>() ) {
         std::cout << "Handle: "<< handle << " int: " << i << " float: " << f << std::endl;
     }
 ```
