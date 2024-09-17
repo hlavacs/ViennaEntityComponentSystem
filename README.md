@@ -18,7 +18,7 @@ Important features of VECS are:
 VECS is a header only library, consisting of the header file *VECS.h*.  Include this file into your source code.
 VECS depends on another projects named the Vienna Type List Library (VTLL), see https://github.com/hlavacs/ViennaTypeListLibrary. This project is included as Git submodule. When cloning the project make sure to run 
 
-git submodule init
+git submodule init\
 git submodule update
 
 in order to also clone VTLL. In tests\testlib.cpp you can find examples on how to use VECS.
