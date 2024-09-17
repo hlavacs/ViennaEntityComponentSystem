@@ -75,6 +75,8 @@ int main() {
         std::cout << "Handle: "<< handle << " int: " << i << " float: " << f << std::endl;
     }
 
+        
+    assert( system.size() > 0 );
     system.clear();
     assert( system.size() == 0 );
 
