@@ -18,6 +18,12 @@ int main() {
     assert( !system.exists(h1) );
     system.validate();
 
+    //vecs::Handle hx = system.create(5, 6); //compile error
+    struct height_t { int i; }; 
+    struct weight_t { int i; }; 
+    vecs::Handle hx1 = system.create(5, height_t{6}, weight_t{6}); //works
+    system.validate();
+
     auto h2 = system.create(5, 6.9f, 7.3);
     assert( system.exists(h2) );
     auto t2 = system.types(h2);
@@ -25,12 +31,17 @@ int main() {
     system.validate();
 
     system.put(h2, 50, 69.0f, 73.0);
-    auto tup = system.get<float, double>(h2);
+    assert( system.get<float>(h2) == 69.0f && system.get<double>(h2) == 73.0 );
+    std::tuple<float,double> tup = system.get<float, double>(h2);
     std::get<float>(tup) = 101.0f;    
     std::get<double>(tup) = 102.0;    
     system.put(h2, tup);
+    assert( system.get<float>(h2) == 101.0f && system.get<double>(h2) == 102.0 );
+    system.validate();
+
     auto tup2 = system.get<int, float, double>(h2);
     int ii = std::get<int>(tup2);
+    auto [ivalue, fvalue, dvalue] = system.get<int, float, double>(h2);
     system.validate();
 
     assert( system.has<int>(h2) );
@@ -41,6 +52,7 @@ int main() {
     assert( !system.has<int>(h2) );
     assert( !system.has<float>(h2) );
     assert( system.has<double>(h2) );
+    system.validate();
 
     system.erase(h2);
     assert( !system.exists(h2) );
@@ -53,10 +65,7 @@ int main() {
     system.create(5);
     system.create(6, 60.0f, 60.0);
 
-   
-    auto view = system.view<vecs::Handle, int, float>();
-
-    for( auto it : view ) {
+    for( auto it : system.view<vecs::Handle, int, float>() ) {
         auto [handle, i, f] = it;
         std::cout << "Handle: "<< handle << " int: " << i << " float: " << f << std::endl;
     }
