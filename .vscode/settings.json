@@ -84,6 +84,9 @@
         "xtr1common": "cpp",
         "xtree": "cpp",
         "xutility": "cpp",
-        "bitset": "cpp"
+        "bitset": "cpp",
+        "latch": "cpp",
+        "stack": "cpp",
+        "unordered_set": "cpp"
     }
 }

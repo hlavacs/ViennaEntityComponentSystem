@@ -77,11 +77,18 @@ namespace vecs
 	class View;
 
 
+	enum RegistryType {
+		SEQUENTIAL,
+		PARALLEL
+	};
+
 	/// @brief A registry for entities and components.
+	template <RegistryType RTYPE = SEQUENTIAL>
 	class Registry {
 
 		template<typename... Ts> requires (vtll::unique<vtll::tl<Ts...>>::value) friend class Iterator;
 		template<typename... Ts> requires (vtll::unique<vtll::tl<Ts...>>::value) friend class View;
+
 
 	private:
 	
@@ -103,7 +110,9 @@ namespace vecs
 			virtual auto size() -> size_t= 0;
 			virtual auto create() -> std::unique_ptr<ComponentMapBase> = 0;
 			virtual void clear() = 0;
-		};
+		}; //end of ComponentMapBase
+
+		//----------------------------------------------------------------------------------------------
 
 		/// @brief A map of components of the same type.
 		/// @tparam T The value type for this comoonent map.
@@ -173,7 +182,7 @@ namespace vecs
 
 		private:
 			std::vector<T> m_data; //vector of component values
-		};
+		}; //end of ComponentMap
 
 		//----------------------------------------------------------------------------------------------
 
@@ -181,6 +190,7 @@ namespace vecs
 		struct ActionInsert{};
 		struct ActionRemove{};
 
+		/// @brief An archetype of entities with the same components.
 		class Archetype {
 
 			template<typename... Ts> requires (vtll::unique<vtll::tl<Ts...>>::value) friend class View;
@@ -371,12 +381,90 @@ namespace vecs
 			std::vector<size_t> m_types; //types of components
 			std::unordered_map<Handle, size_t> m_index; //map from handle ot index of entity in data array
 			std::unordered_map<size_t, std::unique_ptr<ComponentMapBase>> m_maps; //map from type index to component data
-		};
+		}; //end of Archetype
 
+
+	public:
 
 		//----------------------------------------------------------------------------------------------
 
-	public:
+		/// @brief Used for iterating over entity components.
+		/// @tparam ...Ts Choose the types of the components you want the entities to have.
+		template<typename... Ts>
+			requires (vtll::unique<vtll::tl<Ts...>>::value)
+		class Iterator {
+
+		public:
+			/// @brief Iterator constructor saving a list of archetypes and the current index.
+			/// @param arch List of archetypes. 
+			/// @param archidx First archetype index.
+			Iterator(std::vector<Archetype*>& arch, size_t archidx) : m_archetypes{arch}, m_archidx{archidx} {}
+
+			/// @brief Prefix increment operator.
+			auto operator++() {
+				if( ++m_entidx >= m_archetypes[m_archidx]->m_maps.begin()->second->size() ) {
+					do {
+						++m_archidx;
+						m_entidx = 0;
+					} while( m_archidx < m_archetypes.size() && m_archetypes[m_archidx]->m_maps.begin()->second->size() == 0 );
+				}
+				return *this;
+			}
+
+			/// @brief Access the content the iterator points to.
+			auto operator*() {
+				auto tup = std::make_tuple(static_cast<ComponentMap<Ts>*>(m_archetypes[m_archidx]->m_maps[type<Ts>()].get())->get(m_entidx)...);
+				if constexpr (sizeof...(Ts) == 1) {
+					return std::get<0>(tup);
+				} else {
+					return tup;
+				}
+			}
+
+			auto operator!=(const Iterator& other) {
+				return m_archidx != other.m_archidx || m_entidx != other.m_entidx;
+			}
+
+		private:
+			size_t m_archidx{0};
+			size_t m_entidx{0};
+			std::vector<Archetype*>& m_archetypes;
+		}; //end of Iterator
+
+		//----------------------------------------------------------------------------------------------
+
+		/// @brief A view of entities with specific components.
+		/// @tparam ...Ts The types of the components.
+		template<typename... Ts>
+			requires (vtll::unique<vtll::tl<Ts...>>::value)
+		class View {
+
+		public:
+			View(Registry<RTYPE>& system) : m_system{system} {}
+
+			auto begin() {
+				m_archetypes.clear();
+				for( auto& it : m_system.m_archetypes ) {
+					auto arch = it.second.get();
+					auto func = [&]<typename T>() {
+						if( std::find(arch->m_types.begin(), arch->m_types.end(), type<T>()) == arch->m_types.end() ) return false;
+						return true;
+					};
+					if( (func.template operator()<Ts>() && ...) ) m_archetypes.push_back(it.second.get());
+				}
+				return Iterator<Ts...>{m_archetypes, 0};
+			}
+
+			auto end() {
+				return Iterator<Ts...>{m_archetypes, m_archetypes.size()};
+			}
+
+		private:
+			Registry<RTYPE>& m_system;
+			std::vector<Archetype*> m_archetypes;
+		}; //end of View
+
+		//----------------------------------------------------------------------------------------------
 
 		/// @brief Get the number of entities in the system.
 		/// @return The number of entities.
@@ -549,8 +637,8 @@ namespace vecs
 		/// @return A view of the entity components
 		template<typename... Ts>
 			requires (vtll::unique<vtll::tl<Ts...>>::value)
-		[[nodiscard]] auto view() {
-			return View<Ts...>{*this};
+		[[nodiscard]] auto view() -> View<Ts...>{
+			return {*this};
 		}
 
 		/// @brief Validate the registry by checking if all component maps have the same size.
@@ -570,84 +658,6 @@ namespace vecs
 	};
 
 	
-	//----------------------------------------------------------------------------------------------
-
-
-	/// @brief Used for iterating over entity components.
-	/// @tparam ...Ts Choose the types of the components you want the entities to have.
-	template<typename... Ts>
-		requires (vtll::unique<vtll::tl<Ts...>>::value)
-	class Iterator {
-
-	public:
-		/// @brief Iterator constructor saving a list of archetypes and the current index.
-		/// @param arch List of archetypes. 
-		/// @param archidx First archetype index.
-		Iterator(std::vector<Registry::Archetype*>& arch, size_t archidx) : m_archetypes{arch}, m_archidx{archidx} {}
-
-		/// @brief Prefix increment operator.
-		auto operator++() {
-			if( ++m_entidx >= m_archetypes[m_archidx]->m_maps.begin()->second->size() ) {
-				do {
-					++m_archidx;
-					m_entidx = 0;
-				} while( m_archidx < m_archetypes.size() && m_archetypes[m_archidx]->m_maps.begin()->second->size() == 0 );
-			}
-			return *this;
-		}
-
-		/// @brief Access the content the iterator points to.
-		auto operator*() {
-			auto tup = std::make_tuple(static_cast<Registry::ComponentMap<Ts>*>(m_archetypes[m_archidx]->m_maps[type<Ts>()].get())->get(m_entidx)...);
-			if constexpr (sizeof...(Ts) == 1) {
-				return std::get<0>(tup);
-			} else {
-				return tup;
-			}
-		}
-
-		auto operator!=(const Iterator& other) {
-			return m_archidx != other.m_archidx || m_entidx != other.m_entidx;
-		}
-
-	private:
-		size_t m_archidx{0};
-		size_t m_entidx{0};
-		std::vector<Registry::Archetype*>& m_archetypes;
-	};
-
-
-	//----------------------------------------------------------------------------------------------
-
-	template<typename... Ts>
-		requires (vtll::unique<vtll::tl<Ts...>>::value)
-	class View {
-
-	public:
-		View(Registry& system) : m_system{system} {}
-
-		auto begin() {
-			m_archetypes.clear();
-			for( auto& it : m_system.m_archetypes ) {
-				auto arch = it.second.get();
-				auto func = [&]<typename T>() {
-					if( std::find(arch->m_types.begin(), arch->m_types.end(), type<T>()) == arch->m_types.end() ) return false;
-					return true;
-				};
-				if( (func.template operator()<Ts>() && ...) ) m_archetypes.push_back(it.second.get());
-			}
-			return Iterator<Ts...>{m_archetypes, 0};
-		}
-
-		auto end() {
-			return Iterator<Ts...>{m_archetypes, m_archetypes.size()};
-		}
-
-	private:
-		Registry& m_system;
-		std::vector<Registry::Archetype*> m_archetypes;
-	};
-
 }
 
 
