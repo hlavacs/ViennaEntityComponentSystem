@@ -23,8 +23,8 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL 
 elseif(CMAKE_COMPILER_IS_GNUCXX)
 endif()
 
-set(INCLUDE ${CMAKE_HOME_DIRECTORY}/include)
-set(EXTERN ${CMAKE_HOME_DIRECTORY}/extern)
+set(INCLUDE ${PROJECT_SOURCE_DIR}/include)
+set(EXTERN ${PROJECT_SOURCE_DIR}/extern)
 
 include_directories (${EXTERN}/ViennaTypeListLibrary/include)
 
