@@ -1,7 +1,7 @@
 
-set(TARGET testlib)
+set(TARGET testvecs)
 
-set(SOURCE testlib.cpp)
+set(SOURCE testvecs.cpp)
 
 set(HEADERS
   ${INCLUDE}/VECS.h
