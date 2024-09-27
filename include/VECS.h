@@ -17,6 +17,7 @@
 #include <cassert>
 #include <bitset>
 #include <algorithm>    // std::sort
+#include <shared_mutex>
 #include <VTLL.h>
 
 
@@ -82,6 +83,8 @@ namespace vecs
 		PARALLEL
 	};
 
+	struct VecsWrite {}; //dummy type for write access
+
 	/// @brief A registry for entities and components.
 	template <RegistryType RTYPE = SEQUENTIAL>
 	class Registry {
@@ -89,6 +92,7 @@ namespace vecs
 		template<typename... Ts> requires (vtll::unique<vtll::tl<Ts...>>::value) friend class Iterator;
 		template<typename... Ts> requires (vtll::unique<vtll::tl<Ts...>>::value) friend class View;
 
+		using mutext_t = std::conditional_t<RTYPE == SEQUENTIAL, int32_t, std::shared_mutex>;
 
 	private:
 	
@@ -96,6 +100,11 @@ namespace vecs
 
 		/// @brief Base class for component maps.
 		class ComponentMapBase {
+
+			friend class Archetype; //for eaccessing the mutex
+			template<typename... Ts> requires (vtll::unique<vtll::tl<Ts...>>::value)
+			friend class Iterator;
+
 		public:
 			ComponentMapBase() = default;
 			~ComponentMapBase() = default;
@@ -110,6 +119,9 @@ namespace vecs
 			virtual auto size() -> size_t= 0;
 			virtual auto create() -> std::unique_ptr<ComponentMapBase> = 0;
 			virtual void clear() = 0;
+
+		private:
+			mutext_t m_mutex; //mutex for thread safety
 		}; //end of ComponentMapBase
 
 		//----------------------------------------------------------------------------------------------
@@ -119,6 +131,7 @@ namespace vecs
 		template<typename T>
 			requires std::same_as<T, std::decay_t<T>>
 		class ComponentMap : public ComponentMapBase {
+
 		public:
 
 			ComponentMap() = default; //constructor
@@ -378,6 +391,8 @@ namespace vecs
 				other.erase(other_index); //erase the old entity
 			}
 
+			mutext_t m_mutex; //mutex for thread safety
+
 			std::vector<size_t> m_types; //types of components
 			std::unordered_map<Handle, size_t> m_index; //map from handle ot index of entity in data array
 			std::unordered_map<size_t, std::unique_ptr<ComponentMapBase>> m_maps; //map from type index to component data
@@ -398,22 +413,30 @@ namespace vecs
 			/// @brief Iterator constructor saving a list of archetypes and the current index.
 			/// @param arch List of archetypes. 
 			/// @param archidx First archetype index.
-			Iterator(std::vector<Archetype*>& arch, size_t archidx) : m_archetypes{arch}, m_archidx{archidx} {}
+			Iterator(std::vector<Archetype*>& arch, size_t archidx) : m_archetypes{arch}, m_archidx{archidx} {
+				if( m_archidx < m_archetypes.size() ) lock();
+			}
+
+			~Iterator() {
+				if( m_archidx < m_archetypes.size() ) unlock();
+			}
 
 			/// @brief Prefix increment operator.
 			auto operator++() {
 				if( ++m_entidx >= m_archetypes[m_archidx]->m_maps.begin()->second->size() ) {
+					unlock();
 					do {
 						++m_archidx;
 						m_entidx = 0;
 					} while( m_archidx < m_archetypes.size() && m_archetypes[m_archidx]->m_maps.begin()->second->size() == 0 );
 				}
+				if( m_archidx < m_archetypes.size() ) lock();
 				return *this;
 			}
 
 			/// @brief Access the content the iterator points to.
 			auto operator*() {
-				auto tup = std::make_tuple(static_cast<ComponentMap<Ts>*>(m_archetypes[m_archidx]->m_maps[type<Ts>()].get())->get(m_entidx)...);
+				auto tup = std::make_tuple(static_cast<ComponentMap<Ts>*>(m_archetypes[m_archidx]->map(type<Ts>()))->get(m_entidx)...);
 				if constexpr (sizeof...(Ts) == 1) {
 					return std::get<0>(tup);
 				} else {
@@ -426,6 +449,16 @@ namespace vecs
 			}
 
 		private:
+			void lock() {
+				if constexpr (RTYPE == PARALLEL) 
+					(m_archetypes[m_archidx]->map(type<Ts>())->m_mutex.lock(), ...);
+			}
+
+			void unlock() {
+				if constexpr (RTYPE == PARALLEL) 
+					(m_archetypes[m_archidx]->map(type<Ts>())->m_mutex.unlock(), ...);
+			}
+
 			size_t m_archidx{0};
 			size_t m_entidx{0};
 			std::vector<Archetype*>& m_archetypes;
@@ -469,6 +502,7 @@ namespace vecs
 		/// @brief Get the number of entities in the system.
 		/// @return The number of entities.
 		size_t size() {
+			if constexpr (RTYPE == PARALLEL) std::shared_lock lock(m_mutex);
 			return m_entities.size();
 		}
 
@@ -486,8 +520,9 @@ namespace vecs
 		template<typename... Ts>
 			requires ((sizeof...(Ts) > 0) && (vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
 		[[nodiscard]] auto create( Ts&&... component ) -> Handle {
-			Handle handle{ ++m_next_handle };
+			if constexpr (RTYPE == PARALLEL) std::unique_lock lock(m_mutex);
 
+			Handle handle{ ++m_next_handle };
 			std::vector<std::size_t> types = {type<Ts>()...};
 			auto it = m_archetypes.find(&types);
 			if( it == m_archetypes.end() ) {
@@ -505,6 +540,7 @@ namespace vecs
 		/// @param handle The handle of the entity.
 		/// @return true if the entity exists, else false.
 		bool exists(Handle handle) {
+			if constexpr (RTYPE == PARALLEL) std::shared_lock lock(m_mutex);
 			assert(valid(handle));
 			return m_entities.find(handle) != m_entities.end();
 		}
@@ -515,14 +551,16 @@ namespace vecs
 		/// @return true if the entity has the component, else false.
 		template<typename T>
 		bool has(Handle handle) {
+			if constexpr (RTYPE == PARALLEL) std::shared_lock lock(m_mutex);
 			assert(valid(handle));
-			return 	exists(handle) && m_entities[handle]->has(type<T>());
+			return 	m_entities.find(handle) != m_entities.end() && m_entities[handle]->has(type<T>());
 		}
 
 		/// @brief Get the types of the components of an entity.
 		/// @param handle The handle of the entity.
 		/// @return A vector of type indices of the components.
 		const auto& types(Handle handle) {
+			if constexpr (RTYPE == PARALLEL) std::shared_lock lock(m_mutex);
 			assert(exists(handle));
 			return m_entities[handle]->types();
 		}
@@ -534,6 +572,7 @@ namespace vecs
 		/// @return The component value.
 		template<typename T>
 		[[nodiscard]] auto get(Handle handle) -> T {
+			if constexpr (RTYPE == PARALLEL) std::shared_lock lock(m_mutex);
 			assert(has<T>(handle));
 			return m_entities[handle]->get<T>(handle);
 		}
@@ -556,6 +595,8 @@ namespace vecs
 		template<typename T>
 			requires (!is_tuple<T>::value)
 		void put(Handle handle, T&& v) {
+			if constexpr (RTYPE == PARALLEL) std::unique_lock lock(m_mutex);
+
 			assert(exists(handle));
 			if(!has<T>(handle)) {
 				auto typ = m_entities[handle]->types();
@@ -596,6 +637,8 @@ namespace vecs
 		template<typename... Ts>
 			requires (vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
 		void erase(Handle handle) {
+			if constexpr (RTYPE == PARALLEL) std::unique_lock lock(m_mutex);
+
 			assert( (has<Ts>(handle) && ...) );
 			auto entt = m_entities.find(handle)->second; //get the archetype of the entity
 			auto typ = entt->types(); //get the types from the archetype
@@ -619,6 +662,8 @@ namespace vecs
 		/// @brief Erase an entity from the registry.
 		/// @param handle The handle of the entity.
 		void erase(Handle handle) {
+			if constexpr (RTYPE == PARALLEL) std::unique_lock lock(m_mutex);
+
 			assert(exists(handle));
 			m_entities[handle]->erase(handle); //erase the entity from the archetype
 			m_entities.erase(handle); //erase the entity from the entity list
@@ -626,6 +671,8 @@ namespace vecs
 
 		/// @brief Clear the registry by removing all entities.
 		void clear() {
+			if constexpr (RTYPE == PARALLEL) std::unique_lock lock(m_mutex);
+
 			for( auto& arch : m_archetypes ) {
 				arch.second->clear();
 			}
@@ -643,6 +690,8 @@ namespace vecs
 
 		/// @brief Validate the registry by checking if all component maps have the same size.
 		void validate() {
+			if constexpr (RTYPE == PARALLEL) std::shared_lock lock(m_mutex);
+
 			size_t sz{0};
 			for( auto& arch : m_archetypes ) {
 				sz += arch.second->size();
@@ -652,6 +701,8 @@ namespace vecs
 		}
 
 	private:
+		mutext_t m_mutex; //mutex for thread safety
+
 		std::size_t m_next_handle{0};	//next handle to be assigned	
 		std::unordered_map<Handle, Archetype*> m_entities; //Archetype and index in archetype
 		std::unordered_map<std::vector<size_t>*, std::unique_ptr<Archetype>> m_archetypes; //Mapping vector of type index to archetype

@@ -7,7 +7,7 @@
 
 
 int main() {
-    vecs::Registry system;
+    vecs::Registry<vecs::PARALLEL> system;
 
     vecs::Handle h1 = system.create(5);
     assert( system.exists(h1) );
