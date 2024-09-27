@@ -472,6 +472,22 @@ namespace vecs
 			requires (vtll::unique<vtll::tl<Ts...>>::value)
 		class View {
 
+			using typelist = vtll::tl<Ts...>;
+			static const size_t size = sizeof...(Ts);
+			static const size_t null = std::numeric_limits<size_t>::max();
+			static const size_t writeidx = vtll::index_of<typelist, VecsWrite>::value;
+			static const size_t writeidx1 = std::min(writeidx, (size_t)1); //0, 1
+			static const size_t writeidx2 = std::max(writeidx, (size_t)1); //1, ... writeidx or max
+			static const size_t writeidx3 = std::min(writeidx, size - 1); //0, ... writeidx or max
+
+			using read_t = 	std::conditional_t<writeidx == null, typelist, 
+								std::conditional_t< writeidx == 0, vtll::tl<>, vtll::sublist< typelist, 0, writeidx2 - 1 > >
+							>;
+
+			using write_t = std::conditional_t<writeidx == null, vtll::tl<>, 
+								vtll::sublist<typelist, writeidx3 + 1, size - 1>
+							>;
+
 		public:
 			View(Registry<RTYPE>& system) : m_system{system} {}
 
