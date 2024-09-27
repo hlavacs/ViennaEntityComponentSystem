@@ -69,28 +69,30 @@ namespace vecs
 		return ret;
 	}
 
+	struct VecsWrite {}; //dummy type for write access
+
 	template<typename... Ts>
 		requires (vtll::unique<vtll::tl<Ts...>>::value)
 	class Iterator;
 
 	template<typename... Ts>
-		requires (vtll::unique<vtll::tl<Ts...>>::value)
+		requires ((vtll::unique<vtll::tl<Ts...>>::value) && (sizeof...(Ts) > 0) && (!std::is_same_v<vtll::tl<VecsWrite>, vtll::tl<Ts...>>))
 	class View;
-
 
 	enum RegistryType {
 		SEQUENTIAL,
 		PARALLEL
 	};
 
-	struct VecsWrite {}; //dummy type for write access
-
 	/// @brief A registry for entities and components.
 	template <RegistryType RTYPE = SEQUENTIAL>
 	class Registry {
 
 		template<typename... Ts> requires (vtll::unique<vtll::tl<Ts...>>::value) friend class Iterator;
-		template<typename... Ts> requires (vtll::unique<vtll::tl<Ts...>>::value) friend class View;
+
+		template<typename... Ts> 
+			requires ((vtll::unique<vtll::tl<Ts...>>::value) && (sizeof...(Ts) > 0) && (!std::is_same_v<vtll::tl<VecsWrite>, vtll::tl<Ts...>>) )
+		friend class View;
 
 		using mutext_t = std::conditional_t<RTYPE == SEQUENTIAL, int32_t, std::shared_mutex>;
 
@@ -206,7 +208,10 @@ namespace vecs
 		/// @brief An archetype of entities with the same components.
 		class Archetype {
 
-			template<typename... Ts> requires (vtll::unique<vtll::tl<Ts...>>::value) friend class View;
+			template<typename... Ts> 
+				requires ((vtll::unique<vtll::tl<Ts...>>::value) && (sizeof...(Ts) > 0) && (!std::is_same_v<vtll::tl<VecsWrite>, vtll::tl<Ts...>>))
+			friend class View;
+			
 			template<typename... Ts> requires (vtll::unique<vtll::tl<Ts...>>::value) friend class Iterator;
 
 		public:
@@ -409,6 +414,31 @@ namespace vecs
 			requires (vtll::unique<vtll::tl<Ts...>>::value)
 		class Iterator {
 
+			using typelist = vtll::tl<Ts...>;
+			static const size_t size = sizeof...(Ts);
+			static const size_t max = std::numeric_limits<size_t>::max();
+			static const size_t writeidx = vtll::index_of<typelist, VecsWrite>::value;
+
+			static consteval size_t writeidxRead( size_t writeidx ) {
+				if( writeidx == max ) return 0;
+				if( writeidx == 0 ) return 0;
+				return writeidx - 1;
+			}
+
+			static consteval size_t writeidxWrite( size_t writeidx, size_t size ) {
+				if( writeidx == max ) return 0;
+				if( writeidx == size - 1) return 0;
+				return writeidx + 1;
+			}			
+
+			using read_t = 	std::conditional_t<writeidx == max, typelist, 
+								std::conditional_t< writeidx == 0, vtll::tl<>, vtll::sublist< typelist, 0, writeidxRead( writeidx ) > >
+							>;
+
+			using write_t = std::conditional_t<writeidx == max || writeidx == size - 1, vtll::tl<>, 
+								vtll::sublist<typelist, writeidxWrite( writeidx, size ), size - 1>
+							>;
+
 		public:
 			/// @brief Iterator constructor saving a list of archetypes and the current index.
 			/// @param arch List of archetypes. 
@@ -469,24 +499,8 @@ namespace vecs
 		/// @brief A view of entities with specific components.
 		/// @tparam ...Ts The types of the components.
 		template<typename... Ts>
-			requires (vtll::unique<vtll::tl<Ts...>>::value)
+			requires ((vtll::unique<vtll::tl<Ts...>>::value) && (sizeof...(Ts) > 0) && (!std::is_same_v<vtll::tl<VecsWrite>, vtll::tl<Ts...>>) )
 		class View {
-
-			using typelist = vtll::tl<Ts...>;
-			static const size_t size = sizeof...(Ts);
-			static const size_t null = std::numeric_limits<size_t>::max();
-			static const size_t writeidx = vtll::index_of<typelist, VecsWrite>::value;
-			static const size_t writeidx1 = std::min(writeidx, (size_t)1); //0, 1
-			static const size_t writeidx2 = std::max(writeidx, (size_t)1); //1, ... writeidx or max
-			static const size_t writeidx3 = std::min(writeidx, size - 1); //0, ... writeidx or max
-
-			using read_t = 	std::conditional_t<writeidx == null, typelist, 
-								std::conditional_t< writeidx == 0, vtll::tl<>, vtll::sublist< typelist, 0, writeidx2 - 1 > >
-							>;
-
-			using write_t = std::conditional_t<writeidx == null, vtll::tl<>, 
-								vtll::sublist<typelist, writeidx3 + 1, size - 1>
-							>;
 
 		public:
 			View(Registry<RTYPE>& system) : m_system{system} {}
