@@ -268,7 +268,7 @@ namespace vecs
 
 			/// @brief Get the types of the components.
 			/// @return A vector of type indices.
-			[[nodiscard]] auto& types() {
+			[[nodiscard]] const auto&  types() const {
 				return m_types;
 			}
 
@@ -276,6 +276,7 @@ namespace vecs
 			/// @param ti The type index of the component.
 			/// @return true if the archetype has the component, else false.
 			[[nodiscard]] bool has(const size_t ti) {
+				if constexpr (RTYPE == PARALLEL) std::shared_lock lock(m_mutex);
 				return (std::find(m_types.begin(), m_types.end(), ti) != std::end(m_types));
 			}
 
@@ -287,6 +288,8 @@ namespace vecs
 			template<typename... Ts>
 				requires ((sizeof...(Ts) > 0) && (vtll::unique<vtll::tl<Ts...>>::value))
 			[[nodiscard]] void insert( Handle handle, Ts&&... value ) {
+				if constexpr (RTYPE == PARALLEL) m_mutex.lock();
+
 				auto func = [&](auto&& v) {
 					using T = std::decay_t<decltype(v)>;
 					auto* map = static_cast<ComponentMap<std::decay_t<T>>*>(m_maps[type<T>()].get());
@@ -296,6 +299,8 @@ namespace vecs
 				(func( std::forward<Ts>(value) ), ...); //insert all components
 				m_index[handle] = size() - 1; //store the index of the new entity in the archetype
 				assert(validate()); //all component maps should have the same size
+
+				if constexpr (RTYPE == PARALLEL) m_mutex.unlock();
 			}
 
 			/// @brief Get component value of an entity. 
@@ -305,9 +310,35 @@ namespace vecs
 			template<typename T>
 			[[nodiscard]] auto get(Handle handle) -> T& {
 				assert(std::find(m_types.begin(), m_types.end(), type<T>()) != std::end(m_types) && m_maps.find(type<T>()) != m_maps.end() ); 
-				size_t index = m_index[handle];
-				assert( index < m_maps[type<T>()]->size());
-				return static_cast<ComponentMap<std::decay_t<T>>*>(m_maps[type<T>()].get())->get(index);
+				size_t index;
+				{
+					if constexpr (RTYPE == PARALLEL) std::shared_lock lock(m_mutex);
+					index = m_index[handle];
+					assert( index < m_maps[type<T>()]->size());
+				}
+				if constexpr (RTYPE == PARALLEL) m_maps[type<T>()].get()->m_mutex.lock_shared();
+				auto& ret = static_cast<ComponentMap<std::decay_t<T>>*>(m_maps[type<T>()].get())->get(index);
+				if constexpr (RTYPE == PARALLEL) m_maps[type<T>()].get()->m_mutex.lock_shared();
+				return ret;
+			}
+
+			/// @brief Get component values of an entity.
+			/// @tparam ...Ts 
+			/// @param handle Handle oif the entity.
+			/// @return A tuple of the component values.
+			template<typename... Ts>
+				requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value))
+			[[nodiscard]] auto get(Handle handle) -> std::tuple<Ts&...> {
+				size_t index;
+				{
+					if constexpr (RTYPE == PARALLEL) std::shared_lock lock(m_mutex);
+					index = m_index[handle];
+					(assert( index < m_maps[type<Ts>()]->size() ),...);
+				}
+				if constexpr (RTYPE == PARALLEL) (m_maps[type<Ts>()].get()->m_mutex.shared_lock(), ...);
+				auto ret = std::tuple<Ts&...>{ static_cast<ComponentMap<std::decay_t<Ts>>*>(m_maps[type<Ts>()].get())->get(index)... };
+				if constexpr (RTYPE == PARALLEL) (m_maps[type<Ts>()].get()->m_mutex.unlock(), ...);
+				return ret;
 			}
 
 			/// @brief Erase all components of an entity.
@@ -550,19 +581,23 @@ namespace vecs
 		template<typename... Ts>
 			requires ((sizeof...(Ts) > 0) && (vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
 		[[nodiscard]] auto create( Ts&&... component ) -> Handle {
-			if constexpr (RTYPE == PARALLEL) std::unique_lock lock(m_mutex);
-
-			Handle handle{ ++m_next_handle };
+			
+			Handle handle{0};
 			std::vector<std::size_t> types = {type<Ts>()...};
-			auto it = m_archetypes.find(&types);
-			if( it == m_archetypes.end() ) {
-				m_archetypes[&types] = std::make_unique<Archetype>( ActionCreate{}, handle, std::forward<Ts>(component)... );
-				m_entities[handle] = m_archetypes[&types].get();
-				return handle;
+			typename decltype(m_archetypes)::iterator it;
+			{
+				if constexpr (RTYPE == PARALLEL) std::unique_lock lock(m_mutex);
+				handle = ++m_next_handle;		//protect shared data
+				it = m_archetypes.find(&types); //find the archetype, protect shared data
+				if( it == m_archetypes.end() ) { //not found
+					m_archetypes[&types] = std::make_unique<Archetype>( ActionCreate{}, handle, std::forward<Ts>(component)... );
+					m_entities[handle] = m_archetypes[&types].get(); //store the new archetype
+					return handle;
+				}
+				m_entities[handle] = it->second.get();
 			}
 
 			it->second->insert(handle, std::forward<Ts>(component)...);
-			m_entities[handle] = it->second.get();
 			return handle;
 		}
 
@@ -590,9 +625,13 @@ namespace vecs
 		/// @param handle The handle of the entity.
 		/// @return A vector of type indices of the components.
 		const auto& types(Handle handle) {
-			if constexpr (RTYPE == PARALLEL) std::shared_lock lock(m_mutex);
-			assert(exists(handle));
-			return m_entities[handle]->types();
+			Archetype* arch;
+			{
+				if constexpr (RTYPE == PARALLEL) std::shared_lock lock(m_mutex);
+				assert(exists(handle));
+				arch = m_entities[handle];
+			}
+			return arch->types();
 		}
 
 		/// @brief Get component value of an entity. If the component does not exist, it will be created.
@@ -602,9 +641,13 @@ namespace vecs
 		/// @return The component value.
 		template<typename T>
 		[[nodiscard]] auto get(Handle handle) -> T {
-			if constexpr (RTYPE == PARALLEL) std::shared_lock lock(m_mutex);
-			assert(has<T>(handle));
-			return m_entities[handle]->get<T>(handle);
+			Archetype* arch;
+			{
+				if constexpr (RTYPE == PARALLEL) std::shared_lock lock(m_mutex);
+				assert(has<T>(handle));
+				arch = m_entities[handle];
+			}
+			return arch->get<T>(handle);
 		}
 
 		/// @brief Get component values of an entity.
@@ -614,7 +657,12 @@ namespace vecs
 		template<typename... Ts>
 			requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value))
 		[[nodiscard]] auto get(Handle handle) -> std::tuple<Ts...> {
-			return std::tuple<Ts...>(get<Ts>(handle)...);
+			Archetype* arch;
+			{
+				if constexpr (RTYPE == PARALLEL) std::shared_lock lock(m_mutex);
+				arch = m_entities[handle];
+			}
+			return std::tuple<Ts...>(arch->get<Ts>(handle)...); //defer locking to archetype!
 		}
 
 		/// @brief Put a new component value to an entity. If the entity does not have the component, it will be created.
