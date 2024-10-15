@@ -76,14 +76,14 @@ namespace vecs
 	class Iterator;
 
 	template<typename... Ts>
-		requires ((vtll::unique<vtll::tl<Ts...>>::value) && (sizeof...(Ts) > 0) && (!std::is_same_v<vtll::tl<VecsWrite>, vtll::tl<Ts...>>))
+		//requires ((vtll::unique<vtll::tl<Ts...>>::value) && (sizeof...(Ts) > 0) && (!std::is_same_v<vtll::tl<VecsWrite>, vtll::tl<Ts...>>))
 	class View;
 
 	enum RegistryType {
 		SEQUENTIAL,
 		PARALLEL
-	};
-
+	};	
+	
 	/// @brief A registry for entities and components.
 	template <RegistryType RTYPE = SEQUENTIAL>
 	class Registry {
@@ -91,10 +91,10 @@ namespace vecs
 		template<typename... Ts> requires (vtll::unique<vtll::tl<Ts...>>::value) friend class Iterator;
 
 		template<typename... Ts> 
-			requires ((vtll::unique<vtll::tl<Ts...>>::value) && (sizeof...(Ts) > 0) && (!std::is_same_v<vtll::tl<VecsWrite>, vtll::tl<Ts...>>) )
+			//requires ((vtll::unique<vtll::tl<Ts...>>::value) && (sizeof...(Ts) > 0) && (!std::is_same_v<vtll::tl<VecsWrite>, vtll::tl<Ts...>>))
 		friend class View;
 
-		using mutext_t = std::conditional_t<RTYPE == SEQUENTIAL, int32_t, std::shared_mutex>;
+		using mutex_t = std::conditional_t<RTYPE == SEQUENTIAL, int32_t, std::shared_mutex>;
 
 	private:
 	
@@ -122,8 +122,13 @@ namespace vecs
 			virtual auto create() -> std::unique_ptr<ComponentMapBase> = 0;
 			virtual void clear() = 0;
 
+			void lock() { m_mutex.lock(); }
+			void unlock() { m_mutex.unlock(); }
+			void lock_shared() { m_mutex.lock_shared(); }
+			void unlock_shared() { m_mutex.unlock_shared(); }
+
 		private:
-			mutext_t m_mutex; //mutex for thread safety
+			mutex_t m_mutex; //mutex for thread safety
 		}; //end of ComponentMapBase
 
 		//----------------------------------------------------------------------------------------------
@@ -149,7 +154,7 @@ namespace vecs
 			/// @brief Get reference to the component of an entity.
 			/// @param index The index of the component value in the map.
 			/// @return Value of the component value.
-			[[nodiscard]] auto get(std::size_t index) -> T& {
+			auto get(std::size_t index) -> T& {
 				assert(index < m_data.size());
 				return m_data[index];
 			};
@@ -163,7 +168,7 @@ namespace vecs
 			/// @brief Erase a component from the vector.
 			/// @param index The index of the component value in the map.
 			/// @return The handle of the entity that was moved over the erased one so its index can be changed, or nullopt
-			[[nodiscard]] virtual void erase(size_t index) override {
+			virtual void erase(size_t index) override {
 				size_t last = m_data.size() - 1;
 				assert(index <= last);
 				if( index < last ) {
@@ -209,8 +214,8 @@ namespace vecs
 		/// @brief An archetype of entities with the same components.
 		class Archetype {
 
-			template<typename... Ts> 
-				requires ((vtll::unique<vtll::tl<Ts...>>::value) && (sizeof...(Ts) > 0) && (!std::is_same_v<vtll::tl<VecsWrite>, vtll::tl<Ts...>>))
+			template<typename... Ts>
+				//requires ((vtll::unique<vtll::tl<Ts...>>::value) && (sizeof...(Ts) > 0) && (!std::is_same_v<vtll::tl<VecsWrite>, vtll::tl<Ts...>>))
 			friend class View;
 			
 			template<typename... Ts> requires (vtll::unique<vtll::tl<Ts...>>::value) friend class Iterator;
@@ -319,9 +324,9 @@ namespace vecs
 					index = m_index[handle];
 					assert( index < m_maps[type<T>()]->size());
 				}
-				if constexpr (RTYPE == PARALLEL) m_maps[type<T>()].get()->m_mutex.lock_shared();
+				if constexpr (RTYPE == PARALLEL) m_maps[type<T>()].get()->lock_shared();
 				auto& ret = static_cast<ComponentMap<std::decay_t<T>>*>(m_maps[type<T>()].get())->get(index);
-				if constexpr (RTYPE == PARALLEL) m_maps[type<T>()].get()->m_mutex.lock_shared();
+				if constexpr (RTYPE == PARALLEL) m_maps[type<T>()].get()->lock_shared();
 				return ret;
 			}
 
@@ -407,6 +412,19 @@ namespace vecs
 				return true;
 			}
 
+			const std::vector<size_t>& types() {
+				return m_types;
+			}
+
+			const std::unordered_map<size_t, std::unique_ptr<ComponentMapBase>>& maps() {
+				return m_maps;
+			}
+
+			void lock() { m_mutex.lock(); }
+			void unlock() { m_mutex.unlock(); }
+			void lock_shared() { m_mutex.lock_shared(); }
+			void unlock_shared() { m_mutex.unlock_shared(); }
+
 		private:
 
 			/// @brief Add a new component to the archetype.
@@ -430,7 +448,7 @@ namespace vecs
 				other.erase(other_index); //erase the old entity
 			}
 
-			mutext_t m_mutex; //mutex for thread safety
+			mutex_t m_mutex; //mutex for thread safety
 
 			std::vector<size_t> m_types; //types of components
 			std::unordered_map<Handle, size_t> m_index; //map from handle ot index of entity in data array
@@ -487,12 +505,12 @@ namespace vecs
 
 			/// @brief Prefix increment operator.
 			auto operator++() {
-				if( ++m_entidx >= m_archetypes[m_archidx]->m_maps.begin()->second->size() ) {
+				if( ++m_entidx >= m_archetypes[m_archidx]->maps().begin()->second->size() ) {
 					unlock();
 					do {
 						++m_archidx;
 						m_entidx = 0;
-					} while( m_archidx < m_archetypes.size() && m_archetypes[m_archidx]->m_maps.begin()->second->size() == 0 );
+					} while( m_archidx < m_archetypes.size() && m_archetypes[m_archidx]->maps().begin()->second->size() == 0 );
 				}
 				if( m_archidx < m_archetypes.size() ) lock();
 				return *this;
@@ -515,12 +533,12 @@ namespace vecs
 		private:
 			void lock() {
 				if constexpr (RTYPE == PARALLEL) 
-					(m_archetypes[m_archidx]->map(type<Ts>())->m_mutex.lock(), ...);
+					(m_archetypes[m_archidx]->map(type<Ts>())->lock(), ...);
 			}
 
 			void unlock() {
 				if constexpr (RTYPE == PARALLEL) 
-					(m_archetypes[m_archidx]->map(type<Ts>())->m_mutex.unlock(), ...);
+					(m_archetypes[m_archidx]->map(type<Ts>())->unlock(), ...);
 			}
 
 			size_t m_archidx{0};
@@ -533,7 +551,7 @@ namespace vecs
 		/// @brief A view of entities with specific components.
 		/// @tparam ...Ts The types of the components.
 		template<typename... Ts>
-			requires ((vtll::unique<vtll::tl<Ts...>>::value) && (sizeof...(Ts) > 0) && (!std::is_same_v<vtll::tl<VecsWrite>, vtll::tl<Ts...>>) )
+			//requires ((vtll::unique<vtll::tl<Ts...>>::value) && (sizeof...(Ts) > 0) && (!std::is_same_v<vtll::tl<VecsWrite>, vtll::tl<Ts...>>) )
 		class View {
 
 		public:
@@ -544,7 +562,7 @@ namespace vecs
 				for( auto& it : m_system.m_archetypes ) {
 					auto arch = it.second.get();
 					auto func = [&]<typename T>() {
-						if( std::find(arch->m_types.begin(), arch->m_types.end(), type<T>()) == arch->m_types.end() ) return false;
+						if( std::find(arch->types().begin(), arch->types().end(), type<T>()) == arch->types().end() ) return false;
 						return true;
 					};
 					if( (func.template operator()<Ts>() && ...) ) m_archetypes.push_back(it.second.get());
@@ -788,7 +806,7 @@ namespace vecs
 		}
 
 	private:
-		mutext_t m_mutex; //mutex for thread safety
+		mutex_t m_mutex; //mutex for thread safety
 
 		struct ArchetypeAndIndex {
 			Archetype* m_archetype_ptr;
