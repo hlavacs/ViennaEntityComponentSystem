@@ -563,6 +563,8 @@ namespace vecs
 
 		//----------------------------------------------------------------------------------------------
 
+		Registry() = default;
+
 		/// @brief Get the number of entities in the system.
 		/// @return The number of entities.
 		size_t size() {
