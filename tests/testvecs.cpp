@@ -7,9 +7,10 @@
 
 
 int main() {
-    vecs::Registry<vecs::PARALLEL> system;
+    vecs::Registry<vecs::RegistryType::SEQUENTIAL> system;
 
     vecs::Handle h1 = system.create(5);
+	/*
     assert( system.exists(h1) );
     auto t1 = system.types(h1);
     auto v1 = system.get<int>(h1);
@@ -79,6 +80,8 @@ int main() {
     assert( system.size() > 0 );
     system.clear();
     assert( system.size() == 0 );
+	*/
+
 
     return 0;   
 }

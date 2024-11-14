@@ -46,8 +46,14 @@ namespace std {
 }
 
 
-namespace vecs
-{
+namespace vecs {
+
+	enum class RegistryType : int {
+		SEQUENTIAL = 0,
+		PARALLEL
+	};	
+
+
 	using Handle = std::size_t;
 
 	template <typename> struct is_tuple : std::false_type {};
@@ -69,7 +75,7 @@ namespace vecs
 		return ret;
 	}
 
-	struct VecsWrite {}; //dummy type for write access
+	struct VecsWrite {}; //dummy type for write access when using the iterator and view classes
 
 	template<typename... Ts>
 		requires (vtll::unique<vtll::tl<Ts...>>::value)
@@ -79,13 +85,10 @@ namespace vecs
 		//requires ((vtll::unique<vtll::tl<Ts...>>::value) && (sizeof...(Ts) > 0) && (!std::is_same_v<vtll::tl<VecsWrite>, vtll::tl<Ts...>>))
 	class View;
 
-	enum RegistryType {
-		SEQUENTIAL,
-		PARALLEL
-	};	
+
 	
 	/// @brief A registry for entities and components.
-	template <RegistryType RTYPE = SEQUENTIAL>
+	template <RegistryType RTYPE = RegistryType::SEQUENTIAL>
 	class Registry {
 
 		template<typename... Ts> requires (vtll::unique<vtll::tl<Ts...>>::value) friend class Iterator;
@@ -94,7 +97,7 @@ namespace vecs
 			//requires ((vtll::unique<vtll::tl<Ts...>>::value) && (sizeof...(Ts) > 0) && (!std::is_same_v<vtll::tl<VecsWrite>, vtll::tl<Ts...>>))
 		friend class View;
 
-		using mutex_t = std::conditional_t<RTYPE == SEQUENTIAL, int32_t, std::shared_mutex>;
+		using mutex_t = std::conditional_t<RTYPE == RegistryType::SEQUENTIAL, int32_t, std::shared_mutex>;
 
 	private:
 	
@@ -116,16 +119,16 @@ namespace vecs
 				return static_cast<ComponentMap<T>*>(this)->insert(std::forward<T>(v));
 			}
 
-			virtual void erase(std::size_t index) = 0;
+			virtual auto erase(std::size_t index) -> size_t = 0;
 			virtual void move(ComponentMapBase* other, size_t from) = 0;
 			virtual auto size() -> size_t= 0;
 			virtual auto create() -> std::unique_ptr<ComponentMapBase> = 0;
 			virtual void clear() = 0;
 
-			void lock() { m_mutex.lock(); }
-			void unlock() { m_mutex.unlock(); }
-			void lock_shared() { m_mutex.lock_shared(); }
-			void unlock_shared() { m_mutex.unlock_shared(); }
+			void lock() { if constexpr (RTYPE == RegistryType::PARALLEL) m_mutex.lock(); }
+			void unlock() { if constexpr (RTYPE == RegistryType::PARALLEL) m_mutex.unlock(); }
+			void lock_shared() { if constexpr (RTYPE == RegistryType::PARALLEL) m_mutex.lock_shared(); }
+			void unlock_shared() { if constexpr (RTYPE == RegistryType::PARALLEL) m_mutex.unlock_shared(); }
 
 		private:
 			mutex_t m_mutex; //mutex for thread safety
@@ -168,14 +171,14 @@ namespace vecs
 			/// @brief Erase a component from the vector.
 			/// @param index The index of the component value in the map.
 			/// @return The handle of the entity that was moved over the erased one so its index can be changed, or nullopt
-			virtual void erase(size_t index) override {
+			[[nodiscard]] virtual auto erase(size_t index)  -> size_t override {
 				size_t last = m_data.size() - 1;
 				assert(index <= last);
 				if( index < last ) {
 					m_data[index] = std::move( m_data[last] ); //move the last entity to the erased one
 				}
 				m_data.pop_back(); //erase the last entity
-				return;
+				return last; //if index < last then last element was moved -> correct mapping 
 			};
 
 			/// @brief Move a component from another map to this map.
@@ -282,7 +285,6 @@ namespace vecs
 			/// @param ti The type index of the component.
 			/// @return true if the archetype has the component, else false.
 			[[nodiscard]] bool has(const size_t ti) {
-				if constexpr (RTYPE == PARALLEL) std::shared_lock lock(m_mutex);
 				return (std::find(m_types.begin(), m_types.end(), ti) != std::end(m_types));
 			}
 
@@ -294,8 +296,6 @@ namespace vecs
 			template<typename... Ts>
 				requires ((sizeof...(Ts) > 0) && (vtll::unique<vtll::tl<Ts...>>::value))
 			[[nodiscard]] size_t insert( Handle handle, Ts&&... value ) {
-				if constexpr (RTYPE == PARALLEL) m_mutex.lock();
-
 				size_t index{0};
 				auto func = [&](auto&& v) {
 					using T = std::decay_t<decltype(v)>;
@@ -306,8 +306,6 @@ namespace vecs
 				(func( std::forward<Ts>(value) ), ...); //insert all components
 				m_index[handle] = size() - 1; //store the index of the new entity in the archetype
 				assert(validate()); //all component maps should have the same size
-
-				if constexpr (RTYPE == PARALLEL) m_mutex.unlock();
 				return index;
 			}
 
@@ -319,14 +317,9 @@ namespace vecs
 			[[nodiscard]] auto get(Handle handle) -> T& {
 				assert(std::find(m_types.begin(), m_types.end(), type<T>()) != std::end(m_types) && m_maps.find(type<T>()) != m_maps.end() ); 
 				size_t index;
-				{
-					if constexpr (RTYPE == PARALLEL) std::shared_lock lock(m_mutex);
-					index = m_index[handle];
-					assert( index < m_maps[type<T>()]->size());
-				}
-				if constexpr (RTYPE == PARALLEL) m_maps[type<T>()].get()->lock_shared();
+				index = m_index[handle];
+				assert( index < m_maps[type<T>()]->size());
 				auto& ret = static_cast<ComponentMap<std::decay_t<T>>*>(m_maps[type<T>()].get())->get(index);
-				if constexpr (RTYPE == PARALLEL) m_maps[type<T>()].get()->lock_shared();
 				return ret;
 			}
 
@@ -339,13 +332,10 @@ namespace vecs
 			[[nodiscard]] auto get(Handle handle) -> std::tuple<Ts&...> {
 				size_t index;
 				{
-					if constexpr (RTYPE == PARALLEL) std::shared_lock lock(m_mutex);
 					index = m_index[handle];
 					(assert( index < m_maps[type<Ts>()]->size() ),...);
 				}
-				if constexpr (RTYPE == PARALLEL) (m_maps[type<Ts>()].get()->m_mutex.shared_lock(), ...);
 				auto ret = std::tuple<Ts&...>{ static_cast<ComponentMap<std::decay_t<Ts>>*>(m_maps[type<Ts>()].get())->get(index)... };
-				if constexpr (RTYPE == PARALLEL) (m_maps[type<Ts>()].get()->m_mutex.unlock(), ...);
 				return ret;
 			}
 
@@ -458,6 +448,7 @@ namespace vecs
 
 	public:
 
+		/*
 		//----------------------------------------------------------------------------------------------
 
 		/// @brief Used for iterating over entity components.
@@ -532,12 +523,12 @@ namespace vecs
 
 		private:
 			void lock() {
-				if constexpr (RTYPE == PARALLEL) 
+				if constexpr (RTYPE == RegistryType::PARALLEL) 
 					(m_archetypes[m_archidx]->map(type<Ts>())->lock(), ...);
 			}
 
 			void unlock() {
-				if constexpr (RTYPE == PARALLEL) 
+				if constexpr (RTYPE == RegistryType::PARALLEL) 
 					(m_archetypes[m_archidx]->map(type<Ts>())->unlock(), ...);
 			}
 
@@ -578,6 +569,7 @@ namespace vecs
 			Registry<RTYPE>& m_system;
 			std::vector<Archetype*> m_archetypes;
 		}; //end of View
+		*/
 
 		//----------------------------------------------------------------------------------------------
 
@@ -586,9 +578,7 @@ namespace vecs
 		/// @brief Get the number of entities in the system.
 		/// @return The number of entities.
 		size_t size() {
-			if constexpr (RTYPE == PARALLEL) m_mutex.lock_shared();
 			auto ret =  m_entities.size();
-			if constexpr (RTYPE == PARALLEL) m_mutex.unlock_shared();
 			return ret;
 		}
 
@@ -608,30 +598,27 @@ namespace vecs
 		[[nodiscard]] auto create( Ts&&... component ) -> Handle {
 			std::vector<std::size_t> types = {type<Ts>()...};
 
-			if constexpr (RTYPE == PARALLEL) m_mutex.lock();
 			Handle handle = ++m_next_handle;		//protect shared data
+			/*
 			auto it = m_archetypes.find(&types); //find the archetype, protect shared data
 			if( it == m_archetypes.end() ) { //not found
 				m_archetypes[&types] = std::make_unique<Archetype>( ActionCreate{}, handle, std::forward<Ts>(component)... );
 				m_entities[handle] = { m_archetypes[&types].get(), 0 }; //store the new archetype
-				if constexpr (RTYPE == PARALLEL) m_mutex.unlock();
 				return handle;
 			}
 			m_entities[handle] = { it->second.get() };
-
 			size_t index = it->second->insert(handle, std::forward<Ts>(component)...);
-			if constexpr (RTYPE == PARALLEL) m_mutex.unlock();
+			*/
 			return handle;
 		}
 
+		/*
 		/// @brief Test if an entity exists.
 		/// @param handle The handle of the entity.
 		/// @return true if the entity exists, else false.
 		bool exists(Handle handle) {
 			assert(valid(handle));
-			if constexpr (RTYPE == PARALLEL) m_mutex.lock_shared();
 			auto ret = m_entities.find(handle) != m_entities.end();
-			if constexpr (RTYPE == PARALLEL) m_mutex.unlock_shared();
 			return ret;
 		}
 
@@ -642,10 +629,8 @@ namespace vecs
 		template<typename T>
 		bool has(Handle handle) {
 			assert(valid(handle));
-			if constexpr (RTYPE == PARALLEL) m_mutex.lock_shared();
 			auto ret = m_entities.find(handle) != m_entities.end();
 			auto arch = m_entities[handle].m_archetype_ptr;
-			if constexpr (RTYPE == PARALLEL) m_mutex.unlock_shared();
 			return ret && arch->has(type<T>());
 		}
 
@@ -654,9 +639,7 @@ namespace vecs
 		/// @return A vector of type indices of the components.
 		const auto& types(Handle handle) {
 			assert(exists(handle));
-			if constexpr (RTYPE == PARALLEL) m_mutex.lock_shared();
 			auto arch = m_entities[handle].m_archetype_ptr;
-			if constexpr (RTYPE == PARALLEL) m_mutex.unlock_shared();
 			return arch->types();
 		}
 
@@ -668,9 +651,7 @@ namespace vecs
 		template<typename T>
 		[[nodiscard]] auto get(Handle handle) -> T {
 			assert(has<T>(handle));
-			if constexpr (RTYPE == PARALLEL) m_mutex.lock_shared();
 			auto arch = m_entities[handle].m_archetype_ptr;
-			if constexpr (RTYPE == PARALLEL) m_mutex.unlock_shared();
 			return arch->get<T>(handle);
 		}
 
@@ -681,9 +662,7 @@ namespace vecs
 		template<typename... Ts>
 			requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value))
 		[[nodiscard]] auto get(Handle handle) -> std::tuple<Ts...> {
-			if constexpr (RTYPE == PARALLEL) m_mutex.lock_shared();
 			auto arch = m_entities[handle].m_archetype_ptr;
-			if constexpr (RTYPE == PARALLEL) m_mutex.unlock_shared();
 			return std::tuple<Ts...>(arch->get<Ts>(handle)...); //defer locking to archetype!
 		}
 
@@ -696,7 +675,6 @@ namespace vecs
 			requires (!is_tuple<T>::value)
 		void put(Handle handle, T&& v) {
 			assert(exists(handle));
-			if constexpr (RTYPE == PARALLEL) m_mutex.lock();
 			if(!has<T>(handle)) {
 				auto typ = m_entities[handle].m_archetype_ptr->types();
 				typ.push_back(type<T>());
@@ -704,13 +682,11 @@ namespace vecs
 				if( it == m_archetypes.end() ) {
 					m_archetypes[&typ] = std::make_unique<Archetype>( ActionInsert{}, *m_entities[handle].m_archetype_ptr, handle, std::forward<T>(v) );
 					m_entities[handle] = { m_archetypes[&typ].get(), 0 };
-					if constexpr (RTYPE == PARALLEL) m_mutex.unlock();
 					return;
 				}	
 			}
 			auto arch = m_entities[handle].m_archetype_ptr; //implement put !!!
 			arch->get<T>(handle) = v; //get the component value and assign the new value
-			if constexpr (RTYPE == PARALLEL) m_mutex.unlock();
 		}
 
 		/// @brief Put new component values to an entity.
@@ -740,7 +716,6 @@ namespace vecs
 			requires (vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
 		void erase(Handle handle) {
 			assert( (has<Ts>(handle) && ...) );
-			if constexpr (RTYPE == PARALLEL) m_mutex.lock();
 
 			auto entt = m_entities.find(handle)->second; //get the archetype of the entity
 			auto typ = entt.m_archetype_ptr->types(); //get the types from the archetype
@@ -756,32 +731,25 @@ namespace vecs
 				auto map = std::make_unique<Archetype>( ActionRemove{}, *entt.m_archetype_ptr, handle, (Ts*)nullptr... );
 				m_entities[handle] = { map.get() };
 				m_archetypes[&typ] = std::move(map);
-				if constexpr (RTYPE == PARALLEL) m_mutex.unlock();
 				return;
 			}
 			m_entities[handle] = { it->second.get() };
-			if constexpr (RTYPE == PARALLEL) m_mutex.unlock();
 		}
 
 		/// @brief Erase an entity from the registry.
 		/// @param handle The handle of the entity.
 		void erase(Handle handle) {
 			assert(exists(handle));
-			if constexpr (RTYPE == PARALLEL) m_mutex.lock();
 			m_entities[handle].m_archetype_ptr->erase(handle); //erase the entity from the archetype (do both locked)
 			m_entities.erase(handle); //erase the entity from the entity list
-			if constexpr (RTYPE == PARALLEL) m_mutex.unlock();
 		}
 
 		/// @brief Clear the registry by removing all entities.
 		void clear() {
-			if constexpr (RTYPE == PARALLEL) m_mutex.lock();
-
 			for( auto& arch : m_archetypes ) {
 				arch.second->clear();
 			}
 			m_entities.clear();
-			if constexpr (RTYPE == PARALLEL) m_mutex.unlock();
 		}
 
 		/// @brief Get a view of entities with specific components.
@@ -795,8 +763,6 @@ namespace vecs
 
 		/// @brief Validate the registry by checking if all component maps have the same size.
 		void validate() {
-			if constexpr (RTYPE == PARALLEL) std::shared_lock lock(m_mutex);
-
 			size_t sz{0};
 			for( auto& arch : m_archetypes ) {
 				sz += arch.second->size();
@@ -804,6 +770,7 @@ namespace vecs
 			}
 			assert(sz == size());
 		}
+		*/
 
 	private:
 		mutex_t m_mutex; //mutex for thread safety
