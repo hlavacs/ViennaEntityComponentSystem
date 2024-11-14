@@ -9,23 +9,21 @@
 int main() {
 
 	vecs::SlotMap<int> sm;
-	auto [i1, v1] = sm.insert(1);
-	auto [i2, v2] = sm.insert(2);
-	auto [i3, v3] = sm.insert(3);
-
-
+	auto [i1, v1] = sm.Insert(1);
+	auto [i2, v2] = sm.Insert(2);
+	auto [i3, v3] = sm.Insert(3);
 
     vecs::Registry<vecs::RegistryType::SEQUENTIAL> system;
 
-    vecs::Handle h1 = system.create(5);
+    vecs::Handle h1 = system.Create(5);
+    assert( system.Exists(h1) );
 	/*
-    assert( system.exists(h1) );
-    auto t1 = system.types(h1);
-    auto v1 = system.get<int>(h1);
-    assert( system.has<int>(h1) );
+    auto t1 = system.Types(h1);
+    auto v1 = system.Get<int>(h1);
+    assert( system.Has<int>(h1) );
     system.erase(h1);
-    assert( !system.exists(h1) );
-    system.validate();
+    assert( !system.Exists(h1) );
+    system.Validate();
 
     //vecs::Handle hx = system.create(5, 6); //compile error
     struct height_t { int i; }; 
