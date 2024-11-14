@@ -48,6 +48,80 @@ namespace std {
 
 namespace vecs {
 
+
+
+	template <typename> struct is_tuple : std::false_type {};
+	template <typename ...Ts> struct is_tuple<std::tuple<Ts...>> : std::true_type {};
+
+
+	//----------------------------------------------------------------------------------------------
+	//Slot Maps
+
+	enum class SlotMapType : int {
+		SEQUENTIAL = 0,
+		PARALLEL
+	};	
+
+	template<typename T, uint32_t SIZE = 1014, SlotMapType = SlotMapType::SEQUENTIAL>
+	class SlotMap {
+
+		struct Slot {
+			int64_t m_next{-1}; 	//index of the next free slot
+			size_t 	m_version{0};	//version of the slot
+			T 		m_value{};		//value of the slot
+		};
+
+	public:
+		SlotMap() {
+			m_slots.reserve(SIZE);
+			if( SIZE == 0 ) return;
+
+			m_firstFree = 0;
+			for( int64_t i = 1; i <= SIZE-1; ++i ) {
+				m_slots.emplace_back( i, 0uL, T{} );
+			}
+			m_slots.emplace_back( -1, 0uL, T{} );
+		}
+		
+		~SlotMap() = default;
+
+		auto insert(T&& value ) -> std::pair<size_t,size_t> {
+			size_t index;
+			if( m_firstFree != -1 ) {
+				index = m_firstFree;
+				auto& slot = m_slots[m_firstFree];
+				m_firstFree = slot.m_next;
+				slot.m_value = std::forward<T>(value);
+			} else {
+				m_slots.emplace_back( 0, 0, std::forward<T>(value) );
+				index = m_slots.size() - 1;
+			}
+			return {index, m_slots[index].m_version};
+		}
+
+		void erase(size_t index) {
+			assert(index < m_slots.size());
+			auto& slot = m_slots[index];
+			slot.m_next = m_firstFree;
+			m_firstFree = index;
+			++slot.m_version;	//increment the version to invalidate the slot
+		}
+
+		auto get(size_t index) -> std::pair<size_t, T&> {
+			assert(index < m_slots.size());
+			return { m_slots[index].m_version, m_slots[index].m_value };
+		}
+
+	private:
+		std::vector<Slot> m_slots;
+		int64_t m_firstFree{-1};
+	};
+
+
+
+	//----------------------------------------------------------------------------------------------
+
+
 	enum class RegistryType : int {
 		SEQUENTIAL = 0,
 		PARALLEL
@@ -55,9 +129,6 @@ namespace vecs {
 
 
 	using Handle = std::size_t;
-
-	template <typename> struct is_tuple : std::false_type {};
-	template <typename ...Ts> struct is_tuple<std::tuple<Ts...>> : std::true_type {};
 
 
 	template<typename T>
@@ -84,7 +155,6 @@ namespace vecs {
 	template<typename... Ts>
 		//requires ((vtll::unique<vtll::tl<Ts...>>::value) && (sizeof...(Ts) > 0) && (!std::is_same_v<vtll::tl<VecsWrite>, vtll::tl<Ts...>>))
 	class View;
-
 
 	
 	/// @brief A registry for entities and components.
@@ -578,8 +648,7 @@ namespace vecs {
 		/// @brief Get the number of entities in the system.
 		/// @return The number of entities.
 		size_t size() {
-			auto ret =  m_entities.size();
-			return ret;
+			return m_entities.size();
 		}
 
 		/// @brief Test if a handle is valid, i.e., not 0.

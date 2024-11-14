@@ -7,6 +7,14 @@
 
 
 int main() {
+
+	vecs::SlotMap<int> sm;
+	auto [i1, v1] = sm.insert(1);
+	auto [i2, v2] = sm.insert(2);
+	auto [i3, v3] = sm.insert(3);
+
+
+
     vecs::Registry<vecs::RegistryType::SEQUENTIAL> system;
 
     vecs::Handle h1 = system.create(5);
