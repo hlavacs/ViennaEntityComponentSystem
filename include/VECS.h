@@ -400,12 +400,12 @@ namespace vecs {
 
 			/// @brief Move components from another archetype to this one.
 			size_t Move( auto& types, size_t other_index, Archetype& other, SlotMap<ArchetypeAndIndex>& slotmap) {
-				for( auto& it : types ) { //go through all maps
-					if( m_types.end() == m_types.find(it) ) {
-						m_types.insert(it); //add the type to the list
-						m_maps[it] = other.Map(it)->Clone(); //make a component map like this one
+				for( auto& ti : types ) { //go through all maps
+					if( m_types.end() == m_types.find(ti) ) {
+						m_types.insert(ti); //add the type to the list
+						m_maps[ti] = other.Map(ti)->Clone(); //make a component map like this one
 					}
-					m_maps[it]->Move(other.Map(it), other_index); //insert the new value
+					m_maps[ti]->Move(other.Map(ti), other_index); //insert the new value
 				}
 				other.Erase(other_index, slotmap); //erase from old component map
 				return m_maps[Type<Handle>()]->Size() - 1; //return the index of the new entity
@@ -456,8 +456,8 @@ namespace vecs {
 			void UnlockShared() { m_mutex.unlock_shared(); }
 
 
-		private:
-
+			/// @brief Add a new component to the archetype.
+			/// @tparam T The type of the component.
 			template<typename T>
 			void AddComponent() {
 				size_t ti = Type<T>();
@@ -465,7 +465,9 @@ namespace vecs {
 				m_maps[ti] = std::make_unique<ComponentMap<T>>(); //create the component map
 			};
 
-			/// @brief Add a new component to the archetype.
+		private:
+
+			/// @brief Add a new value to the archetype.
 			/// @param v The new value.
 			/// @return The index of the entity in the archetype.
 			void AddValue( size_t& index, auto&& v ) {
@@ -622,19 +624,17 @@ namespace vecs {
 		template<typename... Ts>
 			requires ((sizeof...(Ts) > 0) && (vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
 		[[nodiscard]] auto Insert( Ts&&... component ) -> Handle {
-			std::vector<size_t> types = {Type<Ts>()...};
+			std::vector<size_t> types = {Type<Handle>(), Type<Ts>()...};
 			auto [index, slot] = m_entities.Insert( {nullptr, 0} ); //get a slot for the entity
 			Handle handle{(uint32_t)index, (uint32_t)slot.m_version}; //create a handle
-			auto it = m_archetypes.find(&types); //find the archetype, protect shared data
-			if( it == m_archetypes.end() ) { //not found
-				size_t archIndex;
-				auto archetype = std::make_unique<Archetype>( handle, archIndex, std::forward<Ts>(component)... );
-				slot.m_value = { archetype.get(), archIndex }; //store the archetype and index into archetype
-				m_archetypes[&types] = std::move(archetype); //move pointer to the archetype map
-				return handle;
+
+			size_t archIndex;
+			if( !m_archetypes.contains(&types) ) { 
+				m_archetypes[&types] = std::make_unique<Archetype>( handle, archIndex, std::forward<Ts>(component)... );
+			} else {
+				archIndex = m_archetypes[&types]->Insert( handle, std::forward<Ts>(component)... );
 			}
-			size_t archIndex = it->second->Insert( handle, std::forward<Ts>(component)... );
-			slot.m_value = { it->second.get(), archIndex };
+			slot.m_value = { m_archetypes[&types].get(), archIndex };
 			return handle;
 		}
 
@@ -653,8 +653,8 @@ namespace vecs {
 		template<typename T>
 		bool Has(Handle handle) {
 			assert(Exists(handle));
-			auto arch = m_entities[handle.m_index].m_value.m_archetype_ptr;
-			return arch->Has(Type<T>());
+			auto& value = m_entities[handle.m_index].m_value;
+			return value.m_archetype_ptr->Has(Type<T>());
 		}
 
 		/// @brief Get the types of the components of an entity.
@@ -673,8 +673,21 @@ namespace vecs {
 		/// @return The component value.
 		template<typename T>
 		[[nodiscard]] auto Get(Handle handle) -> T {
-			assert(Has<T>(handle));
 			auto& value = m_entities[handle.m_index].m_value;
+			if(value.m_archetype_ptr->Has(Type<T>())) {
+				return value.m_archetype_ptr->template Get<T>(value.m_archIndex);
+			}
+			std::vector<size_t> types( value.m_archetype_ptr->Types().begin(), value.m_archetype_ptr->Types().end() );
+			types.push_back(Type<T>());
+
+			if(!m_archetypes.contains(&types)) { //not found
+				m_archetypes[&types] = std::make_unique<Archetype>();
+				m_archetypes[&types]->AddComponent<T>();
+			}
+			auto oldArchetype = value.m_archetype_ptr;
+			value.m_archetype_ptr = m_archetypes[&types].get();
+			types.pop_back();
+			value.m_archIndex = value.m_archetype_ptr->Move(types, value.m_archIndex, *oldArchetype, m_entities);
 			return value.m_archetype_ptr->template Get<T>(value.m_archIndex);
 		}
 
@@ -736,8 +749,7 @@ namespace vecs {
 			std::vector<size_t> tv(types.begin(), types.end());
 
 			if( !m_archetypes.contains(&tv) ) { //not found
-				auto archetype = std::make_unique<Archetype>();
-				m_archetypes[&tv] = std::move(archetype);
+				m_archetypes[&tv] = std::make_unique<Archetype>();
 			}
 			auto oldArchetype = value.m_archetype_ptr;
 			value.m_archetype_ptr = m_archetypes[&tv].get();
