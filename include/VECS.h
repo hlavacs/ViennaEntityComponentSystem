@@ -26,7 +26,7 @@ using namespace std::chrono_literals;
 namespace std {
 	template<>
 	struct hash<std::vector<size_t>*> {
-		std::size_t operator()(std::vector<std::size_t>* hashes) const {
+		std::size_t operator()(std::vector<size_t>* hashes) const {
 			std::size_t seed = 0;
 			std::sort(hashes->begin(), hashes->end());
 			for( auto& v : *hashes ) {
@@ -42,6 +42,25 @@ namespace std {
 			return std::hash<std::vector<size_t>*>{}(&types);
 		}
 	};
+
+	template<>
+	struct hash<std::set<size_t>*> {
+		std::size_t operator()(std::set<std::size_t>* hashes) const {
+			std::size_t seed = 0;
+			for( auto& v : *hashes ) {
+				seed ^= v + 0x9e3779b9 + (seed<<6) + (seed>>2);
+			}
+			return seed;
+		}
+	};
+
+	template<>
+	struct hash<std::set<size_t>&> {
+		std::size_t operator()(std::set<size_t>& types) const {
+			return std::hash<std::set<size_t>*>{}(&types);
+		}
+	};
+
 }
 
 
@@ -154,16 +173,6 @@ namespace vecs {
 		return std::type_index(typeid(std::decay_t<T>)).hash_code();
 	}
 
-	template<typename... Ts>
-		requires (vtll::unique<vtll::tl<Ts...>>::value)
-	auto Typevector() -> std::vector<size_t> {
-		auto ret = std::vector<size_t>{Type<Ts>()...};
-		if constexpr( !vtll::has_type< vtll::tl<Ts...>, Handle>::value ) {
-			ret.push_back(Type<Handle>());
-		}
-		return ret;
-	}
-
 	struct VecsWrite {}; //dummy type for write access when using the iterator and view classes
 
 	template<typename... Ts>
@@ -210,7 +219,7 @@ namespace vecs {
 			virtual auto Erase(size_t index) -> size_t = 0;
 			virtual void Move(ComponentMapBase* other, size_t from) = 0;
 			virtual auto Size() -> size_t= 0;
-			virtual auto Insert() -> std::unique_ptr<ComponentMapBase> = 0;
+			virtual auto Clone() -> std::unique_ptr<ComponentMapBase> = 0;
 			virtual void Clear() = 0;
 
 			void Lock() { if constexpr (RTYPE == RegistryType::PARALLEL) m_mutex.lock(); }
@@ -285,7 +294,7 @@ namespace vecs {
 
 			/// @brief Create a new map.
 			/// @return A unique pointer to the new map.
-			[[nodiscard]] virtual auto Insert() -> std::unique_ptr<ComponentMapBase> override {
+			[[nodiscard]] virtual auto Clone() -> std::unique_ptr<ComponentMapBase> override {
 				return std::make_unique<ComponentMap<T>>();
 			};
 
@@ -330,7 +339,6 @@ namespace vecs {
 				(AddValue( archIndex, std::forward<Ts>(values) ), ...); //insert all components, get index of the handle
 				AddComponent<Handle>(); //insert the handle
 				AddValue( archIndex, handle ); //insert the handle
-				std::sort(m_types.begin(), m_types.end()); //sort the types
 			}
 
 			template<typename... Ts>
@@ -341,7 +349,6 @@ namespace vecs {
 				size_t index;
 				(AddValue( index, std::forward<Ts>(values) ), ...); //insert all components, get index of the handle
 				AddValue( index, handle ); //insert the handle
-				std::sort(m_types.begin(), m_types.end()); //sort the types
 				return index;
 			}
 
@@ -355,7 +362,7 @@ namespace vecs {
 			/// @param ti The type index of the component.
 			/// @return true if the archetype has the component, else false.
 			[[nodiscard]] bool Has(const size_t ti) {
-				return (std::find(m_types.begin(), m_types.end(), ti) != std::end(m_types));
+				return m_types.contains(ti);
 			}
 
 			/// @brief Get component value of an entity. 
@@ -394,11 +401,11 @@ namespace vecs {
 			/// @brief Move components from another archetype to this one.
 			size_t Move( auto& types, size_t other_index, Archetype& other, SlotMap<ArchetypeAndIndex>& slotmap) {
 				for( auto& it : types ) { //go through all maps
-					if( m_types.end() == std::find(m_types.begin(), m_types.end(), it) ) {
-						m_types.push_back(it); //add the type to the list
-						m_maps[it] = other.map(it)->create(); //make a component map like this one
+					if( m_types.end() == m_types.find(it) ) {
+						m_types.insert(it); //add the type to the list
+						m_maps[it] = other.Map(it)->Clone(); //make a component map like this one
 					}
-					m_maps[it]->Move(other.map(it), other_index); //insert the new value
+					m_maps[it]->Move(other.Map(it), other_index); //insert the new value
 				}
 				other.Erase(other_index, slotmap); //erase from old component map
 				return m_maps[Type<Handle>()]->Size() - 1; //return the index of the new entity
@@ -435,7 +442,7 @@ namespace vecs {
 				}
 			}
 
-			const std::vector<size_t>& Types() {
+			const std::set<size_t>& Types() {
 				return m_types;
 			}
 
@@ -454,7 +461,7 @@ namespace vecs {
 			template<typename T>
 			void AddComponent() {
 				size_t ti = Type<T>();
-				m_types.push_back(ti);	//add the type to the list
+				m_types.insert(ti);	//add the type to the list
 				m_maps[ti] = std::make_unique<ComponentMap<T>>(); //create the component map
 			};
 
@@ -468,7 +475,7 @@ namespace vecs {
 
 			mutex_t m_mutex; //mutex for thread safety
 
-			std::vector<size_t> m_types; //types of components
+			std::set<size_t> m_types; //types of components
 			std::unordered_map<size_t, std::unique_ptr<ComponentMapBase>> m_maps; //map from type index to component data
 		}; //end of Archetype
 
@@ -615,7 +622,7 @@ namespace vecs {
 		template<typename... Ts>
 			requires ((sizeof...(Ts) > 0) && (vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
 		[[nodiscard]] auto Insert( Ts&&... component ) -> Handle {
-			std::vector<std::size_t> types = {Type<Ts>()...};
+			std::vector<size_t> types = {Type<Ts>()...};
 			auto [index, slot] = m_entities.Insert( {nullptr, 0} ); //get a slot for the entity
 			Handle handle{(uint32_t)index, (uint32_t)slot.m_version}; //create a handle
 			auto it = m_archetypes.find(&types); //find the archetype, protect shared data
@@ -655,8 +662,8 @@ namespace vecs {
 		/// @return A vector of type indices of the components.
 		const auto& Types(Handle handle) {
 			assert(Exists(handle));
-			auto arch = m_entities[handle.m_index].m_value.m_archetype_ptr;
-			return arch->Types();
+			auto& value = m_entities[handle.m_index].m_value;
+			return value.m_archetype_ptr->Types();
 		}
 
 		/// @brief Get component value of an entity. If the component does not exist, it will be created.
@@ -667,9 +674,8 @@ namespace vecs {
 		template<typename T>
 		[[nodiscard]] auto Get(Handle handle) -> T {
 			assert(Has<T>(handle));
-			auto arch = m_entities[handle.m_index].m_value.m_archetype_ptr;
-			size_t archIndex = m_entities[handle.m_index].m_value.m_archIndex;
-			return arch->template Get<T>(archIndex);
+			auto& value = m_entities[handle.m_index].m_value;
+			return value.m_archetype_ptr->template Get<T>(value.m_archIndex);
 		}
 
 		/// @brief Get component values of an entity.
@@ -679,9 +685,8 @@ namespace vecs {
 		template<typename... Ts>
 			requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value))
 		[[nodiscard]] auto Get(Handle handle) -> std::tuple<Ts...> {
-			auto arch = m_entities[handle.m_index].m_value.m_archetype_ptr;
-			size_t archIndex = m_entities[handle.m_index].m_value.m_archIndex;
-			return std::tuple<Ts...>(arch->template Get<Ts>(archIndex)...); //defer locking to archetype!
+			auto& value = m_entities[handle.m_index].m_value;
+			return std::tuple<Ts...>(value.m_archetype_ptr->template Get<Ts>(value.m_archIndex)...); //defer locking to archetype!
 		}
 
 		/// @brief Put a new component value to an entity. If the entity does not have the component, it will be created.
@@ -693,9 +698,8 @@ namespace vecs {
 			requires (!is_tuple<T>::value)
 		void Put(Handle handle, T&& v) {
 			assert(Exists(handle));
-			auto arch = m_entities[handle.m_index].m_value.m_archetype_ptr;
-			size_t archIndex = m_entities[handle.m_index].m_value.m_archIndex;
-			arch->template Get<T>(archIndex) = std::forward<T>(v);
+			auto& value = m_entities[handle.m_index].m_value;
+			value.m_archetype_ptr->template Get<T>(value.m_archIndex) = std::forward<T>(v);
 		}
 
 		/// @brief Put new component values to an entity.
@@ -726,43 +730,26 @@ namespace vecs {
 		void Erase(Handle handle) {
 			assert( (Has<Ts>(handle) && ...) );
 
-			auto arch = m_entities[handle.m_index].m_value.m_archetype_ptr;
-			size_t archIndex = m_entities[handle.m_index].m_value.m_archIndex;
-			auto types = arch->Types();
-			for(size_t i=0; i<types.size(); ++i) {
+			auto& value = m_entities[handle.m_index].m_value;
+			auto types = value.m_archetype_ptr->Types();
+			(types.erase(Type<Ts>()), ... );
+			std::vector<size_t> tv(types.begin(), types.end());
+
+			if( !m_archetypes.contains(&tv) ) { //not found
+				auto archetype = std::make_unique<Archetype>();
+				m_archetypes[&tv] = std::move(archetype);
 			}
-
-
-
-
-			/*
-			auto entt = m_entities.find(handle)->second; //get the archetype of the entity
-			auto typ = entt.m_archetype_ptr->types(); //get the types from the archetype
-
-			auto func = [&]<typename T>() { //remove the types from the list
-				auto it = std::find(typ.begin(), typ.end(), type<T>());
-				typ.erase(it);
-			};
-			(func.template operator()<Ts>(), ...);
-
-			auto it = m_archetypes.find(&typ); //find the new archetype if possible
-			if( it == m_archetypes.end() ) { //if the archetype does not exist, create it
-				auto map = std::make_unique<Archetype>( ActionRemove{}, *entt.m_archetype_ptr, handle, (Ts*)nullptr... );
-				m_entities[handle] = { map.get() };
-				m_archetypes[&typ] = std::move(map);
-				return;
-			}
-			m_entities[handle] = { it->second.get() };
-			*/
+			auto oldArchetype = value.m_archetype_ptr;
+			value.m_archetype_ptr = m_archetypes[&tv].get();
+			value.m_archIndex = value.m_archetype_ptr->Move(types, value.m_archIndex, *oldArchetype, m_entities);
 		}
 
 		/// @brief Erase an entity from the registry.
 		/// @param handle The handle of the entity.
 		void Erase(Handle handle) {
 			assert(Exists(handle));
-			auto arch = m_entities[handle.m_index].m_value.m_archetype_ptr;
-			size_t archIndex = m_entities[handle.m_index].m_value.m_archIndex;
-			arch->Erase(archIndex, m_entities); //erase the entity from the archetype (do both locked)
+			auto& value = m_entities[handle.m_index].m_value;
+			value.m_archetype_ptr->Erase(value.m_archIndex, m_entities); //erase the entity from the archetype (do both locked)
 			m_entities.Erase(handle.m_index); //erase the entity from the entity list
 		}
 

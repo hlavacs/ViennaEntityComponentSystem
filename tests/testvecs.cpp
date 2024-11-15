@@ -62,7 +62,7 @@ int main() {
     assert( system.Has<float>(h2) );
     assert( system.Has<double>(h2) );
 
-    system.Erase<int, float>(h2);
+    system.Erase<int, float>(h2); //remove two components
     assert( !system.Has<int>(h2) );
     assert( !system.Has<float>(h2) );
     assert( system.Has<double>(h2) );
