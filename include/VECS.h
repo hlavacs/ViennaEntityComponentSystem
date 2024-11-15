@@ -696,6 +696,7 @@ namespace vecs {
 				m_archetypes[&types] = std::move(archetype);
 				return handle;
 			}
+			archIndex = it->second->Insert( handle, std::forward<Ts>(component)... );
 			slot.m_value = { it->second.get(), archIndex };
 			return handle;
 		}
