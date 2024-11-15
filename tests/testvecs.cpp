@@ -28,7 +28,7 @@ int main() {
 
     vecs::Registry<vecs::RegistryType::SEQUENTIAL> system;
 
-    vecs::Handle h1 = system.Create(5, 5.5f);
+    vecs::Handle h1 = system.Insert(5, 5.5f);
     assert( system.Exists(h1) );
     auto t1 = system.Types(h1);
     auto v1 = system.Get<int>(h1);
@@ -36,12 +36,12 @@ int main() {
     system.Erase(h1);
     assert( !system.Exists(h1) );
 
-    //vecs::Handle hx = system.create(5, 6); //compile error
+    //vecs::Handle hx = system.Insert(5, 6); //compile error
     struct height_t { int i; }; 
     struct weight_t { int i; }; 
-    vecs::Handle hx1 = system.Create(5, height_t{6}, weight_t{6}); //works
+    vecs::Handle hx1 = system.Insert(5, height_t{6}, weight_t{6}); //works
 
-    auto h2 = system.Create(5, 6.9f, 7.3);
+    auto h2 = system.Insert(5, 6.9f, 7.3);
     assert( system.Exists(h2) );
     auto t2 = system.Types(h2);
     auto [v2a, v2b] = system.Get<float, double>(h2);
@@ -73,12 +73,12 @@ int main() {
     system.Erase(h2);
     assert( !system.Exists(h2) );
  
-    auto hd1 = system.Create(1, 10.0f, 10.0);
-    auto hd2 = system.Create(2, 20.0f );
-    auto hd3 = system.Create(3, 30.0, "AAA");
-    auto hd4 = system.Create(4, 40.0f, 40.0);
-    auto hd5 = system.Create(5);
-    auto hd6 = system.Create(6, 60.0f, 60.0);
+    auto hd1 = system.Insert(1, 10.0f, 10.0);
+    auto hd2 = system.Insert(2, 20.0f );
+    auto hd3 = system.Insert(3, 30.0, "AAA");
+    auto hd4 = system.Insert(4, 40.0f, 40.0);
+    auto hd5 = system.Insert(5);
+    auto hd6 = system.Insert(6, 60.0f, 60.0);
 
 	/*
     for( auto handle : system.view<vecs::Handle>() ) {
