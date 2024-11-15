@@ -317,6 +317,8 @@ namespace vecs {
 
 		public:
 
+			Archetype() = default;
+
 			/// @brief Constructor, called if a new entity should be created with components, and the archetype does not exist yet.
 			/// @tparam ...Ts 
 			/// @param handle The handle of the entity.
@@ -335,6 +337,7 @@ namespace vecs {
 				requires (vtll::unique<vtll::tl<Ts...>>::value)
 			size_t Insert(Handle handle, Ts&& ...values ) {
 				assert( m_types.size() == sizeof...(Ts) + 1 );
+				assert( (m_maps.contains(Type<Ts>()) && ...) );
 				size_t index;
 				(AddValue( index, std::forward<Ts>(values) ), ...); //insert all components, get index of the handle
 				AddValue( index, handle ); //insert the handle
@@ -426,6 +429,19 @@ namespace vecs {
 				}
 			}
 
+			/// @brief Move components from another archetype to this one.
+			size_t Move( auto& types, size_t other_index, Archetype& other, SlotMap<ArchetypeAndIndex>& slotmap) {
+				for( auto& it : types ) { //go through all maps
+					if( m_types.end() == std::find(m_types.begin(), m_types.end(), it) ) {
+						m_types.push_back(it); //add the type to the list
+						m_maps[it] = other.map(it)->create(); //make a component map like this one
+					}
+					m_maps[it]->Move(other.map(it), other_index); //insert the new value
+				}
+				other.Erase(other_index, slotmap); //erase from old component map
+				return m_maps[Type<Handle>()]->Size() - 1; //return the index of the new entity
+			}
+
 			/// @brief Get the map of the components.
 			/// @tparam T The type of the component.
 			/// @return Pointer to the component map.
@@ -498,16 +514,6 @@ namespace vecs {
 				using T = std::decay_t<decltype(v)>;
 				index = m_maps[Type<T>()]->Insert(std::forward<T>(v));	//insert the component value
 			};
-
-
-			/// @brief Move components from another archetype to this one.
-			void Move( auto& types, size_t other_index, auto& other) {
-				for( auto& it : types ) { //go through all maps
-					m_maps[it] = other.map(it)->create(); //make a component map like this one
-					m_maps[it]->Move(other.map(it), other_index); //insert the new value
-				}
-				other.Erase(other_index); //erase the old entity
-			}
 
 			mutex_t m_mutex; //mutex for thread safety
 
