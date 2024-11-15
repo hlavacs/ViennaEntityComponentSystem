@@ -138,12 +138,10 @@ namespace vecs {
 
 	//----------------------------------------------------------------------------------------------
 
-
 	enum class RegistryType : int {
 		SEQUENTIAL = 0,
 		PARALLEL
 	};	
-
 
 	struct Handle {
 		uint32_t m_index;
@@ -209,7 +207,7 @@ namespace vecs {
 				return static_cast<ComponentMap<T>*>(this)->Insert(std::forward<T>(v));
 			}
 
-			virtual auto Erase(std::size_t index) -> size_t = 0;
+			virtual auto Erase(size_t index) -> size_t = 0;
 			virtual void Move(ComponentMapBase* other, size_t from) = 0;
 			virtual auto Size() -> size_t= 0;
 			virtual auto Create() -> std::unique_ptr<ComponentMapBase> = 0;
@@ -305,7 +303,7 @@ namespace vecs {
 
 		struct ArchetypeAndIndex {
 			Archetype* m_archetype_ptr;	//pointer to the archetype
-			size_t m_index;				//index of the entity in the archetype
+			size_t m_archIndex;			//index of the entity in the archetype
 		};
 
 		/// @brief An archetype of entities with the same components.
@@ -448,7 +446,7 @@ namespace vecs {
 				}
 				if( index < last ) {
 					auto& lastHandle = static_cast<ComponentMap<Handle>*>(m_maps[Type<Handle>()].get())->Get(index);
-					slotmap[lastHandle.m_index].m_value.m_index = index;
+					slotmap[lastHandle.m_index].m_value.m_archIndex = index;
 				}
 			}
 
@@ -739,7 +737,7 @@ namespace vecs {
 		[[nodiscard]] auto Get(Handle handle) -> T {
 			assert(Has<T>(handle));
 			auto arch = m_entities[handle.m_index].m_value.m_archetype_ptr;
-			size_t archIndex = m_entities[handle.m_index].m_value.m_index;
+			size_t archIndex = m_entities[handle.m_index].m_value.m_archIndex;
 			return arch->template Get<T>(archIndex);
 		}
 
@@ -751,7 +749,7 @@ namespace vecs {
 			requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value))
 		[[nodiscard]] auto Get(Handle handle) -> std::tuple<Ts...> {
 			auto arch = m_entities[handle.m_index].m_value.m_archetype_ptr;
-			size_t archIndex = m_entities[handle.m_index].m_value.m_index;
+			size_t archIndex = m_entities[handle.m_index].m_value.m_archIndex;
 			return std::tuple<Ts...>(arch->template Get<Ts>(archIndex)...); //defer locking to archetype!
 		}
 
@@ -765,7 +763,7 @@ namespace vecs {
 		void Put(Handle handle, T&& v) {
 			assert(Exists(handle));
 			auto arch = m_entities[handle.m_index].m_value.m_archetype_ptr;
-			size_t archIndex = m_entities[handle.m_index].m_value.m_index;
+			size_t archIndex = m_entities[handle.m_index].m_value.m_archIndex;
 			arch->template Get<T>(archIndex) = std::forward<T>(v);
 		}
 
@@ -822,7 +820,7 @@ namespace vecs {
 		void Erase(Handle handle) {
 			assert(Exists(handle));
 			auto slot = m_entities[handle.m_index];
-			slot.m_value.m_archetype_ptr->Erase(slot.m_value.m_index, m_entities); //erase the entity from the archetype (do both locked)
+			slot.m_value.m_archetype_ptr->Erase(slot.m_value.m_archIndex, m_entities); //erase the entity from the archetype (do both locked)
 			m_entities.Erase(handle.m_index); //erase the entity from the entity list
 		}
 
