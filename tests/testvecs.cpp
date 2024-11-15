@@ -80,16 +80,24 @@ int main() {
     auto hd5 = system.Insert(5);
     auto hd6 = system.Insert(6, 60.0f, 60.0);
 
-	/*
-    for( auto handle : system.view<vecs::Handle>() ) {
+	int a = 0;
+	float b = 1.0f;
+	std::tuple<int&, float> tup3 = {a, b};
+	std::get<int&>(tup3) = 100;
+
+    for( auto handle : system.GetView<vecs::Handle>() ) {
         std::cout << "Handle: "<< handle << std::endl;
     }
 
-    for( auto [handle, i, f] : system.view<vecs::Handle, int, float>() ) {
+    for( auto [handle, i, f] : system.GetView<vecs::Handle, int&, float>() ) {
         std::cout << "Handle: "<< handle << " int: " << i << " float: " << f << std::endl;
-    }*/
+		i = 100;
+		f = 100.0f;
+    }
+    for( auto [handle, i, f] : system.GetView<vecs::Handle, int&, float&>() ) {
+        std::cout << "Handle: "<< handle << " int: " << i << " float: " << f << std::endl;
+	}
 
-        
     assert( system.Size() > 0 );
     system.Clear();
     assert( system.Size() == 0 );

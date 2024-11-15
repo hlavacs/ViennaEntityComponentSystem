@@ -167,6 +167,9 @@ namespace vecs {
 		uint32_t m_version;
 	};
 
+	std::ostream& operator<<(std::ostream& os, const vecs::Handle& handle) {
+    	return os << "{" <<  handle.m_index << ", " << handle.m_version << "}"; 
+	}
 
 	template<typename T>
 	auto Type() -> std::size_t {
@@ -484,7 +487,6 @@ namespace vecs {
 
 	public:
 
-		/*
 		//----------------------------------------------------------------------------------------------
 
 		/// @brief Used for iterating over entity components.
@@ -493,59 +495,35 @@ namespace vecs {
 			requires (vtll::unique<vtll::tl<Ts...>>::value)
 		class Iterator {
 
-			using typelist = vtll::tl<Ts...>;
-			static const size_t size = sizeof...(Ts);
-			static const size_t max = std::numeric_limits<size_t>::max();
-			static const size_t writeidx = vtll::index_of<typelist, VecsWrite>::value;
-
-			static consteval size_t writeidxRead( size_t writeidx ) {
-				if( writeidx == max ) return 0;
-				if( writeidx == 0 ) return 0;
-				return writeidx - 1;
-			}
-
-			static consteval size_t writeidxWrite( size_t writeidx, size_t size ) {
-				if( writeidx == max ) return 0;
-				if( writeidx == size - 1) return 0;
-				return writeidx + 1;
-			}			
-
-			using read_t = 	std::conditional_t<writeidx == max, typelist, 
-								std::conditional_t< writeidx == 0, vtll::tl<>, vtll::sublist< typelist, 0, writeidxRead( writeidx ) > >
-							>;
-
-			using write_t = std::conditional_t<writeidx == max || writeidx == size - 1, vtll::tl<>, 
-								vtll::sublist<typelist, writeidxWrite( writeidx, size ), size - 1>
-							>;
-
 		public:
 			/// @brief Iterator constructor saving a list of archetypes and the current index.
 			/// @param arch List of archetypes. 
 			/// @param archidx First archetype index.
 			Iterator(std::vector<Archetype*>& arch, size_t archidx) : m_archetypes{arch}, m_archidx{archidx} {
-				if( m_archidx < m_archetypes.size() ) lock();
+				//if( m_archidx < m_archetypes.size() ) Lock();
 			}
 
 			~Iterator() {
-				if( m_archidx < m_archetypes.size() ) unlock();
+				//if( m_archidx < m_archetypes.size() ) Unlock();
 			}
 
 			/// @brief Prefix increment operator.
 			auto operator++() {
-				if( ++m_entidx >= m_archetypes[m_archidx]->maps().begin()->second->size() ) {
-					unlock();
+				if( ++m_entidx >= m_archetypes[m_archidx]->Maps().begin()->second->Size() ) {
+					//Unlock();
 					do {
 						++m_archidx;
 						m_entidx = 0;
-					} while( m_archidx < m_archetypes.size() && m_archetypes[m_archidx]->maps().begin()->second->size() == 0 );
+					} while( m_archidx < m_archetypes.size() && m_archetypes[m_archidx]->Maps().begin()->second->Size() == 0 );
 				}
-				if( m_archidx < m_archetypes.size() ) lock();
+				//if( m_archidx < m_archetypes.size() ) Lock();
 				return *this;
 			}
 
 			/// @brief Access the content the iterator points to.
 			auto operator*() {
-				auto tup = std::make_tuple(static_cast<ComponentMap<Ts>*>(m_archetypes[m_archidx]->map(type<Ts>()))->get(m_entidx)...);
+				std::tuple<Ts...> tup = std::tie(static_cast<ComponentMap<Ts>*>(m_archetypes[m_archidx]->Map(Type<Ts>()))->Get(m_entidx)...);
+	
 				if constexpr (sizeof...(Ts) == 1) {
 					return std::get<0>(tup);
 				} else {
@@ -558,14 +536,14 @@ namespace vecs {
 			}
 
 		private:
-			void lock() {
-				if constexpr (RTYPE == RegistryType::PARALLEL) 
-					(m_archetypes[m_archidx]->map(type<Ts>())->lock(), ...);
+			void Lock() {
+				//if constexpr (RTYPE == RegistryType::PARALLEL) 
+				//	(m_archetypes[m_archidx]->Map(type<Ts>())->Lock(), ...);
 			}
 
-			void unlock() {
-				if constexpr (RTYPE == RegistryType::PARALLEL) 
-					(m_archetypes[m_archidx]->map(type<Ts>())->unlock(), ...);
+			void Unlock() {
+				//if constexpr (RTYPE == RegistryType::PARALLEL) 
+				//	(m_archetypes[m_archidx]->Map(type<Ts>())->unlock(), ...);
 			}
 
 			size_t m_archidx{0};
@@ -589,8 +567,8 @@ namespace vecs {
 				for( auto& it : m_system.m_archetypes ) {
 					auto arch = it.second.get();
 					auto func = [&]<typename T>() {
-						if( std::find(arch->types().begin(), arch->types().end(), type<T>()) == arch->types().end() ) return false;
-						return true;
+						if( arch->Types().contains(Type<T>())) return true;
+						return false;
 					};
 					if( (func.template operator()<Ts>() && ...) ) m_archetypes.push_back(it.second.get());
 				}
@@ -605,7 +583,6 @@ namespace vecs {
 			Registry<RTYPE>& m_system;
 			std::vector<Archetype*> m_archetypes;
 		}; //end of View
-		*/
 
 		//----------------------------------------------------------------------------------------------
 
@@ -673,22 +650,7 @@ namespace vecs {
 		/// @return The component value.
 		template<typename T>
 		[[nodiscard]] auto Get(Handle handle) -> T {
-			auto& value = m_entities[handle.m_index].m_value;
-			if(value.m_archetype_ptr->Has(Type<T>())) {
-				return value.m_archetype_ptr->template Get<T>(value.m_archIndex);
-			}
-			std::vector<size_t> types( value.m_archetype_ptr->Types().begin(), value.m_archetype_ptr->Types().end() );
-			types.push_back(Type<T>());
-
-			if(!m_archetypes.contains(&types)) { //not found
-				m_archetypes[&types] = std::make_unique<Archetype>();
-				m_archetypes[&types]->AddComponent<T>();
-			}
-			auto oldArchetype = value.m_archetype_ptr;
-			value.m_archetype_ptr = m_archetypes[&types].get();
-			types.pop_back();
-			value.m_archIndex = value.m_archetype_ptr->Move(types, value.m_archIndex, *oldArchetype, m_entities);
-			return value.m_archetype_ptr->template Get<T>(value.m_archIndex);
+			return GetRef<T>(handle);
 		}
 
 		/// @brief Get component values of an entity.
@@ -773,28 +735,37 @@ namespace vecs {
 			m_entities.Clear();
 		}
 
-		/*
 		/// @brief Get a view of entities with specific components.
 		/// @tparam ...Ts The types of the components.
 		/// @return A view of the entity components
 		template<typename... Ts>
 			requires (vtll::unique<vtll::tl<Ts...>>::value)
-		[[nodiscard]] auto view() -> View<Ts...>{
+		[[nodiscard]] auto GetView() -> View<Ts...>{
 			return {*this};
 		}
 
-		/// @brief Validate the registry by checking if all component maps have the same size.
-		void validate() {
-			size_t sz{0};
-			for( auto& arch : m_archetypes ) {
-				sz += arch.second->size();
-				assert(arch.second->validate());
-			}
-			assert(sz == size());
-		}
-		*/
-
 	private:
+
+		template<typename T>
+		[[nodiscard]] auto GetRef(Handle handle) -> T& {
+			auto& value = m_entities[handle.m_index].m_value;
+			if(value.m_archetype_ptr->Has(Type<T>())) {
+				return value.m_archetype_ptr->template Get<T>(value.m_archIndex);
+			}
+			std::vector<size_t> types( value.m_archetype_ptr->Types().begin(), value.m_archetype_ptr->Types().end() );
+			types.push_back(Type<T>());
+
+			if(!m_archetypes.contains(&types)) { //not found
+				m_archetypes[&types] = std::make_unique<Archetype>();
+				m_archetypes[&types]->AddComponent<T>();
+			}
+			auto oldArchetype = value.m_archetype_ptr;
+			value.m_archetype_ptr = m_archetypes[&types].get();
+			types.pop_back();
+			value.m_archIndex = value.m_archetype_ptr->Move(types, value.m_archIndex, *oldArchetype, m_entities);
+			return value.m_archetype_ptr->template Get<T>(value.m_archIndex);
+		}
+
 		mutex_t m_mutex; //mutex for thread safety
 
 		SlotMap<ArchetypeAndIndex> m_entities;
@@ -803,5 +774,6 @@ namespace vecs {
 
 	
 } //end of namespace vecs
+
 
 
