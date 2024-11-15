@@ -78,7 +78,7 @@ namespace vecs {
 			for( int64_t i = 1; i <= SIZE-1; ++i ) {
 				m_slots.emplace_back( i, 0uL, T{} );
 			}
-			m_slots.emplace_back( -1, 0uL, T{} );
+			m_slots.emplace_back( -1, 0, T{} );
 		}
 		
 		~SlotMap() = default;
@@ -108,7 +108,7 @@ namespace vecs {
 		}
 
 		auto operator[](size_t index) -> Slot& {
-			assert(index < m_slots.size());
+			assert(m_size != 0);
 			return m_slots[index];
 		}
 
@@ -202,7 +202,7 @@ namespace vecs {
 
 		public:
 			ComponentMapBase() = default;
-			~ComponentMapBase() = default;
+			virtual ~ComponentMapBase() = default;
 			
 			size_t Insert(auto&& v) {
 				using T = std::decay_t<decltype(v)>;
@@ -432,8 +432,7 @@ namespace vecs {
 			void Erase(size_t index, SlotMap<ArchetypeAndIndex>& slotmap) {
 				size_t last{index};
 				for( auto& it : m_maps ) {
-					size_t last = it.second->Erase(index); //should always be the same handle
-
+					last = it.second->Erase(index); //should always be the same handle
 				}
 				if( index < last ) {
 					auto& lastHandle = static_cast<ComponentMap<Handle>*>(m_maps[Type<Handle>()].get())->Get(index);
@@ -711,7 +710,7 @@ namespace vecs {
 		[[nodiscard]] auto Get(Handle handle) -> T {
 			assert(Has<T>(handle));
 			auto arch = m_entities[handle.m_index].m_value.m_archetype_ptr;
-			return arch->Get<T>(handle);
+			return arch->template Get<T>(handle);
 		}
 
 		/// @brief Get component values of an entity.
@@ -722,7 +721,7 @@ namespace vecs {
 			requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value))
 		[[nodiscard]] auto Get(Handle handle) -> std::tuple<Ts...> {
 			auto arch = m_entities[handle.m_index].m_value.m_archetype_ptr;
-			return std::tuple<Ts...>(arch->Get<Ts>(handle)...); //defer locking to archetype!
+			return std::tuple<Ts...>(arch->template Get<Ts>(handle)...); //defer locking to archetype!
 		}
 
 		/// @brief Put a new component value to an entity. If the entity does not have the component, it will be created.
@@ -734,7 +733,7 @@ namespace vecs {
 			requires (!is_tuple<T>::value)
 		void Put(Handle handle, T&& v) {
 			assert(Exists(handle));
-			m_entities[handle.m_index].m_value.m_archetype_ptr->Get<T>(handle) = std::forward<T>(v);
+			m_entities[handle.m_index].m_value.m_archetype_ptr->template Get<T>(handle) = std::forward<T>(v);
 		}
 
 		/// @brief Put new component values to an entity.

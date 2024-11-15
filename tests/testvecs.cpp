@@ -13,6 +13,17 @@ int main() {
 		auto [i1, v1] = sm.Insert(1);
 		auto [i2, v2] = sm.Insert(2);
 		auto [i3, v3] = sm.Insert(3);
+		assert( sm.Size() == 3 );
+
+		assert( sm[i1].m_value == 1 );
+		assert( sm[i2].m_value == 2 );
+		assert( sm[i3].m_value == 3 );
+
+		sm.Erase(1);
+		sm.Erase(2);
+
+		assert( sm.Size() == 1 );
+		assert( sm[i3].m_value == 3 );
 	}
 
     vecs::Registry<vecs::RegistryType::SEQUENTIAL> system;
