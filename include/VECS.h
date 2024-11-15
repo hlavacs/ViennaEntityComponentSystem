@@ -108,7 +108,7 @@ namespace vecs {
 		}
 
 		auto operator[](size_t index) -> Slot& {
-			assert(m_size != 0);
+			assert(index < m_slots.size());
 			return m_slots[index];
 		}
 
@@ -228,9 +228,10 @@ namespace vecs {
 
 		/// @brief A map of components of the same type.
 		/// @tparam T The value type for this comoonent map.
-		template<typename T>
-			requires std::same_as<T, std::decay_t<T>>
+		template<typename U>
 		class ComponentMap : public ComponentMapBase {
+
+			using T = std::decay_t<U>;
 
 		public:
 
@@ -324,12 +325,23 @@ namespace vecs {
 			/// @param ...values The values of the components.
 			template<typename... Ts>
 				requires (vtll::unique<vtll::tl<Ts...>>::value)
-			Archetype( Handle& handle, Ts&& ...values ) {
-				size_t index;
-				(AddComponent( index, std::forward<Ts>(values) ), ...); //insert all components, get index of the handle
-				handle.m_index = (uint32_t)index;
-				AddComponent( index, handle ); //insert the handle
+			Archetype(Handle handle, size_t& archIndex, Ts&& ...values ) {
+				(AddComponent<Ts>(), ...); //insert component types
+				(AddValue( archIndex, std::forward<Ts>(values) ), ...); //insert all components, get index of the handle
+				AddComponent<Handle>(); //insert the handle
+				AddValue( archIndex, handle ); //insert the handle
 				std::sort(m_types.begin(), m_types.end()); //sort the types
+			}
+
+			template<typename... Ts>
+				requires (vtll::unique<vtll::tl<Ts...>>::value)
+			size_t Insert(Handle handle, Ts&& ...values ) {
+				size_t index;
+				(AddValue( index, std::forward<Ts>(values) ), ...); //insert all components, get index of the handle
+				handle.m_index = (uint32_t)index;
+				AddValue( index, handle ); //insert the handle
+				std::sort(m_types.begin(), m_types.end()); //sort the types
+				return index;
 			}
 
 			/*
@@ -388,8 +400,8 @@ namespace vecs {
 			/// @param index The index of the entity in the archetype.
 			/// @return The component value.
 			template<typename T>
-			[[nodiscard]] auto Get(Handle handle) -> T& {			
-				return static_cast<ComponentMap<std::decay_t<T>>*>(m_maps[Type<T>()].get())->Get(handle.m_index);
+			[[nodiscard]] auto Get(size_t archIndex) -> T& {			
+				return static_cast<ComponentMap<std::decay_t<T>>*>(m_maps[Type<T>()].get())->Get(archIndex);
 			}
 
 			/// @brief Get component values of an entity.
@@ -398,8 +410,8 @@ namespace vecs {
 			/// @return A tuple of the component values.
 			template<typename... Ts>
 				requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value))
-			[[nodiscard]] auto Get(Handle handle) -> std::tuple<Ts&...> {
-				return std::tuple<Ts&...>{ static_cast<ComponentMap<std::decay_t<Ts>>*>(m_maps[Type<Ts>()].get())->Get(handle.m_index)... };
+			[[nodiscard]] auto Get(size_t archIndex) -> std::tuple<Ts&...> {
+				return std::tuple<Ts&...>{ static_cast<ComponentMap<std::decay_t<Ts>>*>(m_maps[Type<Ts>()].get())->Get(archIndex)... };
 			}
 
 			/*
@@ -487,16 +499,32 @@ namespace vecs {
 
 		private:
 
-			/// @brief Add a new component to the archetype.
-			/// @param v The new value.
-			/// @return The index of the entity in the archetype.
-			void AddComponent( size_t& index, auto&& v ) {
-				using T = std::decay_t<decltype(v)>;
+			template<typename T>
+			void AddComponent() {
 				size_t ti = Type<T>();
 				m_types.push_back(ti);	//add the type to the list
 				m_maps[ti] = std::make_unique<ComponentMap<T>>(); //create the component map
-				index = m_maps[ti]->Insert(std::forward<T>(v));	//insert the component value
 			};
+
+
+			template<typename T>
+			void RemoveComponent() {
+				size_t ti = Type<T>();
+				auto it = std::find(m_types.begin(), m_types.end(), ti);
+				if( it != std::end(m_types) ) {
+					m_types.erase(it); //remove the type from the list
+					m_maps.erase(ti); //remove the component map
+				}
+			};
+
+			/// @brief Add a new component to the archetype.
+			/// @param v The new value.
+			/// @return The index of the entity in the archetype.
+			void AddValue( size_t& index, auto&& v ) {
+				using T = std::decay_t<decltype(v)>;
+				index = m_maps[Type<T>()]->Insert(std::forward<T>(v));	//insert the component value
+			};
+
 
 			/*
 			/// @brief Test if all component maps have the same size.
@@ -662,14 +690,15 @@ namespace vecs {
 			std::vector<std::size_t> types = {Type<Ts>()...};
 			auto [index, slot] = m_entities.Insert( {nullptr, 0} ); //get a slot for the entity
 			Handle handle{(uint32_t)index, (uint32_t)slot.m_version}; //create a handle
+			size_t archIndex;
 			auto it = m_archetypes.find(&types); //find the archetype, protect shared data
 			if( it == m_archetypes.end() ) { //not found
-				auto archetype = std::make_unique<Archetype>( handle, std::forward<Ts>(component)... );
-				slot.m_value = { archetype.get(), index }; //store the archetype and index into archetype
+				auto archetype = std::make_unique<Archetype>( handle, archIndex, std::forward<Ts>(component)... );
+				slot.m_value = { archetype.get(), archIndex }; //store the archetype and index into archetype
 				m_archetypes[&types] = std::move(archetype);
 				return handle;
 			}
-			slot.m_value = { it->second.get(), index };
+			slot.m_value = { it->second.get(), archIndex };
 			return handle;
 		}
 
@@ -710,7 +739,8 @@ namespace vecs {
 		[[nodiscard]] auto Get(Handle handle) -> T {
 			assert(Has<T>(handle));
 			auto arch = m_entities[handle.m_index].m_value.m_archetype_ptr;
-			return arch->template Get<T>(handle);
+			size_t archIndex = m_entities[handle.m_index].m_value.m_index;
+			return arch->template Get<T>(archIndex);
 		}
 
 		/// @brief Get component values of an entity.
@@ -721,7 +751,8 @@ namespace vecs {
 			requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value))
 		[[nodiscard]] auto Get(Handle handle) -> std::tuple<Ts...> {
 			auto arch = m_entities[handle.m_index].m_value.m_archetype_ptr;
-			return std::tuple<Ts...>(arch->template Get<Ts>(handle)...); //defer locking to archetype!
+			size_t archIndex = m_entities[handle.m_index].m_value.m_index;
+			return std::tuple<Ts...>(arch->template Get<Ts>(archIndex)...); //defer locking to archetype!
 		}
 
 		/// @brief Put a new component value to an entity. If the entity does not have the component, it will be created.
@@ -733,7 +764,9 @@ namespace vecs {
 			requires (!is_tuple<T>::value)
 		void Put(Handle handle, T&& v) {
 			assert(Exists(handle));
-			m_entities[handle.m_index].m_value.m_archetype_ptr->template Get<T>(handle) = std::forward<T>(v);
+			auto arch = m_entities[handle.m_index].m_value.m_archetype_ptr;
+			size_t archIndex = m_entities[handle.m_index].m_value.m_index;
+			arch->template Get<T>(archIndex) = std::forward<T>(v);
 		}
 
 		/// @brief Put new component values to an entity.
