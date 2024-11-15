@@ -499,7 +499,7 @@ namespace vecs {
 			/// @brief Iterator constructor saving a list of archetypes and the current index.
 			/// @param arch List of archetypes. 
 			/// @param archidx First archetype index.
-			Iterator(std::vector<Archetype*>& arch, size_t archidx) : m_archetypes{arch}, m_archidx{archidx} {
+			Iterator(std::vector<Archetype*>& arch, size_t archidx) : m_archidx{archidx}, m_archetypes{arch}  {
 				Lock();
 			}
 
@@ -765,7 +765,7 @@ namespace vecs {
 
 			if(!m_archetypes.contains(&types)) { //not found
 				m_archetypes[&types] = std::make_unique<Archetype>();
-				m_archetypes[&types]->AddComponent<T>();
+				m_archetypes[&types]->template AddComponent<T>();
 			}
 			auto oldArchetype = value.m_archetype_ptr;
 			value.m_archetype_ptr = m_archetypes[&types].get();
