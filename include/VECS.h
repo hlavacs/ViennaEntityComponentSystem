@@ -658,7 +658,22 @@ namespace vecs {
 		/// @return The component value.
 		template<typename T>
 		[[nodiscard]] auto Get(Handle handle) -> T {
-			return GetRef<T>(handle);
+			auto& value = m_entities[handle.m_index].m_value;
+			if(value.m_archetype_ptr->Has(Type<T>())) {
+				return value.m_archetype_ptr->template Get<T>(value.m_archIndex);
+			}
+			std::vector<size_t> types( value.m_archetype_ptr->Types().begin(), value.m_archetype_ptr->Types().end() );
+			types.push_back(Type<T>());
+
+			if(!m_archetypes.contains(&types)) { //not found
+				m_archetypes[&types] = std::make_unique<Archetype>();
+				m_archetypes[&types]->template AddComponent<T>();
+			}
+			auto oldArchetype = value.m_archetype_ptr;
+			value.m_archetype_ptr = m_archetypes[&types].get();
+			types.pop_back();
+			value.m_archIndex = value.m_archetype_ptr->Move(types, value.m_archIndex, *oldArchetype, m_entities);
+			return value.m_archetype_ptr->template Get<T>(value.m_archIndex);
 		}
 
 		/// @brief Get component values of an entity.
@@ -692,7 +707,7 @@ namespace vecs {
 		template<typename... Ts>
 			requires (vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
 		void Put(Handle handle, std::tuple<Ts...>& v) {
-			(Put(handle, std::get<Ts>(v)), ...);
+			(Put(handle, std::forward<Ts>(std::get<Ts>(v))), ...);
 		}
 
 		/// @brief Put new component values to an entity.
@@ -753,26 +768,6 @@ namespace vecs {
 		}
 
 	private:
-
-		template<typename T>
-		[[nodiscard]] auto GetRef(Handle handle) -> T& {
-			auto& value = m_entities[handle.m_index].m_value;
-			if(value.m_archetype_ptr->Has(Type<T>())) {
-				return value.m_archetype_ptr->template Get<T>(value.m_archIndex);
-			}
-			std::vector<size_t> types( value.m_archetype_ptr->Types().begin(), value.m_archetype_ptr->Types().end() );
-			types.push_back(Type<T>());
-
-			if(!m_archetypes.contains(&types)) { //not found
-				m_archetypes[&types] = std::make_unique<Archetype>();
-				m_archetypes[&types]->template AddComponent<T>();
-			}
-			auto oldArchetype = value.m_archetype_ptr;
-			value.m_archetype_ptr = m_archetypes[&types].get();
-			types.pop_back();
-			value.m_archIndex = value.m_archetype_ptr->Move(types, value.m_archIndex, *oldArchetype, m_entities);
-			return value.m_archetype_ptr->template Get<T>(value.m_archIndex);
-		}
 
 		mutex_t m_mutex; //mutex for thread safety
 

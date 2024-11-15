@@ -45,6 +45,10 @@ int main() {
     assert( system.Exists(h2) );
     auto t2 = system.Types(h2);
     auto [v2a, v2b] = system.Get<float, double>(h2);
+    auto [v3a, v3b] = system.Get<float&, double&>(h2);
+	v3a = 100.0f;
+	v3b = 101.0;
+    auto [v4a, v4b] = system.Get<float, double>(h2);
 
     system.Put(h2, 50, 69.0f, 73.0);
     assert( system.Get<float>(h2) == 69.0f && system.Get<double>(h2) == 73.0 );
