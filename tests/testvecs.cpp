@@ -62,13 +62,13 @@ int main() {
     assert( system.Has<float>(h2) );
     assert( system.Has<double>(h2) );
 
-    /*system.Erase<int, float>(h2);
+    system.Erase<int, float>(h2);
     assert( !system.Has<int>(h2) );
     assert( !system.Has<float>(h2) );
     assert( system.Has<double>(h2) );
     system.Erase<double>(h2); //remove also the last component
     assert( system.Exists(h2)); //check that the entity still exists
-	*/
+	
 
     system.Erase(h2);
     assert( !system.Exists(h2) );

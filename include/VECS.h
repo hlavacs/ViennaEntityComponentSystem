@@ -345,44 +345,6 @@ namespace vecs {
 				return index;
 			}
 
-			/*
-			/// @brief Constructor, called if components of an entity are added, but the new archetype does not exist yet.
-			/// @tparam T Possible new component type.
-			/// @param other The original archetype.
-			/// @param index The index of the entity in the old archetype.
-			/// @param value Pointer to a new component value if component is added, or nullptr if the component is removed.
-			template<typename... Ts>
-			Archetype( ActionInsert i, Archetype& other, Handle handle, Ts&&... value) {
-				m_types = other.m_types; //make a copy of the types
-				(add( value ), ...); //add the new components
-				std::sort(m_types.begin(), m_types.end()); //sort the types
-				move(m_types, other.m_index[handle], other); //move rest of components 
-				m_index[handle] = size() - 1; //store the index of the new entity in the archetype
-				assert(validate());
-			}
-
-			/// @brief Constructor, called if components of an entity are removed, but the new archetype does not exist yet.
-			/// @tparam Ts Old types of the components that should be moved from the old archteype to the new one.
-			/// @param other The original archetype.
-			/// @param handle The handle of the entity.
-			/// @param value Pointer to the old component values.
-			template<typename... Ts>
-			Archetype(ActionRemove r, Archetype& other, Handle handle, Ts*... value) {
-				m_types = other.m_types; //make a copy of the types
-				auto func = [&](auto&& v) {
-					auto it = std::find(m_types.begin(), m_types.end(), type<std::decay_t<decltype(v)>>());
-					if( it != std::end(m_types) ) {
-						m_types.erase(it); //remove the type from the list
-					}
-				};
-				(func( *value ), ...); //insert all components
-				std::sort(m_types.begin(), m_types.end()); //sort the types
-				move(m_types, other.m_index[handle], other); //copy rest of components and store the index of the new entity 
-				m_index[handle] = size() - 1; //store the index of the new entity in the archetype
-				assert(validate());
-			}
-			*/
-
 			/// @brief Get the types of the components.
 			/// @return A vector of type indices.
 			[[nodiscard]] const auto&  Types() const {
@@ -494,17 +456,6 @@ namespace vecs {
 				size_t ti = Type<T>();
 				m_types.push_back(ti);	//add the type to the list
 				m_maps[ti] = std::make_unique<ComponentMap<T>>(); //create the component map
-			};
-
-
-			template<typename T>
-			void RemoveComponent() {
-				size_t ti = Type<T>();
-				auto it = std::find(m_types.begin(), m_types.end(), ti);
-				if( it != std::end(m_types) ) {
-					m_types.erase(it); //remove the type from the list
-					m_maps.erase(ti); //remove the component map
-				}
 			};
 
 			/// @brief Add a new component to the archetype.
@@ -767,15 +718,24 @@ namespace vecs {
 			(Put(handle, vs), ...);
 		}
 		
-		/*
 		/// @brief Erase components from an entity.
 		/// @tparam Ts The types of the components.
 		/// @param handle The handle of the entity.
 		template<typename... Ts>
 			requires (vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
 		void Erase(Handle handle) {
-			assert( (has<Ts>(handle) && ...) );
+			assert( (Has<Ts>(handle) && ...) );
 
+			auto arch = m_entities[handle.m_index].m_value.m_archetype_ptr;
+			size_t archIndex = m_entities[handle.m_index].m_value.m_archIndex;
+			auto types = arch->Types();
+			for(size_t i=0; i<types.size(); ++i) {
+			}
+
+
+
+
+			/*
 			auto entt = m_entities.find(handle)->second; //get the archetype of the entity
 			auto typ = entt.m_archetype_ptr->types(); //get the types from the archetype
 
@@ -793,7 +753,8 @@ namespace vecs {
 				return;
 			}
 			m_entities[handle] = { it->second.get() };
-		}*/
+			*/
+		}
 
 		/// @brief Erase an entity from the registry.
 		/// @param handle The handle of the entity.
