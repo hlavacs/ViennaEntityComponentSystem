@@ -500,23 +500,23 @@ namespace vecs {
 			/// @param arch List of archetypes. 
 			/// @param archidx First archetype index.
 			Iterator(std::vector<Archetype*>& arch, size_t archidx) : m_archetypes{arch}, m_archidx{archidx} {
-				//if( m_archidx < m_archetypes.size() ) Lock();
+				Lock();
 			}
 
 			~Iterator() {
-				//if( m_archidx < m_archetypes.size() ) Unlock();
+				Unlock();
 			}
 
 			/// @brief Prefix increment operator.
 			auto operator++() {
 				if( ++m_entidx >= m_archetypes[m_archidx]->Maps().begin()->second->Size() ) {
-					//Unlock();
+					Unlock();
 					do {
 						++m_archidx;
 						m_entidx = 0;
 					} while( m_archidx < m_archetypes.size() && m_archetypes[m_archidx]->Maps().begin()->second->Size() == 0 );
 				}
-				//if( m_archidx < m_archetypes.size() ) Lock();
+				Lock();
 				return *this;
 			}
 
@@ -536,14 +536,22 @@ namespace vecs {
 			}
 
 		private:
+			bool m_locked{false};
+
 			void Lock() {
-				//if constexpr (RTYPE == RegistryType::PARALLEL) 
-				//	(m_archetypes[m_archidx]->Map(type<Ts>())->Lock(), ...);
+				if( m_archidx >= m_archetypes.size() ) return;
+				if constexpr (RTYPE == RegistryType::PARALLEL) {
+					//(m_archetypes[m_archidx]->Map(Type<Ts>())->Lock(), ...);
+					m_locked = true;
+				}
 			}
 
 			void Unlock() {
-				//if constexpr (RTYPE == RegistryType::PARALLEL) 
-				//	(m_archetypes[m_archidx]->Map(type<Ts>())->unlock(), ...);
+				if( !m_locked ) return;
+				if constexpr (RTYPE == RegistryType::PARALLEL) {
+					//(m_archetypes[m_archidx]->Map(Type<Ts>())->Unlock(), ...);
+					m_locked = false;
+				}
 			}
 
 			size_t m_archidx{0};
