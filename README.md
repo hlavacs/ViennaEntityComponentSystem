@@ -112,15 +112,16 @@ v3b = 101.0;
 auto [v4a, v4b] = system.Get<float, double>(h2); //check new values
 ```
 
-You can iterate over all components of a given type creating a view. The view covers all entities that hold all components of the specified types, and you can iterate over them using a standard C++ for loop. The following example creates views with one or three tyes and then iterates over all entities having these components. In the second loop, we get references and thus could also update the component values by iterating over them.
+You can iterate over all components of a given type creating a *View*. The view covers all entities that hold all components of the specified types, and you can iterate over them using a standard C++ for loop. The following example creates views with one or three tyes and then iterates over all entities having these components. In the second loop, we get references and thus could also update the component values by iterating over them.
 
 ```C
-for( auto handle : system.view<vecs::Handle>() ) { //iterate over ALL entities
+for( auto handle : system.GetView<vecs::Handle>() ) { //iterate over ALL entities
     std::cout << "Handle: "<< handle << std::endl;
 }
 
-for( auto [handle, i, f] : system.view<vecs::Handle, int&, float&>() ) {
+for( auto [handle, i, f] : system.GetView<vecs::Handle, int&, float&>() ) {
     std::cout << "Handle: "<< handle << " int: " << i << " float: " << f << std::endl;
+	i = 10; //write new value
 }
 ```
 

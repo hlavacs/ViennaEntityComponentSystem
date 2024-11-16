@@ -196,12 +196,6 @@ namespace vecs {
 	template <RegistryType RTYPE = RegistryType::SEQUENTIAL>
 	class Registry {
 
-		template<typename... Ts> requires VecsIterator<Ts...> friend class Iterator;
-
-		template<typename... Ts> 
-			requires VecsView<Ts...>
-		friend class View;
-
 		using mutex_t = std::conditional_t<RTYPE == RegistryType::SEQUENTIAL, int32_t, std::shared_mutex>;
 
 	private:
@@ -242,11 +236,12 @@ namespace vecs {
 		//----------------------------------------------------------------------------------------------
 
 		/// @brief A map of components of the same type.
-		/// @tparam T The value type for this comoonent map.
+		/// @tparam U The value type for this comoonent map. Note that the type is decayed.
+		/// If you want to store a pointer or reference, use a struct to wrap it.
 		template<typename U>
 		class ComponentMap : public ComponentMapBase {
 
-			using T = std::decay_t<U>;
+			using T = std::decay_t<U>; //remove pointer or reference
 
 		public:
 
@@ -262,21 +257,21 @@ namespace vecs {
 
 			/// @brief Get reference to the component of an entity.
 			/// @param index The index of the component value in the map.
-			/// @return Value of the component value.
+			/// @return Reference to the component value.
 			auto Get(std::size_t index) -> T& {
 				assert(index < m_data.size());
 				return m_data[index];
 			};
 
-			/// @brief Get the data vector of the components.
-			/// @return Reference to the data vector.
+			/// @brief Get reference to the data container of the components.
+			/// @return Reference to the data container.
 			[[nodiscard]] auto& Data() {
 				return m_data;
 			};
 
 			/// @brief Erase a component from the vector.
 			/// @param index The index of the component value in the map.
-			/// @return The handle of the entity that was moved over the erased one so its index can be changed, or nullopt
+			/// @return The index of the last element in the vector.
 			[[nodiscard]] virtual auto Erase(size_t index)  -> size_t override {
 				size_t last = m_data.size() - 1;
 				assert(index <= last);
@@ -300,12 +295,13 @@ namespace vecs {
 				return m_data.size();
 			}
 
-			/// @brief Create a new map.
+			/// @brief Clone a new map from this map.
 			/// @return A unique pointer to the new map.
 			[[nodiscard]] virtual auto Clone() -> std::unique_ptr<ComponentMapBase> override {
 				return std::make_unique<ComponentMap<T>>();
 			};
 
+			/// @brief Clear the map.
 			void Clear() override {
 				m_data.clear();
 			}
@@ -316,25 +312,23 @@ namespace vecs {
 
 		//----------------------------------------------------------------------------------------------
 
+		/// @brief An archetype of entities with the same components. 
+		/// All entities that have the same components are stored in the same archetype.
 		class Archetype;
 
+		/// @brief A pair of an archetype and an index. This is stored in the slot map.
 		struct ArchetypeAndIndex {
 			Archetype* m_archetype_ptr;	//pointer to the archetype
 			size_t m_archIndex;			//index of the entity in the archetype
 		};
 
-		/// @brief An archetype of entities with the same components.
+		/// @brief An archetype of entities with the same components. 
+		/// All entities that have the same components are stored in the same archetype.
 		class Archetype {
-
-			template<typename... Ts>
-				requires VecsView<Ts...>
-			friend class View;
-			
-			template<typename... Ts> requires VecsIterator<Ts...> friend class Iterator;
 
 		public:
 
-			Archetype() = default;
+			Archetype() = default; //default constructor
 
 			/// @brief Constructor, called if a new entity should be created with components, and the archetype does not exist yet.
 			/// @tparam ...Ts 
@@ -349,6 +343,11 @@ namespace vecs {
 				AddValue( archIndex, handle ); //insert the handle
 			}
 
+			/// @brief Insert a new entity with components to the archetype.
+			/// @tparam ...Ts Value types of the components.
+			/// @param handle The handle of the entity.
+			/// @param ...values The values of the components.
+			/// @return The index of the entity in the archetype.
 			template<typename... Ts>
 				requires (vtll::unique<vtll::tl<Ts...>>::value)
 			size_t Insert(Handle handle, Ts&& ...values ) {
@@ -360,14 +359,14 @@ namespace vecs {
 				return index;
 			}
 
-			/// @brief Get the types of the components.
-			/// @return A vector of type indices.
+			/// @brief Get referece to the types of the components.
+			/// @return A reference to the container of the types.
 			[[nodiscard]] const auto&  Types() const {
 				return m_types;
 			}
 
 			/// @brief Test if the archetype has a component.
-			/// @param ti The type index of the component.
+			/// @param ti Hash of the type index of the component.
 			/// @return true if the archetype has the component, else false.
 			[[nodiscard]] bool Has(const size_t ti) {
 				return m_types.contains(ti);
@@ -375,7 +374,7 @@ namespace vecs {
 
 			/// @brief Get component value of an entity. 
 			/// @tparam T The type of the component.
-			/// @param index The index of the entity in the archetype.
+			/// @param archIndex The index of the entity in the archetype.
 			/// @return The component value.
 			template<typename T>
 			[[nodiscard]] auto Get(size_t archIndex) -> T& {			
@@ -383,8 +382,8 @@ namespace vecs {
 			}
 
 			/// @brief Get component values of an entity.
-			/// @tparam ...Ts 
-			/// @param handle Handle oif the entity.
+			/// @tparam ...Ts Types of the components to get.
+			/// @param handle Handle of the entity.
 			/// @return A tuple of the component values.
 			template<typename... Ts>
 				requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value))
