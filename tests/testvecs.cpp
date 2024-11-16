@@ -89,6 +89,8 @@ int main() {
 	std::tuple<int&, float> tup3 = {a, b};
 	std::get<int&>(tup3) = 100;
 
+	//auto hhh = system.Get<vecs::Handle&>(hd1); //compile error
+
     for( auto handle : system.GetView<vecs::Handle>() ) {
         std::cout << "Handle: "<< handle << std::endl;
     }

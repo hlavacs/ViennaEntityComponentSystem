@@ -177,14 +177,18 @@ namespace vecs {
 		return std::type_index(typeid(std::decay_t<T>)).hash_code();
 	}
 
-	struct VecsWrite {}; //dummy type for write access when using the iterator and view classes
+	template<typename... Ts>
+	concept VecsView = ((vtll::unique<vtll::tl<Ts...>>::value) && (sizeof...(Ts) > 0) && (!std::is_same_v<Handle&, Ts> && ...));
 
 	template<typename... Ts>
-		requires (vtll::unique<vtll::tl<Ts...>>::value)
+	concept VecsIterator = (vtll::unique<vtll::tl<Ts...>>::value);
+
+	template<typename... Ts>
+		requires VecsIterator<Ts...>
 	class Iterator;
 
 	template<typename... Ts>
-		//requires ((vtll::unique<vtll::tl<Ts...>>::value) && (sizeof...(Ts) > 0) && (!std::is_same_v<vtll::tl<VecsWrite>, vtll::tl<Ts...>>))
+		requires VecsView<Ts...>
 	class View;
 
 	
@@ -192,10 +196,10 @@ namespace vecs {
 	template <RegistryType RTYPE = RegistryType::SEQUENTIAL>
 	class Registry {
 
-		template<typename... Ts> requires (vtll::unique<vtll::tl<Ts...>>::value) friend class Iterator;
+		template<typename... Ts> requires VecsIterator<Ts...> friend class Iterator;
 
 		template<typename... Ts> 
-			//requires ((vtll::unique<vtll::tl<Ts...>>::value) && (sizeof...(Ts) > 0) && (!std::is_same_v<vtll::tl<VecsWrite>, vtll::tl<Ts...>>))
+			requires VecsView<Ts...>
 		friend class View;
 
 		using mutex_t = std::conditional_t<RTYPE == RegistryType::SEQUENTIAL, int32_t, std::shared_mutex>;
@@ -208,7 +212,7 @@ namespace vecs {
 		class ComponentMapBase {
 
 			friend class Archetype; //for eaccessing the mutex
-			template<typename... Ts> requires (vtll::unique<vtll::tl<Ts...>>::value)
+			template<typename... Ts> requires VecsIterator<Ts...>
 			friend class Iterator;
 
 		public:
@@ -323,10 +327,10 @@ namespace vecs {
 		class Archetype {
 
 			template<typename... Ts>
-				//requires ((vtll::unique<vtll::tl<Ts...>>::value) && (sizeof...(Ts) > 0) && (!std::is_same_v<vtll::tl<VecsWrite>, vtll::tl<Ts...>>))
+				requires VecsView<Ts...>
 			friend class View;
 			
-			template<typename... Ts> requires (vtll::unique<vtll::tl<Ts...>>::value) friend class Iterator;
+			template<typename... Ts> requires VecsIterator<Ts...> friend class Iterator;
 
 		public:
 
@@ -493,7 +497,7 @@ namespace vecs {
 		/// @brief Used for iterating over entity components.
 		/// @tparam ...Ts Choose the types of the components you want the entities to have.
 		template<typename... Ts>
-			requires (vtll::unique<vtll::tl<Ts...>>::value)
+			requires VecsIterator<Ts...>
 		class Iterator {
 
 		public:
@@ -565,7 +569,7 @@ namespace vecs {
 		/// @brief A view of entities with specific components.
 		/// @tparam ...Ts The types of the components.
 		template<typename... Ts>
-			//requires ((vtll::unique<vtll::tl<Ts...>>::value) && (sizeof...(Ts) > 0) && (!std::is_same_v<vtll::tl<VecsWrite>, vtll::tl<Ts...>>) )
+			requires VecsView<Ts...>
 		class View {
 
 		public:
@@ -658,6 +662,7 @@ namespace vecs {
 		/// @param handle The handle of the entity.	
 		/// @return The component value.
 		template<typename T>
+			requires (!std::is_same_v<T, Handle&>)
 		[[nodiscard]] auto Get(Handle handle) -> T {
 			auto& value = m_entities[handle.m_index].m_value;
 			if(value.m_archetype_ptr->Has(Type<T>())) {
