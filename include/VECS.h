@@ -6,6 +6,7 @@
 #include <type_traits>
 #include <variant>
 #include <array>
+#include <deque>
 #include <memory>
 #include <optional>
 #include <functional>
@@ -306,7 +307,7 @@ namespace vecs {
 			}
 
 		private:
-			std::vector<T> m_data; //vector of component values
+			std::deque<T> m_data; //vector of component values
 		}; //end of ComponentMap
 
 		//----------------------------------------------------------------------------------------------
