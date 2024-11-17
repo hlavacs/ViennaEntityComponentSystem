@@ -72,9 +72,13 @@ int main() {
     assert( system.Has<double>(h2) );
     system.Erase<double>(h2); //remove also the last component
     assert( system.Exists(h2)); //check that the entity still exists
-	system.Put(h2, 3.9); 
+	system.Put(h2, 3.9); //add a component of type double
     assert( system.Exists(h2)); //check that the entity still exists
-	double d = system.Get<double>(h2);	
+	double d = system.Get<double>(h2);
+	auto& cc = system.Get<char&>(h2); //
+	cc = 'A';
+	auto dd = system.Get<char>(h2); //
+
 
     system.Erase(h2);
     assert( !system.Exists(h2) );

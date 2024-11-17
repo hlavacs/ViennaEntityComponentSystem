@@ -84,6 +84,9 @@ float value = system.Get<float>(h2);    //get float value directly
 std::tuple<float,double> tup = system.Get<float, double>(h2); //returns a std::tuple<float,double>
 float value2 = std::get<float>(tup);    //access the value from the tuple
 auto [fvalue, dvalue] = system.Get<float&, double>(h2); //structured binding. fvalue is now a reference to the component!!
+auto& cc = system.Get<char&>(h2); 	//Create char component and return a reference to it (note the &)!
+cc = 'A'; //can
+auto dd = system.Get<char>(h2); 	//the value has changed
 ```11
 
 You can update the value of a component by calling *Put(handle, value)*. You can call put using the new values directly, or by using a tuple as single value parameter. This way, you can reuse the same tuple that you previously extracted by calling *Get<T1,T2,...>(handle)*. Of course you can always change component values by getting and changing references calling *Get<T1&,T2&,...>(handle)*, which returns a tuple with references.
