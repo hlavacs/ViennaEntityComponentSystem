@@ -33,7 +33,7 @@ namespace vecs {
 
 
 	template <typename T>
-	size_t Hash( const T& hashes ) {
+	inline size_t Hash( const T& hashes ) {
 		std::size_t seed = 0;
 		if constexpr (std::is_same_v<T, const std::vector<size_t>&>) 
 			std::sort(hashes.begin(), hashes.end());
@@ -139,7 +139,7 @@ namespace vecs {
 		uint32_t m_version;
 	};
 
-	std::ostream& operator<<(std::ostream& os, const vecs::Handle& handle) {
+	inline std::ostream& operator<<(std::ostream& os, const vecs::Handle& handle) {
     	return os << "{" <<  handle.m_index << ", " << handle.m_version << "}"; 
 	}
 
