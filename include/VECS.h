@@ -24,57 +24,23 @@
 
 using namespace std::chrono_literals;
 
-namespace std {
-	template<>
-	struct hash<std::vector<size_t>*> {
-		std::size_t operator()(std::vector<size_t>* hashes) const {
-			std::size_t seed = 0;
-			std::sort(hashes->begin(), hashes->end());
-			for( auto& v : *hashes ) {
-				seed ^= v + 0x9e3779b9 + (seed<<6) + (seed>>2);
-			}
-			return seed;
-		}
-	};
-
-	template<>
-	struct hash<std::vector<size_t>&> {
-		std::size_t operator()(std::vector<size_t>& types) const {
-			return std::hash<std::vector<size_t>*>{}(&types);
-		}
-	};
-
-	template<>
-	struct hash<std::set<size_t>*> {
-		std::size_t operator()(std::set<std::size_t>* hashes) const {
-			std::size_t seed = 0;
-			for( auto& v : *hashes ) {
-				seed ^= v + 0x9e3779b9 + (seed<<6) + (seed>>2);
-			}
-			return seed;
-		}
-	};
-
-	template<>
-	struct hash<std::set<size_t>&> {
-		std::size_t operator()(std::set<size_t>& types) const {
-			return std::hash<std::set<size_t>*>{}(&types);
-		}
-	};
-
-}
-
 
 namespace vecs {
-
 
 
 	template <typename> struct is_tuple : std::false_type {};
 	template <typename ...Ts> struct is_tuple<std::tuple<Ts...>> : std::true_type {};
 
 
-	size_t Hash( auto& types ) {
-		return std::hash<decltype(types)&>{}(types);
+	template <typename T>
+	size_t Hash( const T& hashes ) {
+		std::size_t seed = 0;
+		if constexpr (std::is_same_v<T, const std::vector<size_t>&>) 
+			std::sort(hashes.begin(), hashes.end());
+		for( auto& v : hashes ) {
+			seed ^= v + 0x9e3779b9 + (seed<<6) + (seed>>2);
+		}
+		return seed;
 	} 
 
 
