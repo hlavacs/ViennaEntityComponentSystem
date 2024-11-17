@@ -76,7 +76,7 @@ assert( system.Size() == 0 );
 ```
 
 
-You can get the current value of type *T* of an entity by calling *Get<T>(handle)*. You can get a reference to a component by calling *Get<T&>(handle)*. Note that such a reference is invalid after any entity of the same archetype has been erased after getting the reference. If you specify more than one type, you can get a tuple holding the specified types or references. You can easily access all component values by using C++17 "structured binding".
+You can get the current value of type *T* of an entity by calling *Get<T>(handle)*. You can get a reference to a component by calling *Get<T&>(handle)*. Note that such a reference is invalid after any entity of the same archetype has been erased after getting the reference. If you specify more than one type, you can get a tuple holding the specified types or references. You can easily access all component values by using C++17 "structured binding". Calling *Get<T>(handle)* on a type *T* that is not yet past of the entity will also create an empty new component for the entity.
 
 ```C
 vecs::Handle h2 = system.Insert(5, 6.9f, 7.3);; //create a new entity with int, float and double components
@@ -85,14 +85,14 @@ std::tuple<float,double> tup = system.Get<float, double>(h2); //returns a std::t
 float value2 = std::get<float>(tup);    //access the value from the tuple
 auto [fvalue, dvalue] = system.Get<float&, double>(h2); //structured binding. fvalue is now a reference to the component!!
 auto& cc = system.Get<char&>(h2); 	//Create char component and return a reference to it (note the &)!
-cc = 'A'; //can
+cc = 'A'; //can change values
 auto dd = system.Get<char>(h2); 	//the value has changed
 ```11
 
-You can update the value of a component by calling *Put(handle, value)*. You can call put using the new values directly, or by using a tuple as single value parameter. This way, you can reuse the same tuple that you previously extracted by calling *Get<T1,T2,...>(handle)*. Of course you can always change component values by getting and changing references calling *Get<T1&,T2&,...>(handle)*, which returns a tuple with references.
+You can update the value of a component by calling *Put(handle, value)*. You can call *Put(handle, value)* using the new values directly, or by using a tuple as single value parameter. This way, you can reuse the same tuple that you previously extracted by calling *Get<T1,T2,...>(handle)*. 
 
 ```C
-vecs::Handle h2 = system.Insert(5, 6.9f, 7.3);; //create a new entity with int, float and double components
+vecs::Handle h2 = system.Insert(5, 6.9f, 7.3); //create a new entity with int, float and double components
 assert( system.Get<float>(h2) == 6.9f && system.Get<double>(h2) == 7.3 );    //check float and double values
 system.Put(h2, 66.9f, 77.3);    //change float and double values
 assert( system.Get<float>(h2) == 66.9f && system.Get<double>(h2) == 77.3 ); //check new values
@@ -108,6 +108,11 @@ assert( fvalue == 666.9f && dvalue == 777.3);    //check the values
 auto h2 = system.Insert(5, 6.9f, 7.3);
 assert( system.Exists(h2) );
 auto t2 = system.Types(h2);
+```
+
+Of course you can always change component values by getting and changing references calling *Get<T1&,T2&,...>(handle)*, which returns a tuple with references. Calling it on a new type will again create this component for the entity and set its value accordingly.
+
+```C
 auto [v2a, v2b] = system.Get<float, double>(h2);
 auto [v3a, v3b] = system.Get<float&, double&>(h2); //tuple with references
 v3a = 100.0f;
@@ -115,7 +120,7 @@ v3b = 101.0;
 auto [v4a, v4b] = system.Get<float, double>(h2); //check new values
 ```
 
-You can iterate over all components of a given type creating a *View*. The view covers all entities that hold all components of the specified types, and you can iterate over them using a standard C++ for loop. The following example creates views with one or three tyes and then iterates over all entities having these components. In the second loop, we get references and thus could also update the component values by iterating over them.
+You can iterate over all components of a given type creating a *View*. The view covers all entities that hold all components of the specified types, and you can iterate over them using a standard C++ for loop. The following example creates views with one or three types and then iterates over all entities having these components. In the second loop, we get references and thus could also update the component values by iterating over them.
 
 ```C
 for( auto handle : system.GetView<vecs::Handle>() ) { //iterate over ALL entities
