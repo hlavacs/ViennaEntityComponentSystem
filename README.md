@@ -76,7 +76,7 @@ assert( system.Size() == 0 );
 ```
 
 
-You can get the current value of type *T* of an entity by calling *Get<T>(handle)*. You can get a reference to a component by calling *Get<T&>(handle)*. Note that such a reference is invalid if any entity of the same archetype has been erased. If you specify more than one type, you can get a tuple holding the specified types or references. You can easily access all component values by using C++17 "structured binding".
+You can get the current value of type *T* of an entity by calling *Get<T>(handle)*. You can get a reference to a component by calling *Get<T&>(handle)*. Note that such a reference is invalid after any entity of the same archetype has been erased after getting the reference. If you specify more than one type, you can get a tuple holding the specified types or references. You can easily access all component values by using C++17 "structured binding".
 
 ```C
 vecs::Handle h2 = system.Insert(5, 6.9f, 7.3);; //create a new entity with int, float and double components
