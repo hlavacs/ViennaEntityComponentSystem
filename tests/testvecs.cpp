@@ -78,7 +78,13 @@ int main() {
 	auto& cc = system.Get<char&>(h2); //
 	cc = 'A';
 	auto dd = system.Get<char>(h2); //
+	std::string s = "AAA";
+	struct T1 {
+		char* m_str;
+	};
 
+	system.Put(h2, s, T1{"BBB"}); //
+	auto [ee, ff] = system.Get<std::string, T1>(h2); //
 
     system.Erase(h2);
     assert( !system.Exists(h2) );

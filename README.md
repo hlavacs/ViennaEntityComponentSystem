@@ -120,6 +120,17 @@ v3b = 101.0;
 auto [v4a, v4b] = system.Get<float, double>(h2); //check new values
 ```
 
+*std::string* can be included directly, *const char** must be wrapped into a struct.
+
+```C
+std::string s = "AAA";
+struct T1 {
+	char* m_str;
+};
+system.Put(h2, s, T1{"BBB"}); //
+auto [ee, ff] = system.Get<std::string, T1>(h2); //
+```
+
 You can iterate over all components of a given type creating a *View*. The view covers all entities that hold all components of the specified types, and you can iterate over them using a standard C++ for loop. The following example creates views with one or three types and then iterates over all entities having these components. In the second loop, we get references and thus could also update the component values by iterating over them.
 
 ```C
