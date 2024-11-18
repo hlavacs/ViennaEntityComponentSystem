@@ -76,7 +76,9 @@ assert( system.Size() == 0 );
 ```
 
 
-You can get the current value of type *T* of an entity by calling *Get<T>(handle)*. You can get a reference to a component by calling *Get<T&>(handle)*. Note that such a reference is invalid after any entity of the same archetype has been erased after getting the reference. If you specify more than one type, you can get a tuple holding the specified types or references. You can easily access all component values by using C++17 "structured binding". Calling *Get<T>(handle)* on a type *T* that is not yet past of the entity will also create an empty new component for the entity.
+You can get the current value of type *T* of an entity by calling *Get<T>(handle)*. You can get a reference to a component by calling *Get<T&>(handle)*. 
+Note that such a reference is not a standard C++ reference but instead an instance of Class *Ref<T>*, which is a wrapper around *T&*. The wrapper ensures that as long as an entity is not erased, a reference to one of its components is never invalidated. 
+If you specify more than one type, you can get a tuple holding the specified types or references. You can easily access all component values by using C++17 "structured binding". Calling *Get<T>(handle)* on a type *T* that is not yet past of the entity will also create an empty new component for the entity.
 
 ```C
 vecs::Handle h2 = system.Insert(5, 6.9f, 7.3);; //create a new entity with int, float and double components
@@ -84,10 +86,10 @@ float value = system.Get<float>(h2);    //get float value directly
 std::tuple<float,double> tup = system.Get<float, double>(h2); //returns a std::tuple<float,double>
 float value2 = std::get<float>(tup);    //access the value from the tuple
 auto [fvalue, dvalue] = system.Get<float&, double>(h2); //structured binding. fvalue is now a reference to the component!!
-auto& cc = system.Get<char&>(h2); 	//Create char component and return a reference to it (note the &)!
+auto cc = system.Get<char&>(h2); 	//Create char component and return a reference to it (note the &)!
 cc = 'A'; //can change values
 auto dd = system.Get<char>(h2); 	//the value has changed
-```11
+```
 
 You can update the value of a component by calling *Put(handle, value)*. You can call *Put(handle, value)* using the new values directly, or by using a tuple as single value parameter. This way, you can reuse the same tuple that you previously extracted by calling *Get<T1,T2,...>(handle)*. 
 

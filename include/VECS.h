@@ -172,8 +172,48 @@ namespace vecs {
 
 		using mutex_t = std::conditional_t<RTYPE == RegistryType::SEQUENTIAL, int32_t, std::shared_mutex>;
 
-	private:
+	public:
 	
+		//----------------------------------------------------------------------------------------------
+
+		template<typename U>
+		class Ref {
+
+			using T = std::decay_t<U>;
+
+		public:
+			Ref(Registry<RTYPE>& system, Handle handle) : m_system{system}, m_handle{handle} {
+				if constexpr (!std::is_reference_v<U>) {
+					m_value = m_system.Get2<T>(m_handle);
+				}
+			}
+
+			auto operator()() const -> T {
+				if constexpr (std::is_reference_v<U>) {
+					return m_system.Get2<T>(m_handle);
+				} else {
+					return m_value;
+				}
+			}
+
+			void operator=(auto&& value) {
+				if constexpr (std::is_reference_v<U>) {
+					m_system.Put(m_handle, std::forward<T>(value));
+				} else {
+					m_value = std::forward<T>(value);
+				}
+			}
+
+		private:
+			Registry<RTYPE>& m_system;
+			Handle m_handle;
+			T m_value{};
+		};
+
+		template<typename U> friend class Ref;
+
+	private:
+
 		//----------------------------------------------------------------------------------------------
 
 		/// @brief Base class for component maps.
@@ -286,7 +326,7 @@ namespace vecs {
 			}
 
 		private:
-			std::deque<T> m_data; //vector of component values
+			std::vector<T> m_data; //vector of component values
 		}; //end of ComponentMap
 
 		//----------------------------------------------------------------------------------------------
@@ -499,7 +539,8 @@ namespace vecs {
 			/// @brief Iterator constructor saving a list of archetypes and the current index.
 			/// @param arch List of archetypes. 
 			/// @param archidx First archetype index.
-			Iterator(std::vector<Archetype*>& arch, size_t archidx) : m_archidx{archidx}, m_archetypes{arch}  {
+			Iterator( Registry<RTYPE>& system, std::vector<Archetype*>& arch, size_t archidx) 
+				: m_system{system}, m_archetypes{arch}, m_archidx{archidx}  {
 				Lock();
 			}
 
@@ -522,7 +563,9 @@ namespace vecs {
 
 			/// @brief Access the content the iterator points to.
 			auto operator*() {
-				std::tuple<Ts...> tup = std::tie(m_archetypes[m_archidx]->template Map<Ts>()->Get(m_entidx)...);
+				assert( m_entidx < m_archetypes[m_archidx]->Maps().begin()->second->Size() );
+				Handle handle = m_archetypes[m_archidx]->template Map<Handle>()->Get(m_entidx);
+				auto tup = std::make_tuple(m_system.Get<Ts>(handle)...);
 	
 				if constexpr (sizeof...(Ts) == 1) {
 					return std::get<0>(tup);
@@ -554,10 +597,12 @@ namespace vecs {
 				}
 			}
 
+			Registry<RTYPE>& m_system;
+			std::vector<Archetype*>& m_archetypes;
 			size_t m_archidx{0};
 			size_t m_entidx{0};
-			std::vector<Archetype*>& m_archetypes;
 		}; //end of Iterator
+
 
 		//----------------------------------------------------------------------------------------------
 
@@ -580,17 +625,18 @@ namespace vecs {
 					};
 					if( (func.template operator()<Ts>() && ...) ) m_archetypes.push_back(it.second.get());
 				}
-				return Iterator<Ts...>{m_archetypes, 0};
+				return Iterator<Ts...>{m_system, m_archetypes, 0};
 			}
 
 			auto end() {
-				return Iterator<Ts...>{m_archetypes, m_archetypes.size()};
+				return Iterator<Ts...>{m_system, m_archetypes, m_archetypes.size()};
 			}
 
 		private:
 			Registry<RTYPE>& m_system;
 			std::vector<Archetype*> m_archetypes;
 		}; //end of View
+
 
 		//----------------------------------------------------------------------------------------------
 
@@ -658,28 +704,19 @@ namespace vecs {
 		/// @param handle The handle of the entity.	
 		/// @return The component value.
 		template<typename U>
-			requires (!std::is_same_v<U, Handle&>)
-		[[nodiscard]] auto Get(Handle handle) -> U {
+			requires (!std::is_same_v<U, Handle&> && std::is_reference_v<U>)
+		[[nodiscard]] auto Get(Handle handle) {
 			using T = std::decay_t<U>;
+			TryComponent<T>(handle);
+			return Ref<U>{*this, handle};
+		}
 
-			auto& value = m_entities[handle.m_index].m_value;
-			if(value.m_archetype_ptr->Has(Type<T>())) {
-				return value.m_archetype_ptr->template Get<T>(value.m_archIndex);
-			}
-			std::vector<size_t> types( value.m_archetype_ptr->Types().begin(), value.m_archetype_ptr->Types().end() );
-			types.push_back(Type<T>());
-
-			size_t hs = Hash(types);
-			if(!m_archetypes.contains(hs)) { //not found
-				m_archetypes[hs] = std::make_unique<Archetype>();
-				m_archetypes[hs]->template AddComponent<T>();
-			}
-			auto oldArchetype = value.m_archetype_ptr;
-			value.m_archetype_ptr = m_archetypes[hs].get();
-			types.pop_back();
-			value.m_archIndex = value.m_archetype_ptr->Move(types, value.m_archIndex, *oldArchetype, m_entities);
-			m_archetypes[hs]->template AddValue(value.m_archIndex, T{});
-			return value.m_archetype_ptr->template Get<T>(value.m_archIndex);
+		template<typename U>
+			requires (!std::is_same_v<U, Handle&> && !std::is_reference_v<U>)
+		[[nodiscard]] auto Get(Handle handle) {
+			using T = std::decay_t<U>;
+			TryComponent<T>(handle);
+			return Get2<T>(handle);
 		}
 
 		/// @brief Get component values of an entity.
@@ -688,9 +725,8 @@ namespace vecs {
 		/// @return A tuple of the component values.
 		template<typename... Ts>
 			requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value))
-		[[nodiscard]] auto Get(Handle handle) -> std::tuple<Ts...> {
-			auto& value = m_entities[handle.m_index].m_value;
-			return std::tuple<Ts...>(value.m_archetype_ptr->template Get<Ts>(value.m_archIndex)...); //defer locking to archetype!
+		[[nodiscard]] auto Get(Handle handle)  {
+			return std::make_tuple(Get<Ts>(handle)...); //defer locking to archetype!
 		}
 
 		/// @brief Put a new component value to an entity. If the entity does not have the component, it will be created.
@@ -703,7 +739,7 @@ namespace vecs {
 		void Put(Handle handle, U&& v) {
 			using T = std::decay_t<U>;
 			assert(Exists(handle));
-			Get<T&>(handle) = std::forward<T>(v);
+			Get2<T&>(handle) = std::forward<T>(v);
 		}
 
 		/// @brief Put new component values to an entity.
@@ -784,12 +820,52 @@ namespace vecs {
 
 	private:
 
+		template<typename U>
+			requires (!std::is_same_v<U, Handle&>)
+		[[nodiscard]] auto Get2(Handle handle) -> U {
+			using T = std::decay_t<U>;
+			TryComponent<T>(handle);
+			auto& value = m_entities[handle.m_index].m_value;
+			return value.m_archetype_ptr->template Get<T>(value.m_archIndex);
+		}
+
+
+		template<typename T>
+		void TryComponent(Handle handle) {
+
+			auto& value = m_entities[handle.m_index].m_value;
+			if(value.m_archetype_ptr->Has(Type<T>())) {
+				return;
+			}
+
+			std::vector<size_t> types( value.m_archetype_ptr->Types().begin(), value.m_archetype_ptr->Types().end() );
+			types.push_back(Type<T>());
+
+			size_t hs = Hash(types);
+			if(!m_archetypes.contains(hs)) { //not found
+				m_archetypes[hs] = std::make_unique<Archetype>();
+				m_archetypes[hs]->template AddComponent<T>();
+			}
+			auto oldArchetype = value.m_archetype_ptr;
+			value.m_archetype_ptr = m_archetypes[hs].get();
+			types.pop_back();
+			value.m_archIndex = value.m_archetype_ptr->Move(types, value.m_archIndex, *oldArchetype, m_entities);
+			m_archetypes[hs]->template AddValue(value.m_archIndex, T{});
+			return;
+		}
+
+
 		mutex_t m_mutex; //mutex for thread safety
 
 		SlotMap<ArchetypeAndIndex> m_entities;
 		std::unordered_map<size_t, std::unique_ptr<Archetype>> m_archetypes; //Mapping vector of type index to archetype
 	};
 
+
+	template<typename T>
+	inline std::ostream& operator<<(std::ostream& os, const Registry<RegistryType::SEQUENTIAL>::Ref<T>& ref) {
+    	return os <<  ref(); 
+	}
 	
 } //end of namespace vecs
 

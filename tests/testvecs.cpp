@@ -51,12 +51,14 @@ int main() {
     auto [v4a, v4b] = system.Get<float, double>(h2);
 
     system.Put(h2, 50, 69.0f, 73.0);
-    assert( system.Get<float>(h2) == 69.0f && system.Get<double>(h2) == 73.0 );
+	auto [v5a, v5b, v5c] = system.Get<int, float, double>(h2);
+    assert( v5b == 69.0f && v5c == 73.0 );
     std::tuple<float,double> tup = system.Get<float, double>(h2);
     std::get<float>(tup) = 101.0f;    
     std::get<double>(tup) = 102.0;    
     system.Put(h2, tup);
-    assert( system.Get<float>(h2) == 101.0f && system.Get<double>(h2) == 102.0 );
+	auto [v6a, v6b] = system.Get<float, double>(h2);
+    assert( v6a == 101.0f && v6b == 102.0 );
 
     auto tup2 = system.Get<int, float, double>(h2);
     int ii = std::get<int>(tup2);
@@ -74,13 +76,13 @@ int main() {
     assert( system.Exists(h2)); //check that the entity still exists
 	system.Put(h2, 3.9); //add a component of type double
     assert( system.Exists(h2)); //check that the entity still exists
-	double d = system.Get<double>(h2);
-	auto& cc = system.Get<char&>(h2); //
+	auto d = system.Get<double>(h2);
+	auto cc = system.Get<char&>(h2); //
 	cc = 'A';
 	auto dd = system.Get<char>(h2); //
 	std::string s = "AAA";
 	struct T1 {
-		char* m_str;
+		const char* m_str;
 	};
 
 	system.Put(h2, s, T1{"BBB"}); //
