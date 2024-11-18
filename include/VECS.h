@@ -702,7 +702,6 @@ namespace vecs {
 			requires (!std::is_same_v<U, Handle&> && !std::is_reference_v<U>)
 		[[nodiscard]] auto Get(Handle handle) {
 			using T = std::decay_t<U>;
-			TryComponent<T>(handle);
 			return Get2<T>(handle);
 		}
 
@@ -713,7 +712,7 @@ namespace vecs {
 		template<typename... Ts>
 			requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value))
 		[[nodiscard]] auto Get(Handle handle)  {
-			return std::make_tuple(Get<Ts>(handle)...); //defer locking to archetype!
+			return std::make_tuple(Get<Ts>(handle)...); //defer to Get<Ts>()
 		}
 
 		/// @brief Put a new component value to an entity. If the entity does not have the component, it will be created.
