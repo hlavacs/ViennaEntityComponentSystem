@@ -402,6 +402,7 @@ namespace vecs {
 					m_maps[ti]->Move(other.Map(ti), other_index); //insert the new value
 				}
 				other.Erase(other_index, slotmap); //erase from old component map
+				++m_changeCounter;
 				return m_maps[Type<Handle>()]->Size() - 1; //return the index of the new entity
 			}
 
@@ -505,19 +506,21 @@ namespace vecs {
 		//----------------------------------------------------------------------------------------------
 
 		template<typename U>
+			requires (!std::is_reference_v<U>)
 		class Ref {
 
 			using T = std::decay_t<U>;
 
 		public:
-			Ref(Registry<RTYPE>& system, Handle handle, Archetype &arch, T& valueRef) 
-				: m_system{system}, m_handle{handle}, m_archetype{arch}, m_valueRef{valueRef}, m_changeCounter{arch.getChangeCounter()} {}
+			Ref(Registry<RTYPE>& system, Handle handle, Archetype *arch, T& valueRef) 
+				: m_system{system}, m_handle{handle}, m_archetype{arch}, m_valueRef{valueRef}, m_changeCounter{arch->getChangeCounter()} {}
 
 			auto operator()() -> T {
-				size_t changeCounter = m_archetype.getChangeCounter();
-				if(changeCounter != m_changeCounter ) {
-					m_valueRef = m_system.Get2<T>(m_handle);
-					m_changeCounter = changeCounter;
+				if(m_archetype->getChangeCounter() != m_changeCounter ) {
+					auto [arch, ref] = m_system.TryComponent<T>(m_handle);
+					m_archetype = arch;
+					m_valueRef = ref;
+					m_changeCounter = arch->getChangeCounter();
 				}
 				return m_valueRef;
 			}
@@ -529,7 +532,7 @@ namespace vecs {
 		private:
 			Registry<RTYPE>& m_system;
 			Handle m_handle;
-			Archetype& m_archetype;
+			Archetype* m_archetype;
 			T& m_valueRef;
 			size_t m_changeCounter;
 		};
@@ -716,7 +719,7 @@ namespace vecs {
 		[[nodiscard]] auto Get(Handle handle) {
 			using T = std::decay_t<U>;
 			auto [arch, ref] = TryComponent<T>(handle);
-			return Ref<U>{*this, handle, arch, ref};
+			return Ref<T>{*this, handle, arch, ref};
 		}
 
 		template<typename U>
@@ -836,12 +839,13 @@ namespace vecs {
 		}
 
 
-		template<typename T>
-		auto TryComponent(Handle handle) -> std::pair<Archetype&, T&> {	
+		template<typename U>
+		auto TryComponent(Handle handle) -> std::pair<Archetype*, std::decay_t<U>&> {
+			using T = std::decay_t<U>;
 
 			auto& value = m_entities[handle.m_index].m_value;
 			if(value.m_archetype_ptr->Has(Type<T>())) {
-				return std::pair<Archetype&, T&>{*value.m_archetype_ptr, value.m_archetype_ptr->template Get<T>(value.m_archIndex)};
+				return std::pair<Archetype*, T&>{value.m_archetype_ptr, value.m_archetype_ptr->template Get<T>(value.m_archIndex)};
 			}
 
 			std::vector<size_t> types( value.m_archetype_ptr->Types().begin(), value.m_archetype_ptr->Types().end() );
@@ -857,7 +861,7 @@ namespace vecs {
 			types.pop_back();
 			value.m_archIndex = value.m_archetype_ptr->Move(types, value.m_archIndex, *oldArchetype, m_entities);
 			m_archetypes[hs]->template AddValue(value.m_archIndex, T{});
-			return std::pair<Archetype&, T&>{*value.m_archetype_ptr, value.m_archetype_ptr->template Get<T>(value.m_archIndex)};
+			return std::pair<Archetype*, T&>{value.m_archetype_ptr, value.m_archetype_ptr->template Get<T>(value.m_archIndex)};
 		}
 
 
