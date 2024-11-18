@@ -18,8 +18,6 @@ if (MSVC)
   add_compile_options(/EHsc)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
   add_compile_options(-stdlib=libc++)
-  add_compile_options(-pthread)
-  add_compile_options(-fcoroutines-ts)
 elseif(CMAKE_COMPILER_IS_GNUCXX)
 endif()
 

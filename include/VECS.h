@@ -166,6 +166,8 @@ namespace vecs {
 	class View;
 
 	
+	template<typename U> class Ref;
+
 	/// @brief A registry for entities and components.
 	template <RegistryType RTYPE = RegistryType::SEQUENTIAL>
 	class Registry {
@@ -175,27 +177,6 @@ namespace vecs {
 	public:
 	
 		//----------------------------------------------------------------------------------------------
-
-		template<typename U>
-		class Ref {
-
-			using T = std::decay_t<U>;
-
-		public:
-			Ref(Registry<RTYPE>& system, Handle handle) : m_system{system}, m_handle{handle} {}
-
-			auto operator()() const -> T {
-				return m_system.Get2<T>(m_handle);
-			}
-
-			void operator=(auto&& value) {
-				m_system.Put(m_handle, std::forward<T>(value));
-			}
-
-		private:
-			Registry<RTYPE>& m_system;
-			Handle m_handle;
-		};
 
 		template<typename U> friend class Ref;
 
@@ -362,6 +343,7 @@ namespace vecs {
 				size_t index;
 				(AddValue( index, std::forward<Ts>(values) ), ...); //insert all components, get index of the handle
 				AddValue( index, handle ); //insert the handle
+				++m_changeCounter;
 				return index;
 			}
 
@@ -409,6 +391,7 @@ namespace vecs {
 					auto& lastHandle = static_cast<ComponentMap<Handle>*>(m_maps[Type<Handle>()].get())->Get(index);
 					slotmap[lastHandle.m_index].m_value.m_archIndex = index;
 				}
+				++m_changeCounter;
 			}
 
 			/// @brief Move components from another archetype to this one.
@@ -452,6 +435,7 @@ namespace vecs {
 				for( auto& map : m_maps ) {
 					map.second->Clear();
 				}
+				++m_changeCounter;
 			}
 
 			/// @brief Get the types of the components.
@@ -503,16 +487,53 @@ namespace vecs {
 				index = m_maps[Type<T>()]->Insert(std::forward<T>(v));	//insert the component value
 			};
 
+			size_t getChangeCounter() {
+				return m_changeCounter;
+			}
+
 		private:
 
 			mutex_t m_mutex; //mutex for thread safety
+			size_t m_changeCounter{0}; //changes invalidate references
 
 			std::set<size_t> m_types; //types of components
 			std::unordered_map<size_t, std::unique_ptr<ComponentMapBase>> m_maps; //map from type index to component data
 		}; //end of Archetype
 
-
 	public:
+
+		//----------------------------------------------------------------------------------------------
+
+		template<typename U>
+		class Ref {
+
+			using T = std::decay_t<U>;
+
+		public:
+			Ref(Registry<RTYPE>& system, Handle handle, Archetype &arch, T& valueRef) 
+				: m_system{system}, m_handle{handle}, m_archetype{arch}, m_valueRef{valueRef}, m_changeCounter{arch.getChangeCounter()} {}
+
+			auto operator()() -> T {
+				size_t changeCounter = m_archetype.getChangeCounter();
+				if(changeCounter != m_changeCounter ) {
+					m_valueRef = m_system.Get2<T>(m_handle);
+					m_changeCounter = changeCounter;
+				}
+				return m_valueRef;
+			}
+
+			void operator=(auto&& value) {
+				m_system.Put(m_handle, std::forward<T>(value));
+			}
+
+		private:
+			Registry<RTYPE>& m_system;
+			Handle m_handle;
+			Archetype& m_archetype;
+			T& m_valueRef;
+			size_t m_changeCounter;
+		};
+
 
 		//----------------------------------------------------------------------------------------------
 
@@ -694,8 +715,8 @@ namespace vecs {
 			requires (!std::is_same_v<U, Handle&> && std::is_reference_v<U>)
 		[[nodiscard]] auto Get(Handle handle) {
 			using T = std::decay_t<U>;
-			TryComponent<T>(handle);
-			return Ref<U>{*this, handle};
+			auto [arch, ref] = TryComponent<T>(handle);
+			return Ref<U>{*this, handle, arch, ref};
 		}
 
 		template<typename U>
@@ -810,18 +831,17 @@ namespace vecs {
 			requires (!std::is_same_v<U, Handle&>)
 		[[nodiscard]] auto Get2(Handle handle) -> U {
 			using T = std::decay_t<U>;
-			TryComponent<T>(handle);
-			auto& value = m_entities[handle.m_index].m_value;
-			return value.m_archetype_ptr->template Get<T>(value.m_archIndex);
+			auto [arch, ref] = TryComponent<T>(handle);
+			return ref;
 		}
 
 
 		template<typename T>
-		void TryComponent(Handle handle) {
+		auto TryComponent(Handle handle) -> std::pair<Archetype&, T&> {	
 
 			auto& value = m_entities[handle.m_index].m_value;
 			if(value.m_archetype_ptr->Has(Type<T>())) {
-				return;
+				return std::pair<Archetype&, T&>{*value.m_archetype_ptr, value.m_archetype_ptr->template Get<T>(value.m_archIndex)};
 			}
 
 			std::vector<size_t> types( value.m_archetype_ptr->Types().begin(), value.m_archetype_ptr->Types().end() );
@@ -837,7 +857,7 @@ namespace vecs {
 			types.pop_back();
 			value.m_archIndex = value.m_archetype_ptr->Move(types, value.m_archIndex, *oldArchetype, m_entities);
 			m_archetypes[hs]->template AddValue(value.m_archIndex, T{});
-			return;
+			return std::pair<Archetype&, T&>{*value.m_archetype_ptr, value.m_archetype_ptr->template Get<T>(value.m_archIndex)};
 		}
 
 
@@ -849,7 +869,7 @@ namespace vecs {
 
 
 	template<typename T>
-	inline std::ostream& operator<<(std::ostream& os, const Registry<RegistryType::SEQUENTIAL>::Ref<T>& ref) {
+	inline std::ostream& operator<<(std::ostream& os, Registry<RegistryType::SEQUENTIAL>::Ref<T>& ref) {
     	return os <<  ref(); 
 	}
 	
