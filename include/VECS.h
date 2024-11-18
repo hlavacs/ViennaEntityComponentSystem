@@ -182,32 +182,19 @@ namespace vecs {
 			using T = std::decay_t<U>;
 
 		public:
-			Ref(Registry<RTYPE>& system, Handle handle) : m_system{system}, m_handle{handle} {
-				if constexpr (!std::is_reference_v<U>) {
-					m_value = m_system.Get2<T>(m_handle);
-				}
-			}
+			Ref(Registry<RTYPE>& system, Handle handle) : m_system{system}, m_handle{handle} {}
 
 			auto operator()() const -> T {
-				if constexpr (std::is_reference_v<U>) {
-					return m_system.Get2<T>(m_handle);
-				} else {
-					return m_value;
-				}
+				return m_system.Get2<T>(m_handle);
 			}
 
 			void operator=(auto&& value) {
-				if constexpr (std::is_reference_v<U>) {
-					m_system.Put(m_handle, std::forward<T>(value));
-				} else {
-					m_value = std::forward<T>(value);
-				}
+				m_system.Put(m_handle, std::forward<T>(value));
 			}
 
 		private:
 			Registry<RTYPE>& m_system;
 			Handle m_handle;
-			T m_value{};
 		};
 
 		template<typename U> friend class Ref;
