@@ -516,6 +516,15 @@ namespace vecs {
 				: m_system{system}, m_handle{handle}, m_archetype{arch}, m_valueRef{valueRef}, m_changeCounter{arch->getChangeCounter()} {}
 
 			auto operator()() -> T {
+				return CheckChangeCounter();
+			}
+
+			void operator=(T&& value) {
+				CheckChangeCounter() = std::forward<T>(value);
+			}
+
+		private:
+			T& CheckChangeCounter() {
 				if(m_archetype->getChangeCounter() != m_changeCounter ) {
 					auto [arch, ref] = m_system.TryComponent<T>(m_handle);
 					m_archetype = arch;
@@ -525,11 +534,6 @@ namespace vecs {
 				return m_valueRef;
 			}
 
-			void operator=(auto&& value) {
-				m_system.Put(m_handle, std::forward<T>(value));
-			}
-
-		private:
 			Registry<RTYPE>& m_system;
 			Handle m_handle;
 			Archetype* m_archetype;
