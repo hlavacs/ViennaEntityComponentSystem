@@ -26,7 +26,7 @@ int main() {
 		assert( sm[i3].m_value == 3 );
 	}
 
-    vecs::Registry<vecs::RegistryType::SEQUENTIAL> system;
+    vecs::Registry<vecs::REGISTRYTYPE_SEQUENTIAL> system;
 
     vecs::Handle h1 = system.Insert(5, 5.5f);
     assert( system.Exists(h1) );

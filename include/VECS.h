@@ -43,28 +43,30 @@ namespace vecs {
 		return seed;
 	} 
 
+	using mutex_t = std::shared_mutex;
+
 
 	//----------------------------------------------------------------------------------------------
 	//Slot Maps
 
-	enum class SlotMapType : int {
-		SEQUENTIAL = 0,
-		PARALLEL
-	};	
+	using SlotMapType = int;
+	const int SLOTMAPTYPE_SEQUENTIAL = 0;
+	const int SLOTMAPTYPE_PARALLEL = 1;
 
-	template<typename T, uint32_t SIZE = 1014, SlotMapType = SlotMapType::SEQUENTIAL>
+	template<typename T, size_t SIZE = 1024, SlotMapType STYPE = SLOTMAPTYPE_SEQUENTIAL>
 	class SlotMap {
 
+		using next_t = std::conditional_t<STYPE==SLOTMAPTYPE_PARALLEL, std::atomic<int64_t>, int64_t>;
+		using vers_t = std::conditional_t<STYPE==SLOTMAPTYPE_PARALLEL, std::atomic<size_t>, size_t>;
+
 		struct Slot {
-			int64_t m_nextFree{-1}; //index of the next free slot
-			size_t 	m_version{0};	//version of the slot
-			T 		m_value{};		//value of the slot
+			next_t m_nextFree{-1}; //index of the next free slot
+			vers_t m_version{0};	//version of the slot
+			T 	   m_value{};		//value of the slot
 		};
 
 	public:
 		SlotMap() {
-			if( SIZE == 0 ) return;
-			m_slots.reserve(SIZE);
 			m_firstFree = 0;
 			for( int64_t i = 1; i <= SIZE-1; ++i ) {
 				m_slots.emplace_back( i, 0uL, T{} );
@@ -75,7 +77,7 @@ namespace vecs {
 		~SlotMap() = default;
 
 		auto Insert(T&& value) -> std::pair<size_t,Slot&> {
-			size_t index;		
+			size_t index;
 			if( m_firstFree != -1 ) {
 				index = m_firstFree;
 				auto& slot = m_slots[m_firstFree];
@@ -90,17 +92,20 @@ namespace vecs {
 		}
 
 		void Erase(size_t index) {
+			if constexpr (STYPE == SLOTMAPTYPE_PARALLEL) { m_mutex.lock_shared(); }
 			assert(index < m_slots.size());
 			auto& slot = m_slots[index];
 			++slot.m_version;	//increment the version to invalidate the slot
 			slot.m_nextFree = m_firstFree;
 			m_firstFree = index;
 			--m_size;
+			if constexpr (STYPE == SLOTMAPTYPE_PARALLEL) { m_mutex.unlock_shared(); }
 		}
 
 		auto operator[](size_t index) -> Slot& {
 			assert(index < m_slots.size());
-			return m_slots[index];
+			auto& value = m_slots[index];
+			return value;
 		}
 
 		auto Size() -> size_t {
@@ -120,19 +125,18 @@ namespace vecs {
 		}
 
 	private:
+		mutex_t m_mutex;
 		size_t m_size{0};
-		std::vector<Slot> m_slots;
-		int64_t m_firstFree{-1};
+		std::deque<Slot> m_slots;
+		next_t m_firstFree{-1};
 	};
-
 
 
 	//----------------------------------------------------------------------------------------------
 
-	enum class RegistryType : int {
-		SEQUENTIAL = 0,
-		PARALLEL
-	};	
+	using RegistryType = int;
+	const int REGISTRYTYPE_SEQUENTIAL = 0;
+	const int REGISTRYTYPE_PARALLEL = 1;
 
 	struct Handle {
 		uint32_t m_index;
@@ -169,10 +173,8 @@ namespace vecs {
 	template<typename U> class Ref;
 
 	/// @brief A registry for entities and components.
-	template <RegistryType RTYPE = RegistryType::SEQUENTIAL>
+	template <RegistryType RTYPE = REGISTRYTYPE_SEQUENTIAL>
 	class Registry {
-
-		using mutex_t = std::conditional_t<RTYPE == RegistryType::SEQUENTIAL, int32_t, std::shared_mutex>;
 
 	public:
 	
@@ -206,14 +208,6 @@ namespace vecs {
 			virtual auto Clone() -> std::unique_ptr<ComponentMapBase> = 0;
 			virtual void Clear() = 0;
 			virtual void print() = 0;
-
-			void Lock() { if constexpr (RTYPE == RegistryType::PARALLEL) m_mutex.lock(); }
-			void Unlock() { if constexpr (RTYPE == RegistryType::PARALLEL) m_mutex.unlock(); }
-			void LockShared() { if constexpr (RTYPE == RegistryType::PARALLEL) m_mutex.lock_shared(); }
-			void UnlockShared() { if constexpr (RTYPE == RegistryType::PARALLEL) m_mutex.unlock_shared(); }
-
-		private:
-			mutex_t m_mutex; //mutex for thread safety
 		}; //end of ComponentMapBase
 
 		//----------------------------------------------------------------------------------------------
@@ -299,6 +293,7 @@ namespace vecs {
 
 		//----------------------------------------------------------------------------------------------
 
+
 		/// @brief An archetype of entities with the same components. 
 		/// All entities that have the same components are stored in the same archetype.
 		class Archetype;
@@ -312,6 +307,19 @@ namespace vecs {
 		/// @brief An archetype of entities with the same components. 
 		/// All entities that have the same components are stored in the same archetype.
 		class Archetype {
+
+		struct ArchetypeLockGuard {
+			ArchetypeLockGuard(Archetype &arch) : m_archetype{arch} { m_archetype.Lock(); }
+			~ArchetypeLockGuard() { m_archetype.Unlock(); }
+			Archetype& m_archetype;
+		};
+
+		struct ArchetypeLockGuardShared {
+			ArchetypeLockGuardShared(Archetype &arch) : m_archetype{arch} { m_archetype.LockShared(); }
+			~ArchetypeLockGuardShared() { m_archetype.UnlockShared(); }
+			Archetype& m_archetype;
+		};
+
 
 		public:
 
@@ -365,7 +373,7 @@ namespace vecs {
 			/// @param archIndex The index of the entity in the archetype.
 			/// @return The component value.
 			template<typename T>
-			[[nodiscard]] auto Get(size_t archIndex) -> T& {			
+			[[nodiscard]] auto Get(size_t archIndex) -> T& {
 				return Map<T>()->Get(archIndex);
 			}
 
@@ -450,7 +458,7 @@ namespace vecs {
 			}
 
 			void print() {
-				std::cout << "Hash: " << std::hash<std::set<size_t>&>{}(m_types) << std::endl;
+				std::cout << "Hash: " << Hash(m_types) << std::endl;
 				for( auto ti : m_types ) {
 					std::cout << "Type: " << ti << " ";
 				}
@@ -463,10 +471,35 @@ namespace vecs {
 				std::cout << std::endl;
 			}
 
-			void Lock() { m_mutex.lock(); }
-			void Unlock() { m_mutex.unlock(); }
-			void LockShared() { m_mutex.lock_shared(); }
-			void UnlockShared() { m_mutex.unlock_shared(); }
+			void Lock() {
+				if constexpr (RTYPE == REGISTRYTYPE_PARALLEL) {
+					if( m_locked ) return;
+					m_mutex.lock();
+				}
+			}
+
+			void Unlock() { 
+				if constexpr (RTYPE == REGISTRYTYPE_PARALLEL) {
+					if( !m_locked ) return;
+					m_locked = false;
+					m_mutex.unlock(); 
+				}
+			}
+
+			void LockShared() { 
+				if constexpr (RTYPE == REGISTRYTYPE_PARALLEL) {
+					m_mutex.lock_shared(); 
+					m_locked = true;
+				}
+			}
+
+			void UnlockShared() { 
+				if constexpr (RTYPE == REGISTRYTYPE_PARALLEL) {
+					if( !m_locked ) return;
+					m_locked = false;
+					m_mutex.unlock_shared(); 
+				}
+			}
 
 
 			/// @brief Add a new component to the archetype.
@@ -494,6 +527,7 @@ namespace vecs {
 
 		private:
 
+			inline static thread_local bool m_locked{false};
 			mutex_t m_mutex; //mutex for thread safety
 			size_t m_changeCounter{0}; //changes invalidate references
 
@@ -556,29 +590,29 @@ namespace vecs {
 			/// @param archidx First archetype index.
 			Iterator( Registry<RTYPE>& system, std::vector<Archetype*>& arch, size_t archidx) 
 				: m_system{system}, m_archetypes{arch}, m_archidx{archidx}  {
-				Lock();
+				LockShared();
 			}
 
 			~Iterator() {
-				Unlock();
+				UnlockShared();
 			}
 
 			/// @brief Prefix increment operator.
 			auto operator++() {
-				if( ++m_entidx >= m_archetypes[m_archidx]->Maps().begin()->second->Size() ) {
-					Unlock();
+				if( ++m_entidx >= m_archetypes[m_archidx]->Size() ) {
+					UnlockShared();
 					do {
 						++m_archidx;
 						m_entidx = 0;
 					} while( m_archidx < m_archetypes.size() && m_archetypes[m_archidx]->Maps().begin()->second->Size() == 0 );
 				}
-				Lock();
+				LockShared();
 				return *this;
 			}
 
 			/// @brief Access the content the iterator points to.
 			auto operator*() {
-				assert( m_entidx < m_archetypes[m_archidx]->Maps().begin()->second->Size() );
+				assert( m_entidx < m_archetypes[m_archidx]->Size() );
 				Handle handle = m_archetypes[m_archidx]->template Map<Handle>()->Get(m_entidx);
 				auto tup = std::make_tuple(m_system.Get<Ts>(handle)...);
 	
@@ -594,22 +628,14 @@ namespace vecs {
 			}
 
 		private:
-			bool m_locked{false};
-
-			void Lock() {
+			void LockShared() {
 				if( m_archidx >= m_archetypes.size() ) return;
-				if constexpr (RTYPE == RegistryType::PARALLEL) {
-					//(m_archetypes[m_archidx]->Map(Type<Ts>())->Lock(), ...);
-					m_locked = true;
-				}
+				m_archetypes[m_archidx]->LockShared();
 			}
 
-			void Unlock() {
-				if( !m_locked ) return;
-				if constexpr (RTYPE == RegistryType::PARALLEL) {
-					//(m_archetypes[m_archidx]->Map(Type<Ts>())->Unlock(), ...);
-					m_locked = false;
-				}
+			void UnlockShared() {
+				if( m_archidx >= m_archetypes.size() ) return;
+				m_archetypes[m_archidx]->UnlockShared();
 			}
 
 			Registry<RTYPE>& m_system;
@@ -877,7 +903,7 @@ namespace vecs {
 
 
 	template<typename T>
-	inline std::ostream& operator<<(std::ostream& os, Registry<RegistryType::SEQUENTIAL>::Ref<T>& ref) {
+	inline std::ostream& operator<<(std::ostream& os, Registry<REGISTRYTYPE_SEQUENTIAL>::Ref<T>& ref) {
     	return os <<  ref(); 
 	}
 	
