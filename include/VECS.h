@@ -310,11 +310,11 @@ namespace vecs {
 
 			struct ArchetypeLockGuard {
 				ArchetypeLockGuard(mutex_t &arch) : m_archetype{arch}, m_other{nullptr} { 
-					//if constexpr (RTYPE == REGISTRYTYPE_SEQUENTIAL) return;
+					if constexpr (RTYPE == REGISTRYTYPE_SEQUENTIAL) return;
 					m_archetype.lock(); 
 				}
 				ArchetypeLockGuard(mutex_t &arch, mutex_t* other) : m_archetype{arch}, m_other{other} { 
-					//if constexpr (RTYPE == REGISTRYTYPE_SEQUENTIAL) return;
+					if constexpr (RTYPE == REGISTRYTYPE_SEQUENTIAL) return;
 					if( &m_archetype < m_other ) { 
 						m_archetype.lock();
 						m_other->lock(); 
@@ -324,7 +324,7 @@ namespace vecs {
 					}
 				}
 				~ArchetypeLockGuard() { 
-					//if constexpr (RTYPE == REGISTRYTYPE_SEQUENTIAL) return;
+					if constexpr (RTYPE == REGISTRYTYPE_SEQUENTIAL) return;
 					if(m_other) { 
 						if( &m_archetype < m_other ) { 
 							m_other->unlock(); 
@@ -343,11 +343,11 @@ namespace vecs {
 
 			struct ArchetypeLockGuardShared {
 				ArchetypeLockGuardShared(mutex_t &arch) : m_archetype{arch}, m_other{nullptr} { 
-					//if constexpr (RTYPE == REGISTRYTYPE_SEQUENTIAL) return;
+					if constexpr (RTYPE == REGISTRYTYPE_SEQUENTIAL) return;
 					m_archetype.lock_shared(); 
 				}
 				ArchetypeLockGuardShared(mutex_t &arch, mutex_t* other) : m_archetype{arch}, m_other{other} { 
-					//if constexpr (RTYPE == REGISTRYTYPE_SEQUENTIAL) return;
+					if constexpr (RTYPE == REGISTRYTYPE_SEQUENTIAL) return;
 					if( &m_archetype < m_other ) { 
 						m_archetype.lock_shared();
 						m_other->lock_shared(); 
@@ -357,7 +357,7 @@ namespace vecs {
 					}
 				}
 				~ArchetypeLockGuardShared() { 
-					//if constexpr (RTYPE == REGISTRYTYPE_SEQUENTIAL) return;
+					if constexpr (RTYPE == REGISTRYTYPE_SEQUENTIAL) return;
 					if(m_other) { 
 						if( &m_archetype < m_other ) { 
 							m_other->unlock_shared(); 
