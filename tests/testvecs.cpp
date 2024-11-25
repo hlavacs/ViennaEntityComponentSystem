@@ -19,8 +19,8 @@ int main() {
 		assert( sm[i2].m_value == 2 );
 		assert( sm[i3].m_value == 3 );
 
-		sm.Erase(1);
-		sm.Erase(2);
+		sm.Erase(1,0);
+		sm.Erase(2,0);
 
 		assert( sm.Size() == 1 );
 		assert( sm[i3].m_value == 3 );

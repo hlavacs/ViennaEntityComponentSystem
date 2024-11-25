@@ -27,14 +27,35 @@ using namespace std::chrono_literals;
 
 namespace vecs {
 
+	template<typename T>
+	struct dummy_atomic {
+		T m_value;
+		auto load() -> T { return m_value; }
+		void store(T v) { m_value = v; }
+		bool compare_exchange_weak(T& expected, T desired) {
+			if( m_value == expected ) {
+				m_value = desired;
+				return true;
+			}
+			return false;
+		}
+		T operator++() { return m_value++; }
+		T operator++(int) { return ++m_value; }
+		T operator--() { return m_value--; }
+		T operator--(int) { return --m_value; }
+	};
 
 	template <typename> struct is_tuple : std::false_type {};
 	template <typename ...Ts> struct is_tuple<std::tuple<Ts...>> : std::true_type {};
 
+	/// @brief Compute the hash of a list of hashes. If stored in a vector, make sure that hashes are sorted.
+	/// @tparam T Container type of the hashes.
+	/// @param hashes Reference to the container of the hashes.
+	/// @return Overall hash made from the hashes.
 	template <typename T>
 	inline size_t Hash( const T& hashes ) {
 		std::size_t seed = 0;
-		if constexpr (std::is_same_v<T, const std::vector<size_t>&>) 
+		if constexpr (std::is_same_v<T, const std::vector<size_t>&> ) 
 			std::sort(hashes.begin(), hashes.end());
 		for( auto& v : hashes ) {
 			seed ^= v + 0x9e3779b9 + (seed<<6) + (seed>>2);
@@ -42,65 +63,84 @@ namespace vecs {
 		return seed;
 	} 
 
-	using mutex_t = std::shared_mutex;
+	using mutex_t = std::shared_mutex; ///< Shared mutex type.
 
 
 	//----------------------------------------------------------------------------------------------
 
-	using LockGuardType = int;
+	using LockGuardType = int; ///< Type of the lock guard.
 	const int LOCKGUARDTYPE_SEQUENTIAL = 0;
 	const int LOCKGUARDTYPE_PARALLEL = 1;
 
+	/// @brief A lock guard for a mutex. A LockGuard is used to lock and unlock a mutex in a RAII manner.
+	/// In some instances, when the mutex is in read lock, and the same thread wants to create a new entity,
+	/// the mutex must be unlocked and locked again. This is done by the LockGuard with two mutexes.
+	/// @tparam LTYPE Type of the lock guard.
 	template<int LTYPE = LOCKGUARDTYPE_SEQUENTIAL>
 	struct LockGuard {
-		LockGuard(mutex_t* mutex, mutex_t* sharedMutex) 
-			: m_mutex{mutex}, m_sharedMutex{sharedMutex}, m_other{nullptr}, m_sharedOther{nullptr} { 
 
+		/// @brief Constructor for a single mutex.
+		/// @param mutex Pointer to the Archetype mutex.
+		/// @param sharedMutex In case the thread has already locked the mutex in shared mode, this is the pointer to the shared mutex.
+		/// If the pointers are the same, the thread already holds a read lock.
+		LockGuard(mutex_t* mutex, mutex_t* sharedMutex=nullptr) 
+			: m_mutex{mutex}, m_sharedMutex{sharedMutex}, m_other{nullptr}, m_sharedOther{nullptr} { 
 			if constexpr (LTYPE == LOCKGUARDTYPE_SEQUENTIAL) return;
 			if( mutex == m_sharedMutex ) { m_mutex->unlock_shared(); }
 			m_mutex->lock(); 
 		}
 
+		/// @brief Constructor for two mutexes. This is necessary if an entity must be moved from one archetype to another, because
+		/// the entity components change.
+		/// @param mutex Pointer to the Archetype mutex.
+		/// @param sharedMutex In case the thread has already locked the mutex in shared mode, this is the pointer to the shared mutex.
+		/// If the pointers are the same, the thread already holds a read lock.
+		/// @param other Pointer to the other Archetype mutex.
 		LockGuard(mutex_t* mutex, mutex_t* sharedMutex, mutex_t* other, mutex_t* sharedOther) 
 			: m_mutex{mutex}, m_sharedMutex{sharedMutex}, m_other{other}, m_sharedOther{sharedOther} { 
-
 			if constexpr (LTYPE == LOCKGUARDTYPE_SEQUENTIAL) return;
-			if( m_mutex == m_sharedMutex ) { m_mutex->unlock_shared(); }
+			if( m_mutex == m_sharedMutex ) { m_mutex->unlock_shared(); } //check if the mutex is already locked
 			if( m_other == m_sharedOther ) { m_other->unlock_shared(); }
-			std::min(m_mutex, m_other)->lock();
+			std::min(m_mutex, m_other)->lock();	///lock the mutexes in the correct order
 			std::max(m_mutex, m_other)->lock();
 		}
 
+		/// @brief Destructor, unlocks the mutexes.
 		~LockGuard() { 
 			if constexpr (LTYPE == LOCKGUARDTYPE_SEQUENTIAL) return;
 			if(m_other) { 
 				m_other->unlock();
-				if( m_other == m_sharedOther ) { m_other->lock_shared(); }
+				if( m_other == m_sharedOther ) { m_other->lock_shared(); } //get the shared lock back
 			}
 			m_mutex->unlock();
-			if( m_mutex == m_sharedMutex ) { m_mutex->lock_shared(); }
+			if( m_mutex == m_sharedMutex ) { m_mutex->lock_shared(); } //get the shared lock back
 		}
 
-		mutex_t* m_mutex;
-		mutex_t* m_sharedMutex;
+		mutex_t* m_mutex{nullptr};
+		mutex_t* m_sharedMutex{nullptr};
 		mutex_t* m_other{nullptr};
-		mutex_t* m_sharedOther;
+		mutex_t* m_sharedOther{nullptr};
 	};
 
+	/// @brief A lock guard for a shared mutex in RAII manner.
+	/// @tparam LTYPE Type of the lock guard.
 	template<int LTYPE = LOCKGUARDTYPE_SEQUENTIAL>
 	struct LockGuardShared {
+
+		/// @brief Constructor for a single mutex. Acquire only if the thread has not already locked the mutex in shared mode.
 		LockGuardShared(mutex_t* mutex, mutex_t* sharedMutex=nullptr) : m_mutex{mutex}, m_sharedMutex{sharedMutex} { 
 			if constexpr (LTYPE == LOCKGUARDTYPE_SEQUENTIAL) return;
 			if( mutex != m_sharedMutex ) m_mutex->lock_shared();
 		}
 
+		/// @brief Destructor, unlocks the mutex.
 		~LockGuardShared() { 
 			if constexpr (LTYPE == LOCKGUARDTYPE_SEQUENTIAL) return;
 			if( m_mutex != m_sharedMutex ) m_mutex->unlock_shared();
 		}
 
-		mutex_t* m_mutex;
-		mutex_t* m_sharedMutex;
+		mutex_t* m_mutex{nullptr};		 ///< Pointer to the mutex.
+		mutex_t* m_sharedMutex{nullptr}; ///< Pointer to the shared mutex.
 	};
 
 
@@ -112,82 +152,106 @@ namespace vecs {
 	const int SLOTMAPTYPE_SEQUENTIAL = 0;
 	const int SLOTMAPTYPE_PARALLEL = 1;
 
+	/// @brief A slot map for storing a map from handle to archetpe and index.
+	/// @tparam T The value type of the slot map.
+	/// @tparam SIZE The minimum size of the slot map.
+	/// @tparam STYPE The type of the slot map.
 	template<typename T, size_t SIZE = 1024, SlotMapType STYPE = SLOTMAPTYPE_SEQUENTIAL>
 	class SlotMap {
 
-		using next_t = std::conditional_t<STYPE==SLOTMAPTYPE_PARALLEL, std::atomic<int64_t>, int64_t>;
-		using vers_t = std::conditional_t<STYPE==SLOTMAPTYPE_PARALLEL, std::atomic<size_t>, size_t>;
+		/// @brief Need atomics only for the parallel case
+		using next_t = std::conditional_t<STYPE==SLOTMAPTYPE_PARALLEL, std::atomic<int64_t>, dummy_atomic<int64_t>>;
+		using vers_t = std::conditional_t<STYPE==SLOTMAPTYPE_PARALLEL, std::atomic<size_t>,  dummy_atomic<size_t>>;
 
+		/// @brief A slot in the slot map.
 		struct Slot {
-			next_t m_nextFree{-1}; //index of the next free slot
+			next_t m_nextFree{-1}; 	//index of the next free slot
 			vers_t m_version{0};	//version of the slot
 			T 	   m_value{};		//value of the slot
 		};
 
 	public:
+
+		/// @brief Constructor, creates the slot map.
 		SlotMap() {
-			m_firstFree = 0;
-			for( int64_t i = 1; i <= SIZE-1; ++i ) {
-				m_slots.emplace_back( i, 0uL, T{} );
+			m_firstFree.store(0);
+			for( int64_t i = 1; i <= SIZE-1; ++i ) { //create the free list
+				m_slots.emplace_back( next_t{i}, vers_t{0uL}, T{} );
 			}
-			m_slots.emplace_back( -1, 0, T{} );
+			m_slots.emplace_back( next_t{-1}, vers_t{0}, T{} ); //last slot
 		}
 		
-		~SlotMap() = default;
+		~SlotMap() = default; ///< Destructor.
 
-		auto Insert(T&& value) -> std::pair<size_t,Slot&> {
-			size_t index;
-			if( m_firstFree != -1 ) {
-				index = m_firstFree;
-				auto& slot = m_slots[m_firstFree];
-				m_firstFree = slot.m_nextFree;
-				slot.m_value = std::forward<T>(value);
-			} else {
-				m_slots.emplace_back( 0, 0, std::forward<T>(value) );
-				index = m_slots.size() - 1;
+		/// @brief Insert a new value to the slot map.
+		/// @param value The value to insert.
+		/// @return A pair of the index and reference to the slot.
+		auto Insert(T&& value) -> std::pair<size_t, Slot&> {
+			{
+				LockGuardShared<STYPE> lock(&m_mutex); //there might be a deallocation in progress
+				int64_t firstFree = m_firstFree.load();
+				if( firstFree > -1 && m_firstFree.compare_exchange_weak(firstFree, m_slots[firstFree].m_nextFree.load()) ) {
+					auto& slot = m_slots[firstFree];
+					slot.m_value = std::forward<T>(value);
+					++m_size;
+					return {firstFree, slot};		
+				}
 			}
+
+			LockGuard<STYPE> lock(&m_mutex); //might deallocate the slots
+			m_slots.emplace_back( next_t{-1}, vers_t{0}, std::forward<T>(value) );
+			size_t index = m_slots.size() - 1; //index of the new slot
+			auto& slot = m_slots[index];
+			slot.m_value = std::forward<T>(value);
 			++m_size;
-			return {index, m_slots[index]};
+			return {index, m_slots[index]};			
 		}
 
-		void Erase(size_t index) {
-			if constexpr (STYPE == SLOTMAPTYPE_PARALLEL) { m_mutex.lock_shared(); }
+		/// @brief Erase a value from the slot map.
+		/// @param index The index of the value to erase.
+		void Erase(size_t index, size_t version) {
+			LockGuardShared<STYPE> lock(&m_mutex);
 			assert(index < m_slots.size());
 			auto& slot = m_slots[index];
 			++slot.m_version;	//increment the version to invalidate the slot
-			slot.m_nextFree = m_firstFree;
-			m_firstFree = index;
+			int64_t firstFree = m_firstFree.load();
+			slot.m_nextFree.store(firstFree);	
+			while( !m_firstFree.compare_exchange_weak(firstFree, index) ) {
+				if( slot.m_version.load() != version + 1 ) { return; } //the slot is already in the free list
+				slot.m_nextFree.store(firstFree);	
+			} //add the slot to the free list		
 			--m_size;
-			if constexpr (STYPE == SLOTMAPTYPE_PARALLEL) { m_mutex.unlock_shared(); }
 		}
 
 		auto operator[](size_t index) -> Slot& {
+			LockGuardShared<STYPE> lock(&m_mutex);
 			assert(index < m_slots.size());
 			auto& value = m_slots[index];
 			return value;
 		}
 
 		auto Size() -> size_t {
-			return m_size;
+			return m_size.load();
 		}
 
 		void Clear() {
-			m_firstFree = 0;
-			m_size = 0;
+			LockGuard<STYPE> lock(&m_mutex);
+			m_firstFree.store(0);
+			m_size.store(0);
 			size_t size = m_slots.size();
 			for( size_t i = 1; i <= size-1; ++i ) { 
-				m_slots[i-1].m_nextFree = i;
+				m_slots[i-1].m_nextFree.store(i);
 				m_slots[i-1].m_version++;
 			}
-			m_slots[size-1].m_nextFree = -1;
+			m_slots[size-1].m_nextFree.store(-1);
 			m_slots[size-1].m_version++;
 		}
 
 	private:
-		mutex_t m_mutex;
-		size_t m_size{0};
-		std::deque<Slot> m_slots;
-		next_t m_firstFree{-1};
+		mutex_t m_mutex; ///< Mutex for the slot map.
+		vers_t m_size{0}; ///< Size of the slot map.
+		std::vector<Slot> m_slots; ///< Vector of slots.
+		next_t m_firstFree{-1}; ///< Index of the first free slot.
 	};
 
 
@@ -379,9 +443,9 @@ namespace vecs {
 				requires VecsArchetype<Ts...>
 			Archetype(Handle handle, size_t& archIndex, Ts&& ...values ) {
 				(AddComponent<Ts>(), ...); //insert component types
-				(AddValue( archIndex, std::forward<Ts>(values) ), ...); //insert all components, get index of the handle
+				(AddValue2( archIndex, std::forward<Ts>(values) ), ...); //insert all components, get index of the handle
 				AddComponent<Handle>(); //insert the handle
-				AddValue( archIndex, handle ); //insert the handle
+				AddValue2( archIndex, handle ); //insert the handle
 			}
 
 			/// @brief Insert a new entity with components to the archetype.
@@ -392,11 +456,12 @@ namespace vecs {
 			template<typename... Ts>
 				requires VecsArchetype<Ts...>
 			size_t Insert(Handle handle, Ts&& ...values ) {
+				LockGuard<RTYPE> lock(&m_mutex, m_sharedMutex);
 				assert( m_types.size() == sizeof...(Ts) + 1 );
 				assert( (m_maps.contains(Type<Ts>()) && ...) );
 				size_t index;
-				(AddValue( index, std::forward<Ts>(values) ), ...); //insert all components, get index of the handle
-				AddValue( index, handle ); //insert the handle
+				(AddValue2( index, std::forward<Ts>(values) ), ...); //insert all components, get index of the handle
+				AddValue2( index, handle ); //insert the handle
 				++m_changeCounter;
 				return index;
 			}
@@ -420,6 +485,7 @@ namespace vecs {
 			/// @return The component value.
 			template<typename T>
 			[[nodiscard]] auto Get(size_t archIndex) -> T& {
+				LockGuardShared<RTYPE> lock(&m_mutex, m_sharedMutex);
 				return Map<T>()->Get(archIndex);
 			}
 
@@ -430,6 +496,7 @@ namespace vecs {
 			template<typename... Ts>
 				requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value))
 			[[nodiscard]] auto Get(size_t archIndex) -> std::tuple<Ts&...> {
+				LockGuardShared<RTYPE> lock(&m_mutex, m_sharedMutex);
 				return std::tuple<Ts&...>{ Map<Ts>()->Get(archIndex)... };
 			}
 
@@ -437,25 +504,19 @@ namespace vecs {
 			/// @param index The index of the entity in the archetype.
 			/// @return The handle of the entity that was moved over the erased one so its index can be changed.
 			void Erase(size_t index, SlotMap<ArchetypeAndIndex>& slotmap) {
-				size_t last{index};
-				for( auto& it : m_maps ) {
-					last = it.second->Erase(index); //should always be the same handle
-				}
-				if( index < last ) {
-					auto& lastHandle = static_cast<ComponentMap<Handle>*>(m_maps[Type<Handle>()].get())->Get(index);
-					slotmap[lastHandle.m_index].m_value.m_archIndex = index;
-				}
-				++m_changeCounter;
+				LockGuard<RTYPE> lock(&m_mutex, m_sharedMutex);
+				Erase2(index, slotmap);
 			}
 
 			/// @brief Move components from another archetype to this one.
-			size_t Move( auto& types, size_t other_index, Archetype& other, SlotMap<ArchetypeAndIndex>& slotmap) {
+			size_t Move( auto& types, size_t other_index, Archetype& other, SlotMap<ArchetypeAndIndex>& slotmap) {			
+				LockGuard<RTYPE> lock(&m_mutex, m_sharedMutex, &other.m_mutex, other.m_sharedMutex);
 				for( auto& ti : types ) { //go through all maps
 					m_types.insert(ti); //add the type to the list
 					m_maps[ti] = other.Map(ti)->Clone(); //make a component map like this one
 					m_maps[ti]->Move(other.Map(ti), other_index); //insert the new value
 				}
-				other.Erase(other_index, slotmap); //erase from old component map
+				other.Erase2(other_index, slotmap); //erase from old component map
 				++m_changeCounter;
 				return m_maps[Type<Handle>()]->Size() - 1; //return the index of the new entity
 			}
@@ -487,6 +548,7 @@ namespace vecs {
 
 			/// @brief Clear the archetype.
 			void Clear() {
+				LockGuard<RTYPE> lock(&m_mutex, m_sharedMutex);
 				for( auto& map : m_maps ) {
 					map.second->Clear();
 				}
@@ -517,7 +579,6 @@ namespace vecs {
 				std::cout << std::endl;
 			}
 
-
 			/// @brief Add a new component to the archetype.
 			/// @tparam T The type of the component.
 			template<typename U>
@@ -533,10 +594,15 @@ namespace vecs {
 			/// @param v The new value.
 			/// @return The index of the entity in the archetype.
 			void AddValue( size_t& index, auto&& v ) {
+				LockGuard<RTYPE> lock(&m_mutex, m_sharedMutex);
+				AddValue2(index, std::forward<decltype(v)>(v));
+			};
+
+			void AddValue2( size_t& index, auto&& v ) {
 				using T = std::decay_t<decltype(v)>;
 				index = m_maps[Type<T>()]->Insert(std::forward<T>(v));	//insert the component value
 			};
-
+			
 			size_t GetChangeCounter() {
 				return m_changeCounter;
 			}
@@ -554,6 +620,18 @@ namespace vecs {
 			}
 
 		private:
+
+			void Erase2(size_t index, SlotMap<ArchetypeAndIndex>& slotmap) {
+				size_t last{index};
+				for( auto& it : m_maps ) {
+					last = it.second->Erase(index); //should always be the same handle
+				}
+				if( index < last ) {
+					auto& lastHandle = static_cast<ComponentMap<Handle>*>(m_maps[Type<Handle>()].get())->Get(index);
+					slotmap[lastHandle.m_index].m_value.m_archIndex = index;
+				}
+				++m_changeCounter;
+			}
 			
 			mutex_t m_mutex; //mutex for thread safety
 			size_t m_changeCounter{0}; //changes invalidate references
@@ -743,16 +821,19 @@ namespace vecs {
 		[[nodiscard]] auto Insert( Ts&&... component ) -> Handle {
 			std::vector<size_t> types = {Type<Handle>(), Type<Ts>()...};
 			auto [index, slot] = m_entities.Insert( {nullptr, 0} ); //get a slot for the entity
-			Handle handle{(uint32_t)index, (uint32_t)slot.m_version}; //create a handle
+			Handle handle{(uint32_t)index, (uint32_t)slot.m_version.load()}; //create a handle
 
 			size_t archIndex;
 			size_t hs = Hash(types);
 			if( !m_archetypes.contains( hs ) ) { //not found
+				LockGuard<RTYPE> lock(&m_mutex); //lock the mutex
 				m_archetypes[hs] = std::make_unique<Archetype>( handle, archIndex, std::forward<Ts>(component)... );
+				slot.m_value = { m_archetypes[hs].get(), archIndex };
 			} else {
+				LockGuardShared<RTYPE> lock(&m_mutex); //lock the mutex
 				archIndex = m_archetypes[hs]->Insert( handle, std::forward<Ts>(component)... );
+				slot.m_value = { m_archetypes[hs].get(), archIndex };
 			}
-			slot.m_value = { m_archetypes[hs].get(), archIndex };
 			return handle;
 		}
 
@@ -761,7 +842,7 @@ namespace vecs {
 		/// @return true if the entity exists, else false.
 		bool Exists(Handle handle) {
 			auto& slot = m_entities[handle.m_index];
-			return slot.m_version == handle.m_version;
+			return slot.m_version.load() == handle.m_version;
 		}
 
 		/// @brief Test if an entity has a component.
@@ -875,7 +956,7 @@ namespace vecs {
 			assert(Exists(handle));
 			auto& value = m_entities[handle.m_index].m_value;
 			value.m_archetype_ptr->Erase(value.m_archIndex, m_entities); //erase the entity from the archetype (do both locked)
-			m_entities.Erase(handle.m_index); //erase the entity from the entity list
+			m_entities.Erase(handle.m_index, handle.m_version); //erase the entity from the entity list
 		}
 
 		/// @brief Clear the registry by removing all entities.
@@ -906,6 +987,10 @@ namespace vecs {
 
 	private:
 
+		/// @brief Internal Get function for getting component values.
+		/// @tparam U Component type
+		/// @param handle Handle of the entity.
+		/// @return Reference to the component value.
 		template<typename U>
 			requires (!std::is_same_v<U, Handle&>)
 		[[nodiscard]] auto Get2(Handle handle) -> U {
@@ -914,6 +999,12 @@ namespace vecs {
 			return ref;
 		}
 
+		/// @brief Try to get a component value of an entity.
+		/// If the component does not exist, it will be created.
+		/// This might result in moving the entity to another archetype.
+		/// @tparam U The type of the component.
+		/// @param handle The handle of the entity.
+		/// @return A pair of the archetype pointer and the component value.
 		template<typename U>
 		auto TryComponent(Handle handle) -> std::pair<Archetype*, std::decay_t<U>&> {
 			using T = std::decay_t<U>;
@@ -928,14 +1019,27 @@ namespace vecs {
 
 			size_t hs = Hash(types);
 			if(!m_archetypes.contains(hs)) { //not found
+				LockGuard<RTYPE> lock(&m_mutex); //lock the mutex
 				m_archetypes[hs] = std::make_unique<Archetype>();
 				m_archetypes[hs]->template AddComponent<T>();
+				return Fix<T>(hs, value, types);
 			}
-			auto oldArchetype = value.m_archetype_ptr;
-			value.m_archetype_ptr = m_archetypes[hs].get();
-			types.pop_back();
-			value.m_archIndex = value.m_archetype_ptr->Move(types, value.m_archIndex, *oldArchetype, m_entities);
-			m_archetypes[hs]->template AddValue(value.m_archIndex, T{});
+			LockGuardShared<RTYPE> lock(&m_mutex); //lock the mutex
+			return Fix<T>(hs, value, types);
+		}
+
+		/// @brief Fix the archetype and component value after adding a new component.
+		/// @tparam T The type of the component.
+		/// @param hs Hash of the types.
+		/// @param value The entity value.
+		/// @param types The types of the components.
+		template<typename T>
+		auto Fix(auto& hs, auto& value, auto& types) {
+			auto oldArchetype = value.m_archetype_ptr; 		//remember the old archetype
+			value.m_archetype_ptr = m_archetypes[hs].get();	//set the new archetype
+			types.pop_back();								//remove the last type	
+			value.m_archIndex = value.m_archetype_ptr->Move(types, value.m_archIndex, *oldArchetype, m_entities); //move entity components
+			m_archetypes[hs]->template AddValue2(value.m_archIndex, T{});
 			return std::pair<Archetype*, T&>{value.m_archetype_ptr, value.m_archetype_ptr->template Get<T>(value.m_archIndex)};
 		}
 
