@@ -431,6 +431,8 @@ namespace vecs {
 		/// All entities that have the same components are stored in the same archetype.
 		class Archetype {
 
+			template <RegistryType> friend class Registry;
+
 		public:
 
 			Archetype() = default; //default constructor
@@ -565,6 +567,7 @@ namespace vecs {
 				return m_maps;
 			}
 
+			/// @brief Print the archetype.
 			void print() {
 				std::cout << "Hash: " << Hash(m_types) << std::endl;
 				for( auto ti : m_types ) {
@@ -597,12 +600,7 @@ namespace vecs {
 				LockGuard<RTYPE> lock(&m_mutex, m_sharedMutex);
 				AddValue2(index, std::forward<decltype(v)>(v));
 			};
-
-			void AddValue2( size_t& index, auto&& v ) {
-				using T = std::decay_t<decltype(v)>;
-				index = m_maps[Type<T>()]->Insert(std::forward<T>(v));	//insert the component value
-			};
-			
+		
 			size_t GetChangeCounter() {
 				return m_changeCounter;
 			}
@@ -620,7 +618,11 @@ namespace vecs {
 			}
 
 		private:
-
+			void AddValue2( size_t& index, auto&& v ) {
+				using T = std::decay_t<decltype(v)>;
+				index = m_maps[Type<T>()]->Insert(std::forward<T>(v));	//insert the component value
+			};
+	
 			void Erase2(size_t index, SlotMap<ArchetypeAndIndex>& slotmap) {
 				size_t last{index};
 				for( auto& it : m_maps ) {
