@@ -156,7 +156,7 @@ namespace vecs {
 	/// @tparam T The value type of the slot map.
 	/// @tparam SIZE The minimum size of the slot map.
 	/// @tparam STYPE The type of the slot map.
-	template<typename T, size_t SIZE = 1024, SlotMapType STYPE = SLOTMAPTYPE_SEQUENTIAL>
+	template<typename T, size_t SIZE = 2<<20, SlotMapType STYPE = SLOTMAPTYPE_SEQUENTIAL>
 	class SlotMap {
 
 		/// @brief Need atomics only for the parallel case
@@ -1041,7 +1041,7 @@ namespace vecs {
 			value.m_archetype_ptr = m_archetypes[hs].get();	//set the new archetype
 			types.pop_back();								//remove the last type	
 			value.m_archIndex = value.m_archetype_ptr->Move(types, value.m_archIndex, *oldArchetype, m_entities); //move entity components
-			m_archetypes[hs]->template AddValue2(value.m_archIndex, T{});
+			m_archetypes[hs]->AddValue2(value.m_archIndex, T{});
 			return std::pair<Archetype*, T&>{value.m_archetype_ptr, value.m_archetype_ptr->template Get<T>(value.m_archIndex)};
 		}
 

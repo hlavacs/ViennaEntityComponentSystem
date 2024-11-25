@@ -6,7 +6,7 @@
 #include "VECS.h"
 
 
-int main() {
+int test1() {
 
 	{
 		vecs::SlotMap<int> sm;
@@ -105,18 +105,18 @@ int main() {
 
 	//auto hhh = system.Get<vecs::Handle&>(hd1); //compile error
 
-    for( auto handle : system.GetView<vecs::Handle>() ) {
+    for( auto handle : system.template GetView<vecs::Handle>() ) {
         std::cout << "Handle: "<< handle << std::endl;
     }
 
-    for( auto [handle, i, f] : system.GetView<vecs::Handle, int&, float>() ) {
+    for( auto [handle, i, f] : system.template GetView<vecs::Handle, int&, float>() ) {
         std::cout << "Handle: "<< handle << " int: " << i << " float: " << f << std::endl;
 		i = 100;
 		f = 100.0f;
 		auto h1 = system.Insert(5, 5.5f);
 		auto h2 = system.Insert(5, 5.5f);
     }
-    for( auto [handle, i, f] : system.GetView<vecs::Handle, int&, float&>() ) {
+    for( auto [handle, i, f] : system.template GetView<vecs::Handle, int&, float&>() ) {
         std::cout << "Handle: "<< handle << " int: " << i << " float: " << f << std::endl;
 	}
 
@@ -126,3 +126,48 @@ int main() {
 
     return 0;   
 }
+
+size_t test2( auto& system, int m ) {
+
+	auto t1 = std::chrono::high_resolution_clock::now();
+
+	for( int i=0; i<m; ++i ) {
+		auto h = system.Insert(i, (float)i, (double)i, 'A', std::string("AAAAAA") );
+	}
+
+	for( auto [handle, i, f, d] : system.template GetView<vecs::Handle, int&, float, double>() ) {
+		i = (int)(f + d);
+	}
+
+	auto t2 = std::chrono::high_resolution_clock::now();
+
+	return std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
+}
+
+
+int main() {
+	test1();
+
+	size_t duration;
+	int num = 2000000;
+	{
+		vecs::Registry<vecs::REGISTRYTYPE_SEQUENTIAL> system;
+		duration = test2(system, num);
+		std::cout << "Size: " << system.Size() << " us: " << duration << " us/entity: " << (double)duration/(double)num << std::endl;
+		system.Clear();
+		duration = test2(system, num);
+		std::cout << "Size: " << system.Size() << " us: " << duration << " us/entity: " << (double)duration/(double)num << std::endl;
+	}
+
+	{
+		vecs::Registry<vecs::REGISTRYTYPE_PARALLEL> system;
+		duration = test2(system, num);
+		std::cout << "Size: " << system.Size() << " us: " << duration << " us/entity: " << (double)duration/(double)num << std::endl;
+		system.Clear();
+		duration = test2(system, num);
+		std::cout << "Size: " << system.Size() << " us: " << duration << " us/entity: " << (double)duration/(double)num << std::endl;
+	}
+
+	return 0;
+}
+

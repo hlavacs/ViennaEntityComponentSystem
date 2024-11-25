@@ -11,7 +11,7 @@ BuildDirectory: C:/data/GitHub/ViennaEntityComponentSystem/build
 CostDataFile: 
 
 # Site is something like machine.domain, i.e. pragmatic.crd
-Site: DESKTOP-AFMPS34
+Site: LAPTOP-GMOS5MGU
 
 # Build name is osname-revision-compiler, i.e. Linux-2.4.2-2smp-c++
 BuildName: Win32-ninja
@@ -45,7 +45,7 @@ SVNOptions:
 SVNUpdateOptions: 
 
 # Git options
-GITCommand: C:/Users/hlavacs/AppData/Local/Programs/Git/cmd/git.exe
+GITCommand: C:/Program Files/Git/cmd/git.exe
 GITInitSubmodules: 
 GITUpdateOptions: 
 GITUpdateCustom: 
@@ -58,13 +58,13 @@ P4UpdateOptions:
 P4UpdateCustom: 
 
 # Generic update command
-UpdateCommand: C:/Users/hlavacs/AppData/Local/Programs/Git/cmd/git.exe
+UpdateCommand: C:/Program Files/Git/cmd/git.exe
 UpdateOptions: 
 UpdateType: git
 
 # Compiler info
 Compiler: C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/Llvm/x64/bin/clang.exe
-CompilerVersion: 17.0.3
+CompilerVersion: 18.1.8
 
 # Dynamic analysis (MemCheck)
 PurifyCommand: 
