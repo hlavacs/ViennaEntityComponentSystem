@@ -31,7 +31,6 @@ namespace vecs {
 	template <typename> struct is_tuple : std::false_type {};
 	template <typename ...Ts> struct is_tuple<std::tuple<Ts...>> : std::true_type {};
 
-
 	template <typename T>
 	inline size_t Hash( const T& hashes ) {
 		std::size_t seed = 0;
@@ -54,65 +53,56 @@ namespace vecs {
 
 	template<int LTYPE = LOCKGUARDTYPE_SEQUENTIAL>
 	struct LockGuard {
-		LockGuard(mutex_t &arch, bool* lockedShared=nullptr) : m_archetype{arch}, m_other{nullptr}, m_lockedShared{lockedShared} { 
+		LockGuard(mutex_t* mutex, mutex_t* sharedMutex) 
+			: m_mutex{mutex}, m_sharedMutex{sharedMutex}, m_other{nullptr}, m_sharedOther{nullptr} { 
+
 			if constexpr (LTYPE == LOCKGUARDTYPE_SEQUENTIAL) return;
-			if( lockedShared && *lockedShared ) { m_archetype.unlock_shared(); }
-			m_archetype.lock(); 
+			if( mutex == m_sharedMutex ) { m_mutex->unlock_shared(); }
+			m_mutex->lock(); 
 		}
 
-		LockGuard(mutex_t &arch, mutex_t* other, bool* lockedShared=nullptr) : m_archetype{arch}, m_other{other}, m_lockedShared{lockedShared} { 
+		LockGuard(mutex_t* mutex, mutex_t* sharedMutex, mutex_t* other, mutex_t* sharedOther) 
+			: m_mutex{mutex}, m_sharedMutex{sharedMutex}, m_other{other}, m_sharedOther{sharedOther} { 
+
 			if constexpr (LTYPE == LOCKGUARDTYPE_SEQUENTIAL) return;
-			if( lockedShared && *lockedShared ) { m_archetype.unlock_shared(); }
-			std::min(&m_archetype, m_other)->lock();
-			std::max(&m_archetype, m_other)->lock();
+			if( m_mutex == m_sharedMutex ) { m_mutex->unlock_shared(); }
+			if( m_other == m_sharedOther ) { m_other->unlock_shared(); }
+			std::min(m_mutex, m_other)->lock();
+			std::max(m_mutex, m_other)->lock();
 		}
 
 		~LockGuard() { 
 			if constexpr (LTYPE == LOCKGUARDTYPE_SEQUENTIAL) return;
 			if(m_other) { 
-				std::max(&m_archetype, m_other)->unlock();
-				std::min(&m_archetype, m_other)->unlock();
-				return;
+				m_other->unlock();
+				if( m_other == m_sharedOther ) { m_other->lock_shared(); }
 			}
-			m_archetype.unlock();
-			if( m_lockedShared && *m_lockedShared ) { m_archetype.lock_shared(); }
+			m_mutex->unlock();
+			if( m_mutex == m_sharedMutex ) { m_mutex->lock_shared(); }
 		}
 
-		mutex_t& m_archetype;
+		mutex_t* m_mutex;
+		mutex_t* m_sharedMutex;
 		mutex_t* m_other{nullptr};
-		bool* m_lockedShared{nullptr};
+		mutex_t* m_sharedOther;
 	};
 
 	template<int LTYPE = LOCKGUARDTYPE_SEQUENTIAL>
 	struct LockGuardShared {
-		LockGuardShared(mutex_t &arch, bool* lockedShared=nullptr) : m_archetype{arch}, m_other{nullptr}, m_lockedShared{lockedShared} { 
+		LockGuardShared(mutex_t* mutex, mutex_t* sharedMutex=nullptr) : m_mutex{mutex}, m_sharedMutex{sharedMutex} { 
 			if constexpr (LTYPE == LOCKGUARDTYPE_SEQUENTIAL) return;
-			if( lockedShared && *lockedShared ) { m_archetype.unlock_shared(); }
-			m_archetype.lock_shared(); 
-		}
-
-		LockGuardShared(mutex_t &arch, mutex_t* other, bool* lockedShared=nullptr) : m_archetype{arch}, m_other{other}, m_lockedShared{lockedShared} { 
-			if constexpr (LTYPE == LOCKGUARDTYPE_SEQUENTIAL) return;
-			if( lockedShared && *lockedShared ) { m_archetype.unlock_shared(); }
-			std::min(&m_archetype, m_other)->lock_shared();
-			std::max(&m_archetype, m_other)->lock_shared();
+			if( mutex != m_sharedMutex ) m_mutex->lock_shared();
 		}
 
 		~LockGuardShared() { 
 			if constexpr (LTYPE == LOCKGUARDTYPE_SEQUENTIAL) return;
-			if(m_other) { 
-				std::max(&m_archetype, m_other)->unlock_shared();
-				std::min(&m_archetype, m_other)->unlock_shared();
-				return;
-			}
-			m_archetype.unlock_shared();
-			if( m_lockedShared && *m_lockedShared ) { m_archetype.lock_shared(); }
+			if( m_mutex != m_sharedMutex ) m_mutex->unlock_shared();
 		}
-		
-		mutex_t& m_archetype;
-		mutex_t* m_other{nullptr};
-		bool* m_lockedShared{nullptr};
+
+		mutex_t* m_mutex;
+		mutex_t* m_sharedMutex;
 	};
+
 
 
 	//----------------------------------------------------------------------------------------------
@@ -555,8 +545,12 @@ namespace vecs {
 				return m_mutex;
 			}
 
-			void SetLockedShared(bool locked) {
-				m_lockedShared = locked;
+			auto GetSharedMutexPtr() -> mutex_t* {
+				return m_sharedMutex;
+			}
+
+			auto SetSharedMutexPtr(mutex_t* ptr) {
+				m_sharedMutex = ptr;
 			}
 
 		private:
@@ -565,7 +559,7 @@ namespace vecs {
 			size_t m_changeCounter{0}; //changes invalidate references
 			std::set<size_t> m_types; //types of components
 			std::unordered_map<size_t, std::unique_ptr<ComponentMapBase>> m_maps; //map from type index to component data
-			inline static thread_local bool m_lockedShared{false}; //thread local variable for locking
+			inline static thread_local mutex_t* m_sharedMutex{nullptr}; //thread local variable for locking
 		}; //end of Archetype
 
 	public:
@@ -622,9 +616,12 @@ namespace vecs {
 			/// @param arch List of archetypes. 
 			/// @param archidx First archetype index.
 			Iterator( Registry<RTYPE>& system, std::vector<Archetype*>& arch, size_t archidx) 
-				: m_system{system}, m_archetypes{arch}, m_archidx{archidx}  {
+				: m_system{system}, m_archetypes{arch}, m_archidx{archidx} {
 				Next();
-				LockShared();
+			}
+
+			Iterator(const Iterator& other) : m_system{other.m_system}, m_archetypes{other.m_archetypes}, 
+				m_archidx{other.m_archidx}, m_entidx{other.m_entidx}, m_isLocked{false} {
 			}
 
 			~Iterator() {
@@ -635,7 +632,6 @@ namespace vecs {
 			auto operator++() {
 				++m_entidx;
 				Next();				
-				LockShared();
 				return *this;
 			}
 
@@ -646,17 +642,19 @@ namespace vecs {
 				return m_system.Get<Ts...>(handle);
 			}
 
-			auto operator!=(const Iterator& other) {
-				return m_archidx != other.m_archidx || m_entidx != other.m_entidx;
+			auto operator!=(const Iterator& other) -> bool {
+				return (m_archidx != other.m_archidx) || (m_entidx != other.m_entidx);
 			}
 
 		private:
 
 			void Next() {
 				while( m_archidx < m_archetypes.size() && m_entidx >= m_archetypes[m_archidx]->Size() ) {
+					if( m_isLocked ) UnlockShared();
 					++m_archidx;
 					m_entidx = 0;
 				} 
+				if( m_archidx < m_archetypes.size() ) LockShared();
 			}
 
 			void LockShared() {
@@ -664,21 +662,25 @@ namespace vecs {
 				if( m_archidx >= m_archetypes.size() ) return;
 				auto arch = m_archetypes[m_archidx];
 				arch->GetMutex().lock_shared();
-				arch->SetLockedShared(true);
+				arch->SetSharedMutexPtr(&arch->GetMutex()); //thread remembers that it locked the mutex
+				m_isLocked = true;
 			}
 
 			void UnlockShared() {
 				if constexpr (RTYPE == REGISTRYTYPE_SEQUENTIAL) return;
 				if( m_archidx >= m_archetypes.size() ) return;
+				if( !m_isLocked ) return;
 				auto arch = m_archetypes[m_archidx];
-				arch->SetLockedShared(false);
+				arch->SetSharedMutexPtr(nullptr);
 				arch->GetMutex().unlock_shared();
+				m_isLocked = false;
 			}
 
 			Registry<RTYPE>& m_system;
 			std::vector<Archetype*>& m_archetypes;
 			size_t m_archidx{0};
 			size_t m_entidx{0};
+			bool m_isLocked{false};
 		}; //end of Iterator
 
 
@@ -941,7 +943,12 @@ namespace vecs {
 	inline std::ostream& operator<<(std::ostream& os, Registry<REGISTRYTYPE_SEQUENTIAL>::Ref<T>& ref) {
     	return os <<  ref(); 
 	}
-	
+
+	template<typename T>
+	inline std::ostream& operator<<(std::ostream& os, Registry<REGISTRYTYPE_PARALLEL>::Ref<T>& ref) {
+    	return os <<  ref(); 
+	}
+
 } //end of namespace vecs
 
 
