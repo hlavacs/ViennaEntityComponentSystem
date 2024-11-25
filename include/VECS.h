@@ -30,7 +30,7 @@ namespace vecs {
 	template<typename T>
 	struct dummy_atomic {
 		T m_value;
-		auto load() -> T { return m_value; }
+		auto load() const -> T { return m_value; }
 		void store(T v) { m_value = v; }
 		bool compare_exchange_weak(T& expected, T desired) {
 			if( m_value == expected ) {
@@ -156,7 +156,7 @@ namespace vecs {
 	/// @tparam T The value type of the slot map.
 	/// @tparam SIZE The minimum size of the slot map.
 	/// @tparam STYPE The type of the slot map.
-	template<typename T, size_t SIZE = 2<<20, SlotMapType STYPE = SLOTMAPTYPE_SEQUENTIAL>
+	template<typename T, SlotMapType STYPE >
 	class SlotMap {
 
 		/// @brief Need atomics only for the parallel case
@@ -165,27 +165,33 @@ namespace vecs {
 
 		/// @brief A slot in the slot map.
 		struct Slot {
-			next_t m_nextFree{-1}; 	//index of the next free slot
-			vers_t m_version{0};	//version of the slot
-			T 	   m_value{};		//value of the slot
+			next_t m_nextFree; 	//index of the next free slot
+			vers_t m_version;	//version of the slot
+			T 	   m_value{};	//value of the slot
+
+			Slot(const next_t&& next, const vers_t&& version, T&& value) : m_value{std::forward<T>(value)} {
+				m_nextFree.store(next.load());
+				m_version.store(version.load());
+			}
+			Slot( const Slot& other ) : m_value{other.m_value} {
+				m_nextFree.store(other.m_nextFree.load());
+				m_version.store(other.m_version.load());
+			}
 		};
 
 	public:
 
 		/// @brief Constructor, creates the slot map.
-		SlotMap() {
+		SlotMap(int64_t SIZE = 1<<20) {
 			m_firstFree.store(0);
 			for( int64_t i = 1; i <= SIZE-1; ++i ) { //create the free list
-				m_slots.emplace_back( next_t{i}, vers_t{0uL}, T{} );
+				m_slots.push_back( Slot( next_t{i}, vers_t{0uL}, T{} ) );
 			}
-			m_slots.emplace_back( next_t{-1}, vers_t{0}, T{} ); //last slot
+			m_slots.push_back( Slot(next_t{-1}, vers_t{0}, T{}) ); //last slot
 		}
 		
 		~SlotMap() = default; ///< Destructor.
-
-		/// @brief Insert a new value to the slot map.
-		/// @param value The value to insert.
-		/// @return A pair of the index and reference to the slot.
+		
 		auto Insert(T&& value) -> std::pair<size_t, Slot&> {
 			{
 				LockGuardShared<STYPE> lock(&m_mutex); //there might be a deallocation in progress
@@ -249,9 +255,9 @@ namespace vecs {
 
 	private:
 		mutex_t m_mutex; ///< Mutex for the slot map.
-		vers_t m_size{0}; ///< Size of the slot map.
-		std::vector<Slot> m_slots; ///< Vector of slots.
+		vers_t m_size; ///< Size of the slot map.
 		next_t m_firstFree{-1}; ///< Index of the first free slot.
+		std::deque<Slot> m_slots; ///< Vector of slots.
 	};
 
 
@@ -505,13 +511,13 @@ namespace vecs {
 			/// @brief Erase an entity
 			/// @param index The index of the entity in the archetype.
 			/// @return The handle of the entity that was moved over the erased one so its index can be changed.
-			void Erase(size_t index, SlotMap<ArchetypeAndIndex>& slotmap) {
+			void Erase(size_t index, auto& slotmap) {
 				LockGuard<RTYPE> lock(&m_mutex, m_sharedMutex);
 				Erase2(index, slotmap);
 			}
 
 			/// @brief Move components from another archetype to this one.
-			size_t Move( auto& types, size_t other_index, Archetype& other, SlotMap<ArchetypeAndIndex>& slotmap) {			
+			size_t Move( auto& types, size_t other_index, Archetype& other, auto& slotmap) {			
 				LockGuard<RTYPE> lock(&m_mutex, m_sharedMutex, &other.m_mutex, other.m_sharedMutex);
 				for( auto& ti : types ) { //go through all maps
 					m_types.insert(ti); //add the type to the list
@@ -623,7 +629,7 @@ namespace vecs {
 				index = m_maps[Type<T>()]->Insert(std::forward<T>(v));	//insert the component value
 			};
 	
-			void Erase2(size_t index, SlotMap<ArchetypeAndIndex>& slotmap) {
+			void Erase2(size_t index, auto& slotmap) {
 				size_t last{index};
 				for( auto& it : m_maps ) {
 					last = it.second->Erase(index); //should always be the same handle
@@ -806,7 +812,8 @@ namespace vecs {
 
 		//----------------------------------------------------------------------------------------------
 
-		Registry() = default;
+		Registry() = default; ///< Constructor.
+		~Registry() = default;
 
 		/// @brief Get the number of entities in the system.
 		/// @return The number of entities.
@@ -1046,7 +1053,7 @@ namespace vecs {
 		}
 
 		mutex_t m_mutex; //mutex for thread safety
-		SlotMap<ArchetypeAndIndex> m_entities;
+		SlotMap<ArchetypeAndIndex, RTYPE> m_entities;
 		std::unordered_map<size_t, std::unique_ptr<Archetype>> m_archetypes; //Mapping vector of type index to archetype
 	};
 

@@ -9,7 +9,7 @@
 int test1() {
 
 	{
-		vecs::SlotMap<int> sm;
+		vecs::SlotMap<int, vecs::SLOTMAPTYPE_SEQUENTIAL> sm;
 		auto [i1, v1] = sm.Insert(1);
 		auto [i2, v2] = sm.Insert(2);
 		auto [i3, v3] = sm.Insert(3);
@@ -127,7 +127,7 @@ int test1() {
     return 0;   
 }
 
-size_t test2( auto& system, int m ) {
+size_t test_insert_iterate( auto& system, int m ) {
 
 	auto t1 = std::chrono::high_resolution_clock::now();
 
@@ -144,29 +144,89 @@ size_t test2( auto& system, int m ) {
 	return std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
 }
 
+size_t test_insert( auto& system, int m ) {
 
-int main() {
-	test1();
+	auto t1 = std::chrono::high_resolution_clock::now();
+
+	for( int i=0; i<m; ++i ) {
+		auto h = system.Insert(i, (float)i, (double)i, 'A', std::string("AAAAAA") );
+	}
+	auto t2 = std::chrono::high_resolution_clock::now();
+
+	return std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
+}
+
+
+void test3(auto&& job ) {
 
 	size_t duration;
 	int num = 2000000;
 	{
 		vecs::Registry<vecs::REGISTRYTYPE_SEQUENTIAL> system;
-		duration = test2(system, num);
+		duration = job(system, num);
 		std::cout << "Size: " << system.Size() << " us: " << duration << " us/entity: " << (double)duration/(double)num << std::endl;
 		system.Clear();
-		duration = test2(system, num);
+		duration = job(system, num);
 		std::cout << "Size: " << system.Size() << " us: " << duration << " us/entity: " << (double)duration/(double)num << std::endl;
 	}
 
 	{
 		vecs::Registry<vecs::REGISTRYTYPE_PARALLEL> system;
-		duration = test2(system, num);
+		duration = job(system, num);
 		std::cout << "Size: " << system.Size() << " us: " << duration << " us/entity: " << (double)duration/(double)num << std::endl;
 		system.Clear();
-		duration = test2(system, num);
+		duration = job(system, num);
 		std::cout << "Size: " << system.Size() << " us: " << duration << " us/entity: " << (double)duration/(double)num << std::endl;
 	}
+}
+
+
+void test4( auto&& job ) {
+
+	vecs::Registry<vecs::REGISTRYTYPE_PARALLEL> system;
+
+	int num = 1000000;
+	auto work = [&](auto& system) {
+		size_t duration = job(system, num);
+	};
+
+	auto t1 = std::chrono::high_resolution_clock::now();
+	{
+		std::jthread t1{ [&](){ work(system);} };
+		std::jthread t2{ [&](){ work(system);} };
+		std::jthread t3{ [&](){ work(system);} };
+		std::jthread t4{ [&](){ work(system);} };
+	}
+	{
+		auto t2 = std::chrono::high_resolution_clock::now();
+		auto duration = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
+		std::cout << "Size: " << system.Size() << " us: " << duration << " us/entity: " << (double)duration/(double)system.Size() << std::endl;
+	}
+
+	system.Clear();
+	std::cout << "Size: " << system.Size() << std::endl;
+
+	t1 = std::chrono::high_resolution_clock::now();
+
+	{
+		std::jthread t1{ [&](){ work(system);} };
+		std::jthread t2{ [&](){ work(system);} };
+		std::jthread t3{ [&](){ work(system);} };
+		std::jthread t4{ [&](){ work(system);} };
+	}
+	{
+		auto t2 = std::chrono::high_resolution_clock::now();
+		auto duration = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
+		std::cout << "Size: " << system.Size() << " us: " << duration << " us/entity: " << (double)duration/(double)system.Size() << std::endl;
+	}
+}
+
+
+int main() {
+	test3( [&](auto& system, int num){ return test_insert(system, num); } );
+	test3( [&](auto& system, int num){ return test_insert_iterate(system, num); } );
+	test4( [&](auto& system, int num){ return test_insert(system, num); } );
+	test4( [&](auto& system, int num){ return test_insert_iterate(system, num); } );
 
 	return 0;
 }
