@@ -113,6 +113,8 @@ int main() {
         std::cout << "Handle: "<< handle << " int: " << i << " float: " << f << std::endl;
 		i = 100;
 		f = 100.0f;
+		auto h1 = system.Insert(5, 5.5f);
+		auto h2 = system.Insert(5, 5.5f);
     }
     for( auto [handle, i, f] : system.GetView<vecs::Handle, int&, float&>() ) {
         std::cout << "Handle: "<< handle << " int: " << i << " float: " << f << std::endl;

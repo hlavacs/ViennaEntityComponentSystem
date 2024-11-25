@@ -605,6 +605,11 @@ namespace vecs {
 
 		//----------------------------------------------------------------------------------------------
 
+		struct ArchetypeAndSize {
+			Archetype* m_archetype;
+			size_t m_size;
+		};
+
 		/// @brief Used for iterating over entity components.
 		/// @tparam ...Ts Choose the types of the components you want the entities to have.
 		template<typename... Ts>
@@ -615,7 +620,7 @@ namespace vecs {
 			/// @brief Iterator constructor saving a list of archetypes and the current index.
 			/// @param arch List of archetypes. 
 			/// @param archidx First archetype index.
-			Iterator( Registry<RTYPE>& system, std::vector<Archetype*>& arch, size_t archidx) 
+			Iterator( Registry<RTYPE>& system, std::vector<ArchetypeAndSize>& arch, size_t archidx) 
 				: m_system{system}, m_archetypes{arch}, m_archidx{archidx} {
 				Next();
 			}
@@ -637,8 +642,8 @@ namespace vecs {
 
 			/// @brief Access the content the iterator points to.
 			auto operator*() {
-				assert( m_entidx < m_archetypes[m_archidx]->Size() );
-				Handle handle = m_archetypes[m_archidx]->template Map<Handle>()->Get(m_entidx);
+				assert( m_entidx < m_archetypes[m_archidx].m_archetype->Size() );
+				Handle handle = m_archetypes[m_archidx].m_archetype->template Map<Handle>()->Get(m_entidx);
 				return m_system.Get<Ts...>(handle);
 			}
 
@@ -649,7 +654,7 @@ namespace vecs {
 		private:
 
 			void Next() {
-				while( m_archidx < m_archetypes.size() && m_entidx >= m_archetypes[m_archidx]->Size() ) {
+				while( m_archidx < m_archetypes.size() && m_entidx >= std::min(m_archetypes[m_archidx].m_size, m_archetypes[m_archidx].m_archetype->Size()) ) {
 					if( m_isLocked ) UnlockShared();
 					++m_archidx;
 					m_entidx = 0;
@@ -660,7 +665,8 @@ namespace vecs {
 			void LockShared() {
 				if constexpr (RTYPE == REGISTRYTYPE_SEQUENTIAL) return;
 				if( m_archidx >= m_archetypes.size() ) return;
-				auto arch = m_archetypes[m_archidx];
+				if( m_isLocked ) return;
+				auto arch = m_archetypes[m_archidx].m_archetype;
 				arch->GetMutex().lock_shared();
 				arch->SetSharedMutexPtr(&arch->GetMutex()); //thread remembers that it locked the mutex
 				m_isLocked = true;
@@ -670,14 +676,14 @@ namespace vecs {
 				if constexpr (RTYPE == REGISTRYTYPE_SEQUENTIAL) return;
 				if( m_archidx >= m_archetypes.size() ) return;
 				if( !m_isLocked ) return;
-				auto arch = m_archetypes[m_archidx];
+				auto arch = m_archetypes[m_archidx].m_archetype;
 				arch->SetSharedMutexPtr(nullptr);
 				arch->GetMutex().unlock_shared();
 				m_isLocked = false;
 			}
 
 			Registry<RTYPE>& m_system;
-			std::vector<Archetype*>& m_archetypes;
+			std::vector<ArchetypeAndSize>& m_archetypes;
 			size_t m_archidx{0};
 			size_t m_entidx{0};
 			bool m_isLocked{false};
@@ -703,7 +709,7 @@ namespace vecs {
 						if( arch->Types().contains(Type<T>())) return true;
 						return false;
 					};
-					if( (func.template operator()<Ts>() && ...) ) m_archetypes.push_back(it.second.get());
+					if( (func.template operator()<Ts>() && ...) && arch->Size()>0 ) m_archetypes.push_back({arch, arch->Size()});
 				}
 				return Iterator<Ts...>{m_system, m_archetypes, 0};
 			}
@@ -714,7 +720,7 @@ namespace vecs {
 
 		private:
 			Registry<RTYPE>& m_system;
-			std::vector<Archetype*> m_archetypes;
+			std::vector<ArchetypeAndSize> m_archetypes;
 		}; //end of View
 
 
