@@ -1,21 +1,4 @@
 # ninja log v6
-4	13	7542403512123913	clean	423d399e6810f01
-9	2002	7542403513131246	tests/CMakeFiles/testvecs.dir/testvecs.cpp.obj	ef839c9b2ab9ceb1
-2004	2253	7542403533120253	tests/testvecs.exe	d91999083d0c0950
 13	22	7542404038189148	clean	423d399e6810f01
-12	2216	7542404039140176	tests/CMakeFiles/testvecs.dir/testvecs.cpp.obj	ef839c9b2ab9ceb1
-2217	2300	7542404061168503	tests/testvecs.exe	d91999083d0c0950
-17	2350	7542404707009937	tests/CMakeFiles/testvecs.dir/testvecs.cpp.obj	ef839c9b2ab9ceb1
-2350	2428	7542404730350514	tests/testvecs.exe	d91999083d0c0950
-21	2108	7542405372499963	tests/CMakeFiles/testvecs.dir/testvecs.cpp.obj	ef839c9b2ab9ceb1
-2110	2189	7542405393388714	tests/testvecs.exe	d91999083d0c0950
-8	2014	7542407527536171	tests/CMakeFiles/testvecs.dir/testvecs.cpp.obj	ef839c9b2ab9ceb1
-2015	2093	7542407547557647	tests/testvecs.exe	d91999083d0c0950
-16	2014	7542407589605487	tests/CMakeFiles/testvecs.dir/testvecs.cpp.obj	ef839c9b2ab9ceb1
-2014	2093	7542407609621166	tests/testvecs.exe	d91999083d0c0950
-15	2039	7542407855507855	tests/CMakeFiles/testvecs.dir/testvecs.cpp.obj	ef839c9b2ab9ceb1
-2040	2117	7542407875725683	tests/testvecs.exe	d91999083d0c0950
-7	1940	7542410326233880	tests/CMakeFiles/testvecs.dir/testvecs.cpp.obj	ef839c9b2ab9ceb1
-1941	2018	7542410345587173	tests/testvecs.exe	d91999083d0c0950
 17	2002	7542411041462360	tests/CMakeFiles/testvecs.dir/testvecs.cpp.obj	ef839c9b2ab9ceb1
 2003	2081	7542411061316618	tests/testvecs.exe	d91999083d0c0950
