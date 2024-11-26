@@ -187,7 +187,7 @@ namespace vecs {
 		
 		~SlotMap() = default; ///< Destructor.
 		
-		auto Insert(T&& value) -> std::pair<size_t, Slot&> {
+		auto Insert(T&& value) -> std::pair<Handle, Slot&> {
 			{
 				int64_t firstFree = m_firstFree;
 				if( firstFree > -1 ) { 
@@ -196,7 +196,7 @@ namespace vecs {
 					slot.m_nextFree = -1;
 					slot.m_value = std::forward<T>(value);
 					++m_size;
-					return {firstFree, slot};		
+					return {Handle{(uint32_t)firstFree, (uint32_t)slot.m_version}, slot};		
 				}
 			}
 
@@ -205,17 +205,17 @@ namespace vecs {
 			auto& slot = m_slots[index];
 			slot.m_value = std::forward<T>(value);
 			++m_size;
-			return {index, m_slots[index]};			
+			return { Handle{ (uint32_t)index, (uint32_t)slot.m_version}, slot};			
 		}
 
 		/// @brief Erase a value from the slot map.
 		/// @param index The index of the value to erase.
-		void Erase(size_t index, size_t version) {
-			assert(index < m_slots.size());
-			auto& slot = m_slots[index];
+		void Erase(Handle handle) {
+			assert(handle.m_index < m_slots.size());
+			auto& slot = m_slots[handle.m_index];
 			++slot.m_version;	//increment the version to invalidate the slot
 			slot.m_nextFree = m_firstFree;	
-			m_firstFree = index; //add the slot to the free list
+			m_firstFree = handle.m_index; //add the slot to the free list
 			--m_size;
 		}
 
@@ -813,8 +813,7 @@ namespace vecs {
 			LockGuard<RTYPE> lock(&m_mutex); //lock the mutex
 
 			std::vector<size_t> types = {Type<Handle>(), Type<Ts>()...};
-			auto [index, slot] = m_entities.Insert( {nullptr, 0} ); //get a slot for the entity
-			Handle handle{(uint32_t)index, (uint32_t)slot.m_version}; //create a handle
+			auto [handle, slot] = m_entities.Insert( {nullptr, 0} ); //get a slot for the entity
 
 			size_t archIndex;
 			size_t hs = Hash(types);
@@ -849,7 +848,7 @@ namespace vecs {
 			Archetype* arch;
 			{
 				LockGuardShared<RTYPE> lock(&m_mutex); //lock the system
-				arch = m_entities[handle.m_index].m_value.m_archetypePtr;
+				arch = m_entities[handle].m_value.m_archetypePtr;
 			}
 			LockGuardShared<RTYPE> lock(&arch->GetMutex(), m_sharedMutex); //lock the archetype
 			return arch->Has(Type<T>());
@@ -993,7 +992,7 @@ namespace vecs {
 			LockGuard<RTYPE> lock(&m_mutex); //lock the mutex
 			auto& value = m_entities[handle].m_value;
 			value.m_archetypePtr->Erase(value.m_archIndex, m_entities); //erase the entity from the archetype (do both locked)
-			m_entities.Erase(handle.m_index, handle.m_version); //erase the entity from the entity list
+			m_entities.Erase(handle); //erase the entity from the entity list
 		}
 
 		/// @brief Clear the registry by removing all entities.

@@ -11,20 +11,20 @@ int test1() {
 
 	{
 		vecs::SlotMap<int> sm;
-		auto [i1, v1] = sm.Insert(1);
-		auto [i2, v2] = sm.Insert(2);
-		auto [i3, v3] = sm.Insert(3);
+		auto [h1, v1] = sm.Insert(1);
+		auto [h2, v2] = sm.Insert(2);
+		auto [h3, v3] = sm.Insert(3);
 		assert( sm.Size() == 3 );
 
-		assert( sm[i1].m_value == 1 );
-		assert( sm[i2].m_value == 2 );
-		assert( sm[i3].m_value == 3 );
+		assert( sm[h1].m_value == 1 );
+		assert( sm[h2].m_value == 2 );
+		assert( sm[h3].m_value == 3 );
 
-		sm.Erase(1,0);
-		sm.Erase(2,0);
+		sm.Erase( h1 );
+		sm.Erase( h2);
 
 		assert( sm.Size() == 1 );
-		assert( sm[i3].m_value == 3 );
+		assert( sm[h3].m_value == 3 );
 	}
 
     vecs::Registry<vecs::REGISTRYTYPE_PARALLEL> system;
