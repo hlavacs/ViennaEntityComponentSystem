@@ -137,6 +137,15 @@ namespace vecs {
 	//----------------------------------------------------------------------------------------------
 	//Slot Maps
 
+	struct Handle {
+		uint32_t m_index;
+		uint32_t m_version;
+
+		bool operator<(const Handle& other) const {
+			return m_index < other.m_index;
+		}
+	};
+
 	/// @brief A slot map for storing a map from handle to archetpe and index.
 	/// @tparam T The value type of the slot map.
 	/// @tparam SIZE The minimum size of the slot map.
@@ -210,10 +219,11 @@ namespace vecs {
 			--m_size;
 		}
 
-		auto operator[](size_t index) -> Slot& {
-			assert(index < m_slots.size());
-			auto& value = m_slots[index];
-			return value;
+		auto operator[](Handle handle) -> Slot& {
+			assert(handle.m_index < m_slots.size());
+			auto& slot = m_slots[handle.m_index];
+			assert(slot.m_version == handle.m_version);
+			return slot;
 		}
 
 		auto Size() -> size_t {
@@ -245,14 +255,6 @@ namespace vecs {
 	const int REGISTRYTYPE_SEQUENTIAL = 0;
 	const int REGISTRYTYPE_PARALLEL = 1;
 
-	struct Handle {
-		uint32_t m_index;
-		uint32_t m_version;
-
-		bool operator<(const Handle& other) const {
-			return m_index < other.m_index;
-		}
-	};
 
 	inline std::ostream& operator<<(std::ostream& os, const vecs::Handle& handle) {
     	return os << "{" <<  handle.m_index << ", " << handle.m_version << "}"; 
@@ -578,7 +580,7 @@ namespace vecs {
 				}
 				if( index < last ) {
 					auto& lastHandle = static_cast<ComponentMap<Handle>*>(m_maps[Type<Handle>()].get())->Get(index);
-					slotmap[lastHandle.m_index].m_value.m_archIndex = index;
+					slotmap[lastHandle].m_value.m_archIndex = index;
 				}
 				++m_changeCounter;
 			}
@@ -833,7 +835,7 @@ namespace vecs {
 		/// @return true if the entity exists, else false.
 		bool Exists(Handle handle) {
 			LockGuardShared<RTYPE> lock(&m_mutex); //lock the mutex
-			auto& slot = m_entities[handle.m_index];
+			auto& slot = m_entities[handle];
 			return slot.m_version == handle.m_version;
 		}
 
@@ -861,7 +863,7 @@ namespace vecs {
 			Archetype* arch;
 			{
 				LockGuardShared<RTYPE> lock(&m_mutex); //lock the system
-				arch = m_entities[handle.m_index].m_value.m_archetypePtr;
+				arch = m_entities[handle].m_value.m_archetypePtr;
 			}
 			LockGuardShared<RTYPE> lock(&arch->GetMutex(), m_sharedMutex); //lock the mutex
 			return arch->Types();
@@ -945,7 +947,7 @@ namespace vecs {
 
 			{
 				LockGuardShared<RTYPE> lock(&m_mutex); //lock the mutex
-				value = &m_entities[handle.m_index].m_value;
+				value = &m_entities[handle].m_value;
 				oldArch = value->m_archetypePtr;
 				{
 					LockGuardShared<RTYPE> lock(&oldArch->m_mutex, m_sharedMutex); //lock the archetype
@@ -989,7 +991,7 @@ namespace vecs {
 		void Erase(Handle handle) {
 			assert(Exists(handle));
 			LockGuard<RTYPE> lock(&m_mutex); //lock the mutex
-			auto& value = m_entities[handle.m_index].m_value;
+			auto& value = m_entities[handle].m_value;
 			value.m_archetypePtr->Erase(value.m_archIndex, m_entities); //erase the entity from the archetype (do both locked)
 			m_entities.Erase(handle.m_index, handle.m_version); //erase the entity from the entity list
 		}
@@ -1062,8 +1064,7 @@ namespace vecs {
 			{
 				std::vector<size_t> types;
 				LockGuardShared<RTYPE> lock(&m_mutex); //lock the system
-				auto& entry = m_entities[handle.m_index];
-				assert( entry.m_version == handle.m_version );
+				auto& entry = m_entities[handle];
 				value = &entry.m_value;
 				oldArch = value->m_archetypePtr;
 				{
