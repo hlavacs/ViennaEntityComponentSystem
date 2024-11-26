@@ -10,7 +10,7 @@
 int test1() {
 
 	{
-		vecs::SlotMap<int, vecs::SLOTMAPTYPE_SEQUENTIAL> sm;
+		vecs::SlotMap<int> sm;
 		auto [i1, v1] = sm.Insert(1);
 		auto [i2, v2] = sm.Insert(2);
 		auto [i3, v3] = sm.Insert(3);
@@ -248,46 +248,48 @@ void test5() {
 	auto GetChar = [&]() -> char { return (char)(dis(gen)*100.0); };
 
 	std::vector<std::function<void(handles_t&)>> jobs;
-	jobs.push_back( [&](handles_t& handles) { handles.insert( system.Insert(GetInt()) ); } );
-	jobs.push_back( [&](handles_t& handles) { handles.insert( system.Insert(GetFloat())); } );
-	jobs.push_back( [&](handles_t& handles) { handles.insert( system.Insert(GetDouble())); } );
-	jobs.push_back( [&](handles_t& handles) { handles.insert( system.Insert(GetChar())); } );
-	jobs.push_back( [&](handles_t& handles) { handles.insert( system.Insert(GetInt(), GetFloat())); } );
-	jobs.push_back( [&](handles_t& handles) { handles.insert( system.Insert(GetInt(), GetFloat(), GetDouble())); } );
-	jobs.push_back( [&](handles_t& handles) { handles.insert( system.Insert(GetInt(), GetFloat(), GetDouble(), GetChar())); } );
-	jobs.push_back( [&](handles_t& handles) { handles.insert( system.Insert(GetInt(), GetFloat(), GetDouble(), GetChar(), std::string("1"))); } );
-	jobs.push_back( [&](handles_t& handles) { handles.insert( system.Insert(GetFloat(), GetDouble())); } );
-	jobs.push_back( [&](handles_t& handles) { handles.insert( system.Insert(GetFloat(), GetDouble(), GetChar())); } );
-	jobs.push_back( [&](handles_t& handles) { handles.insert( system.Insert(GetFloat(), GetDouble(), GetChar(), std::string("1"))); } );
-	jobs.push_back( [&](handles_t& handles) { handles.insert( system.Insert(GetDouble(), GetChar())); } );
-	jobs.push_back( [&](handles_t& handles) { handles.insert( system.Insert(GetDouble(), GetChar(), std::string("1"))); } );
-	jobs.push_back( [&](handles_t& handles) { handles.insert( system.Insert(GetChar(), std::string("1"))); } );
+	jobs.push_back( [&](handles_t& hs) { hs.insert( system.Insert(GetInt()) ); } );
+	jobs.push_back( [&](handles_t& hs) { hs.insert( system.Insert(GetFloat())); } );
+	jobs.push_back( [&](handles_t& hs) { hs.insert( system.Insert(GetDouble())); } );
+	jobs.push_back( [&](handles_t& hs) { hs.insert( system.Insert(GetChar())); } );
+	jobs.push_back( [&](handles_t& hs) { hs.insert( system.Insert(GetInt(), GetFloat())); } );
+	jobs.push_back( [&](handles_t& hs) { hs.insert( system.Insert(GetInt(), GetFloat(), GetDouble())); } );
+	jobs.push_back( [&](handles_t& hs) { hs.insert( system.Insert(GetInt(), GetFloat(), GetDouble(), GetChar())); } );
+	jobs.push_back( [&](handles_t& hs) { hs.insert( system.Insert(GetInt(), GetFloat(), GetDouble(), GetChar(), std::string("1"))); } );
+	jobs.push_back( [&](handles_t& hs) { hs.insert( system.Insert(GetFloat(), GetDouble())); } );
+	jobs.push_back( [&](handles_t& hs) { hs.insert( system.Insert(GetFloat(), GetDouble(), GetChar())); } );
+	jobs.push_back( [&](handles_t& hs) { hs.insert( system.Insert(GetFloat(), GetDouble(), GetChar(), std::string("1"))); } );
+	jobs.push_back( [&](handles_t& hs) { hs.insert( system.Insert(GetDouble(), GetChar())); } );
+	jobs.push_back( [&](handles_t& hs) { hs.insert( system.Insert(GetDouble(), GetChar(), std::string("1"))); } );
+	jobs.push_back( [&](handles_t& hs) { hs.insert( system.Insert(GetChar(), std::string("1"))); } );
 	
-	/*jobs.push_back( [&](handles_t& handles) { if( handles.size()) { 
-		auto h = SelectRandom(handles, dis(gen)*handles.size()); 
-		handles.erase(h);}; 
-	} );*/
-
 	jobs.push_back( [&](handles_t& handles) { 
-		if( handles.size()) { 
-			auto h = SelectRandom(handles, dis(gen)*handles.size());
-			system.Get<int&>(*h) = GetInt();
-		};
+		if( handles.size()>0) { 
+			auto h = SelectRandom(handles, dis(gen)*handles.size()); 
+			handles.erase(h);
+		}; 
 	} );
 
 	jobs.push_back( [&](handles_t& handles) { 
-		if( handles.size()) { 
+		if( handles.size()>0) { 
 			auto h = SelectRandom(handles, dis(gen)*handles.size());
+			system.Get<int&>(*h) = GetInt();			
+		};
+	} );
+
+	jobs.push_back( [&](handles_t& hs) { 
+		if( hs.size()>0) {
+			auto h = SelectRandom(hs, dis(gen)*hs.size());
 			system.Get<float&>(*h) = GetFloat();
 		};
 	} );
 
-	int num = 20000;
+	int num = 100000;
 	auto work = [&](auto& system) {
-		std::set<vecs::Handle> handles;
+		std::set<vecs::Handle> lh;
 
 		for( int i=0; i<num; ++i ) {
-			jobs[dis(gen)*jobs.size()](handles);
+			jobs[dis(gen)*jobs.size()](lh);
 		};
 	};
 
@@ -309,6 +311,8 @@ void test5() {
 
 
 int main() {
+	//test1();
+
 	/*test3( [&](auto& system, int num){ return test_insert(system, num); } );
 	test3( [&](auto& system, int num){ return test_insert_iterate(system, num); } );
 	test4( [&](auto& system, int num){ return test_insert(system, num); } );
