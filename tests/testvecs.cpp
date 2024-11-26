@@ -300,6 +300,8 @@ void test5() {
 		};
 	};
 
+	auto t1 = std::chrono::high_resolution_clock::now();
+
 	{
 		std::jthread t1{ [&](){ work(system);} };
 		std::jthread t2{ [&](){ work(system);} };
@@ -311,21 +313,22 @@ void test5() {
 		std::jthread t8{ [&](){ work(system);} };
 	}
 
-	std::cout << "Size: " << system.Size() << std::endl;
+	auto t2 = std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
+	std::cout << "Size: " << system.Size() << " us: " << duration << " us/entity: " << (double)duration/(double)(8*num) << std::endl;
 
 }
 
 
 
 int main() {
-	//test1();
-
-	//test3( [&](auto& system, int num){ return test_insert(system, num); } );
-	//test3( [&](auto& system, int num){ return test_insert_iterate(system, num); } );
-	//test4( [&](auto& system, int num){ return test_insert(system, num); } );
+	test1();
+	test3( [&](auto& system, int num){ return test_insert(system, num); } );
+	test3( [&](auto& system, int num){ return test_insert_iterate(system, num); } );
+	test4( [&](auto& system, int num){ return test_insert(system, num); } );
 	test4( [&](auto& system, int num){ return test_insert_iterate(system, num); } );
 	
-	//test5();
+	test5();
 
 	return 0;
 }

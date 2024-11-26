@@ -96,12 +96,9 @@ namespace vecs {
 				if( m_mutex == m_sharedMutex && m_other == m_sharedOther ) { 
 					std::min(m_mutex, m_other)->lock_shared();	///lock the mutexes in the correct order
 					std::max(m_mutex, m_other)->lock_shared();
-				} else if( m_mutex == m_sharedMutex ) { 
-					m_mutex->lock_shared(); 
-				}
-				else if( m_other == m_sharedOther ) { 
-					m_other->lock_shared(); 
-				}
+				} 
+				else if( m_mutex == m_sharedMutex ) { m_mutex->lock_shared(); }
+				else if( m_other == m_sharedOther ) { m_other->lock_shared(); }
 				return;
 			}
 			m_mutex->unlock();
@@ -700,9 +697,12 @@ namespace vecs {
 
 			/// @brief Access the content the iterator points to.
 			auto operator*() {
-				assert( m_entidx < m_archetypes[m_archidx].m_archetype->Size() );
-				Handle handle = m_archetypes[m_archidx].m_archetype->template Map<Handle>()->Get(m_entidx);
-				return m_system.Get<Ts...>(handle);
+				auto arch = m_archetypes[m_archidx].m_archetype;
+				assert( m_entidx < arch->Size() );
+				Handle handle = arch->template Map<Handle>()->Get(m_entidx);
+				auto tup = std::make_tuple( Get<Ts>(m_system, handle, arch)... );
+				if constexpr (sizeof...(Ts) == 1) { return std::get<0>(tup); }
+				else return tup;
 			}
 
 			auto operator!=(const Iterator& other) -> bool {
@@ -710,6 +710,20 @@ namespace vecs {
 			}
 
 		private:
+
+			template<typename U>
+			requires (!std::is_same_v<U, Handle&> && std::is_reference_v<U>)
+			[[nodiscard]] auto Get(auto &system, Handle handle, Archetype *arch) {
+				using T = std::decay_t<U>;
+				return Ref<T>{system, handle, arch, arch->template Map<T>()->Get(m_entidx)};
+			}
+
+			template<typename U>
+			requires (!std::is_same_v<U, Handle&> && !std::is_reference_v<U>)
+			[[nodiscard]] auto Get(auto &system, Handle handle, Archetype *arch) {
+				using T = std::decay_t<U>;
+				return arch->template Map<T>()->Get(m_entidx);
+			}
 
 			void Next() {
 				while( m_archidx < m_archetypes.size() && m_entidx >= std::min(m_archetypes[m_archidx].m_size, m_archetypes[m_archidx].m_archetype->Size()) ) {
