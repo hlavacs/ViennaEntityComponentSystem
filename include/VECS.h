@@ -950,14 +950,17 @@ namespace vecs {
 				return IsContained(); 
 			}
 
-			if( !m_archetypes.contains(hs) ) {
+			{
 				LockGuard<RTYPE> lock1(&m_mutex); //lock the mutex
-				auto archPtr = std::make_unique<Archetype>();
-				arch = archPtr.get();
-	 			LockGuard<RTYPE> lock2(&arch->m_mutex, arch->m_sharedMutex, &oldArch->m_mutex, oldArch->m_sharedMutex);
-				arch->Clone(*oldArch, types);
-				m_archetypes[hs] = std::move(archPtr);
-				return IsContained();
+				if( !m_archetypes.contains(hs) ) {
+					auto archPtr = std::make_unique<Archetype>();
+					arch = archPtr.get();
+		 			LockGuard<RTYPE> lock2(&arch->m_mutex, arch->m_sharedMutex, &oldArch->m_mutex, oldArch->m_sharedMutex);
+					arch->Clone(*oldArch, types);
+					m_archetypes[hs] = std::move(archPtr);
+					return IsContained();
+				}
+				arch = m_archetypes[hs].get();
 			}
 
  			LockGuard<RTYPE> lock(&arch->m_mutex, arch->m_sharedMutex, &oldArch->m_mutex, oldArch->m_sharedMutex);
@@ -1066,15 +1069,18 @@ namespace vecs {
 				return IsContained(); 
 			}
 
-			if( !m_archetypes.contains(hs) ) {
+			{
 				LockGuard<RTYPE> lock1(&m_mutex); //lock the system
-				auto archPtr = std::make_unique<Archetype>();
-				arch = archPtr.get();
-				LockGuard<RTYPE> lock2(&arch->m_mutex, arch->m_sharedMutex, &oldArch->m_mutex, oldArch->m_sharedMutex);
-				arch->Clone(*oldArch, oldArch->Types());
-				arch->template AddComponent<T>();
-				m_archetypes[hs] = std::move(archPtr);
-				return IsContained();
+				if( !m_archetypes.contains(hs) ) { //still not found?
+					auto archPtr = std::make_unique<Archetype>();
+					arch = archPtr.get();
+					LockGuard<RTYPE> lock2(&arch->m_mutex, arch->m_sharedMutex, &oldArch->m_mutex, oldArch->m_sharedMutex);
+					arch->Clone(*oldArch, oldArch->Types());
+					arch->template AddComponent<T>();
+					m_archetypes[hs] = std::move(archPtr);
+					return IsContained();
+				}
+				arch = m_archetypes[hs].get();
 			}
 
 			LockGuard<RTYPE> lock(&arch->m_mutex, arch->m_sharedMutex, &oldArch->m_mutex, oldArch->m_sharedMutex);

@@ -284,6 +284,13 @@ void test5() {
 		};
 	} );
 
+	jobs.push_back( [&](handles_t& hs) { 
+		if( hs.size()>0) {
+			auto h = SelectRandom(hs, dis(gen)*hs.size());
+			system.Get<double&>(*h) = GetDouble();
+		};
+	} );
+
 	int num = 100000;
 	auto work = [&](auto& system) {
 		std::set<vecs::Handle> lh;
