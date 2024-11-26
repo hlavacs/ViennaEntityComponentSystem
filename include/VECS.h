@@ -454,11 +454,10 @@ namespace vecs {
 			template<typename... Ts>
 				requires VecsArchetype<Ts...>
 			Archetype(Handle handle, size_t& archIndex, Ts&& ...values ) {
-				LockGuard<RTYPE> lock(&m_mutex, m_sharedMutex);
 				(AddComponent<Ts>(), ...); //insert component types
-				(AddValue2( archIndex, std::forward<Ts>(values) ), ...); //insert all components, get index of the handle
+				(AddValue( archIndex, std::forward<Ts>(values) ), ...); //insert all components, get index of the handle
 				AddComponent<Handle>(); //insert the handle
-				AddValue2( archIndex, handle ); //insert the handle
+				AddValue( archIndex, handle ); //insert the handle
 			}
 
 			/// @brief Insert a new entity with components to the archetype.
@@ -473,9 +472,8 @@ namespace vecs {
 				assert( m_types.size() == sizeof...(Ts) + 1 );
 				assert( (m_maps.contains(Type<Ts>()) && ...) );
 				size_t index;
-				(AddValue2( index, std::forward<Ts>(values) ), ...); //insert all components, get index of the handle
-				AddValue2( index, handle ); //insert the handle
-				//++m_changeCounter;
+				(AddValue( index, std::forward<Ts>(values) ), ...); //insert all components, get index of the handle
+				AddValue( index, handle ); //insert the handle
 				return index;
 			}
 
@@ -535,6 +533,82 @@ namespace vecs {
 				return m_maps[Type<Handle>()]->Size() - 1; //return the index of the new entity
 			}
 
+			/// @brief Get the number of entites in this archetype.
+			/// @return The number of entities.
+			size_t Size() {
+				return m_maps[Type<Handle>()]->Size();
+			}
+
+			/// @brief Clear the archetype.
+			void Clear() {
+				LockGuard<RTYPE> lock(&m_mutex, m_sharedMutex);
+				for( auto& map : m_maps ) {
+					map.second->Clear();
+				}
+				++m_changeCounter;
+			}
+
+			/// @brief Print the archetype.
+			void print() {
+				std::cout << "Hash: " << Hash(m_types) << std::endl;
+				for( auto ti : m_types ) {
+					std::cout << "Type: " << ti << " ";
+				}
+				std::cout << std::endl;
+				for( auto& map : m_maps ) {
+					std::cout << "Map: ";
+					map.second->print();
+					std::cout << std::endl;
+				}
+				std::cout << std::endl;
+			}
+		
+			size_t GetChangeCounter() {
+				return m_changeCounter;
+			}
+
+			auto GetMutex() -> mutex_t& {
+				return m_mutex;
+			}
+
+			auto GetSharedMutexPtr() -> mutex_t* {
+				return m_sharedMutex;
+			}
+
+			auto SetSharedMutexPtr(mutex_t* ptr) {
+				m_sharedMutex = ptr;
+			}
+
+		private:
+
+			/// @brief Add a new component to the archetype.
+			/// @tparam T The type of the component.
+			template<typename U>
+			void AddComponent() {
+				using T = std::decay_t<U>; //remove pointer or reference
+				size_t ti = Type<T>();
+				assert( !m_types.contains(ti) );
+				m_types.insert(ti);	//add the type to the list
+				m_maps[ti] = std::make_unique<ComponentMap<T>>(); //create the component map
+			};
+
+			void AddValue( size_t& index, auto&& v ) {
+				using T = std::decay_t<decltype(v)>;
+				index = m_maps[Type<T>()]->Insert(std::forward<T>(v));	//insert the component value
+			};
+	
+			void Erase2(size_t index, auto& slotmap) {
+				size_t last{index};
+				for( auto& it : m_maps ) {
+					last = it.second->Erase(index); //should always be the same handle
+				}
+				if( index < last ) {
+					auto& lastHandle = static_cast<ComponentMap<Handle>*>(m_maps[Type<Handle>()].get())->Get(index);
+					slotmap[lastHandle.m_index].m_value.m_archIndex = index;
+				}
+				++m_changeCounter;
+			}
+			
 			/// @brief Get the map of the components.
 			/// @tparam T The type of the component.
 			/// @return Pointer to the component map.
@@ -554,100 +628,6 @@ namespace vecs {
 				return it->second.get();
 			}
 
-			/// @brief Get the number of entites in this archetype.
-			/// @return The number of entities.
-			size_t Size() {
-				LockGuardShared<RTYPE> lock(&m_mutex, m_sharedMutex);
-				return m_maps[Type<Handle>()]->Size();
-			}
-
-			/// @brief Clear the archetype.
-			void Clear() {
-				LockGuard<RTYPE> lock(&m_mutex, m_sharedMutex);
-				for( auto& map : m_maps ) {
-					map.second->Clear();
-				}
-				++m_changeCounter;
-			}
-
-			/// @brief Get the types of the components.
-			const std::set<size_t>& Types() {
-				return m_types;
-			}
-
-			/// @brief Get the maps of the components.
-			const std::unordered_map<size_t, std::unique_ptr<ComponentMapBase>>& Maps() {
-				return m_maps;
-			}
-
-			/// @brief Print the archetype.
-			void print() {
-				std::cout << "Hash: " << Hash(m_types) << std::endl;
-				for( auto ti : m_types ) {
-					std::cout << "Type: " << ti << " ";
-				}
-				std::cout << std::endl;
-				for( auto& map : m_maps ) {
-					std::cout << "Map: ";
-					map.second->print();
-					std::cout << std::endl;
-				}
-				std::cout << std::endl;
-			}
-
-			/// @brief Add a new component to the archetype.
-			/// @tparam T The type of the component.
-			template<typename U>
-			void AddComponent() {
-				using T = std::decay_t<U>; //remove pointer or reference
-				size_t ti = Type<T>();
-				assert( !m_types.contains(ti) );
-				m_types.insert(ti);	//add the type to the list
-				m_maps[ti] = std::make_unique<ComponentMap<T>>(); //create the component map
-			};
-
-			/// @brief Add a new value to the archetype.
-			/// @param v The new value.
-			/// @return The index of the entity in the archetype.
-			void AddValue( size_t& index, auto&& v ) {
-				LockGuard<RTYPE> lock(&m_mutex, m_sharedMutex);
-				AddValue2(index, std::forward<decltype(v)>(v));
-			};
-		
-			size_t GetChangeCounter() {
-				return m_changeCounter;
-			}
-
-			auto GetMutex() -> mutex_t& {
-				return m_mutex;
-			}
-
-			auto GetSharedMutexPtr() -> mutex_t* {
-				return m_sharedMutex;
-			}
-
-			auto SetSharedMutexPtr(mutex_t* ptr) {
-				m_sharedMutex = ptr;
-			}
-
-		private:
-			void AddValue2( size_t& index, auto&& v ) {
-				using T = std::decay_t<decltype(v)>;
-				index = m_maps[Type<T>()]->Insert(std::forward<T>(v));	//insert the component value
-			};
-	
-			void Erase2(size_t index, auto& slotmap) {
-				size_t last{index};
-				for( auto& it : m_maps ) {
-					last = it.second->Erase(index); //should always be the same handle
-				}
-				if( index < last ) {
-					auto& lastHandle = static_cast<ComponentMap<Handle>*>(m_maps[Type<Handle>()].get())->Get(index);
-					slotmap[lastHandle.m_index].m_value.m_archIndex = index;
-				}
-				++m_changeCounter;
-			}
-			
 			mutex_t m_mutex; //mutex for thread safety
 			size_t m_changeCounter{0}; //changes invalidate references
 			std::set<size_t> m_types; //types of components
@@ -1002,7 +982,6 @@ namespace vecs {
 			std::cout << std::endl << std::endl;
 		}	
 
-
 	private:
 
 		/// @brief Internal Get function for getting component values.
@@ -1028,10 +1007,8 @@ namespace vecs {
 			using T = std::decay_t<U>;
 
 			auto& value = m_entities[handle.m_index].m_value;
-			{
-				if(value.m_archetype_ptr->Has(Type<T>())) {
-					return std::pair<Archetype*, T&>{value.m_archetype_ptr, value.m_archetype_ptr->template Get<T>(value.m_archIndex)};
-				}
+			if(value.m_archetype_ptr->Has(Type<T>())) {
+				return std::pair<Archetype*, T&>{value.m_archetype_ptr, value.m_archetype_ptr->template Get<T>(value.m_archIndex)};
 			}
 
 			std::vector<size_t> types( value.m_archetype_ptr->Types().begin(), value.m_archetype_ptr->Types().end() );
@@ -1058,7 +1035,7 @@ namespace vecs {
 			value.m_archetype_ptr = m_archetypes[hs].get();	//set the new archetype
 			types.pop_back();								//remove the last type	
 			value.m_archIndex = value.m_archetype_ptr->Move(types, value.m_archIndex, *oldArchetype, m_entities); //move entity components
-			m_archetypes[hs]->AddValue2(value.m_archIndex, T{});
+			m_archetypes[hs]->AddValue(value.m_archIndex, T{});
 			return std::pair<Archetype*, T&>{value.m_archetype_ptr, value.m_archetype_ptr->template Get<T>(value.m_archIndex)};
 		}
 

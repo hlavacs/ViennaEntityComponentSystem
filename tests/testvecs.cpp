@@ -263,7 +263,11 @@ void test5() {
 	jobs.push_back( [&](handles_t& handles) { handles.insert( system.Insert(GetDouble(), GetChar(), std::string("1"))); } );
 	jobs.push_back( [&](handles_t& handles) { handles.insert( system.Insert(GetChar(), std::string("1"))); } );
 	
-	jobs.push_back( [&](handles_t& handles) { if( handles.size()) { auto h=handles.begin(); handles.erase(h);}; } );
+	jobs.push_back( [&](handles_t& handles) { if( handles.size()) { 
+		auto h = SelectRandom(handles, dis(gen)*handles.size()); 
+		handles.erase(h);}; 
+	} );
+	
 	jobs.push_back( [&](handles_t& handles) { 
 		if( handles.size()) { 
 			auto h = SelectRandom(handles, dis(gen)*handles.size());
@@ -286,6 +290,10 @@ void test5() {
 		std::jthread t2{ [&](){ work(system);} };
 		std::jthread t3{ [&](){ work(system);} };
 		std::jthread t4{ [&](){ work(system);} };
+		std::jthread t5{ [&](){ work(system);} };
+		std::jthread t6{ [&](){ work(system);} };
+		std::jthread t7{ [&](){ work(system);} };
+		std::jthread t8{ [&](){ work(system);} };
 	}
 
 	std::cout << "Size: " << system.Size() << std::endl;
