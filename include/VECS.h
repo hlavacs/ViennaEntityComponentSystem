@@ -91,8 +91,18 @@ namespace vecs {
 		~LockGuard() { 
 			if constexpr (LTYPE == LOCKGUARDTYPE_SEQUENTIAL) return;
 			if(m_other) { 
-				m_other->unlock();
-				if( m_other == m_sharedOther ) { m_other->lock_shared(); } //get the shared lock back
+				std::max(m_mutex, m_other)->unlock();
+				std::min(m_mutex, m_other)->unlock();	///lock the mutexes in the correct order
+				if( m_mutex == m_sharedMutex && m_other == m_sharedOther ) { 
+					std::min(m_mutex, m_other)->lock_shared();	///lock the mutexes in the correct order
+					std::max(m_mutex, m_other)->lock_shared();
+				} else if( m_mutex == m_sharedMutex ) { 
+					m_mutex->lock_shared(); 
+				}
+				else if( m_other == m_sharedOther ) { 
+					m_other->lock_shared(); 
+				}
+				return;
 			}
 			m_mutex->unlock();
 			if( m_mutex == m_sharedMutex ) { m_mutex->lock_shared(); } //get the shared lock back
@@ -112,7 +122,7 @@ namespace vecs {
 		/// @brief Constructor for a single mutex. Acquire only if the thread has not already locked the mutex in shared mode.
 		LockGuardShared(mutex_t* mutex, mutex_t* sharedMutex=nullptr) : m_mutex{mutex}, m_sharedMutex{sharedMutex} { 
 			if constexpr (LTYPE == LOCKGUARDTYPE_SEQUENTIAL) return;
-			if( mutex != m_sharedMutex ) m_mutex->lock_shared();
+			if( m_mutex != m_sharedMutex ) m_mutex->lock_shared();
 		}
 
 		/// @brief Destructor, unlocks the mutex.
@@ -715,8 +725,8 @@ namespace vecs {
 				if( m_archidx >= m_archetypes.size() ) return;
 				if( m_isLocked ) return;
 				auto arch = m_archetypes[m_archidx].m_archetype;
-				arch->GetMutex().lock_shared();
 				arch->SetSharedMutexPtr(&arch->GetMutex()); //thread remembers that it locked the mutex
+				arch->GetMutex().lock_shared();
 				m_isLocked = true;
 			}
 
@@ -725,8 +735,8 @@ namespace vecs {
 				if( m_archidx >= m_archetypes.size() ) return;
 				if( !m_isLocked ) return;
 				auto arch = m_archetypes[m_archidx].m_archetype;
-				arch->SetSharedMutexPtr(nullptr);
 				arch->GetMutex().unlock_shared();
+				arch->SetSharedMutexPtr(nullptr);
 				m_isLocked = false;
 			}
 
@@ -751,14 +761,16 @@ namespace vecs {
 
 			auto begin() {
 				m_archetypes.clear();
-				LockGuardShared<RTYPE> lock(&m_system.m_mutex);
-				for( auto& it : m_system.m_archetypes ) {
-					auto arch = it.second.get();
-					auto func = [&]<typename T>() {
-						if( arch->Types().contains(Type<T>())) return true;
-						return false;
-					};
-					if( (func.template operator()<Ts>() && ...) && arch->Size()>0 ) m_archetypes.push_back({arch, arch->Size()});
+				{
+					LockGuardShared<RTYPE> lock(&m_system.m_mutex);
+					for( auto& it : m_system.m_archetypes ) {
+						auto arch = it.second.get();
+						auto func = [&]<typename T>() {
+							if( arch->Types().contains(Type<T>())) return true;
+							return false;
+						};
+						if( (func.template operator()<Ts>() && ...) && arch->Size()>0 ) m_archetypes.push_back({arch, arch->Size()});
+					}
 				}
 				return Iterator<Ts...>{m_system, m_archetypes, 0};
 			}

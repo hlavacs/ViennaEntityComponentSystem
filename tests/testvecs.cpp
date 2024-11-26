@@ -188,7 +188,7 @@ void test4( auto&& job ) {
 
 	vecs::Registry<vecs::REGISTRYTYPE_PARALLEL> system;
 
-	int num = 1000000;
+	int num = 10000;
 	auto work = [&](auto& system) {
 		size_t duration = job(system, num);
 	};
@@ -320,12 +320,12 @@ void test5() {
 int main() {
 	//test1();
 
-	/*test3( [&](auto& system, int num){ return test_insert(system, num); } );
-	test3( [&](auto& system, int num){ return test_insert_iterate(system, num); } );
-	test4( [&](auto& system, int num){ return test_insert(system, num); } );
+	//test3( [&](auto& system, int num){ return test_insert(system, num); } );
+	//test3( [&](auto& system, int num){ return test_insert_iterate(system, num); } );
+	//test4( [&](auto& system, int num){ return test_insert(system, num); } );
 	test4( [&](auto& system, int num){ return test_insert_iterate(system, num); } );
-	*/
-	test5();
+	
+	//test5();
 
 	return 0;
 }
