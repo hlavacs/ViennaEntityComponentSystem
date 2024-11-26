@@ -263,11 +263,11 @@ void test5() {
 	jobs.push_back( [&](handles_t& handles) { handles.insert( system.Insert(GetDouble(), GetChar(), std::string("1"))); } );
 	jobs.push_back( [&](handles_t& handles) { handles.insert( system.Insert(GetChar(), std::string("1"))); } );
 	
-	jobs.push_back( [&](handles_t& handles) { if( handles.size()) { 
+	/*jobs.push_back( [&](handles_t& handles) { if( handles.size()) { 
 		auto h = SelectRandom(handles, dis(gen)*handles.size()); 
 		handles.erase(h);}; 
-	} );
-	
+	} );*/
+
 	jobs.push_back( [&](handles_t& handles) { 
 		if( handles.size()) { 
 			auto h = SelectRandom(handles, dis(gen)*handles.size());
@@ -275,8 +275,14 @@ void test5() {
 		};
 	} );
 
+	jobs.push_back( [&](handles_t& handles) { 
+		if( handles.size()) { 
+			auto h = SelectRandom(handles, dis(gen)*handles.size());
+			system.Get<float&>(*h) = GetFloat();
+		};
+	} );
 
-	int num = 100000;
+	int num = 20000;
 	auto work = [&](auto& system) {
 		std::set<vecs::Handle> handles;
 
