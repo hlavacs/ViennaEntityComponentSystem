@@ -3,6 +3,7 @@
 #include <utility>
 #include <ranges>
 #include <utility>
+#include <random>
 #include "VECS.h"
 
 
@@ -127,6 +128,7 @@ int test1() {
     return 0;   
 }
 
+
 size_t test_insert_iterate( auto& system, int m ) {
 
 	auto t1 = std::chrono::high_resolution_clock::now();
@@ -143,6 +145,7 @@ size_t test_insert_iterate( auto& system, int m ) {
 
 	return std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
 }
+
 
 size_t test_insert( auto& system, int m ) {
 
@@ -222,11 +225,82 @@ void test4( auto&& job ) {
 }
 
 
+template<typename S>
+auto SelectRandom(const S &s, size_t n) {
+ 	auto it = std::begin(s);
+ 	std::advance(it,n);
+ 	return it;
+}
+
+
+void test5() {
+	using system_t = vecs::Registry<vecs::REGISTRYTYPE_PARALLEL>;
+	using handles_t = std::set<vecs::Handle>;
+	system_t system;
+
+	std::random_device rd;
+	std::mt19937 gen(rd());
+	std::uniform_real_distribution<> dis(0.0, 1.0);
+
+	auto GetInt = [&]() -> int { return dis(gen); };
+	auto GetFloat = [&]() -> float { return (float)dis(gen)*1000.0f; };
+	auto GetDouble = [&]() -> double { return (double)dis(gen)*1000.0; };
+	auto GetChar = [&]() -> char { return (char)(dis(gen)*100.0); };
+
+	std::vector<std::function<void(handles_t&)>> jobs;
+	jobs.push_back( [&](handles_t& handles) { handles.insert( system.Insert(GetInt()) ); } );
+	jobs.push_back( [&](handles_t& handles) { handles.insert( system.Insert(GetFloat())); } );
+	jobs.push_back( [&](handles_t& handles) { handles.insert( system.Insert(GetDouble())); } );
+	jobs.push_back( [&](handles_t& handles) { handles.insert( system.Insert(GetChar())); } );
+	jobs.push_back( [&](handles_t& handles) { handles.insert( system.Insert(GetInt(), GetFloat())); } );
+	jobs.push_back( [&](handles_t& handles) { handles.insert( system.Insert(GetInt(), GetFloat(), GetDouble())); } );
+	jobs.push_back( [&](handles_t& handles) { handles.insert( system.Insert(GetInt(), GetFloat(), GetDouble(), GetChar())); } );
+	jobs.push_back( [&](handles_t& handles) { handles.insert( system.Insert(GetInt(), GetFloat(), GetDouble(), GetChar(), std::string("1"))); } );
+	jobs.push_back( [&](handles_t& handles) { handles.insert( system.Insert(GetFloat(), GetDouble())); } );
+	jobs.push_back( [&](handles_t& handles) { handles.insert( system.Insert(GetFloat(), GetDouble(), GetChar())); } );
+	jobs.push_back( [&](handles_t& handles) { handles.insert( system.Insert(GetFloat(), GetDouble(), GetChar(), std::string("1"))); } );
+	jobs.push_back( [&](handles_t& handles) { handles.insert( system.Insert(GetDouble(), GetChar())); } );
+	jobs.push_back( [&](handles_t& handles) { handles.insert( system.Insert(GetDouble(), GetChar(), std::string("1"))); } );
+	jobs.push_back( [&](handles_t& handles) { handles.insert( system.Insert(GetChar(), std::string("1"))); } );
+	
+	jobs.push_back( [&](handles_t& handles) { if( handles.size()) { auto h=handles.begin(); handles.erase(h);}; } );
+	jobs.push_back( [&](handles_t& handles) { 
+		if( handles.size()) { 
+			auto h = SelectRandom(handles, dis(gen)*handles.size());
+			system.Get<int&>(*h) = GetInt();
+		};
+	} );
+
+
+	int num = 100000;
+	auto work = [&](auto& system) {
+		std::set<vecs::Handle> handles;
+
+		for( int i=0; i<num; ++i ) {
+			jobs[dis(gen)*jobs.size()](handles);
+		};
+	};
+
+	{
+		std::jthread t1{ [&](){ work(system);} };
+		std::jthread t2{ [&](){ work(system);} };
+		std::jthread t3{ [&](){ work(system);} };
+		std::jthread t4{ [&](){ work(system);} };
+	}
+
+	std::cout << "Size: " << system.Size() << std::endl;
+
+}
+
+
+
 int main() {
-	test3( [&](auto& system, int num){ return test_insert(system, num); } );
+	/*test3( [&](auto& system, int num){ return test_insert(system, num); } );
 	test3( [&](auto& system, int num){ return test_insert_iterate(system, num); } );
 	test4( [&](auto& system, int num){ return test_insert(system, num); } );
 	test4( [&](auto& system, int num){ return test_insert_iterate(system, num); } );
+	*/
+	test5();
 
 	return 0;
 }

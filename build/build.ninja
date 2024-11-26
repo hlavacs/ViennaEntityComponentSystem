@@ -12,7 +12,7 @@
 
 # =============================================================================
 # Project: ViennaEntittyCOmpnentSystem
-# Configurations: Release
+# Configurations: RelWithDebInfo
 # =============================================================================
 
 #############################################
@@ -24,7 +24,7 @@ ninja_required_version = 1.5
 #############################################
 # Set configuration variable for custom commands.
 
-CONFIGURATION = Release
+CONFIGURATION = RelWithDebInfo
 # =============================================================================
 # Include auxiliary files.
 
@@ -482,9 +482,9 @@ build CMakeFiles/ContinuousSubmit | ${cmake_ninja_workdir}CMakeFiles/ContinuousS
 
 build cmake_object_order_depends_target_testvecs: phony || tests/CMakeFiles/testvecs.dir
 
-build tests/CMakeFiles/testvecs.dir/testvecs.cpp.obj: CXX_COMPILER__testvecs_unscanned_Release C$:/data/GitHub/ViennaEntityComponentSystem/tests/testvecs.cpp || cmake_object_order_depends_target_testvecs
+build tests/CMakeFiles/testvecs.dir/testvecs.cpp.obj: CXX_COMPILER__testvecs_unscanned_RelWithDebInfo C$:/data/GitHub/ViennaEntityComponentSystem/tests/testvecs.cpp || cmake_object_order_depends_target_testvecs
   DEP_FILE = tests\CMakeFiles\testvecs.dir\testvecs.cpp.obj.d
-  FLAGS = -O3 -DNDEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrt -std=gnu++20 -stdlib=libc++
+  FLAGS = -O2 -DNDEBUG -g -Xclang -gcodeview -D_DLL -D_MT -Xclang --dependent-lib=msvcrt -std=gnu++20 -stdlib=libc++
   INCLUDES = -IC:/data/GitHub/ViennaEntityComponentSystem/extern/ViennaTypeListLibrary/include -IC:/data/GitHub/ViennaEntityComponentSystem/include
   OBJECT_DIR = tests\CMakeFiles\testvecs.dir
   OBJECT_FILE_DIR = tests\CMakeFiles\testvecs.dir
@@ -499,8 +499,8 @@ build tests/CMakeFiles/testvecs.dir/testvecs.cpp.obj: CXX_COMPILER__testvecs_uns
 #############################################
 # Link the executable tests\testvecs.exe
 
-build tests/testvecs.exe: CXX_EXECUTABLE_LINKER__testvecs_Release tests/CMakeFiles/testvecs.dir/testvecs.cpp.obj
-  FLAGS = -O3 -DNDEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrt
+build tests/testvecs.exe: CXX_EXECUTABLE_LINKER__testvecs_RelWithDebInfo tests/CMakeFiles/testvecs.dir/testvecs.cpp.obj
+  FLAGS = -O2 -DNDEBUG -g -Xclang -gcodeview -D_DLL -D_MT -Xclang --dependent-lib=msvcrt
   LINK_FLAGS = -Xlinker /subsystem:console
   LINK_LIBRARIES = -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -loldnames
   OBJECT_DIR = tests\CMakeFiles\testvecs.dir

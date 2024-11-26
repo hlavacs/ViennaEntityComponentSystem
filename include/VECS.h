@@ -270,6 +270,10 @@ namespace vecs {
 	struct Handle {
 		uint32_t m_index;
 		uint32_t m_version;
+
+		bool operator<(const Handle& other) const {
+			return m_index < other.m_index;
+		}
 	};
 
 	inline std::ostream& operator<<(std::ostream& os, const vecs::Handle& handle) {
@@ -450,6 +454,7 @@ namespace vecs {
 			template<typename... Ts>
 				requires VecsArchetype<Ts...>
 			Archetype(Handle handle, size_t& archIndex, Ts&& ...values ) {
+				LockGuard<RTYPE> lock(&m_mutex, m_sharedMutex);
 				(AddComponent<Ts>(), ...); //insert component types
 				(AddValue2( archIndex, std::forward<Ts>(values) ), ...); //insert all components, get index of the handle
 				AddComponent<Handle>(); //insert the handle
@@ -470,7 +475,7 @@ namespace vecs {
 				size_t index;
 				(AddValue2( index, std::forward<Ts>(values) ), ...); //insert all components, get index of the handle
 				AddValue2( index, handle ); //insert the handle
-				++m_changeCounter;
+				//++m_changeCounter;
 				return index;
 			}
 
@@ -484,6 +489,7 @@ namespace vecs {
 			/// @param ti Hash of the type index of the component.
 			/// @return true if the archetype has the component, else false.
 			[[nodiscard]] bool Has(const size_t ti) {
+				LockGuardShared<RTYPE> lock(&m_mutex, m_sharedMutex);
 				return m_types.contains(ti);
 			}
 
@@ -551,6 +557,7 @@ namespace vecs {
 			/// @brief Get the number of entites in this archetype.
 			/// @return The number of entities.
 			size_t Size() {
+				LockGuardShared<RTYPE> lock(&m_mutex, m_sharedMutex);
 				return m_maps[Type<Handle>()]->Size();
 			}
 
@@ -828,6 +835,8 @@ namespace vecs {
 		template<typename... Ts>
 			requires ((sizeof...(Ts) > 0) && (vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
 		[[nodiscard]] auto Insert( Ts&&... component ) -> Handle {
+			LockGuard<RTYPE> lock(&m_mutex); //lock the mutex
+
 			std::vector<size_t> types = {Type<Handle>(), Type<Ts>()...};
 			auto [index, slot] = m_entities.Insert( {nullptr, 0} ); //get a slot for the entity
 			Handle handle{(uint32_t)index, (uint32_t)slot.m_version.load()}; //create a handle
@@ -835,11 +844,11 @@ namespace vecs {
 			size_t archIndex;
 			size_t hs = Hash(types);
 			if( !m_archetypes.contains( hs ) ) { //not found
-				LockGuard<RTYPE> lock(&m_mutex); //lock the mutex
+				//LockGuard<RTYPE> lock(&m_mutex); //lock the mutex
 				m_archetypes[hs] = std::make_unique<Archetype>( handle, archIndex, std::forward<Ts>(component)... );
 				slot.m_value = { m_archetypes[hs].get(), archIndex };
 			} else {
-				LockGuardShared<RTYPE> lock(&m_mutex); //lock the mutex
+				//LockGuardShared<RTYPE> lock(&m_mutex); //lock the mutex
 				archIndex = m_archetypes[hs]->Insert( handle, std::forward<Ts>(component)... );
 				slot.m_value = { m_archetypes[hs].get(), archIndex };
 			}
@@ -1019,21 +1028,22 @@ namespace vecs {
 			using T = std::decay_t<U>;
 
 			auto& value = m_entities[handle.m_index].m_value;
-			if(value.m_archetype_ptr->Has(Type<T>())) {
-				return std::pair<Archetype*, T&>{value.m_archetype_ptr, value.m_archetype_ptr->template Get<T>(value.m_archIndex)};
+			{
+				if(value.m_archetype_ptr->Has(Type<T>())) {
+					return std::pair<Archetype*, T&>{value.m_archetype_ptr, value.m_archetype_ptr->template Get<T>(value.m_archIndex)};
+				}
 			}
 
 			std::vector<size_t> types( value.m_archetype_ptr->Types().begin(), value.m_archetype_ptr->Types().end() );
 			types.push_back(Type<T>());
 
+			LockGuard<RTYPE> lock(&m_mutex); //lock the mutex
 			size_t hs = Hash(types);
 			if(!m_archetypes.contains(hs)) { //not found
-				LockGuard<RTYPE> lock(&m_mutex); //lock the mutex
 				m_archetypes[hs] = std::make_unique<Archetype>();
 				m_archetypes[hs]->template AddComponent<T>();
 				return Fix<T>(hs, value, types);
 			}
-			LockGuardShared<RTYPE> lock(&m_mutex); //lock the mutex
 			return Fix<T>(hs, value, types);
 		}
 
