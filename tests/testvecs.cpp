@@ -188,8 +188,9 @@ void test3( std::string name, bool insert, auto&& job ) {
 	int num = 2000000;
 
 	{
-		std::cout << "test3.1 sequential " + name << std::endl;
+		std::cout << "test 3.1 sequential " + name << std::endl;
 		vecs::Registry<vecs::REGISTRYTYPE_SEQUENTIAL> system;
+		if(insert) test_insert(system, num);
 		duration = job(system, num);
 		std::cout << "Size: " << system.Size() << " us: " << duration << " us/entity: " << (double)duration/(double)num << std::endl;
 		system.Clear();
@@ -199,7 +200,7 @@ void test3( std::string name, bool insert, auto&& job ) {
 	}
 
 	{
-		std::cout << "test3.2 sequential " + name << std::endl;
+		std::cout << "test 3.2 sequential " + name << std::endl;
 		vecs::Registry<vecs::REGISTRYTYPE_PARALLEL> system;
 		if(insert) test_insert(system, num);
 		duration = job(system, num);
@@ -268,7 +269,7 @@ auto SelectRandom(const S &s, size_t n) {
 
 void test5() {
 
-	std::cout << "test5 parallel" << std::endl;
+	std::cout << "test 5 parallel" << std::endl;
 
 	using system_t = vecs::Registry<vecs::REGISTRYTYPE_PARALLEL>;
 	using handles_t = std::set<vecs::Handle>;

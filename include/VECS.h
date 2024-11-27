@@ -133,6 +133,66 @@ namespace vecs {
 	};
 
 
+	//----------------------------------------------------------------------------------------------
+	//Segmented Stack
+
+	template<typename T>
+	class Stack {
+
+		using segment_t = std::unique_ptr<std::vector<T>>;
+		using stack_t = std::vector<segment_t>;
+
+		public:
+			Stack(size_t segmentBits = 10) : m_segmentBits(segmentBits), m_segmentSize{1ul<<segmentBits} {
+				assert(segmentBits > 0);
+				m_stack.push_back( std::make_unique<std::vector<T>>(m_segmentSize) );
+			}
+
+			~Stack() = default;
+
+			template<typename U>
+				requires std::is_convertible_v<U, T>
+			void push_back(U&& value) {
+				if( size() >> m_segmentBits == m_stack.size() ) {
+					m_stack.push_back( std::make_unique<std::vector<T>>(m_segmentSize) );
+				}
+				++m_size;
+				operator[](size()-1) = std::forward<U>(value);
+			}
+
+			void pop_back() {
+				assert(m_size > 0);
+				--m_size;
+				if(	(m_size & (m_segmentSize-1ul)) == 0 && m_stack.size() > 1 ) {
+					m_stack.pop_back();
+				}
+			}
+
+			auto operator[](size_t index) -> T& {
+				assert(index < m_size);
+				size_t segment = index >> m_segmentBits;
+				size_t offset = index & (m_segmentSize-1ul);
+				return (*m_stack[segment])[offset];
+			}
+
+			auto size() -> size_t {
+				return m_size;
+			}
+
+			void clear() {
+				m_size = 0;
+				m_stack.clear();
+				m_stack.push_back( std::make_unique<std::vector<T>>(m_segmentSize) );
+			}
+
+		private:
+			size_t m_size{0};
+			size_t m_segmentBits{10};
+			size_t m_segmentSize{1<<m_segmentBits};
+			stack_t m_stack;
+	};
+
+
 
 	//----------------------------------------------------------------------------------------------
 	//Slot Maps
@@ -162,15 +222,18 @@ namespace vecs {
 			vers_t m_version;	//version of the slot
 			T 	   m_value{};	//value of the slot
 
+			Slot() = default;
+
 			Slot(const next_t&& next, const vers_t&& version, T&& value) : m_value{std::forward<T>(value)} {
 				m_nextFree = next;
 				m_version = version;
 			}
 
-			Slot( const Slot& other ) : m_value{other.m_value} {
+			Slot& operator=( const Slot& other ) {
 				m_nextFree = other.m_nextFree;
 				m_version = other.m_version;
 				m_value = other.m_value;
+				return *this;
 			}
 		};
 
@@ -200,7 +263,7 @@ namespace vecs {
 				}
 			}
 
-			m_slots.emplace_back( next_t{-1}, vers_t{0}, std::forward<T>(value) );
+			m_slots.push_back( Slot{ next_t{-1}, vers_t{0}, std::forward<T>(value) } );
 			size_t index = m_slots.size() - 1; //index of the new slot
 			auto& slot = m_slots[index];
 			slot.m_value = std::forward<T>(value);
@@ -245,7 +308,7 @@ namespace vecs {
 	private:
 		vers_t m_size{0}; ///< Size of the slot map.
 		next_t m_firstFree{-1}; ///< Index of the first free slot.
-		std::deque<Slot> m_slots; ///< Vector of slots.
+		Stack<Slot> m_slots{15}; ///< Vector of slots.
 	};
 
 
@@ -341,7 +404,7 @@ namespace vecs {
 			/// @param handle The handle of the entity.
 			/// @param v The component value.
 			[[nodiscard]] size_t Insert(auto&& v) {
-				m_data.emplace_back( std::forward<T>(v) );
+				m_data.push_back( std::forward<T>(v) );
 				return m_data.size() - 1;
 			};
 
@@ -401,7 +464,7 @@ namespace vecs {
 			}
 
 		private:
-			std::deque<T> m_data; //vector of component values
+			Stack<T> m_data; //vector of component values
 		}; //end of ComponentMap
 
 		//----------------------------------------------------------------------------------------------
