@@ -9,6 +9,8 @@
 
 int test1() {
 
+	std::cout << "test 1.1 slotmap" << std::endl;
+
 	{
 		vecs::SlotMap<int> sm;
 		auto [h1, v1] = sm.Insert(1);
@@ -26,6 +28,8 @@ int test1() {
 		assert( sm.Size() == 1 );
 		assert( sm[h3].m_value == 3 );
 	}
+
+	std::cout << "test 1.2 system" << std::endl;
 
     vecs::Registry<vecs::REGISTRYTYPE_PARALLEL> system;
 
@@ -117,6 +121,7 @@ int test1() {
 		auto h1 = system.Insert(5, 5.5f);
 		auto h2 = system.Insert(5, 5.5f);
     }
+
     for( auto [handle, i, f] : system.template GetView<vecs::Handle, int&, float&>() ) {
         std::cout << "Handle: "<< handle << " int: " << i << " float: " << f << std::endl;
 	}
@@ -160,39 +165,66 @@ size_t test_insert( auto& system, int m ) {
 }
 
 
-void test3(auto&& job ) {
+size_t test_iterate( auto& system, int m ) {
+
+	auto t1 = std::chrono::high_resolution_clock::now();
+
+    for( auto [handle, i, f] : system.template GetView<vecs::Handle, int&, float&>() ) {
+        i = i() + (int)f();
+		f = (float)i();
+		//system.template Has<int>(handle);
+		//system.Exists(handle);
+	}
+
+	auto t2 = std::chrono::high_resolution_clock::now();
+
+	return std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
+}
+
+
+void test3( std::string name, bool insert, auto&& job ) {
 
 	size_t duration;
 	int num = 2000000;
+
 	{
+		std::cout << "test3.1 sequential " + name << std::endl;
 		vecs::Registry<vecs::REGISTRYTYPE_SEQUENTIAL> system;
 		duration = job(system, num);
 		std::cout << "Size: " << system.Size() << " us: " << duration << " us/entity: " << (double)duration/(double)num << std::endl;
 		system.Clear();
+		if(insert) test_insert(system, num);
 		duration = job(system, num);
 		std::cout << "Size: " << system.Size() << " us: " << duration << " us/entity: " << (double)duration/(double)num << std::endl;
 	}
 
 	{
+		std::cout << "test3.2 sequential " + name << std::endl;
 		vecs::Registry<vecs::REGISTRYTYPE_PARALLEL> system;
+		if(insert) test_insert(system, num);
 		duration = job(system, num);
 		std::cout << "Size: " << system.Size() << " us: " << duration << " us/entity: " << (double)duration/(double)num << std::endl;
 		system.Clear();
+		if(insert) test_insert(system, num);
 		duration = job(system, num);
 		std::cout << "Size: " << system.Size() << " us: " << duration << " us/entity: " << (double)duration/(double)num << std::endl;
 	}
+
 }
 
 
-void test4( auto&& job ) {
+void test4( std::string name, bool insert, auto&& job ) {
 
 	vecs::Registry<vecs::REGISTRYTYPE_PARALLEL> system;
 
-	int num = 10000;
+	int num = 500000;
 	auto work = [&](auto& system) {
 		size_t duration = job(system, num);
 	};
 
+	if(insert) test_insert(system, 4*num);
+
+	std::cout << "test 4.1 parallel " + name << std::endl;
 	auto t1 = std::chrono::high_resolution_clock::now();
 	{
 		std::jthread t1{ [&](){ work(system);} };
@@ -207,8 +239,9 @@ void test4( auto&& job ) {
 	}
 
 	system.Clear();
-	std::cout << "Size: " << system.Size() << std::endl;
+	if(insert) test_insert(system, 4*num);
 
+	std::cout << "test 4.2 parallel " + name << std::endl;
 	t1 = std::chrono::high_resolution_clock::now();
 
 	{
@@ -234,6 +267,9 @@ auto SelectRandom(const S &s, size_t n) {
 
 
 void test5() {
+
+	std::cout << "test5 parallel" << std::endl;
+
 	using system_t = vecs::Registry<vecs::REGISTRYTYPE_PARALLEL>;
 	using handles_t = std::set<vecs::Handle>;
 	system_t system;
@@ -323,11 +359,14 @@ void test5() {
 
 int main() {
 	test1();
-	test3( [&](auto& system, int num){ return test_insert(system, num); } );
-	test3( [&](auto& system, int num){ return test_insert_iterate(system, num); } );
-	test4( [&](auto& system, int num){ return test_insert(system, num); } );
-	test4( [&](auto& system, int num){ return test_insert_iterate(system, num); } );
-	
+
+	test3( "Insert", false, [&](auto& system, int num){ return test_insert(system, num); } );
+	test3( "Iterate", true, [&](auto& system, int num){ return test_iterate(system, num); } );
+	test3( "Insert + Iterate", false, [&](auto& system, int num){ return test_insert_iterate(system, num); } );
+
+	test4( "Insert", false, [&](auto& system, int num){ return test_insert(system, num); } );
+	test4( "Iterate", true, [&](auto& system, int num){ return test_iterate(system, num); } );
+	test4( "Insert + Iterate", false, [&](auto& system, int num){ return test_insert_iterate(system, num); } );
 	test5();
 
 	return 0;

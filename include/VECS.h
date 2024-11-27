@@ -604,8 +604,10 @@ namespace vecs {
 				return it->second.get();
 			}
 
+			using Size_t = std::conditional_t<RTYPE == REGISTRYTYPE_SEQUENTIAL, std::size_t, std::atomic<std::size_t>>;
+
 			mutex_t m_mutex; //mutex for thread safety
-			size_t m_changeCounter{0}; //changes invalidate references
+			Size_t m_changeCounter{0}; //changes invalidate references
 			std::set<size_t> m_types; //types of components
 			std::unordered_map<size_t, std::unique_ptr<ComponentMapBase>> m_maps; //map from type index to component data
 		}; //end of Archetype
@@ -624,23 +626,29 @@ namespace vecs {
 			Ref(Registry<RTYPE>& system, Handle handle, Archetype *arch, T& valueRef) 
 				: m_system{system}, m_handle{handle}, m_archetype{arch}, m_valueRef{valueRef}, m_changeCounter{arch->GetChangeCounter()} {}
 
-			auto operator()() -> T {
+			auto operator()() {
 				return CheckChangeCounter();
 			}
 
 			void operator=(T&& value) {
-				CheckChangeCounter() = std::forward<T>(value);
+				CheckChangeCounter();
+				m_valueRef = std::forward<T>(value);
+			}
+
+			auto Get() {
+				return CheckChangeCounter();
 			}
 
 		private:
-			T& CheckChangeCounter() {
-				if(m_archetype->GetChangeCounter() != m_changeCounter ) {
+			auto CheckChangeCounter() -> T& {
+				auto cc = m_archetype->GetChangeCounter();
+				if(cc != m_changeCounter ) {
 					auto [arch, ref] = m_system.Get2<T>(m_handle);
 					m_archetype = arch;
 					m_valueRef = ref;
-					m_changeCounter = arch->GetChangeCounter();
+					m_changeCounter = cc;
 				}
-				return m_valueRef;
+				return  m_valueRef;
 			}
 
 			Registry<RTYPE>& m_system;
@@ -810,7 +818,7 @@ namespace vecs {
 		template<typename... Ts>
 			requires ((sizeof...(Ts) > 0) && (vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
 		[[nodiscard]] auto Insert( Ts&&... component ) -> Handle {
-			LockGuard<RTYPE> lock(&m_mutex); //lock the mutex
+			LockGuard<RTYPE> lock(&m_mutex, m_sharedMutex); //lock the mutex
 
 			std::vector<size_t> types = {Type<Handle>(), Type<Ts>()...};
 			auto [handle, slot] = m_entities.Insert( {nullptr, 0} ); //get a slot for the entity
@@ -833,7 +841,7 @@ namespace vecs {
 		/// @param handle The handle of the entity.
 		/// @return true if the entity exists, else false.
 		bool Exists(Handle handle) {
-			LockGuardShared<RTYPE> lock(&m_mutex); //lock the mutex
+			LockGuardShared<RTYPE> lock(&m_mutex, m_sharedMutex); //lock the mutex
 			auto& slot = m_entities[handle];
 			return slot.m_version == handle.m_version;
 		}
@@ -847,7 +855,7 @@ namespace vecs {
 			assert(Exists(handle));
 			Archetype* arch;
 			{
-				LockGuardShared<RTYPE> lock(&m_mutex); //lock the system
+				LockGuardShared<RTYPE> lock(&m_mutex, m_sharedMutex); //lock the system
 				arch = m_entities[handle].m_value.m_archetypePtr;
 			}
 			LockGuardShared<RTYPE> lock(&arch->GetMutex(), m_sharedMutex); //lock the archetype
@@ -861,7 +869,7 @@ namespace vecs {
 			assert(Exists(handle));
 			Archetype* arch;
 			{
-				LockGuardShared<RTYPE> lock(&m_mutex); //lock the system
+				LockGuardShared<RTYPE> lock(&m_mutex, m_sharedMutex); //lock the system
 				arch = m_entities[handle].m_value.m_archetypePtr;
 			}
 			LockGuardShared<RTYPE> lock(&arch->GetMutex(), m_sharedMutex); //lock the mutex
@@ -945,7 +953,7 @@ namespace vecs {
 			bool contained;
 
 			{
-				LockGuardShared<RTYPE> lock(&m_mutex); //lock the mutex
+				LockGuardShared<RTYPE> lock(&m_mutex, m_sharedMutex); //lock the mutex
 				value = &m_entities[handle].m_value;
 				oldArch = value->m_archetypePtr;
 				{
