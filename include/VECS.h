@@ -65,11 +65,8 @@ namespace vecs {
 		/// @param mutex Pointer to the Archetype mutex.
 		/// @param sharedMutex In case the thread has already locked the mutex in shared mode, this is the pointer to the shared mutex.
 		/// If the pointers are the same, the thread already holds a read lock.
-		LockGuard(mutex_t* mutex, mutex_t* sharedMutex=nullptr) 
-			: m_mutex{mutex}, m_sharedMutex{sharedMutex}, m_other{nullptr}, m_sharedOther{nullptr} { 
-			if constexpr (LTYPE == LOCKGUARDTYPE_SEQUENTIAL) return;
-			if( mutex == m_sharedMutex ) { m_mutex->unlock_shared(); }
-			m_mutex->lock(); 
+		LockGuard(mutex_t* mutex) : m_mutex{mutex}, m_other{nullptr} { 
+			if constexpr (LTYPE == LOCKGUARDTYPE_PARALLEL) { m_mutex->lock(); }
 		}
 
 		/// @brief Constructor for two mutexes. This is necessary if an entity must be moved from one archetype to another, because
@@ -78,37 +75,27 @@ namespace vecs {
 		/// @param sharedMutex In case the thread has already locked the mutex in shared mode, this is the pointer to the shared mutex.
 		/// If the pointers are the same, the thread already holds a read lock.
 		/// @param other Pointer to the other Archetype mutex.
-		LockGuard(mutex_t* mutex, mutex_t* sharedMutex, mutex_t* other, mutex_t* sharedOther) 
-			: m_mutex{mutex}, m_sharedMutex{sharedMutex}, m_other{other}, m_sharedOther{sharedOther} { 
-			if constexpr (LTYPE == LOCKGUARDTYPE_SEQUENTIAL) return;
-			if( m_mutex == m_sharedMutex ) { m_mutex->unlock_shared(); } //check if the mutex is already locked
-			if( m_other == m_sharedOther ) { m_other->unlock_shared(); }
-			std::min(m_mutex, m_other)->lock();	///lock the mutexes in the correct order
-			std::max(m_mutex, m_other)->lock();
+		LockGuard(mutex_t* mutex, mutex_t* other) : m_mutex{mutex}, m_other{other} { 
+			if constexpr (LTYPE == LOCKGUARDTYPE_PARALLEL) {
+				std::min(m_mutex, m_other)->lock();	///lock the mutexes in the correct order
+				std::max(m_mutex, m_other)->lock();
+			}
 		}
 
 		/// @brief Destructor, unlocks the mutexes.
 		~LockGuard() { 
-			if constexpr (LTYPE == LOCKGUARDTYPE_SEQUENTIAL) return;
-			if(m_other) { 
-				std::max(m_mutex, m_other)->unlock();
-				std::min(m_mutex, m_other)->unlock();	///lock the mutexes in the correct order
-				if( m_mutex == m_sharedMutex && m_other == m_sharedOther ) { 
-					std::min(m_mutex, m_other)->lock_shared();	///lock the mutexes in the correct order
-					std::max(m_mutex, m_other)->lock_shared();
-				} 
-				else if( m_mutex == m_sharedMutex ) { m_mutex->lock_shared(); }
-				else if( m_other == m_sharedOther ) { m_other->lock_shared(); }
-				return;
+			if constexpr (LTYPE == LOCKGUARDTYPE_PARALLEL) {
+				if(m_other) { 
+					std::max(m_mutex, m_other)->unlock();
+					std::min(m_mutex, m_other)->unlock();	///lock the mutexes in the correct order
+					return;
+				}
+				m_mutex->unlock();
 			}
-			m_mutex->unlock();
-			if( m_mutex == m_sharedMutex ) { m_mutex->lock_shared(); } //get the shared lock back
 		}
 
 		mutex_t* m_mutex{nullptr};
-		mutex_t* m_sharedMutex{nullptr};
 		mutex_t* m_other{nullptr};
-		mutex_t* m_sharedOther{nullptr};
 	};
 
 	/// @brief A lock guard for a shared mutex in RAII manner.
@@ -117,19 +104,16 @@ namespace vecs {
 	struct LockGuardShared {
 
 		/// @brief Constructor for a single mutex. Acquire only if the thread has not already locked the mutex in shared mode.
-		LockGuardShared(mutex_t* mutex, mutex_t* sharedMutex=nullptr) : m_mutex{mutex}, m_sharedMutex{sharedMutex} { 
-			if constexpr (LTYPE == LOCKGUARDTYPE_SEQUENTIAL) return;
-			if( m_mutex != m_sharedMutex ) m_mutex->lock_shared();
+		LockGuardShared(mutex_t* mutex) : m_mutex{mutex} { 
+			if constexpr (LTYPE == LOCKGUARDTYPE_PARALLEL) { m_mutex->lock_shared(); }
 		}
 
 		/// @brief Destructor, unlocks the mutex.
 		~LockGuardShared() { 
-			if constexpr (LTYPE == LOCKGUARDTYPE_SEQUENTIAL) return;
-			if( m_mutex != m_sharedMutex ) m_mutex->unlock_shared();
+			if constexpr (LTYPE == LOCKGUARDTYPE_PARALLEL) { m_mutex->unlock_shared(); }
 		}
 
 		mutex_t* m_mutex{nullptr};		 ///< Pointer to the mutex.
-		mutex_t* m_sharedMutex{nullptr}; ///< Pointer to the shared mutex.
 	};
 
 
@@ -198,8 +182,12 @@ namespace vecs {
 	//Slot Maps
 
 	struct Handle {
-		uint32_t m_index;
-		uint32_t m_version;
+		uint32_t m_index{std::numeric_limits<uint32_t>::max()};
+		uint32_t m_version{0};
+
+		bool IsValid() const {
+			return m_index != std::numeric_limits<uint32_t>::max();
+		}
 
 		bool operator<(const Handle& other) const {
 			return m_index < other.m_index;
@@ -240,7 +228,7 @@ namespace vecs {
 	public:
 
 		/// @brief Constructor, creates the slot map.
-		SlotMap(int64_t SIZE = 1<<20) {
+		SlotMap(int64_t SIZE = 1<<10) {
 			m_firstFree = 0;
 			for( int64_t i = 1; i <= SIZE-1; ++i ) { //create the free list
 				m_slots.push_back( Slot( next_t{i}, vers_t{0uL}, T{} ) );
@@ -274,7 +262,6 @@ namespace vecs {
 		/// @brief Erase a value from the slot map.
 		/// @param index The index of the value to erase.
 		void Erase(Handle handle) {
-			assert(handle.m_index < m_slots.size());
 			auto& slot = m_slots[handle.m_index];
 			++slot.m_version;	//increment the version to invalidate the slot
 			slot.m_nextFree = m_firstFree;	
@@ -283,9 +270,7 @@ namespace vecs {
 		}
 
 		auto operator[](Handle handle) -> Slot& {
-			assert(handle.m_index < m_slots.size());
 			auto& slot = m_slots[handle.m_index];
-			assert(slot.m_version == handle.m_version);
 			return slot;
 		}
 
@@ -308,7 +293,7 @@ namespace vecs {
 	private:
 		vers_t m_size{0}; ///< Size of the slot map.
 		next_t m_firstFree{-1}; ///< Index of the first free slot.
-		Stack<Slot> m_slots{15}; ///< Vector of slots.
+		std::deque<Slot> m_slots; ///< Container of slots.
 	};
 
 
@@ -464,7 +449,7 @@ namespace vecs {
 			}
 
 		private:
-			Stack<T> m_data; //vector of component values
+			std::deque<T> m_data; //vector of component values
 		}; //end of ComponentMap
 
 		//----------------------------------------------------------------------------------------------
@@ -741,15 +726,18 @@ namespace vecs {
 			/// @param archidx First archetype index.
 			Iterator( Registry<RTYPE>& system, std::vector<ArchetypeAndSize>& arch, size_t archidx) 
 				: m_system{system}, m_archetypes{arch}, m_archidx{archidx} {
+				system.increaseIterators();
 				Next();
 			}
 
 			Iterator(const Iterator& other) : m_system{other.m_system}, m_archetypes{other.m_archetypes}, 
 				m_archidx{other.m_archidx}, m_entidx{other.m_entidx}, m_isLocked{false} {
+				m_system.increaseIterators();
 			}
 
 			~Iterator() {
 				UnlockShared();
+				if( m_system.decreaseIterators() == 0 ) m_system.runDelayedTransactions();
 			}
 
 			/// @brief Prefix increment operator.
@@ -803,7 +791,7 @@ namespace vecs {
 				if( m_archidx >= m_archetypes.size() ) return;
 				if( m_isLocked ) return;
 				auto arch = m_archetypes[m_archidx].m_archetype;
-				m_system.SetSharedMutexPtr(&arch->GetMutex()); //thread remembers that it locked the mutex
+				//m_system.SetSharedMutexPtr(&arch->GetMutex()); //thread remembers that it locked the mutex
 				arch->GetMutex().lock_shared();
 				m_isLocked = true;
 			}
@@ -814,7 +802,7 @@ namespace vecs {
 				if( !m_isLocked ) return;
 				auto arch = m_archetypes[m_archidx].m_archetype;
 				arch->GetMutex().unlock_shared();
-				m_system.SetSharedMutexPtr(nullptr);
+				//m_system.SetSharedMutexPtr(nullptr);
 				m_isLocked = false;
 			}
 
@@ -881,22 +869,25 @@ namespace vecs {
 		template<typename... Ts>
 			requires ((sizeof...(Ts) > 0) && (vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
 		[[nodiscard]] auto Insert( Ts&&... component ) -> Handle {
-			LockGuard<RTYPE> lock(&m_mutex, m_sharedMutex); //lock the mutex
+			assert(CheckDelay());
 
-			std::vector<size_t> types = {Type<Handle>(), Type<Ts>()...};
+			LockGuard<RTYPE> lock(&m_mutex); //lock the mutex
 			auto [handle, slot] = m_entities.Insert( {nullptr, 0} ); //get a slot for the entity
 
 			size_t archIndex;
+			std::vector<size_t> types = {Type<Handle>(), Type<Ts>()...};
 			size_t hs = Hash(types);
 			if( !m_archetypes.contains( hs ) ) { //not found
-				m_archetypes[hs] = std::make_unique<Archetype>( handle, archIndex, std::forward<Ts>(component)... );
-				slot.m_value = { m_archetypes[hs].get(), archIndex };
+				auto arch = std::make_unique<Archetype>( handle, archIndex, std::forward<Ts>(component)... );
+				slot.m_value = { arch.get(), archIndex };
+				m_archetypes[hs] = std::move(arch);
 			} else {
 				auto arch = m_archetypes[hs].get();
-				LockGuard<RTYPE> lock(&arch->GetMutex(), m_sharedMutex); //lock the mutex
+				LockGuard<RTYPE> lock(&arch->GetMutex()); //lock the mutex
 				archIndex = arch->Insert( handle, std::forward<Ts>(component)... );
 				slot.m_value = { arch, archIndex };
 			}
+
 			return handle;
 		}
 
@@ -904,7 +895,8 @@ namespace vecs {
 		/// @param handle The handle of the entity.
 		/// @return true if the entity exists, else false.
 		bool Exists(Handle handle) {
-			LockGuardShared<RTYPE> lock(&m_mutex, m_sharedMutex); //lock the mutex
+			assert(CheckDelay());
+			LockGuardShared<RTYPE> lock(&m_mutex); //lock the mutex
 			auto& slot = m_entities[handle];
 			return slot.m_version == handle.m_version;
 		}
@@ -915,13 +907,10 @@ namespace vecs {
 		/// @return true if the entity has the component, else false.
 		template<typename T>
 		bool Has(Handle handle) {
+			assert(CheckDelay());
 			assert(Exists(handle));
-			Archetype* arch;
-			{
-				LockGuardShared<RTYPE> lock(&m_mutex, m_sharedMutex); //lock the system
-				arch = m_entities[handle].m_value.m_archetypePtr;
-			}
-			LockGuardShared<RTYPE> lock(&arch->GetMutex(), m_sharedMutex); //lock the archetype
+			LockGuardShared<RTYPE> lock(&m_mutex); //lock the system
+			auto arch = m_entities[handle].m_value.m_archetypePtr;
 			return arch->Has(Type<T>());
 		}
 
@@ -929,13 +918,10 @@ namespace vecs {
 		/// @param handle The handle of the entity.
 		/// @return A vector of type indices of the components.
 		const auto& Types(Handle handle) {
+			assert(CheckDelay());
 			assert(Exists(handle));
-			Archetype* arch;
-			{
-				LockGuardShared<RTYPE> lock(&m_mutex, m_sharedMutex); //lock the system
-				arch = m_entities[handle].m_value.m_archetypePtr;
-			}
-			LockGuardShared<RTYPE> lock(&arch->GetMutex(), m_sharedMutex); //lock the mutex
+			LockGuardShared<RTYPE> lock(&m_mutex); //lock the system
+			auto arch = m_entities[handle].m_value.m_archetypePtr;
 			return arch->Types();
 		}
 
@@ -947,6 +933,7 @@ namespace vecs {
 		template<typename U>
 			requires (!std::is_same_v<U, Handle&> && std::is_reference_v<U>)
 		[[nodiscard]] auto Get(Handle handle) {
+			assert(CheckDelay());
 			using T = std::decay_t<U>;
 			auto [arch, ref] = Get2<T>(handle);
 			return Ref<T>{*this, handle, arch, ref};
@@ -1008,7 +995,13 @@ namespace vecs {
 		template<typename... Ts>
 			requires (vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
 		void Erase(Handle handle) {
+			assert(CheckDelay());
 			assert( (Has<Ts>(handle) && ...) );
+
+			if constexpr( RTYPE == REGISTRYTYPE_PARALLEL ) {
+				if( m_numIterators > 0 ) { m_delayedTransactions.push_back([&](){ Erase(handle); }); return; }
+			}
+
 			ArchetypeAndIndex *value;
 			std::set<size_t> types;
 			Archetype *oldArch, *arch;
@@ -1016,11 +1009,11 @@ namespace vecs {
 			bool contained;
 
 			{
-				LockGuardShared<RTYPE> lock(&m_mutex, m_sharedMutex); //lock the mutex
+				LockGuardShared<RTYPE> lock(&m_mutex); //lock the mutex
 				value = &m_entities[handle].m_value;
 				oldArch = value->m_archetypePtr;
 				{
-					LockGuardShared<RTYPE> lock(&oldArch->m_mutex, m_sharedMutex); //lock the archetype
+					LockGuardShared<RTYPE> lock(&oldArch->m_mutex); //lock the archetype
 					types = oldArch->Types();
 				}
 				(types.erase(Type<Ts>()), ... );
@@ -1035,7 +1028,7 @@ namespace vecs {
 			};
 			
 			if( contained ) { 
-				LockGuard<RTYPE> lock(&arch->m_mutex, m_sharedMutex, &oldArch->m_mutex, m_sharedMutex);
+				LockGuard<RTYPE> lock(&arch->m_mutex, &oldArch->m_mutex);
 				return IsContained(); 
 			}
 
@@ -1044,7 +1037,7 @@ namespace vecs {
 				if( !m_archetypes.contains(hs) ) {
 					auto archPtr = std::make_unique<Archetype>();
 					arch = archPtr.get();
-		 			LockGuard<RTYPE> lock2(&arch->m_mutex, m_sharedMutex, &oldArch->m_mutex, m_sharedMutex);
+		 			LockGuard<RTYPE> lock2(&arch->m_mutex, &oldArch->m_mutex);
 					arch->Clone(*oldArch, types);
 					m_archetypes[hs] = std::move(archPtr);
 					return IsContained();
@@ -1052,22 +1045,25 @@ namespace vecs {
 				arch = m_archetypes[hs].get();
 			}
 
- 			LockGuard<RTYPE> lock(&arch->m_mutex, m_sharedMutex, &oldArch->m_mutex, m_sharedMutex);
+ 			LockGuard<RTYPE> lock(&arch->m_mutex, &oldArch->m_mutex);
 			return IsContained();
 		}
 
 		/// @brief Erase an entity from the registry.
 		/// @param handle The handle of the entity.
 		void Erase(Handle handle) {
+			assert(CheckDelay());
 			assert(Exists(handle));
 			LockGuard<RTYPE> lock(&m_mutex); //lock the mutex
 			auto& value = m_entities[handle].m_value;
+			LockGuard<RTYPE> lock2(&value.m_archetypePtr->m_mutex); //lock the archetype
 			value.m_archetypePtr->Erase(value.m_archIndex, m_entities); //erase the entity from the archetype (do both locked)
 			m_entities.Erase(handle); //erase the entity from the entity list
 		}
 
 		/// @brief Clear the registry by removing all entities.
 		void Clear() {
+			assert(CheckDelay());
 			LockGuard<RTYPE> lock(&m_mutex); //lock the mutex
 			for( auto& arch : m_archetypes ) {
 				arch.second->Clear();
@@ -1092,21 +1088,50 @@ namespace vecs {
 			std::cout << std::endl << std::endl;
 		}
 
-		auto GetSharedMutexPtr() -> mutex_t* {
-			return m_sharedMutex;
-		}
-
-		auto SetSharedMutexPtr(mutex_t* ptr) {
-			m_sharedMutex = ptr;
-		}
-
 		void Validate() {
+			assert(CheckDelay());
 			LockGuardShared<RTYPE> lock(&m_mutex);
 			for( auto& it : m_archetypes ) {
 				auto arch = it.second.get();
 				LockGuardShared<RTYPE> lock(&arch->m_mutex);
 				arch->Validate();
 			}
+		}
+
+		size_t increaseIterators() {
+			return ++m_numIterators;
+		}	
+
+		size_t decreaseIterators() {
+			assert(m_numIterators > 0);
+			return --m_numIterators;
+		}
+
+		bool CheckDelay() {
+			if constexpr( RTYPE == REGISTRYTYPE_PARALLEL ) {
+				if( m_numIterators > 0 ) {
+					return false;
+				}
+			}
+			return true;
+		}
+
+		bool DelayTransaction( auto&& func ) {
+			if constexpr( RTYPE == REGISTRYTYPE_PARALLEL ) {
+				if( m_numIterators > 0 ) { 
+					m_delayedTransactions.push_back(func); 
+					return true; 
+				}
+			}
+			func();
+			return false;
+		}
+
+		void runDelayedTransactions() {
+			for( auto& func : m_delayedTransactions ) {
+				func();
+			}
+			m_delayedTransactions.clear();
 		}
 
 	private:
@@ -1138,7 +1163,7 @@ namespace vecs {
 				value = &entry.m_value;
 				oldArch = value->m_archetypePtr;
 				{
-					LockGuardShared<RTYPE> lock(&oldArch->m_mutex, m_sharedMutex); //lock the archetype
+					LockGuardShared<RTYPE> lock(&oldArch->m_mutex); //lock the archetype
 					if(oldArch->Has(Type<T>())) {
 						return std::pair<Archetype*, T&>{oldArch, oldArch->template Get<T>(value->m_archIndex)};
 					}
@@ -1159,7 +1184,7 @@ namespace vecs {
 			};
 
 			if(contained) { 
-				LockGuard<RTYPE> lock(&arch->m_mutex, m_sharedMutex, &oldArch->m_mutex, m_sharedMutex);
+				LockGuard<RTYPE> lock(&arch->m_mutex, &oldArch->m_mutex);
 				return IsContained(); 
 			}
 
@@ -1168,7 +1193,7 @@ namespace vecs {
 				if( !m_archetypes.contains(hs) ) { //still not found?
 					auto archPtr = std::make_unique<Archetype>();
 					arch = archPtr.get();
-					LockGuard<RTYPE> lock2(&arch->m_mutex, m_sharedMutex, &oldArch->m_mutex, m_sharedMutex);
+					LockGuard<RTYPE> lock2(&arch->m_mutex, &oldArch->m_mutex);
 					arch->Clone(*oldArch, oldArch->Types());
 					arch->template AddComponent<T>();
 					m_archetypes[hs] = std::move(archPtr);
@@ -1177,14 +1202,45 @@ namespace vecs {
 				arch = m_archetypes[hs].get();
 			}
 
-			LockGuard<RTYPE> lock(&arch->m_mutex, m_sharedMutex, &oldArch->m_mutex, m_sharedMutex);
+			LockGuard<RTYPE> lock(&arch->m_mutex, &oldArch->m_mutex);
 			return IsContained();
 		}
+
+
+		template<typename... Ts>
+		auto Get4(Handle handle, size_t ti) -> std::pair<Archetype*, std::tuple<Ts&...>> {
+			std::vector<size_t> types;
+			auto& value = m_entities[handle].m_value;
+			auto arch = value.m_archetypePtr;
+			( [&](){ if(!arch->Has(Type<Ts>())) types.push_back(Type<Ts>()); }, ... );
+			if( types.size() == 0 ) { 
+				LockGuardShared<RTYPE> lock(&arch->m_mutex);
+				return { arch, std::tuple<Ts&...>{ arch->template Map<Ts>()->Get(value.m_archIndex)... } };
+			}
+
+			std::vector<size_t> newTypes;
+			newTypes.reserve(arch->Types().size() + types.size());
+			std::copy( types.begin(), types.end(), std::back_inserter(newTypes) );
+			std::copy( arch->Types().begin(), arch->Types().end(), std::back_inserter(newTypes) );
+			size_t hs = Hash(newTypes);
+			if( !m_archetypes.contains(hs) ) {
+				auto newArchUnique = std::make_unique<Archetype>();
+				newArchUnique->Clone(*arch, types);
+				( [&](){ if(!arch->Has(Type<Ts>())) newArchUnique->AddValue(Ts{}); }, ... );
+				m_archetypes[hs] = std::move(newArchUnique);
+			}
+			auto newArch = m_archetypes[hs].get();
+			LockGuard<RTYPE> lock(&arch->m_mutex);
+			newArch->Move(types, arch->m_entities[handle].m_archIndex, *arch, m_entities);
+			return { newArch, std::tuple<Ts&...>{ newArch->template Map<Ts>()->Get(value.m_archIndex)... } };
+		}
+
 
 		mutex_t m_mutex; //mutex for thread safety
 		SlotMap<ArchetypeAndIndex> m_entities;
 		std::unordered_map<size_t, std::unique_ptr<Archetype>> m_archetypes; //Mapping vector of type index to archetype
-		inline static thread_local mutex_t* m_sharedMutex{nullptr}; //thread local variable for locking
+		inline static thread_local size_t m_numIterators{0}; //thread local variable for locking
+		inline static thread_local std::vector<std::function<void()>> m_delayedTransactions; //thread local variable for locking
 	};
 
 
