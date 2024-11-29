@@ -1207,32 +1207,49 @@ namespace vecs {
 		}
 
 
+		template<typename U>
+			requires (std::is_reference_v<U>)
+		[[nodiscard]] auto Get3( Handle handle, Archetype* arch, size_t archIndex) {
+			using T = std::decay_t<U>;
+			return Ref<T>{*this, handle, arch, arch->template Map<T>()->Get(archIndex)};
+		}
+
+		template<typename U>
+			requires (!std::is_reference_v<U>)
+		[[nodiscard]] auto Get3( Handle handle, Archetype* arch, size_t archIndex) {
+			using T = std::decay_t<U>;
+			return arch->template Map<T>()->Get(archIndex);
+		}
+
 		template<typename... Ts>
-		auto Get4(Handle handle, size_t ti) -> std::pair<Archetype*, std::tuple<Ts&...>> {
-			std::vector<size_t> types;
+		auto GetArchetypeAndIndex(Handle handle, size_t ti) -> ArchetypeAndIndex {
+			std::vector<size_t> newTypes;
 			auto& value = m_entities[handle].m_value;
 			auto arch = value.m_archetypePtr;
-			( [&](){ if(!arch->Has(Type<Ts>())) types.push_back(Type<Ts>()); }, ... );
-			if( types.size() == 0 ) { 
-				LockGuardShared<RTYPE> lock(&arch->m_mutex);
-				return { arch, std::tuple<Ts&...>{ arch->template Map<Ts>()->Get(value.m_archIndex)... } };
-			}
+			( [&](){ if(!arch->Has(Type<Ts>())) newTypes.push_back(Type<Ts>()); }, ... );
+			if( newTypes.size() == 0 ) { return value; }
 
-			std::vector<size_t> newTypes;
-			newTypes.reserve(arch->Types().size() + types.size());
-			std::copy( types.begin(), types.end(), std::back_inserter(newTypes) );
-			std::copy( arch->Types().begin(), arch->Types().end(), std::back_inserter(newTypes) );
-			size_t hs = Hash(newTypes);
+			std::vector<size_t> allTypes;
+			allTypes.reserve(arch->Types().size() + newTypes.size());
+			std::copy( arch->Types().begin(), arch->Types().end(), std::back_inserter(allTypes) );
+			std::copy( newTypes.begin(), newTypes.end(), std::back_inserter(allTypes) );
+			size_t hs = Hash(allTypes);
 			if( !m_archetypes.contains(hs) ) {
 				auto newArchUnique = std::make_unique<Archetype>();
-				newArchUnique->Clone(*arch, types);
-				( [&](){ if(!arch->Has(Type<Ts>())) newArchUnique->AddValue(Ts{}); }, ... );
+				newArchUnique->Clone(*arch, arch->Types());
+				( [&](){ 
+					if(!arch->Has(Type<Ts>())) {
+						newArchUnique->template AddComponent<Ts>();
+						newArchUnique->template AddValue(Ts{}); 
+					}
+				}, ...  );
 				m_archetypes[hs] = std::move(newArchUnique);
 			}
 			auto newArch = m_archetypes[hs].get();
-			LockGuard<RTYPE> lock(&arch->m_mutex);
-			newArch->Move(types, arch->m_entities[handle].m_archIndex, *arch, m_entities);
-			return { newArch, std::tuple<Ts&...>{ newArch->template Map<Ts>()->Get(value.m_archIndex)... } };
+			value.m_archetypePtr = newArch;
+			LockGuard<RTYPE> lock(&arch->m_mutex); //lock old archetype
+			value.m_archIndex = newArch->Move(arch->Types(), value.m_archIndex, *arch, m_entities); //move values
+			return value;
 		}
 
 
