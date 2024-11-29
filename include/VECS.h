@@ -1222,13 +1222,19 @@ namespace vecs {
 		}
 
 		template<typename... Ts>
-		auto GetArchetypeAndIndex(Handle handle, size_t ti) -> ArchetypeAndIndex {
+		inline auto GetArchetypeAndIndex(Handle handle, size_t ti) -> ArchetypeAndIndex* {
 			std::vector<size_t> newTypes;
-			auto& value = m_entities[handle].m_value;
-			auto arch = value.m_archetypePtr;
-			( [&](){ if(!arch->Has(Type<Ts>())) newTypes.push_back(Type<Ts>()); }, ... );
-			if( newTypes.size() == 0 ) { return value; }
+			Archetype* arch;
+			ArchetypeAndIndex *value;
+			{
+				LockGuardShared<RTYPE> lock(&m_mutex); //lock the system
+				value = &m_entities[handle].m_value;
+				arch = value->m_archetypePtr;
+				( [&](){ if(!arch->Has(Type<Ts>())) newTypes.push_back(Type<Ts>()); }, ... );
+				if( newTypes.size() == 0 ) { return value; }
+			}
 
+			LockGuard<RTYPE> lock(&m_mutex); //lock the system
 			std::vector<size_t> allTypes;
 			allTypes.reserve(arch->Types().size() + newTypes.size());
 			std::copy( arch->Types().begin(), arch->Types().end(), std::back_inserter(allTypes) );
@@ -1246,9 +1252,9 @@ namespace vecs {
 				m_archetypes[hs] = std::move(newArchUnique);
 			}
 			auto newArch = m_archetypes[hs].get();
-			value.m_archetypePtr = newArch;
-			LockGuard<RTYPE> lock(&arch->m_mutex); //lock old archetype
-			value.m_archIndex = newArch->Move(arch->Types(), value.m_archIndex, *arch, m_entities); //move values
+			value->m_archetypePtr = newArch;
+			LockGuard<RTYPE> lock2(&arch->m_mutex); //lock old archetype
+			value->m_archIndex = newArch->Move(arch->Types(), value->m_archIndex, *arch, m_entities); //move values
 			return value;
 		}
 
