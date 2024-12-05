@@ -562,7 +562,7 @@ namespace vecs {
 			/// @brief Test if the archetype has a component.
 			/// @param ti Hash of the type index of the component.
 			/// @return true if the archetype has the component, else false.
-			[[nodiscard]] bool Has(const size_t ti) {
+			bool Has(const size_t ti) {
 				return m_types.contains(ti);
 			}
 
@@ -675,8 +675,9 @@ namespace vecs {
 			/// @brief Add a new component value to the archetype.
 			/// @param v The component value.
 			/// @return The index of the component value.
-			auto AddValue( auto&& v ) -> size_t {
-				using T = std::decay_t<decltype(v)>;
+			template<typename U>
+			auto AddValue( U&& v ) -> size_t {
+				using T = std::decay_t<U>;
 				return m_maps[Type<T>()]->Insert(std::forward<T>(v));	//insert the component value
 			};
 	
@@ -1017,20 +1018,11 @@ namespace vecs {
 		/// @tparam T The type of the component.
 		/// @param handle The handle of the entity.	
 		/// @return The component value.
-		template<typename U>
-			requires (!std::is_same_v<U, Handle&> && std::is_reference_v<U>)
+		template<typename T>
+			requires (!std::is_same_v<T, Handle&>)
 		[[nodiscard]] auto Get(Handle handle) {
 			assert(CheckDelay());
-			using T = std::decay_t<U>;
-			auto [arch, ref] = Get2<T>(handle);
-			return Ref<T>{*this, handle, arch, ref};
-		}
-
-		template<typename U>
-			requires (!std::is_same_v<U, Handle&> && !std::is_reference_v<U>)
-		[[nodiscard]] auto Get(Handle handle) {
-			using T = std::decay_t<U>;
-			return Get2<T>(handle).second;
+			return std::get<0>(Get4<T>(handle));
 		}
 
 		/// @brief Get component values of an entity.
@@ -1038,9 +1030,10 @@ namespace vecs {
 		/// @param handle The handle of the entity.
 		/// @return A tuple of the component values.
 		template<typename... Ts>
-			requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value))
+			requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
 		[[nodiscard]] auto Get(Handle handle)  {
-			return std::make_tuple(Get<Ts>(handle)...); //defer to Get<Ts>()
+			assert(CheckDelay());
+			return Get4<Ts...>(handle);			
 		}
 
 		/// @brief Put a new component value to an entity. If the entity does not have the component, it will be created.
@@ -1308,43 +1301,73 @@ namespace vecs {
 			return arch->template Map<T>()->Get(archIndex);
 		}
 
+				/// @brief Get component values of an entity.
+		/// @tparam Ts The types of the components.
+		/// @param handle The handle of the entity.
+		/// @return A tuple of the component values.
 		template<typename... Ts>
-		inline auto GetArchetypeAndIndex(Handle handle, size_t ti) -> ArchetypeAndIndex* {
+		[[nodiscard]] auto Get4(Handle handle)  {
 			std::vector<size_t> newTypes;
-			Archetype* arch;
-			ArchetypeAndIndex *value;
 			{
-				LockGuardShared<RTYPE> lock(&m_mutex); //lock the system
-				value = &m_entities[handle].m_value;
-				arch = value->m_archetypePtr;
-				( [&](){ if(!arch->Has(Type<Ts>())) newTypes.push_back(Type<Ts>()); }, ... );
-				if( newTypes.size() == 0 ) { return value; }
+				LockGuardShared<RTYPE> lock(&m_mutex); //lock the mutex
+				auto value = GetArchetype<Ts...>(handle, newTypes);
+				//value->m_archetypePtr->Print();	
+				if(newTypes.empty()) return std::make_tuple(Get3<Ts>(handle, value->m_archetypePtr, value->m_archIndex)...);
 			}
 
-			LockGuard<RTYPE> lock(&m_mutex); //lock the system
+			LockGuard<RTYPE> lock1(&m_mutex); //lock the mutex
+			auto value = GetArchetype<Ts...>(handle, newTypes);
+			auto arch = value->m_archetypePtr;
+			if(newTypes.empty()) return std::make_tuple(Get3<Ts>(handle, arch, value->m_archIndex)...);
+			auto newArch = CreateArchetype<Ts...>(handle, newTypes);
+			
+			value->m_archetypePtr = newArch;
+			LockGuard<RTYPE> lock2(&arch->m_mutex); //lock old archetype, new one cannot be seen yet
+			value->m_archIndex = newArch->Move(arch->Types(), value->m_archIndex, *arch, m_entities); //move values
+			return std::make_tuple(Get3<Ts>(handle, newArch, value->m_archIndex)...);
+		}
+
+
+		template<typename... Ts>
+		inline auto GetArchetype(Handle handle, std::vector<size_t>& newTypes) -> ArchetypeAndIndex* {		
+			newTypes.clear();
+			newTypes.reserve(sizeof...(Ts));
+			auto value = &m_entities[handle].m_value;
+			
+			auto func = [&]<typename T>(){ if(!value->m_archetypePtr->Has(Type<T>())) newTypes.push_back(Type<T>()); };
+			( func.template operator()<Ts>(), ...  );
+			return value;
+		}
+
+		template<typename... Ts>
+		inline auto CreateArchetype(Handle handle, std::vector<size_t>& newTypes) -> Archetype* {
+			auto value = GetArchetype<Ts...>(handle, newTypes);
+			if( newTypes.empty() ) return value->m_archetypePtr;
+			auto arch = value->m_archetypePtr;
 			std::vector<size_t> allTypes;
 			allTypes.reserve(arch->Types().size() + newTypes.size());
 			std::copy( arch->Types().begin(), arch->Types().end(), std::back_inserter(allTypes) );
 			std::copy( newTypes.begin(), newTypes.end(), std::back_inserter(allTypes) );
 			size_t hs = Hash(allTypes);
+			Archetype *newArch=nullptr;
 			if( !m_archetypes.contains(hs) ) {
 				auto newArchUnique = std::make_unique<Archetype>();
-				newArchUnique->Clone(*arch, arch->Types());
-				( [&](){ 
-					if(!arch->Has(Type<Ts>())) {
-						newArchUnique->template AddComponent<Ts>();
-						newArchUnique->template AddValue(Ts{}); 
+				newArch = newArchUnique.get();
+				newArch->Clone(*arch, arch->Types());
+				
+				auto func = [&]<typename U>(){ 
+					using T = std::decay_t<U>;
+					if(!arch->Has(Type<T>())) { //need the types, type indices are not enough
+						newArch->template AddComponent<T>();
+						newArch->template AddValue(T{}); 
 					}
-				}, ...  );
-				m_archetypes[hs] = std::move(newArchUnique);
-			}
-			auto newArch = m_archetypes[hs].get();
-			value->m_archetypePtr = newArch;
-			LockGuard<RTYPE> lock2(&arch->m_mutex); //lock old archetype
-			value->m_archIndex = newArch->Move(arch->Types(), value->m_archIndex, *arch, m_entities); //move values
-			return value;
-		}
+				};
 
+				( func.template operator()<Ts>(), ...  );
+				m_archetypes[hs] = std::move(newArchUnique);
+			} else { newArch = m_archetypes[hs].get(); }
+			return newArch;
+		}
 
 		mutex_t m_mutex; //mutex for thread safety
 		SlotMap<ArchetypeAndIndex> m_entities;
