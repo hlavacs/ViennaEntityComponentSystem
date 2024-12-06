@@ -739,9 +739,15 @@ namespace vecs {
 	public:
 
 		//----------------------------------------------------------------------------------------------
-
+		
 		/// @brief A samrt reference to an entity component. After a change in the entity, components might be moved.
 		/// This reference checks if the entity has changed and updates the reference if necessary.
+		/// This class is meant for use in SEQUENTIAL mode or in PARALLEL mode when iterating through range based for loop.
+		/// When iterating through a range based for loop in PARALLEL mode, because the achetype is locked in shared mode, components 
+		/// cannot be moved. Thus, the reference is always valid in these cases.
+		/// However this is not true if you hold a reference to any other component not from the current archetype. In these cases make sure
+		/// to use Get and Put only.
+		/// @tparam U The type of the component.
 		template<typename U>
 			requires VecsRef<U>
 		class Ref {
@@ -759,8 +765,8 @@ namespace vecs {
 				: m_system{system}, m_handle{handle}, m_archetype{arch}, m_valueRef{valueRef}, m_changeCounter{arch->GetChangeCounter()} {}
 
 			/// @brief Get the component value. Check if the entity has changed before returning the value.
-			auto operator()() {
-				return CheckChangeCounter();
+			auto operator()() -> T {
+				return Get();
 			}
 
 			/// @brief Set the component value. Check if the entity has changed before setting the value.
@@ -770,7 +776,7 @@ namespace vecs {
 			}
 
 			/// @brief Get the component value. Check if the entity has changed before returning the value.
-			auto Get() {
+			auto Get() -> T {
 				return CheckChangeCounter();
 			}
 
@@ -781,10 +787,10 @@ namespace vecs {
 			auto CheckChangeCounter() -> T& {
 				auto cc = m_archetype->GetChangeCounter();
 				if(cc != m_changeCounter ) {
-					auto [arch, ref] = m_system.Get2<T>(m_handle);
-					m_archetype = arch;
-					m_valueRef = ref;
-					m_changeCounter = cc;
+					auto& value = m_system.m_entities[m_handle].m_value;
+					m_archetype = value.m_archetypePtr;
+					m_valueRef = m_archetype->template Map<T>()->Get(value.m_archIndex);
+					m_changeCounter = m_archetype->GetChangeCounter();
 				}
 				return  m_valueRef;
 			}
@@ -795,7 +801,7 @@ namespace vecs {
 			T& 					m_valueRef; 		///< Reference to the component value.
 			size_t 				m_changeCounter; 	///< Change counter of the archetype.
 		};
-
+		
 
 		//----------------------------------------------------------------------------------------------
 
@@ -834,7 +840,7 @@ namespace vecs {
 			/// @brief Destructor, unlocks the archetype.
 			~Iterator() {
 				UnlockShared();
-				if( m_system.decreaseIterators() == 0 ) m_system.runDelayedTransactions();
+				if( m_system.decreaseIterators() == 0 ) m_system.RunDelayedTransactions();
 			}
 
 			/// @brief Prefix increment operator.
@@ -1034,7 +1040,7 @@ namespace vecs {
 			requires (!std::is_same_v<T, Handle&>)
 		[[nodiscard]] auto Get(Handle handle) {
 			assert(CheckDelay());
-			return std::get<0>(Get4<T>(handle));
+			return std::get<0>(Get3<T>(handle));
 		}
 
 		/// @brief Get component values of an entity.
@@ -1045,7 +1051,7 @@ namespace vecs {
 			requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
 		[[nodiscard]] auto Get(Handle handle)  {
 			assert(CheckDelay());
-			return Get4<Ts...>(handle);			
+			return Get3<Ts...>(handle);			
 		}
 
 		/// @brief Put a new component value to an entity. If the entity does not have the component, it will be created.
@@ -1058,7 +1064,7 @@ namespace vecs {
 		void Put(Handle handle, U&& v) {
 			assert(Exists(handle));
 			using T = std::decay_t<U>;
-			Put3(handle, std::forward<T>(v));
+			Put2(handle, std::forward<T>(v));
 		}
 
 		/// @brief Put new component values to an entity.
@@ -1068,7 +1074,7 @@ namespace vecs {
 		template<typename... Ts>
 			requires (vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<std::decay_t<Ts>...>, Handle>::value)
 		void Put(Handle handle, std::tuple<Ts...>& v) {
-			Put3(handle, std::forward<Ts>(std::get<Ts>(v))...);
+			Put2(handle, std::forward<Ts>(std::get<Ts>(v))...);
 		}
 
 		/// @brief Put new component values to an entity.
@@ -1078,80 +1084,35 @@ namespace vecs {
 		template<typename... Ts>
 			requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<std::decay_t<Ts>...>, Handle>::value)
 		void Put(Handle handle, Ts&&... vs) {
-			Put3(handle, std::forward<Ts>(vs)...);
+			Put2(handle, std::forward<Ts>(vs)...);
 		}
 		
 		/// @brief Erase components from an entity.
-		/// @tparam Ts The types of the components.
-		/// @param handle The handle of the entity.
+		/// @tparam ...Ts The types of the components.
+		/// @param handle The handle of the entity.		
 		template<typename... Ts>
 			requires (vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
 		void Erase(Handle handle) {
 			assert(CheckDelay());
 			assert( (Has<Ts>(handle) && ...) );
 
-			if constexpr( RTYPE == REGISTRYTYPE_PARALLEL ) {
-				if( m_numIterators > 0 ) { m_delayedTransactions.push_back([&](){ Erase(handle); }); return; }
-			}
-
-			ArchetypeAndIndex *value;
-			std::set<size_t> types;
-			Archetype *oldArch, *arch;
-			size_t hs;
-			bool contained;
-
-			{
-				LockGuardShared<RTYPE> lock(&m_mutex); //lock the mutex
-				value = &m_entities[handle].m_value;
-				oldArch = value->m_archetypePtr;
-				{
-					LockGuardShared<RTYPE> lock(&oldArch->m_mutex); //lock the archetype
-					types = oldArch->Types();
-				}
-				(types.erase(Type<Ts>()), ... );
-				hs = Hash(types);
-				contained = m_archetypes.contains(hs);
-				if( contained ) { arch = m_archetypes[hs].get(); }
-			}
-
-			auto IsContained = [&]() {
-				value->m_archetypePtr = arch;
-				value->m_archIndex = arch->Move(types, value->m_archIndex, *oldArch, m_entities);
-			};
-			
-			if( contained ) { 
-				LockGuard<RTYPE> lock(&arch->m_mutex, &oldArch->m_mutex);
-				return IsContained(); 
-			}
-
-			{
-				LockGuard<RTYPE> lock1(&m_mutex); //lock the mutex
-				if( !m_archetypes.contains(hs) ) {
-					auto archPtr = std::make_unique<Archetype>();
-					arch = archPtr.get();
-		 			LockGuard<RTYPE> lock2(&arch->m_mutex, &oldArch->m_mutex);
-					arch->Clone(*oldArch, types);
-					m_archetypes[hs] = std::move(archPtr);
-					return IsContained();
-				}
-				arch = m_archetypes[hs].get();
-			}
-
- 			LockGuard<RTYPE> lock(&arch->m_mutex, &oldArch->m_mutex);
-			return IsContained();
+			LockGuard<RTYPE> lock(&m_mutex); //lock the mutex
+			auto value = &m_entities[handle].m_value;
+			auto oldArch = value->m_archetypePtr;
+			std::set<size_t> types = oldArch->Types();
+			(types.erase(Type<Ts>()), ... );
+			size_t hs = Hash(types);
+			Archetype *arch;
+			if( !m_archetypes.contains(hs) ) {
+				auto archPtr = std::make_unique<Archetype>();
+				arch = archPtr.get();
+				arch->Clone(*oldArch, types);
+				m_archetypes[hs] = std::move(archPtr);
+			} else { arch = m_archetypes[hs].get(); }
+			LockGuard<RTYPE> lock2(&arch->m_mutex, &oldArch->m_mutex);
+			value->m_archetypePtr = arch;
+			value->m_archIndex = arch->Move(types, value->m_archIndex, *oldArch, m_entities);
 		}
-
-
-		template<typename... Ts>
-			requires (vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
-		void Erase3(Handle handle) {
-			assert(CheckDelay());
-			assert( (Has<Ts>(handle) && ...) );
-
-			
-	
-		}
-
 
 		/// @brief Erase an entity from the registry.
 		/// @param handle The handle of the entity.
@@ -1184,6 +1145,8 @@ namespace vecs {
 			return {*this};
 		}
 
+		/// @brief Print the registry.
+		/// Print the number of entities and the archetypes.
 		void Print() {
 			std::cout << "Entities: " << m_entities.Size() << std::endl;
 			for( auto& it : m_archetypes ) {
@@ -1192,6 +1155,8 @@ namespace vecs {
 			std::cout << std::endl << std::endl;
 		}
 
+		/// @brief Validate the registry.
+		/// Make sure all archetypes have the same size in all component maps.
 		void Validate() {
 			assert(CheckDelay());
 			LockGuardShared<RTYPE> lock(&m_mutex);
@@ -1202,15 +1167,21 @@ namespace vecs {
 			}
 		}
 
+		/// @brief Increase the number of iterators.
+		/// @return number of iterators.
 		size_t increaseIterators() {
 			return ++m_numIterators;
 		}	
 
+		/// @brief Decrease the number of iterators.
+		/// @return number of iterators.
 		size_t decreaseIterators() {
 			assert(m_numIterators > 0);
 			return --m_numIterators;
 		}
 
+		/// @brief Check if a transaction must be delayed.
+		/// @return true if the transaction must be delayed, else false.
 		bool CheckDelay() {
 			if constexpr( RTYPE == REGISTRYTYPE_PARALLEL ) {
 				if( m_numIterators > 0 ) {
@@ -1220,6 +1191,7 @@ namespace vecs {
 			return true;
 		}
 
+		/// @brief Delay a transaction until all iterators are destroyed.
 		bool DelayTransaction( auto&& func ) {
 			if constexpr( RTYPE == REGISTRYTYPE_PARALLEL ) {
 				if( m_numIterators > 0 ) { 
@@ -1231,23 +1203,29 @@ namespace vecs {
 			return false;
 		}
 
-		void runDelayedTransactions() {
+		/// @brief Run all delayed transactions. Since each thread has its own list of delayed transactions,
+		/// this function must be called by each thread, and does not need synchronization.
+		void RunDelayedTransactions() {
 			for( auto& func : m_delayedTransactions ) {
 				func();
 			}
 			m_delayedTransactions.clear();
 		}
 
-	private:
-
-		template<typename U>
-		void Put2(Handle handle, U&& v) {
-			using T = std::decay_t<U>;
-			Get2<T>(handle).second = std::forward<T>(v);
+		/// @brief Get the mutex of the archetype.
+		/// @return Reference to the mutex.
+		[[nodiscard]] auto GetMutex() -> mutex_t& {
+			return m_mutex;
 		}
 
+	private:
+
+		/// @brief Change the component values of an entity.
+		/// @tparam ...Ts The types of the components.
+		/// @param handle The handle of the entity.
+		/// @param ...vs The new values.
 		template<typename... Ts>
-		void Put3(Handle handle, Ts&&... vs) {
+		void Put2(Handle handle, Ts&&... vs) {
 			auto func = [&]<typename T>(Archetype* arch, size_t archIndex, T&& v){ arch->template Get<T>(archIndex) = std::forward<T>(v); };
 
 			std::vector<size_t> newTypes;
@@ -1277,112 +1255,63 @@ namespace vecs {
 			return;
 		}
 		
-		/// @brief Try to get a component value of an entity.
-		/// If the component does not exist, it will be created.
-		/// This might result in moving the entity to another archetype.
+		/// @brief Get a Ref object for he cmopoent of an entity.
 		/// @tparam U The type of the component.
 		/// @param handle The handle of the entity.
-		/// @return A pair of the archetype pointer and the component value.
-		template<typename U>
-		auto Get2(Handle handle) -> std::pair<Archetype*, std::decay_t<U>&> {
-			using T = std::decay_t<U>;
-
-			size_t hs;
-			bool contained;
-			ArchetypeAndIndex *value;
-			Archetype *arch, *oldArch;
-			{
-				std::vector<size_t> types;
-				LockGuardShared<RTYPE> lock(&m_mutex); //lock the system
-				auto& entry = m_entities[handle];
-				value = &entry.m_value;
-				oldArch = value->m_archetypePtr;
-				{
-					LockGuardShared<RTYPE> lock(&oldArch->m_mutex); //lock the archetype
-					if(oldArch->Has(Type<T>())) {
-						return std::pair<Archetype*, T&>{oldArch, oldArch->template Get<T>(value->m_archIndex)};
-					}
-					types.reserve(oldArch->Types().size() + 1);
-					std::copy( oldArch->Types().begin(), oldArch->Types().end(), std::back_inserter(types) );
-				}
-				types.push_back(Type<T>());
-				hs = Hash(types);
-				contained = m_archetypes.contains(hs);
-				if( contained ) { arch = m_archetypes[hs].get(); }
-			}
-			
-			auto IsContained = [&]() {
-				value->m_archetypePtr = arch;
-				value->m_archIndex = arch->Move(oldArch->Types(), value->m_archIndex, *oldArch, m_entities);
-				arch->AddValue(T{});
-				return std::pair<Archetype*, T&>{arch, arch->template Get<T>(value->m_archIndex)};
-			};
-
-			if(contained) { 
-				LockGuard<RTYPE> lock(&arch->m_mutex, &oldArch->m_mutex);
-				return IsContained(); 
-			}
-
-			{
-				LockGuard<RTYPE> lock1(&m_mutex); //lock the system
-				if( !m_archetypes.contains(hs) ) { //still not found?
-					auto archPtr = std::make_unique<Archetype>();
-					arch = archPtr.get();
-					LockGuard<RTYPE> lock2(&arch->m_mutex, &oldArch->m_mutex);
-					arch->Clone(*oldArch, oldArch->Types());
-					arch->template AddComponent<T>();
-					m_archetypes[hs] = std::move(archPtr);
-					return IsContained();
-				}
-				arch = m_archetypes[hs].get();
-			}
-
-			LockGuard<RTYPE> lock(&arch->m_mutex, &oldArch->m_mutex);
-			return IsContained();
-		}
-
-
+		/// @param arch The archetype of the entity.
+		/// @param archIndex The index of the entity in the archetype.
+		/// @return A Ref object.
 		template<typename U>
 			requires (std::is_reference_v<U>)
-		[[nodiscard]] auto Get3( Handle handle, Archetype* arch, size_t archIndex) {
+		[[nodiscard]] auto Get2( Handle handle, Archetype* arch, size_t archIndex) {
 			using T = std::decay_t<U>;
 			return Ref<T>{*this, handle, arch, arch->template Map<T>()->Get(archIndex)};
 		}
 
+		/// @brief Get the component value of an entity.
+		/// @tparam U The type of the component.
+		/// @param handle The handle of the entity.
+		/// @param arch The archetype of the entity.
+		/// @param archIndex The index of the entity in the archetype.
+		/// @return the component value.
 		template<typename U>
 			requires (!std::is_reference_v<U>)
-		[[nodiscard]] auto Get3( Handle handle, Archetype* arch, size_t archIndex) {
+		[[nodiscard]] auto Get2( Handle handle, Archetype* arch, size_t archIndex) {
 			using T = std::decay_t<U>;
 			return arch->template Map<T>()->Get(archIndex);
 		}
 
-				/// @brief Get component values of an entity.
+		/// @brief Get component values of an entity.
 		/// @tparam Ts The types of the components.
 		/// @param handle The handle of the entity.
 		/// @return A tuple of the component values.
 		template<typename... Ts>
-		[[nodiscard]] auto Get4(Handle handle)  {
+		[[nodiscard]] auto Get3(Handle handle)  {
 			std::vector<size_t> newTypes;
 			{
 				LockGuardShared<RTYPE> lock(&m_mutex); //lock the mutex
 				auto value = GetArchetype<std::decay_t<Ts>...>(handle, newTypes);
 				//value->m_archetypePtr->Print();	
-				if(newTypes.empty()) return std::make_tuple(Get3<Ts>(handle, value->m_archetypePtr, value->m_archIndex)...);
+				if(newTypes.empty()) return std::make_tuple(Get2<Ts>(handle, value->m_archetypePtr, value->m_archIndex)...);
 			}
 
 			LockGuard<RTYPE> lock1(&m_mutex); //lock the mutex
 			auto value = GetArchetype<std::decay_t<Ts>...>(handle, newTypes);
 			auto arch = value->m_archetypePtr;
-			if(newTypes.empty()) return std::make_tuple(Get3<Ts>(handle, arch, value->m_archIndex)...);
+			if(newTypes.empty()) return std::make_tuple(Get2<Ts>(handle, arch, value->m_archIndex)...);
 			auto newArch = CreateArchetype<std::decay_t<Ts>...>(handle, newTypes);
 			
 			value->m_archetypePtr = newArch;
 			LockGuard<RTYPE> lock2(&arch->m_mutex); //lock old archetype, new one cannot be seen yet
 			value->m_archIndex = newArch->Move(arch->Types(), value->m_archIndex, *arch, m_entities); //move values
-			return std::make_tuple(Get3<Ts>(handle, newArch, value->m_archIndex)...);
+			return std::make_tuple(Get2<Ts>(handle, newArch, value->m_archIndex)...);
 		}
 
-
+		/// @brief Get the archetype/index of an entity and the types of the components that are currently not contained.
+		/// @tparam ...Ts The types of the components.
+		/// @param handle The handle of the entity.
+		/// @param newTypes A vector to store the types of the components that are not contained.
+		/// @return Pointer to the archetype/index of the entity.
 		template<typename... Ts>
 		inline auto GetArchetype(Handle handle, std::vector<size_t>& newTypes) -> ArchetypeAndIndex* {		
 			newTypes.clear();
@@ -1390,10 +1319,15 @@ namespace vecs {
 			auto value = &m_entities[handle].m_value;
 			
 			auto func = [&]<typename T>(){ if(!value->m_archetypePtr->Has(Type<T>())) newTypes.push_back(Type<T>()); };
-			( func.template operator()<Ts>(), ...  );
+			( func.template operator()<std::decay_t<Ts>>(), ...  );
 			return value;
 		}
 
+		/// @brief Create a new archetype with the types of the components that are not contained.
+		/// @tparam ...Ts The types of the components.
+		/// @param handle The handle of the entity.
+		/// @param newTypes A vector with the types of the components that are not contained.
+		/// @return Pointer to the new archetype.
 		template<typename... Ts>
 		inline auto CreateArchetype(Handle handle, std::vector<size_t>& newTypes) -> Archetype* {
 			auto value = GetArchetype<Ts...>(handle, newTypes);
@@ -1417,7 +1351,7 @@ namespace vecs {
 						newArch->template AddValue(T{}); 
 					}
 				};
-				( func.template operator()<Ts>(), ...  );
+				( func.template operator()<std::decay_t<Ts>>(), ...  );
 
 				m_archetypes[hs] = std::move(newArchUnique);
 			} else { 
@@ -1435,12 +1369,13 @@ namespace vecs {
 		inline static thread_local std::vector<std::function<void()>> m_delayedTransactions; //thread local variable for locking
 	};
 
-
+	/// @brief Output operator for a Ref object.
 	template<typename T>
 	inline std::ostream& operator<<(std::ostream& os, Registry<REGISTRYTYPE_SEQUENTIAL>::Ref<T>& ref) {
     	return os <<  ref(); 
 	}
 
+	/// @brief Output operator for a Ref object.
 	template<typename T>
 	inline std::ostream& operator<<(std::ostream& os, Registry<REGISTRYTYPE_PARALLEL>::Ref<T>& ref) {
     	return os <<  ref(); 
