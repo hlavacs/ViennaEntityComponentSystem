@@ -166,13 +166,12 @@ for( auto [handle, i, f] : system.GetView<vecs::Handle, int&, float&>() ) {
 Note that if you want the handle of the entity you are currently accessing, you have to explicitly include the *vecs::Handle* type also into the view. Also note that trying to get a handle reference results in a compile error.
 
 ```C
-    for( auto [handle, i, f] : system.GetView<vecs::Handle, int&, float&>() ) { //works
-        std::cout << "Handle: "<< handle << " int: " << i << " float: " << f << std::endl;
-	}
+for( auto [handle, i, f] : system.GetView<vecs::Handle, int&, float&>() ) { //works
+    std::cout << "Handle: "<< handle << " int: " << i << " float: " << f << std::endl;
+}
 
-	for( auto [handle, i, f] : system.GetView<vecs::Handle&, int&, float&>() ) { //compile error
-        std::cout << "Handle: "<< handle << " int: " << i << " float: " << f << std::endl;
-	}
+for( auto [handle, i, f] : system.GetView<vecs::Handle&, int&, float&>() ) { //compile error
+    std::cout << "Handle: "<< handle << " int: " << i << " float: " << f << std::endl;
 }
 ```
 
@@ -188,17 +187,16 @@ Mutexes can be used in shared mode or in exclusive mode. Shared mode creates a r
 To mitigate this, VECS provides the possibility for scheduling a delayed transaction, i.e., a function that is carried out right after the iterator unlocks the current archetype. This is done in the following example:
 
 ```C
-    for( auto [handle, i, f] : system.template GetView<vecs::Handle, int&, float>() ) {
-        std::cout << "Handle: "<< handle << " int: " << i << " float: " << f << std::endl;
-		i = 100;
-		f = 100.0f;
-		system.DelayTransaction( [&](){  //carried out when archetype is changed or end is reached
-			std::cout << "Delayed Insert" << std::endl;
-			auto h = system.Insert(5, 5.5f);
-		} );
-
-		//auto h2 = system.Insert(5, 5.5f); // can cause deadlocks in parallel mode
-    }
+for( auto [handle, i, f] : system.template GetView<vecs::Handle, int&, float>() ) {
+    std::cout << "Handle: "<< handle << " int: " << i << " float: " << f << std::endl;
+	i = 100;
+	f = 100.0f;
+	system.DelayTransaction( [&](){  //carried out when archetype is changed or end is reached
+		std::cout << "Delayed Insert" << std::endl;
+		auto h = system.Insert(5, 5.5f);
+	} );
+	//auto h2 = system.Insert(5, 5.5f); // can cause deadlocks in parallel mode
+}
 ```
 
 Of course this code also workd in sequential mode, and it makes sense to use such operations in both modes to keep the code consistent.
