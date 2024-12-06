@@ -408,6 +408,7 @@ namespace vecs {
 				return static_cast<ComponentMap<T>*>(this)->Insert(std::forward<T>(v));
 			}
 
+			virtual auto Insert() -> size_t = 0;
 			virtual auto Erase(size_t index) -> size_t = 0;
 			virtual void Move(ComponentMapBase* other, size_t from) = 0;
 			virtual auto Size() -> size_t= 0;
@@ -436,6 +437,13 @@ namespace vecs {
 			/// @param v The component value.
 			[[nodiscard]] size_t Insert(auto&& v) {
 				m_data.push_back( std::forward<T>(v) );
+				return m_data.size() - 1;
+			};
+
+			/// @brief Insert a new empty component value.
+			/// @return The index of the new component value.
+			[[nodiscard]] size_t Insert() override{
+				m_data.push_back( T{} );
 				return m_data.size() - 1;
 			};
 
@@ -680,7 +688,11 @@ namespace vecs {
 				using T = std::decay_t<U>;
 				return m_maps[Type<T>()]->Insert(std::forward<T>(v));	//insert the component value
 			};
-	
+
+			auto AddEmptyValue( size_t ti ) -> size_t {
+				return m_maps[ti]->Insert();	//insert the component value
+			};
+
 			/// @brief Erase an entity. To ensure thet consistency of the entity indices, the last entity is moved to the erased one.
 			/// This might result in a reindexing of the moved entity in the slot map. Thus we need a ref to the slot map
 			/// @param index The index of the entity in the archetype.
@@ -1042,11 +1054,11 @@ namespace vecs {
 		/// @param handle The handle of the entity.
 		/// @param v The new value.
 		template<typename U>
-			requires (!is_tuple<U>::value)
+			requires (!is_tuple<U>::value && !std::is_same_v<std::decay_t<U>, Handle>)
 		void Put(Handle handle, U&& v) {
 			assert(Exists(handle));
 			using T = std::decay_t<U>;
-			Put2(handle, std::forward<T>(v));
+			Put3(handle, std::forward<T>(v));
 		}
 
 		/// @brief Put new component values to an entity.
@@ -1054,9 +1066,9 @@ namespace vecs {
 		/// @param handle The handle of the entity.
 		/// @param v The new values in a tuple
 		template<typename... Ts>
-			requires (vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
+			requires (vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<std::decay_t<Ts>...>, Handle>::value)
 		void Put(Handle handle, std::tuple<Ts...>& v) {
-			(Put2(handle, std::forward<Ts>(std::get<Ts>(v))), ...);
+			Put3(handle, std::forward<Ts>(std::get<Ts>(v))...);
 		}
 
 		/// @brief Put new component values to an entity.
@@ -1064,9 +1076,9 @@ namespace vecs {
 		/// @param handle The handle of the entity.
 		/// @param ...vs The new values.
 		template<typename... Ts>
-			requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
+			requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<std::decay_t<Ts>...>, Handle>::value)
 		void Put(Handle handle, Ts&&... vs) {
-			(Put2(handle, vs), ...);
+			Put3(handle, std::forward<Ts>(vs)...);
 		}
 		
 		/// @brief Erase components from an entity.
@@ -1128,6 +1140,18 @@ namespace vecs {
  			LockGuard<RTYPE> lock(&arch->m_mutex, &oldArch->m_mutex);
 			return IsContained();
 		}
+
+
+		template<typename... Ts>
+			requires (vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
+		void Erase3(Handle handle) {
+			assert(CheckDelay());
+			assert( (Has<Ts>(handle) && ...) );
+
+			
+	
+		}
+
 
 		/// @brief Erase an entity from the registry.
 		/// @param handle The handle of the entity.
@@ -1222,6 +1246,37 @@ namespace vecs {
 			Get2<T>(handle).second = std::forward<T>(v);
 		}
 
+		template<typename... Ts>
+		void Put3(Handle handle, Ts&&... vs) {
+			auto func = [&]<typename T>(Archetype* arch, size_t archIndex, T&& v){ arch->template Get<T>(archIndex) = std::forward<T>(v); };
+
+			std::vector<size_t> newTypes;
+			{
+				LockGuardShared<RTYPE> lock(&m_mutex); //lock the mutex
+				auto value = GetArchetype<std::decay_t<Ts>...>(handle, newTypes);
+				//value->m_archetypePtr->Print();	
+				if(newTypes.empty()) {
+					( func.template operator()<Ts>(value->m_archetypePtr, value->m_archIndex, std::forward<Ts>(vs)), ... );
+					return;
+				};
+			}
+
+			LockGuard<RTYPE> lock1(&m_mutex); //lock the mutex
+			auto value = GetArchetype<std::decay_t<Ts>...>(handle, newTypes);
+			auto arch = value->m_archetypePtr;
+			if(newTypes.empty()) {
+				( func.template operator()<Ts>(arch, value->m_archIndex, std::forward<Ts>(vs)), ... );
+				return;
+			}
+			auto newArch = CreateArchetype<std::decay_t<Ts>...>(handle, newTypes);
+			
+			value->m_archetypePtr = newArch;
+			LockGuard<RTYPE> lock2(&arch->m_mutex); //lock old archetype, new one cannot be seen yet
+			value->m_archIndex = newArch->Move(arch->Types(), value->m_archIndex, *arch, m_entities); //move values
+			( func.template operator()<Ts>(newArch, value->m_archIndex, std::forward<Ts>(vs)), ... );
+			return;
+		}
+		
 		/// @brief Try to get a component value of an entity.
 		/// If the component does not exist, it will be created.
 		/// This might result in moving the entity to another archetype.
@@ -1310,16 +1365,16 @@ namespace vecs {
 			std::vector<size_t> newTypes;
 			{
 				LockGuardShared<RTYPE> lock(&m_mutex); //lock the mutex
-				auto value = GetArchetype<Ts...>(handle, newTypes);
+				auto value = GetArchetype<std::decay_t<Ts>...>(handle, newTypes);
 				//value->m_archetypePtr->Print();	
 				if(newTypes.empty()) return std::make_tuple(Get3<Ts>(handle, value->m_archetypePtr, value->m_archIndex)...);
 			}
 
 			LockGuard<RTYPE> lock1(&m_mutex); //lock the mutex
-			auto value = GetArchetype<Ts...>(handle, newTypes);
+			auto value = GetArchetype<std::decay_t<Ts>...>(handle, newTypes);
 			auto arch = value->m_archetypePtr;
 			if(newTypes.empty()) return std::make_tuple(Get3<Ts>(handle, arch, value->m_archIndex)...);
-			auto newArch = CreateArchetype<Ts...>(handle, newTypes);
+			auto newArch = CreateArchetype<std::decay_t<Ts>...>(handle, newTypes);
 			
 			value->m_archetypePtr = newArch;
 			LockGuard<RTYPE> lock2(&arch->m_mutex); //lock old archetype, new one cannot be seen yet
@@ -1362,10 +1417,14 @@ namespace vecs {
 						newArch->template AddValue(T{}); 
 					}
 				};
-
 				( func.template operator()<Ts>(), ...  );
+
 				m_archetypes[hs] = std::move(newArchUnique);
-			} else { newArch = m_archetypes[hs].get(); }
+			} else { 
+				newArch = m_archetypes[hs].get(); 
+				for( auto ti : newTypes ) { newArch->AddEmptyValue(ti); }
+			}
+
 			return newArch;
 		}
 

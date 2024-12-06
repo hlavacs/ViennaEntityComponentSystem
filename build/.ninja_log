@@ -1,6 +1,0 @@
-# ninja log v6
-14	22	7551160840350246	clean	423d399e6810f01
-3071	3163	7551166895208922	tests/testvecs.exe	d91999083d0c0950
-15	3070	7551166864673716	tests/CMakeFiles/testvecs.dir/testvecs.cpp.obj	ef839c9b2ab9ceb1
-16	4380	7551167124290030	tests/CMakeFiles/testvecs.dir/testvecs.cpp.obj	f2cff597a3c763f1
-4381	4443	7551167167972938	tests/testvecs.exe	875cc5bafeba4f6b
