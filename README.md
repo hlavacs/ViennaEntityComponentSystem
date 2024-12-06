@@ -82,8 +82,8 @@ assert( system.Size() == 0 );
 You can get the current value of type *T* of an entity by calling *Get<T>(handle)*. You can get a reference to a component by calling *Get<T&>(handle)*. 
 Note that such a reference is not a standard C++ reference but instead an instance of Class *Ref<T>*, which is a wrapper around *T&*. The wrapper ensures that as long as an entity is not erased, a reference to one of its components is never invalidated. This is due to the fact that components may change their place in memory due to the following operations:
 * Components are added to or erased from an entity.
-* Erasing whole entities might cause another entity to be moved in order to fill the gap left by the erased entity.
-A *Ref<T>* automatically detects such operations and may reload the reference to the correct memory location. 
+* Erasing an entity might cause another entity to be moved in order to fill the gap left by the erased entity.
+A *Ref<T>* automatically detects such operations and resets the reference to the correct memory location. 
 Note that *Ref<T>* offers an *operator()* and a conversion operator that in most cases conceal the fact that this is not a C++ reference. However, in some cases, it might be nevessary to call either this operator or the function *Get()*.
 
 ```C
@@ -95,20 +95,20 @@ float f3 = value.Get(); //call Get() instead
 value = 10.0f; //implicit operator()
 ```
 
-If you specify more than one type, you can get a tuple holding the specified types or references. You can easily access all component values by using C++17 "structured binding". Calling *Get<T>(handle)* on a type *T* that is not yet past of the entity will also create an empty new component for the entity.
+If you specify more than one type, you can get a tuple holding the specified types or references. You can easily access all component values by using C++17 "structured binding". Calling *Get<T>(handle)* on a type *T* that is not yet part of the entity will also create an empty new component for the entity.
 
 ```C
 vecs::Handle h2 = system.Insert(5, 6.9f, 7.3);; //create a new entity with int, float and double components
 float value = system.Get<float>(h2);    //get float value directly
 std::tuple<float,double> tup = system.Get<float, double>(h2); //returns a std::tuple<float,double>
 float value2 = std::get<float>(tup);    //access the value from the tuple
-auto [fvalue, dvalue] = system.Get<float&, double>(h2); //structured binding. fvalue is now a reference to the component!!
+auto [fvalue, dvalue] = system.Get<float&, double>(h2); //structured binding. fvalue is now a Ref to the component!!
 auto cc = system.Get<char&>(h2); 	//Create char component and return a reference to it (note the &)!
 cc = 'A'; //can change values
 auto dd = system.Get<char>(h2); 	//the value has changed
 ```
 
-You can update the value of a component by calling *Put(handle, value)*. You can call *Put(handle, value)* using the new values directly, or by using a tuple as single value parameter. This way, you can reuse the same tuple that you previously extracted by calling *Get<T1,T2,...>(handle)*. 
+You can update the value of a component by calling *Put(handle, values...)*. You can call *Put(handle, values...)* using the new values directly, or by using a tuple as single value parameter. This way, you can reuse the same tuple that you previously extracted by calling *Get<T1,T2,...>(handle)*. 
 
 ```C
 vecs::Handle h2 = system.Insert(5, 6.9f, 7.3); //create a new entity with int, float and double components
@@ -129,11 +129,11 @@ assert( system.Exists(h2) );
 auto t2 = system.Types(h2);
 ```
 
-Of course you can always change component values by getting and changing references calling *Get<T1&,T2&,...>(handle)*, which returns a tuple with references. Calling it on a new type will again create this component for the entity and set its value accordingly.
+Of course you can always change component values by getting and changing references calling *Get<T1&,T2&,...>(handle)*, which returns a tuple with Ref objects. Calling it on a new type will again create this component for the entity and set its value accordingly.
 
 ```C
 auto [v2a, v2b] = system.Get<float, double>(h2);
-auto [v3a, v3b] = system.Get<float&, double&>(h2); //tuple with references
+auto [v3a, v3b] = system.Get<float&, double&>(h2); //tuple with Refs
 v3a = 100.0f;
 v3b = 101.0;
 auto [v4a, v4b] = system.Get<float, double>(h2); //check new values
@@ -150,7 +150,7 @@ system.Put(h2, s, T1{"BBB"}); //
 auto [ee, ff] = system.Get<std::string, T1>(h2); //
 ```
 
-You can iterate over all components of a given type creating a *View*. The view covers all entities that hold all components of the specified types, and you can iterate over them using a standard C++ for loop. The following example creates views with one or three types and then iterates over all entities having these components. In the second loop, we get references and thus could also update the component values by iterating over them.
+You can iterate over all components of a given type creating a *View*. The view covers all entities that hold all components of the specified types, and you can iterate over them using a standard C++ range based for loop. The following example creates views with one or three types and then iterates over all entities having these components. In the second loop, we get references and thus could also update the component values by iterating over them.
 
 ```C
 for( auto handle : system.GetView<vecs::Handle>() ) { //iterate over ALL entities
@@ -176,4 +176,30 @@ Note that if you want the handle of the entity you are currently accessing, you 
 }
 ```
 
+Inside the for loop you can do everything as long as VECS is running in sequential mode. In the next section the parallel mode is discussed.
+
+## Parallel Processing
+
+VECS can be compiled to run in parallel mode. This means that it can be accessed from several threads in parallel. VECS uses two types of mutexes to ensure no corruption of its data structures:
+* The registry uses a mutex to protect its global structures, i.e. the slot map and the map of archetypes.
+* Each archetype has its own mutex.
+Mutexes can be used in shared mode or in exclusive mode. Shared mode creates a read lock, i.e., many readers are allows to access the data in parallel, but no writer is allowed. A writer must lock in exclusive mode, and during this period, no othr reader or writer is allowed. Shared locks are fast and thus VECS prioritises them as much as possible for frequent operations, like iterating through entities. When using range based for loops, VECS read locks each archetype when the iterator enters the archetype, and unlocks it when leaving. This make iterating fast, but bears the potential for deadlocks when entities in the current archetype are accessed by others. E.g., if thread A runs a range based for loop and enters an archetype, it is immediately read locked. Thread B might want to add a new entity to the same archetype, and gets a write lock to the system, then waits for a write lock to the archetype. Thread A now wants to read lock the system, but the system is already locked by thread B. Thus both threads wait for each other.
+
+To mitigate this, VECS provides the possibility for scheduling a delayed transaction, i.e., a function that is carried out right after the iterator unlocks the current archetype. This is done in the following example:
+
+```C
+    for( auto [handle, i, f] : system.template GetView<vecs::Handle, int&, float>() ) {
+        std::cout << "Handle: "<< handle << " int: " << i << " float: " << f << std::endl;
+		i = 100;
+		f = 100.0f;
+		system.DelayTransaction( [&](){  //carried out when archetype is changed or end is reached
+			std::cout << "Delayed Insert" << std::endl;
+			auto h = system.Insert(5, 5.5f);
+		} );
+
+		//auto h2 = system.Insert(5, 5.5f); // can cause deadlocks in parallel mode
+    }
+```
+
+Of course this code also workd in sequential mode, and it makes sense to use such operations in both modes to keep the code consistent.
 

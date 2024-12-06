@@ -125,7 +125,10 @@ int test1() {
         std::cout << "Handle: "<< handle << " int: " << i << " float: " << f << std::endl;
 		i = 100;
 		f = 100.0f;
-		system.DelayTransaction( [&](){ auto h =system.Insert(5, 5.5f);} );
+		system.DelayTransaction( [&](){ 
+			std::cout << "Delayed Insert" << std::endl;
+			auto h = system.Insert(5, 5.5f);
+		} );
 		//auto h2 = system.Insert(5, 5.5f);
     }
 
