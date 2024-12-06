@@ -49,6 +49,13 @@ int test1() {
     auto h2 = system.Insert(5, 6.9f, 7.3);
     assert( system.Exists(h2) );
     auto t2 = system.Types(h2);
+
+	auto value = system.Get<float&>(h2);
+	float f1 = value; //implicit operator()
+	float f2 = value(); //call operator() explicitly
+	float f3 = value.Get(); //call Get() instead
+	value = 10.0f; //implicit operator()
+
     auto [v2a, v2b] = system.Get<float, double>(h2);
     auto [v3a, v3b] = system.Get<float&, double&>(h2);
 	v3a = 100.0f;

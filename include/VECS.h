@@ -210,9 +210,10 @@ namespace vecs {
 	//----------------------------------------------------------------------------------------------
 	//Handles
 
+	/// @brief A handle for an entity or a component. 
 	struct Handle {
-		uint32_t m_index{std::numeric_limits<uint32_t>::max()};
-		uint32_t m_version{0};
+		uint32_t m_index{std::numeric_limits<uint32_t>::max()}; ///< Index of the entity in the slot map.
+		uint32_t m_version{0}; ///< Version of the entity in the slot map. If the version is different from the slot version, the entity is also invalid.
 
 		bool IsValid() const {
 			return m_index != std::numeric_limits<uint32_t>::max();
@@ -237,18 +238,17 @@ namespace vecs {
 
 
 	/// @brief A slot map for storing a map from handle to archetype and index in the archetype.
+	/// A slot map can never shrink. If an entity is erased, the slot is added to the free list. A handle holds an index
+	/// to the slot map and a version counter. If the version counter of the slot is different from the version counter of the handle,
+	/// the slot is invalid.
 	/// @tparam T The value type of the slot map.
 	template<typename T>
 	class SlotMap {
 
-		/// @brief Need atomics only for the parallel case
-		using next_t = int64_t;
-		using vers_t = size_t;
-
 		/// @brief A slot in the slot map.
 		struct Slot {
-			next_t m_nextFree; 	//index of the next free slot
-			vers_t m_version;	//version of the slot
+			int64_t m_nextFree; //index of the next free slot in the free list. 
+			size_t m_version;	//version of the slot
 			T 	   m_value{};	//value of the slot
 
 			Slot() = default;
@@ -257,11 +257,13 @@ namespace vecs {
 			/// @param next Next free slot in the free list.
 			/// @param version Version counter of the slot to avoid accessing erased slots.
 			/// @param value Value stored in the slot.
-			Slot(const next_t&& next, const vers_t&& version, T&& value) : m_value{std::forward<T>(value)} {
+			Slot(const int64_t&& next, const size_t&& version, T&& value) : m_value{std::forward<T>(value)} {
 				m_nextFree = next;
 				m_version = version;
 			}
 
+			/// @brief Copy operator.
+			/// @param other The slot to copy.
 			Slot& operator=( const Slot& other ) {
 				m_nextFree = other.m_nextFree;
 				m_version = other.m_version;
@@ -277,9 +279,9 @@ namespace vecs {
 		SlotMap(int64_t size = 1<<10) {
 			m_firstFree = 0;
 			for( int64_t i = 1; i <= size-1; ++i ) { //create the free list
-				m_slots.push_back( Slot( next_t{i}, vers_t{0uL}, T{} ) );
+				m_slots.push_back( Slot( int64_t{i}, size_t{0uL}, T{} ) );
 			}
-			m_slots.push_back( Slot(next_t{-1}, vers_t{0}, T{}) ); //last slot
+			m_slots.push_back( Slot(int64_t{-1}, size_t{0}, T{}) ); //last slot
 		}
 		
 		~SlotMap() = default; ///< Destructor.
@@ -295,7 +297,7 @@ namespace vecs {
 				m_firstFree = slot->m_nextFree;
 				slot->m_nextFree = -1;
 			} else {
-				m_slots.push_back( Slot{ next_t{-1}, vers_t{0}, std::forward<T>(value) } );
+				m_slots.push_back( Slot{ int64_t{-1}, size_t{0}, std::forward<T>(value) } );
 				index = m_slots.size() - 1; //index of the new slot
 				slot = &m_slots[index];
 			}
@@ -318,8 +320,7 @@ namespace vecs {
 		/// @param handle The handle of the value to get.
 		/// @return Reference to the value.
 		auto operator[](Handle handle) -> Slot& {
-			auto& slot = m_slots[handle.m_index];
-			return slot;
+			return m_slots[handle.m_index];
 		}
 
 		/// @brief Get the size of the slot map.
@@ -342,8 +343,8 @@ namespace vecs {
 		}
 
 	private:
-		vers_t m_size{0}; ///< Size of the slot map.
-		next_t m_firstFree{-1}; ///< Index of the first free slot.
+		size_t m_size{0}; ///< Size of the slot map. This is the size of the Stack minus the free slots.
+		int64_t m_firstFree{-1}; ///< Index of the first free slot. If -1 then there are no free slots.
 		Stack<Slot> m_slots; ///< Container of slots.
 	};
 
@@ -396,13 +397,13 @@ namespace vecs {
 		/// This is useful when e.g. moving entities between archetypes.
 		class ComponentMapBase {
 
-			friend class Archetype; 
-			template<typename... Ts> requires VecsIterator<Ts...> friend class Iterator;
-
 		public:
-			ComponentMapBase() = default;
-			virtual ~ComponentMapBase() = default;
+			ComponentMapBase() = default; //constructor
+			virtual ~ComponentMapBase() = default; //destructor
 			
+			/// @brief Insert a new component value.
+			/// @param v The component value.
+			/// @return The index of the new component value.
 			size_t Insert(auto&& v) {
 				using T = std::decay_t<decltype(v)>;
 				return static_cast<ComponentMap<T>*>(this)->Insert(std::forward<T>(v));
@@ -433,8 +434,8 @@ namespace vecs {
 			ComponentMap() = default; //constructor
 
 			/// @brief Insert a new component value.
-			/// @param handle The handle of the entity.
 			/// @param v The component value.
+			/// @return The index of the new component value.
 			[[nodiscard]] size_t Insert(auto&& v) {
 				m_data.push_back( std::forward<T>(v) );
 				return m_data.size() - 1;
@@ -464,7 +465,7 @@ namespace vecs {
 			/// @brief Erase a component from the container.
 			/// @param index The index of the component value in the map.
 			/// @return The index of the last element in the vector.
-			[[nodiscard]] virtual auto Erase(size_t index)  -> size_t override {
+			[[nodiscard]] auto Erase(size_t index)  -> size_t override {
 				size_t last = m_data.size() - 1;
 				assert(index <= last);
 				if( index < last ) {
@@ -477,19 +478,19 @@ namespace vecs {
 			/// @brief Move a component from another map to this map.
 			/// @param other The other map.
 			/// @param from The index of the component in the other map.
-			virtual void Move(ComponentMapBase* other, size_t from) override {
+			void Move(ComponentMapBase* other, size_t from) override {
 				m_data.push_back( static_cast<ComponentMap<std::decay_t<T>>*>(other)->Get(from) );
 			};
 
 			/// @brief Get the size of the map.
 			/// @return The size of the map.
-			[[nodiscard]] virtual auto Size() -> size_t override {
+			[[nodiscard]] auto Size() -> size_t override {
 				return m_data.size();
 			}
 
 			/// @brief Clone a new map from this map.
 			/// @return A unique pointer to the new map.
-			[[nodiscard]] virtual auto Clone() -> std::unique_ptr<ComponentMapBase> override {
+			[[nodiscard]] auto Clone() -> std::unique_ptr<ComponentMapBase> override {
 				return std::make_unique<ComponentMap<T>>();
 			};
 
@@ -780,6 +781,8 @@ namespace vecs {
 				return CheckChangeCounter();
 			}
 
+			operator T () { return Get(); }; ///< Conversion operator.
+
 		private:
 
 			/// @brief Check if the entity has changed and update the reference if necessary.
@@ -859,26 +862,30 @@ namespace vecs {
 				else return tup;
 			}
 
+			/// @brief Compare two iterators.
 			auto operator!=(const Iterator& other) -> bool {
 				return (m_archidx != other.m_archidx) || (m_entidx != other.m_entidx);
 			}
 
 		private:
 
+			/// @brief Get a component reference from the archetype.
 			template<typename U>
-			requires (!std::is_same_v<U, Handle&> && std::is_reference_v<U>)
+				requires (!std::is_same_v<U, Handle&> && std::is_reference_v<U>)
 			[[nodiscard]] auto Get(auto &system, Handle handle, Archetype *arch) {
 				using T = std::decay_t<U>;
 				return Ref<T>{system, handle, arch, arch->template Map<T>()->Get(m_entidx)};
 			}
 
+			/// @brief Get a component value from the archetype.
 			template<typename U>
-			requires (!std::is_same_v<U, Handle&> && !std::is_reference_v<U>)
+				requires (!std::is_same_v<U, Handle&> && !std::is_reference_v<U>)
 			[[nodiscard]] auto Get(auto &system, Handle handle, Archetype *arch) {
 				using T = std::decay_t<U>;
 				return arch->template Map<T>()->Get(m_entidx);
 			}
 
+			/// @brief Go to the next entity. If this means changing the archetype, unlock the current archetype and lock the new one.
 			void Next() {
 				while( m_archidx < m_archetypes.size() && m_entidx >= std::min(m_archetypes[m_archidx].m_size, m_archetypes[m_archidx].m_archetype->Size()) ) {
 					if( m_isLocked ) UnlockShared();
@@ -894,29 +901,33 @@ namespace vecs {
 				}
 			}
 
+			/// @brief Lock the archetype in shared mode.
 			void LockShared() {
-				if constexpr (RTYPE == REGISTRYTYPE_SEQUENTIAL) return;
-				if( !m_archetype ) return;
-				if( m_isLocked ) return;
-				m_archetype->GetMutex().lock_shared();
-				m_isLocked = true;
+				if constexpr (RTYPE == REGISTRYTYPE_PARALLEL) {
+					if( !m_archetype ) return;
+					if( m_isLocked ) return;
+					m_archetype->GetMutex().lock_shared();
+					m_isLocked = true;
+				}
 			}
 
+			/// @brief Unlock the archetype.
 			void UnlockShared() {
-				if constexpr (RTYPE == REGISTRYTYPE_SEQUENTIAL) return;
-				if( !m_archetype ) return;
-				if( !m_isLocked ) return;
-				m_archetype->GetMutex().unlock_shared();
-				m_isLocked = false;
+				if constexpr (RTYPE == REGISTRYTYPE_PARALLEL) {
+					if( !m_archetype ) return;
+					if( !m_isLocked ) return;
+					m_archetype->GetMutex().unlock_shared();
+					m_isLocked = false;
+				}
 			}
 
-			Registry<RTYPE>& m_system;
-			Archetype *m_archetype{nullptr};
-			ComponentMap<Handle> *m_mapHandle{nullptr};
-			std::vector<ArchetypeAndSize>& m_archetypes;
-			size_t m_archidx{0};
-			size_t m_entidx{0};
-			bool m_isLocked{false};
+			Registry<RTYPE>& m_system; ///< Reference to the registry system.
+			Archetype *m_archetype{nullptr}; ///< Pointer to the current archetype.
+			ComponentMap<Handle> *m_mapHandle{nullptr}; ///< Pointer to the comp map holding the handle of the current archetype.
+			std::vector<ArchetypeAndSize>& m_archetypes; ///< List of archetypes.
+			size_t m_archidx{0};	///< Index of the current archetype.
+			size_t m_entidx{0};		///< Index of the current entity.
+			bool m_isLocked{false};	///< Flag if the archetype is locked.
 		}; //end of Iterator
 
 
@@ -929,12 +940,16 @@ namespace vecs {
 		class View {
 
 		public:
-			View(Registry<RTYPE>& system) : m_system{system} {}
+			View(Registry<RTYPE>& system) : m_system{system} {} ///< Constructor.
 
+			/// @brief Get an iterator to the first entity. 
+			/// The archetype is locked in shared mode to prevent changes. 
+			/// Then it makes a list of all archetypes that have the components.
+			/// @return Iterator to the first entity.
 			auto begin() {
 				m_archetypes.clear();
 				{
-					LockGuardShared<RTYPE> lock(&m_system.m_mutex);
+					LockGuardShared<RTYPE> lock(&m_system.GetMutex()); //lock the system
 					for( auto& it : m_system.m_archetypes ) {
 						auto arch = it.second.get();
 						auto func = [&]<typename T>() {
@@ -947,20 +962,21 @@ namespace vecs {
 				return Iterator<Ts...>{m_system, m_archetypes, 0};
 			}
 
+			/// @brief Get an iterator to the end of the view.
 			auto end() {
 				return Iterator<Ts...>{m_system, m_archetypes, m_archetypes.size()};
 			}
 
 		private:
-			Registry<RTYPE>& m_system;
-			std::vector<ArchetypeAndSize> m_archetypes;
+			Registry<RTYPE>& m_system;	///< Reference to the registry system.
+			std::vector<ArchetypeAndSize> m_archetypes;	///< List of archetypes.
 		}; //end of View
 
 
 		//----------------------------------------------------------------------------------------------
 
 		Registry() = default; ///< Constructor.
-		~Registry() = default;
+		~Registry() = default;	///< Destructor.
 
 		/// @brief Get the number of entities in the system.
 		/// @return The number of entities.
@@ -1037,8 +1053,19 @@ namespace vecs {
 		/// @param handle The handle of the entity.	
 		/// @return The component value.
 		template<typename T>
-			requires (!std::is_same_v<T, Handle&>)
-		[[nodiscard]] auto Get(Handle handle) {
+			requires (!std::is_same_v<T, Handle&> && !std::is_reference_v<T>)
+		[[nodiscard]] auto Get(Handle handle) -> T {
+			assert(CheckDelay());
+			return std::get<0>(Get3<T>(handle));
+		}
+
+		/// @brief Get component reference of an entity.
+		/// @tparam T The type of the component.
+		/// @param handle The handle of the entity.
+		/// @return Ref objects to the component value.
+		template<typename T>
+			requires (!std::is_same_v<T, Handle&> && std::is_reference_v<T>)
+		[[nodiscard]] auto Get(Handle handle) -> Ref<std::decay_t<T>> {
 			assert(CheckDelay());
 			return std::get<0>(Get3<T>(handle));
 		}
@@ -1049,7 +1076,7 @@ namespace vecs {
 		/// @return A tuple of the component values.
 		template<typename... Ts>
 			requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
-		[[nodiscard]] auto Get(Handle handle)  {
+		[[nodiscard]] auto Get(Handle handle) {
 			assert(CheckDelay());
 			return Get3<Ts...>(handle);			
 		}

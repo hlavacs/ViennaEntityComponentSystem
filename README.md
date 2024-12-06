@@ -32,11 +32,13 @@ You can create an ECS with such a statement:
  #include "VECS.h"
 
 int main() {
-    vecs::Registry system; //create an ECS
+    vecs::Registry<vecs::REGISTRYTYPE_SEQUENTIAL> system; //Either REGISTRYTYPE_SEQUENTIAL or REGISTRYTYPE_PARALLEL
 }
 ```
+Now *system* is a container of entities and their components. 
+VECS can be compiled in two versions. In REGISTRYTYPE_SEQUENTIAL mode all operations are supposed to be done sequentially, there is no internal synchronization taking place. In REGISTRYTYPE_PARALLEL mode VECS uses mutexes to protect internal data structures from corruption, when access are done from multiple threads concurrently. 
 
-Now *system* is a container of entities and their components. Entities can be created by calling *create()*:
+Entities can be created by calling *Insert()*:
 
 ```C
 vecs::Handle h1 = system.Insert(5, 3.0f, 4.0);
@@ -45,11 +47,13 @@ vecs::Handle h1 = system.Insert(5, 3.0f, 4.0);
 Component values and their types are automatically determined by the function parameter list. In the example an entity is created that holds an integer, a float and a double as components, with the respective values. Note that you can use types only **once**, since access to components is type based. Thus, if you want to include components with the same type, wrap them into *structs* like so:
 
 ```C
-//vecs::Handle hx = system.create(5, 6); //compile error
+//vecs::Handle hx = system.Insert(5, 6); //compile error
 struct height_t { int i; }; 
 struct weight_t { int i; }; 
-vecs::Handle hx1 = system.Insert(5, height_t{6}, weight_t{7}); //compiles
+vecs::Handle hx1 = system.Insert(height_t{5}, weight_t{6}); //compiles
 ```
+
+Entities always contain their handle as a component. Thus it is not possible to additionally insert components of type *Handle*. If you need to insert handles, wrap them into a struct.
 
 Do not forget to use type names that describe the intent of the new type, not its type itself. So if you need another integer for storing the height of a person, name it *height_t* rather than *myint_t*. You can check whether an entity still exists by calling *Exists(handle)*. You can get a reference to a *std::set* holding *std::size_t* representing the component types that a given entity has by calling *Types()*. You can check whether an entity has a specific component type *T* by calling *Has<T>(handle)*. You can erase an entity and all its components by calling *Erase(handle)*. You can also erase individual components *T1, T2, ...* by calling *Erase<T1, T2, ...>(handle)*. Note that it is perfectly fine to remove all components from an entity. This does not remove the entity itself, and you can afterwards add new components to it. Call *Clear()* to remove all entities from the system.
 
@@ -71,13 +75,26 @@ system.Erase<double>(h2); //remove also the last component
 assert( system.Exists(h2) ); //check that the entity still exists
 
 assert( system.Size() > 0 );
-system.Clear();
+system.Clear(); //clear the system
 assert( system.Size() == 0 );
 ```
 
-
 You can get the current value of type *T* of an entity by calling *Get<T>(handle)*. You can get a reference to a component by calling *Get<T&>(handle)*. 
-Note that such a reference is not a standard C++ reference but instead an instance of Class *Ref<T>*, which is a wrapper around *T&*. The wrapper ensures that as long as an entity is not erased, a reference to one of its components is never invalidated. 
+Note that such a reference is not a standard C++ reference but instead an instance of Class *Ref<T>*, which is a wrapper around *T&*. The wrapper ensures that as long as an entity is not erased, a reference to one of its components is never invalidated. This is due to the fact that components may change their place in memory due to the following operations:
+* Components are added to or erased from an entity.
+* Erasing whole entities might cause another entity to be moved in order to fill the gap left by the erased entity.
+A *Ref<T>* automatically detects such operations and may reload the reference to the correct memory location. 
+Note that *Ref<T>* offers an *operator()* and a conversion operator that in most cases conceal the fact that this is not a C++ reference. However, in some cases, it might be nevessary to call either this operator or the function *Get()*.
+
+```C
+vecs::Handle h2 = system.Insert(5, 6.9f, 7.3);; //create a new entity with int, float and double components
+auto value = system.Get<float&>(h2);    //get Ref<float>
+float f1 = value; //implicit conversion
+float f2 = value(); //call operator() explicitly
+float f3 = value.Get(); //call Get() instead
+value = 10.0f; //implicit operator()
+```
+
 If you specify more than one type, you can get a tuple holding the specified types or references. You can easily access all component values by using C++17 "structured binding". Calling *Get<T>(handle)* on a type *T* that is not yet past of the entity will also create an empty new component for the entity.
 
 ```C
