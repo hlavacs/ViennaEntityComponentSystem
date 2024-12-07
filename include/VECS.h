@@ -52,7 +52,7 @@ namespace vecs {
 
 
 	template<typename T>
-	auto Type() -> std::size_t {
+	inline auto Type() -> std::size_t {
 		return std::type_index(typeid(T)).hash_code();
 	}
 
@@ -224,7 +224,7 @@ namespace vecs {
 		}
 	};
 
-	bool IsValid(const Handle& handle) {
+	inline bool IsValid(const Handle& handle) {
 		return handle.IsValid();
 	}
 
