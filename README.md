@@ -206,8 +206,9 @@ Note also that a new element is added each loop, which bears the potential of st
 
 VECS mutexes protect agains data structure corruption, but they do not protect each component from data races. Parallel writes to the same components can occur and must be synchronized externally. In a video game this is traditionally done with a *directed acyclic graph (DAG)* that interconnects each system working on the ECS. In order to create this graph, each system must announce beforehand which resources it wants to read from and write to. With VECS two ways are possible.
 
-* In the easy way, each system only declares the component types it wants to read/write to coming from the *iterator in the for loop*. ** If the system does nothing else than iterating (no entity erased, no components added or erased), then those systems are not in a conflict with each other, i.e., they can read from the same components, but write to different components, can easily be determined and run in parallel. In these cases, delaying transactions is not necessary, since the corresponding operations do not occur.
-** If systems do carry out operations other than iterating, then deadlocks can occur and delaying transactions ist necessary.
+* In the easy way, each system only declares the component types it wants to read/write to coming from the *iterator in the for loop*.
+	** If the system does nothing else than iterating (no entity erased, no components added or erased), then those systems are not in a conflict with each other, i.e., they can read from the same components, but write to different components, can easily be determined and run in parallel. In these cases, delaying transactions is not necessary, since the corresponding operations do not occur.
+	** If systems do carry out operations other than iterating, then deadlocks can occur and delaying transactions ist necessary.
 
 * In the sophisticated mode, systems would also declare which entity types they would erase, or add/erase components from. Since these are writing operations, it would severly restrict the number of systems that can run in parallel, but would not need any delayed transaction since one system would not write over or change/move entities that currently belong to another system. 
 
