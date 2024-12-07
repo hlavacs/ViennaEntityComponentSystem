@@ -13,6 +13,36 @@ Important features of VECS are:
 * Easy to use
 * Supports multithreading and parallel accesses.
 
+VECS is a container for entities. Entities are composed of an arbitrary number of components of simple data types. 
+The standard operation in each game loop is to loop over a *subset* of such components concurrently. 
+Data layout is organized in such a way to make optimal use of chaches for exactly this main use case.
+All entities containing the same component types are grouped into *archetypes*, i.e., separate data structures 
+storing these components, each component in continuous memory. Here, empty slots are never allowed,
+i.e., if an entity and all its components is erased, the components at the end of the data structure are moved into the now 
+empty slots to fill up the space. 
+Thus when iterating over *N* components, accessing each component can make optimal use of cache prefetching, i.e.,
+hiding slow data transfers from main memory by loading the data up front before being actually accessed.
+
+VECS internally uses the following data structures:
+* *Stack*: a container like a *std::vector*, but using segments to store data. Inside a segment, data is stored 
+continuously. Pointers to data are invalidated only if data is removed. 
+* *SlotMap*: a map that maps an integer index to an archetype and an index inside the archetype. 
+SlotMap is based on Stack and never shrinks. Each entry also contains a version number, which is increased 
+each time an entity is erased from VECS.
+* *Handle*: Handles identify entities. For this, they contain an integer *index* into the SlotMap, 
+and a *version* number. Handles point to existing entities only if their version numbers match. A handle 
+points to an erased entity if its version number does not match the SlotMap version number.
+* *ComponentMap*: is based on Stack and stores one specific data type.
+* *Archetype*: Contains all component maps of entities having the same set of component types.
+* *View*: allows to select a subset of component types and can create Iterators for looping.
+* *Iterator*: can be used to loop over a subset of component types.
+* *Ref*: a smart reference fpr a specific component of an entity. Can be used to access this component directly,
+but also checks whether the component has been moved, e.g., to another archetype.
+* *Registry*: the main class representing a container for entities. Programs can hold an arbitrary number of
+Registry instances any time, they do not interfere with each other.
+* *LockGuard* and *LockGuardShared*: used to protect data structures when compiled for parallel mode. Are empty when 
+compiled for sequential mode.
+
 
 ## The VECS Include File
 
