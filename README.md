@@ -11,6 +11,7 @@ Important features of VECS are:
 * C++20
 * Header only, simply include the headers to your project
 * Easy to use
+* Supports multithreading and parallel accesses.
 
 
 ## The VECS Include File
@@ -95,7 +96,7 @@ float f3 = value.Get(); //call Get() instead
 value = 10.0f; //implicit operator()
 ```
 
-If you specify more than one type, you can get a tuple holding the specified types or references. You can easily access all component values by using C++17 "structured binding". Calling *Get<T>(handle)* on a type *T* that is not yet part of the entity will also create an empty new component for the entity.
+If you specify more than one type, you can get a tuple holding the specified types or references. You can easily access all component values by using C++17 *structured binding*. Calling *Get<T>(handle)* on a type *T* that is not yet part of the entity will also create an empty new component for the entity.
 
 ```C
 vecs::Handle h2 = system.Insert(5, 6.9f, 7.3);; //create a new entity with int, float and double components
@@ -175,7 +176,7 @@ for( auto [handle, i, f] : system.GetView<vecs::Handle&, int&, float&>() ) { //c
 }
 ```
 
-Inside the for loop you can do everything as long as VECS is running in sequential mode. In the next section the parallel mode is discussed.
+Inside the for loop you can do everything as long as VECS is running in *sequential mode*. Nevertheless, of course erasing entities might result in crahes if systems still try to access them. Systems can check if entities still exist using the *Exists(handle)* function. VECS does not use C++ *std::optional* intentionally since accessing erased entities should never occur which lies in the responsibility of the programmer.
 
 ## Parallel Processing
 
@@ -204,12 +205,13 @@ Of course this code also works in sequential mode, and it makes sense to use suc
 
 Note also that a new element is added each loop, which bears the potential of staying in the loop forever if the element is added to the same archetype the iterator is currently in. VECS mitigates this problem by limiting the loop count for each archetype to the number of entities in them when the view is created. 
 
-VECS mutexes protect agains data structure corruption, but they do not protect each component from data races. Parallel writes to the same components can occur and must be synchronized externally. In a video game this is traditionally done with a *directed acyclic graph (DAG)* that interconnects each system working on the ECS. In order to create this graph, each system must announce beforehand which resources it wants to read from and write to. With VECS two ways are possible.
+VECS mutexes protect agains data structure corruption, but they do not protect each component from data races. Parallel writes to the same components can occur and must be synchronized externally. In a video game this is traditionally done with a *directed acyclic graph (DAG)* that interconnects each system working on the ECS and other shared resources. In order to create this graph, each system must announce beforehand which resources it wants to read from and write to. With VECS two ways are possible.
 
-* In the easy way, each system only declares the component types it wants to read/write to coming from the *iterator in the for loop*.
-	** If the system does nothing else than iterating (no entity erased, no components added or erased), then those systems are not in a conflict with each other, i.e., they can read from the same components, but write to different components, can easily be determined and run in parallel. In these cases, delaying transactions is not necessary, since the corresponding operations do not occur.
-	** If systems do carry out operations other than iterating, then deadlocks can occur and delaying transactions ist necessary.
+1. In the easy way, each system only declares the component types it wants to read/write to coming from the *iterator in the for loop*.
+	
+	* If the system does nothing else than iterating (no entity erased, no components added or erased), then those systems are not in a conflict with each other, i.e., they can read from the same components, but write to different components. This can easily be determined and systems run in parallel. In these cases, delaying transactions is not necessary, since the corresponding operations do not occur.
+	* If systems do carry out operations other than iterating, then deadlocks can occur and delaying transactions is necessary.
 
-* In the sophisticated mode, systems would also declare which entity types they would erase, or add/erase components from. Since these are writing operations, it would severly restrict the number of systems that can run in parallel, but would not need any delayed transaction since one system would not write over or change/move entities that currently belong to another system. 
+2. In the sophisticated mode, systems would also declare which entity types they would erase, or add/erase components from. Since these are writing operations, it would severly restrict the number of systems that can run in parallel, but would not need any delayed transaction since one system would not write over or change/move entities that currently belong to another system. 
 
 
