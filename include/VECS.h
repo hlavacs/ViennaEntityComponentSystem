@@ -381,6 +381,11 @@ namespace vecs {
 		requires (RTYPE == REGISTRYTYPE_SEQUENTIAL || RTYPE == REGISTRYTYPE_PARALLEL)
 	class Registry {
 
+		struct TypeSetAndHash {
+			std::set<size_t> m_types;	//set of types that have been searched for
+			size_t m_hash;				//hash of the set
+		};
+
 	public:
 	
 		template<typename U> requires VecsRef<U> friend class Ref;
@@ -1001,6 +1006,7 @@ namespace vecs {
 			size_t hs = Hash(types);
 			if( !m_archetypes.contains( hs ) ) { //not found
 				auto arch = std::make_unique<Archetype>( handle, archIndex, std::forward<Ts>(component)... );
+				UpdateSearchCache(arch.get());
 				slot.m_value = { arch.get(), archIndex };
 				m_archetypes[hs] = std::move(arch);
 			} else {
@@ -1134,6 +1140,7 @@ namespace vecs {
 				auto archPtr = std::make_unique<Archetype>();
 				arch = archPtr.get();
 				arch->Clone(*oldArch, types);
+				UpdateSearchCache(arch);
 				m_archetypes[hs] = std::move(archPtr);
 			} else { arch = m_archetypes[hs].get(); }
 			LockGuard<RTYPE> lock2(&arch->m_mutex, &oldArch->m_mutex);
@@ -1379,6 +1386,7 @@ namespace vecs {
 					}
 				};
 				( func.template operator()<std::decay_t<Ts>>(), ...  );
+				UpdateSearchCache(newArch);
 
 				m_archetypes[hs] = std::move(newArchUnique);
 			} else { 
@@ -1389,11 +1397,22 @@ namespace vecs {
 			return newArch;
 		}
 
-		mutex_t m_mutex; //mutex for thread safety
-		SlotMap<ArchetypeAndIndex> m_entities;
-		std::unordered_map<size_t, std::unique_ptr<Archetype>> m_archetypes; //Mapping vector of type index to archetype
-		inline static thread_local size_t m_numIterators{0}; //thread local variable for locking
-		inline static thread_local std::vector<std::function<void()>> m_delayedTransactions; //thread local variable for locking
+		void UpdateSearchCache(Archetype* arch) {
+			auto types = arch->Types();
+			for( auto& ts : m_searchCacheSet ) {
+				if( std::includes(types.begin(), types.end(), ts.m_types.begin(), ts.m_types.end()) ) {
+					m_searchCacheMap.insert({ts.m_hash, arch});
+				}
+			}
+		}
+
+		mutex_t 					m_mutex; //mutex for thread safety
+		SlotMap<ArchetypeAndIndex> 	m_entities;
+		std::unordered_map<size_t, std::unique_ptr<Archetype>> 	m_archetypes; //Mapping vector of type set hash to archetype 1:1
+		std::unordered_multimap<size_t, Archetype*> 			m_searchCacheMap; //Mapping vector of hash to archetype, 1:N
+		std::vector<TypeSetAndHash> 							m_searchCacheSet; //These type combinations have been searched for
+		inline static thread_local size_t 								m_numIterators{0}; //thread local variable for locking
+		inline static thread_local std::vector<std::function<void()>> 	m_delayedTransactions; //thread local variable for locking
 	};
 
 	/// @brief Output operator for a Ref object.
