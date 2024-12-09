@@ -1032,7 +1032,7 @@ namespace vecs {
 		[[nodiscard]] auto Insert( Ts&&... component ) -> Handle {
 			assert(CheckDelay());
 
-			LockGuard<RTYPE> lock(&m_mutex); //lock the mutex
+			LockGuard<RTYPE> lock(&GetMutex()); //lock the mutex
 			auto [handle, slot] = m_entities.Insert( {nullptr, 0} ); //get a slot for the entity
 
 			size_t archIndex;
@@ -1058,7 +1058,7 @@ namespace vecs {
 		/// @return true if the entity exists, else false.
 		bool Exists(Handle handle) {
 			assert(CheckDelay());
-			LockGuardShared<RTYPE> lock(&m_mutex); //lock the mutex
+			LockGuardShared<RTYPE> lock(&GetMutex()); //lock the mutex
 			auto& slot = m_entities[handle];
 			return slot.m_version == handle.m_version;
 		}
@@ -1071,7 +1071,7 @@ namespace vecs {
 		bool Has(Handle handle) {
 			assert(CheckDelay());
 			assert(Exists(handle));
-			LockGuardShared<RTYPE> lock(&m_mutex); //lock the system
+			LockGuardShared<RTYPE> lock(&GetMutex()); //lock the system
 			auto arch = m_entities[handle].m_value.m_archetypePtr;
 			return arch->Has(Type<T>());
 		}
@@ -1082,7 +1082,7 @@ namespace vecs {
 		const auto& Types(Handle handle) {
 			assert(CheckDelay());
 			assert(Exists(handle));
-			LockGuardShared<RTYPE> lock(&m_mutex); //lock the system
+			LockGuardShared<RTYPE> lock(&GetMutex()); //lock the system
 			auto arch = m_entities[handle].m_value.m_archetypePtr;
 			return arch->Types();
 		}
@@ -1163,7 +1163,7 @@ namespace vecs {
 			assert(CheckDelay());
 			assert( (Has<Ts>(handle) && ...) );
 
-			LockGuard<RTYPE> lock(&m_mutex); //lock the mutex
+			LockGuard<RTYPE> lock(&GetMutex()); //lock the mutex
 			auto value = &m_entities[handle].m_value;
 			auto oldArch = value->m_archetypePtr;
 			std::set<size_t> types = oldArch->Types();
@@ -1177,7 +1177,7 @@ namespace vecs {
 				UpdateSearchCache(arch);
 				m_archetypes[hs] = std::move(archPtr);
 			} else { arch = m_archetypes[hs].get(); }
-			LockGuard<RTYPE> lock2(&arch->m_mutex, &oldArch->m_mutex);
+			LockGuard<RTYPE> lock2(&arch->GetMutex(), &oldArch->GetMutex());
 			value->m_archetypePtr = arch;
 			value->m_archIndex = arch->Move(types, value->m_archIndex, *oldArch, m_entities);
 		}
@@ -1187,9 +1187,9 @@ namespace vecs {
 		void Erase(Handle handle) {
 			assert(CheckDelay());
 			assert(Exists(handle));
-			LockGuard<RTYPE> lock(&m_mutex); //lock the mutex
+			LockGuard<RTYPE> lock(&GetMutex()); //lock the mutex
 			auto& value = m_entities[handle].m_value;
-			LockGuard<RTYPE> lock2(&value.m_archetypePtr->m_mutex); //lock the archetype
+			LockGuard<RTYPE> lock2(&value.m_archetypePtr->GetMutex()); //lock the archetype
 			value.m_archetypePtr->Erase(value.m_archIndex, m_entities); //erase the entity from the archetype (do both locked)
 			m_entities.Erase(handle); //erase the entity from the entity list
 		}
@@ -1197,7 +1197,7 @@ namespace vecs {
 		/// @brief Clear the registry by removing all entities.
 		void Clear() {
 			assert(CheckDelay());
-			LockGuard<RTYPE> lock(&m_mutex); //lock the mutex
+			LockGuard<RTYPE> lock(&GetMutex()); //lock the mutex
 			for( auto& arch : m_archetypes ) {
 				arch.second->Clear();
 			}
@@ -1227,10 +1227,10 @@ namespace vecs {
 		/// Make sure all archetypes have the same size in all component maps.
 		void Validate() {
 			assert(CheckDelay());
-			LockGuardShared<RTYPE> lock(&m_mutex);
+			LockGuardShared<RTYPE> lock(&GetMutex());
 			for( auto& it : m_archetypes ) {
 				auto arch = it.second.get();
-				LockGuardShared<RTYPE> lock(&arch->m_mutex);
+				LockGuardShared<RTYPE> lock(&arch->GetMutex());
 				arch->Validate();
 			}
 		}
@@ -1282,7 +1282,7 @@ namespace vecs {
 
 		/// @brief Get the mutex of the archetype.
 		/// @return Reference to the mutex.
-		[[nodiscard]] auto GetMutex() -> mutex_t& {
+		[[nodiscard]] inline auto GetMutex() -> mutex_t& {
 			return m_mutex;
 		}
 
@@ -1298,7 +1298,7 @@ namespace vecs {
 
 			std::vector<size_t> newTypes;
 			{
-				LockGuardShared<RTYPE> lock(&m_mutex); //lock the mutex
+				LockGuardShared<RTYPE> lock(&GetMutex()); //lock the mutex
 				auto value = GetArchetype<std::decay_t<Ts>...>(handle, newTypes);
 				//value->m_archetypePtr->Print();	
 				if(newTypes.empty()) {
@@ -1307,7 +1307,7 @@ namespace vecs {
 				};
 			}
 
-			LockGuard<RTYPE> lock1(&m_mutex); //lock the mutex
+			LockGuard<RTYPE> lock1(&GetMutex()); //lock the mutex
 			auto value = GetArchetype<std::decay_t<Ts>...>(handle, newTypes);
 			auto arch = value->m_archetypePtr;
 			if(newTypes.empty()) {
@@ -1317,7 +1317,7 @@ namespace vecs {
 			auto newArch = CreateArchetype<std::decay_t<Ts>...>(handle, newTypes);
 			
 			value->m_archetypePtr = newArch;
-			LockGuard<RTYPE> lock2(&arch->m_mutex); //lock old archetype, new one cannot be seen yet
+			LockGuard<RTYPE> lock2(&arch->GetMutex()); //lock old archetype, new one cannot be seen yet
 			value->m_archIndex = newArch->Move(arch->Types(), value->m_archIndex, *arch, m_entities); //move values
 			( func.template operator()<Ts>(newArch, value->m_archIndex, std::forward<Ts>(vs)), ... );
 			return;
@@ -1370,7 +1370,7 @@ namespace vecs {
 			auto newArch = CreateArchetype<std::decay_t<Ts>...>(handle, newTypes);
 			
 			value->m_archetypePtr = newArch;
-			LockGuard<RTYPE> lock2(&arch->m_mutex); //lock old archetype, new one cannot be seen yet
+			LockGuard<RTYPE> lock2(&arch->GetMutex()); //lock old archetype, new one cannot be seen yet
 			value->m_archIndex = newArch->Move(arch->Types(), value->m_archIndex, *arch, m_entities); //move values
 			return std::make_tuple(Get2<Ts>(handle, newArch, value->m_archIndex)...);
 		}
