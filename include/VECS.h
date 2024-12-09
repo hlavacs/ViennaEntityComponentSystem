@@ -824,8 +824,6 @@ namespace vecs {
 
 		//----------------------------------------------------------------------------------------------
 
-		using iterator_t = std::set<Archetype*>::iterator;
-
 		/// @brief Used for iterating over entity components. Iterators are created by a view. 
 		/// When iterating over an archetype, the archetype is locked in shared mode to prevent changes.
 		/// The iterator unlocks the archetype when it changes to another archetype or when it is destroyed.
