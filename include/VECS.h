@@ -40,9 +40,20 @@ namespace vecs {
 	/// @param hashes Reference to the container of the hashes.
 	/// @return Overall hash made from the hashes.
 	template <typename T>
-	inline size_t Hash( const T& hashes ) {
+	inline size_t Hash( T& hashes ) {
 		std::size_t seed = 0;
-		if constexpr (std::is_same_v<T, const std::vector<size_t>&> ) 
+		if constexpr (std::is_same_v<std::decay_t<T>, const std::vector<size_t>&> ) 
+			std::sort(hashes.begin(), hashes.end());
+		for( auto& v : hashes ) {
+			seed ^= v + 0x9e3779b9 + (seed<<6) + (seed>>2);
+		}
+		return seed;
+	}
+
+	template <typename T>
+	inline size_t Hash( T&& hashes ) {
+		std::size_t seed = 0;
+		if constexpr (std::is_same_v<std::decay_t<T>, const std::vector<size_t>&> ) 
 			std::sort(hashes.begin(), hashes.end());
 		for( auto& v : hashes ) {
 			seed ^= v + 0x9e3779b9 + (seed<<6) + (seed>>2);
@@ -144,7 +155,7 @@ namespace vecs {
 			/// @param segmentBits The number of bits for the segment size.
 			Stack(size_t segmentBits = 10) : m_segmentBits(segmentBits), m_segmentSize{1ul<<segmentBits} {
 				assert(segmentBits > 0);
-				m_segments.push_back( std::make_unique<std::vector<T>>(m_segmentSize) );
+				m_segments.emplace_back( std::make_unique<std::vector<T>>(m_segmentSize) );
 			}
 
 			~Stack() = default;
@@ -155,7 +166,7 @@ namespace vecs {
 				requires std::is_convertible_v<U, T>
 			void push_back(U&& value) {
 				if( Segment(m_size) == m_segments.size() ) {
-					m_segments.push_back( std::make_unique<std::vector<T>>(m_segmentSize) );
+					m_segments.emplace_back( std::make_unique<std::vector<T>>(m_segmentSize) );
 				}
 				++m_size;
 				operator[](size()-1) = std::forward<U>(value);
@@ -184,7 +195,7 @@ namespace vecs {
 			void clear() {
 				m_size = 0;
 				m_segments.clear();
-				m_segments.push_back( std::make_unique<std::vector<T>>(m_segmentSize) );
+				m_segments.emplace_back( std::make_unique<std::vector<T>>(m_segmentSize) );
 			}
 
 		private:
@@ -813,11 +824,7 @@ namespace vecs {
 
 		//----------------------------------------------------------------------------------------------
 
-		/// @brief A struct holding the archetype and the size of the archetype.
-		struct ArchetypeAndSize {
-			Archetype* m_archetype;
-			size_t m_size;
-		};
+		using iterator_t = std::set<Archetype*>::iterator;
 
 		/// @brief Used for iterating over entity components. Iterators are created by a view. 
 		/// When iterating over an archetype, the archetype is locked in shared mode to prevent changes.
@@ -833,15 +840,17 @@ namespace vecs {
 			/// @brief Iterator constructor saving a list of archetypes and the current index.
 			/// @param arch List of archetypes. 
 			/// @param archidx First archetype index.
-			Iterator( Registry<RTYPE>& system, std::vector<ArchetypeAndSize>& arch, size_t archidx) 
+			Iterator( Registry<RTYPE>& system, std::vector<Archetype*>& arch, size_t archidx) 
 				: m_system{system}, m_archetypes{arch}, m_archidx{archidx} {
+					
 				system.increaseIterators(); //Tell the system that an iterator is created
+				if( m_archetypes.size() > 0 ) { m_size = m_archetypes[0]->Size(); }
 				Next(); //go to the first entity
 			}
 
 			/// @brief Copy constructor.
 			Iterator(const Iterator& other) : m_system{other.m_system}, m_archetypes{other.m_archetypes}, 
-				m_archidx{other.m_archidx}, m_entidx{other.m_entidx}, m_isLocked{false} {
+				m_archidx{other.m_archidx}, m_size{other.m_size}, m_entidx{other.m_entidx}, m_isLocked{false} {
 				m_system.increaseIterators();
 			}
 
@@ -892,13 +901,14 @@ namespace vecs {
 
 			/// @brief Go to the next entity. If this means changing the archetype, unlock the current archetype and lock the new one.
 			void Next() {
-				while( m_archidx < m_archetypes.size() && m_entidx >= std::min(m_archetypes[m_archidx].m_size, m_archetypes[m_archidx].m_archetype->Size()) ) {
+				while( m_archidx < m_archetypes.size() && m_entidx >= std::min(m_size, m_archetypes[m_archidx]->Size()) ) {
 					if( m_isLocked ) UnlockShared();
 					++m_archidx;
 					m_entidx = 0;
 				} 
 				if( m_archidx < m_archetypes.size() ) {
-					m_archetype = m_archetypes[m_archidx].m_archetype;
+					m_archetype = m_archetypes[m_archidx];
+					m_size = m_archetype->Size();
 					m_mapHandle = m_archetype->template Map<Handle>();
 					LockShared();
 				} else {
@@ -926,13 +936,14 @@ namespace vecs {
 				}
 			}
 
-			Registry<RTYPE>& m_system; ///< Reference to the registry system.
-			Archetype *m_archetype{nullptr}; ///< Pointer to the current archetype.
-			ComponentMap<Handle> *m_mapHandle{nullptr}; ///< Pointer to the comp map holding the handle of the current archetype.
-			std::vector<ArchetypeAndSize>& m_archetypes; ///< List of archetypes.
-			size_t m_archidx{0};	///< Index of the current archetype.
-			size_t m_entidx{0};		///< Index of the current entity.
-			bool m_isLocked{false};	///< Flag if the archetype is locked.
+			Registry<RTYPE>& 		m_system; ///< Reference to the registry system.
+			Archetype*				m_archetype{nullptr}; ///< Pointer to the current archetype.
+			ComponentMap<Handle>*	m_mapHandle{nullptr}; ///< Pointer to the comp map holding the handle of the current archetype.
+			std::vector<Archetype*>& m_archetypes; ///< List of archetypes.
+			size_t 	m_archidx{0};	///< Index of the current archetype.
+			size_t 	m_size{0};		///< Size of the current archetype.
+			size_t 	m_entidx{0};		///< Index of the current entity.
+			bool 	m_isLocked{false};	///< Flag if the archetype is locked.
 		}; //end of Iterator
 
 
@@ -949,21 +960,31 @@ namespace vecs {
 
 			/// @brief Get an iterator to the first entity. 
 			/// The archetype is locked in shared mode to prevent changes. 
-			/// Then it makes a list of all archetypes that have the components.
 			/// @return Iterator to the first entity.
 			auto begin() {
 				m_archetypes.clear();
+				auto types = std::vector<size_t>({Type<Ts>()...});
+				auto hs = Hash(types);
 				{
 					LockGuardShared<RTYPE> lock(&m_system.GetMutex()); //lock the system
-					for( auto& it : m_system.m_archetypes ) {
-						auto arch = it.second.get();
-						auto func = [&]<typename T>() {
-							if( arch->Types().contains(Type<T>())) return true;
-							return false;
-						};
-						if( (func.template operator()<Ts>() && ...) && arch->Size()>0 ) m_archetypes.push_back({arch, arch->Size()});
-					}
+					if(FindAndCopy(hs) ) return Iterator<Ts...>{m_system, m_archetypes, 0};
 				}
+
+				LockGuard<RTYPE> lock(&m_system.GetMutex()); //lock the system
+				if(FindAndCopy(hs) ) return Iterator<Ts...>{m_system, m_archetypes, 0};
+
+				auto& archetypes = m_system.m_searchCacheMap[hs]; //create empty set
+				assert(archetypes.size() == 0);
+				for( auto& it : m_system.m_archetypes ) {
+					auto arch = it.second.get();
+					auto func = [&]<typename T>() {
+						if( arch->Types().contains(Type<T>())) return true;
+						return false;
+					};
+					if( (func.template operator()<Ts>() && ...) ) archetypes.insert(arch);
+				}
+				m_system.m_searchCacheSet.emplace_back(TypeSetAndHash{{}, hs});
+				( m_system.m_searchCacheSet.back().m_types.insert(Type<Ts>()), ... );
 				return Iterator<Ts...>{m_system, m_archetypes, 0};
 			}
 
@@ -973,8 +994,23 @@ namespace vecs {
 			}
 
 		private:
-			Registry<RTYPE>& m_system;	///< Reference to the registry system.
-			std::vector<ArchetypeAndSize> m_archetypes;	///< List of archetypes.
+
+			/// @brief Find archetypes with the same components in the search cache and copy them to the list.
+			/// @param hs Hash of the types of the components.
+			/// @return true if the archetypes were found in the cache, else false.
+			[[nodiscard]]
+			inline auto FindAndCopy(size_t hs) -> bool {
+				if( m_system.m_searchCacheMap.contains(hs) ) {
+					for( auto& arch : m_system.m_searchCacheMap[hs] ) {
+						m_archetypes.emplace_back( arch );
+					}
+					return true;
+				}
+				return false;
+			}
+
+			Registry<RTYPE>& 		m_system;	///< Reference to the registry system.
+			std::vector<Archetype*> m_archetypes;	///< List of archetypes.
 		}; //end of View
 
 
@@ -1229,7 +1265,7 @@ namespace vecs {
 		bool DelayTransaction( auto&& func ) {
 			if constexpr( RTYPE == REGISTRYTYPE_PARALLEL ) {
 				if( m_numIterators > 0 ) { 
-					m_delayedTransactions.push_back(func); 
+					m_delayedTransactions.emplace_back(func); 
 					return true; 
 				}
 			}
@@ -1352,7 +1388,7 @@ namespace vecs {
 			newTypes.reserve(sizeof...(Ts));
 			auto value = &m_entities[handle].m_value;
 			
-			auto func = [&]<typename T>(){ if(!value->m_archetypePtr->Has(Type<T>())) newTypes.push_back(Type<T>()); };
+			auto func = [&]<typename T>(){ if(!value->m_archetypePtr->Has(Type<T>())) newTypes.emplace_back(Type<T>()); };
 			( func.template operator()<std::decay_t<Ts>>(), ...  );
 			return value;
 		}
@@ -1401,7 +1437,7 @@ namespace vecs {
 			auto types = arch->Types();
 			for( auto& ts : m_searchCacheSet ) {
 				if( std::includes(types.begin(), types.end(), ts.m_types.begin(), ts.m_types.end()) ) {
-					m_searchCacheMap.insert({ts.m_hash, arch});
+					m_searchCacheMap[ts.m_hash].insert(arch);
 				}
 			}
 		}
@@ -1409,7 +1445,7 @@ namespace vecs {
 		mutex_t 					m_mutex; //mutex for thread safety
 		SlotMap<ArchetypeAndIndex> 	m_entities;
 		std::unordered_map<size_t, std::unique_ptr<Archetype>> 	m_archetypes; //Mapping vector of type set hash to archetype 1:1
-		std::unordered_multimap<size_t, Archetype*> 			m_searchCacheMap; //Mapping vector of hash to archetype, 1:N
+		std::unordered_map<size_t, std::set<Archetype*>> 		m_searchCacheMap; //Mapping vector of hash to archetype, 1:N
 		std::vector<TypeSetAndHash> 							m_searchCacheSet; //These type combinations have been searched for
 		inline static thread_local size_t 								m_numIterators{0}; //thread local variable for locking
 		inline static thread_local std::vector<std::function<void()>> 	m_delayedTransactions; //thread local variable for locking
