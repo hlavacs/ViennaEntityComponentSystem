@@ -812,7 +812,7 @@ namespace vecs {
 				return CheckChangeCounter();
 			}
 
-			bool IsValid() { return m_handle.IsValid(); }
+			bool IsValid() { return m_system && m_archetype && m_value && m_handle.IsValid(); }
 
 			auto GetHandle() -> Handle { return m_handle; }; ///< Get the handle of the entity.
 
