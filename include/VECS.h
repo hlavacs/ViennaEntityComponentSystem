@@ -808,14 +808,11 @@ namespace vecs {
 			}
 
 			/// @brief Get the component value. Check if the entity has changed before returning the value.
-			auto Get() -> T {
-				return CheckChangeCounter();
-			}
-
+			auto Get() -> T { return CheckChangeCounter(); }
+			auto GetRef() -> T& { return CheckChangeCounter(); }
+			auto GetPtr() -> T* { return &CheckChangeCounter(); }
 			bool IsValid() { return m_system && m_archetype && m_value && m_handle.IsValid(); }
-
 			auto GetHandle() -> Handle { return m_handle; }; ///< Get the handle of the entity.
-
 			operator T () { return Get(); }; ///< Conversion operator.
 
 		private:
