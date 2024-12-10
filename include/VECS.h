@@ -773,13 +773,28 @@ namespace vecs {
 
 		public:
 
+			Ref() : m_system{nullptr}, m_handle{}, 
+					m_archetype{nullptr}, m_changeCounter{std::numeric_limits<size_t>::max()} {} //default constructor
+
 			/// @brief Constructor, creates a reference to an entity component.
 			/// @param system The registry system.
 			/// @param handle Handle to the entity
 			/// @param arch Archetype of the entity.
 			/// @param valueRef Reference to the component value.
-			Ref(Registry<RTYPE>& system, Handle handle, Archetype *arch, T& valueRef) 
-				: m_system{system}, m_handle{handle}, m_archetype{arch}, m_valueRef{valueRef}, m_changeCounter{arch->GetChangeCounter()} {}
+			Ref(Registry<RTYPE>* system, Handle handle, Archetype *arch, T& value) 
+				: 	m_system{system}, m_handle{handle}, m_archetype{arch}, m_value{&value}, 
+					m_changeCounter{arch->GetChangeCounter()} {}
+
+			Ref( const Ref<T>& other ) = default; //copy constructor
+
+			auto operator=(Ref<T>&& other) -> Ref<T>& {
+				m_system = other.m_system; 
+				m_handle = other.m_handle;  		
+				m_archetype = other.m_archetype;	
+				m_value = other.m_value; 	
+				m_changeCounter = other.m_changeCounter; 
+				return *this;
+			}	
 
 			/// @brief Get the component value. Check if the entity has changed before returning the value.
 			auto operator()() -> T {
@@ -789,13 +804,17 @@ namespace vecs {
 			/// @brief Set the component value. Check if the entity has changed before setting the value.
 			void operator=(T&& value) {
 				CheckChangeCounter();
-				m_valueRef = std::forward<T>(value);
+				*m_value = std::forward<T>(value);
 			}
 
 			/// @brief Get the component value. Check if the entity has changed before returning the value.
 			auto Get() -> T {
 				return CheckChangeCounter();
 			}
+
+			bool IsValid() { return m_handle.IsValid(); }
+
+			auto GetHandle() -> Handle { return m_handle; }; ///< Get the handle of the entity.
 
 			operator T () { return Get(); }; ///< Conversion operator.
 
@@ -804,20 +823,21 @@ namespace vecs {
 			/// @brief Check if the entity has changed and update the reference if necessary.
 			/// @return Reference to the component value.
 			auto CheckChangeCounter() -> T& {
+				assert(m_system && m_archetype);
 				auto cc = m_archetype->GetChangeCounter();
 				if(cc != m_changeCounter ) {
-					auto& value = m_system.m_entities[m_handle].m_value;
+					auto& value = m_system->m_entities[m_handle].m_value;
 					m_archetype = value.m_archetypePtr;
-					m_valueRef = m_archetype->template Map<T>()->Get(value.m_archIndex);
+					m_value = &m_archetype->template Map<T>()->Get(value.m_archIndex);
 					m_changeCounter = m_archetype->GetChangeCounter();
 				}
-				return  m_valueRef;
+				return  *m_value;
 			}
 
-			Registry<RTYPE>& 	m_system; 			///< Reference to the registry system.
+			Registry<RTYPE>* 	m_system; 			///< Reference to the registry system.
 			Handle 				m_handle;  			///< Handle of the entity.
 			Archetype* 			m_archetype;		///< Archetype of the entity. Might have changed.
-			T& 					m_valueRef; 		///< Reference to the component value.
+			T* 					m_value; 			///< Pointer to the component value.
 			size_t 				m_changeCounter; 	///< Change counter of the archetype.
 		};
 		
@@ -886,7 +906,7 @@ namespace vecs {
 				requires (!std::is_same_v<U, Handle&> && std::is_reference_v<U>)
 			[[nodiscard]] auto Get(auto &system, Handle handle, Archetype *arch) {
 				using T = std::decay_t<U>;
-				return Ref<T>{system, handle, arch, arch->template Map<T>()->Get(m_entidx)};
+				return Ref<T>{&system, handle, arch, arch->template Map<T>()->Get(m_entidx)};
 			}
 
 			/// @brief Get a component value from the archetype.
@@ -1333,7 +1353,7 @@ namespace vecs {
 			requires (std::is_reference_v<U>)
 		[[nodiscard]] auto Get2( Handle handle, Archetype* arch, size_t archIndex) {
 			using T = std::decay_t<U>;
-			return Ref<T>{*this, handle, arch, arch->template Map<T>()->Get(archIndex)};
+			return Ref<T>{this, handle, arch, arch->template Map<T>()->Get(archIndex)};
 		}
 
 		/// @brief Get the component value of an entity.
