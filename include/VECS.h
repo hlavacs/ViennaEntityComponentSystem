@@ -226,13 +226,10 @@ namespace vecs {
 		uint32_t m_index{std::numeric_limits<uint32_t>::max()}; ///< Index of the entity in the slot map.
 		uint32_t m_version{0}; ///< Version of the entity in the slot map. If the version is different from the slot version, the entity is also invalid.
 
-		bool IsValid() const {
-			return m_index != std::numeric_limits<uint32_t>::max();
-		}
-
-		bool operator<(const Handle& other) const {
-			return m_index < other.m_index;
-		}
+		bool IsValid() const { return m_index != std::numeric_limits<uint32_t>::max(); }
+		bool operator==(const Handle& other) const { return m_index == other.m_index && m_version == other.m_version; }
+		bool operator!=(const Handle& other) const { return !(*this == other); }
+		bool operator<(const Handle& other) const { return m_index < other.m_index; }
 	};
 
 	inline bool IsValid(const Handle& handle) {
