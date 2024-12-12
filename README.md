@@ -36,8 +36,6 @@ points to an erased entity if its version number does not match the SlotMap vers
 * *Archetype*: Contains all component maps of entities having the same set of component types.
 * *View*: allows to select a subset of component types and can create Iterators for looping.
 * *Iterator*: can be used to loop over a subset of component types.
-* *Ref*: a smart reference fpr a specific component of an entity. Can be used to access this component directly,
-but also checks whether the component has been moved, e.g., to another archetype.
 * *Registry*: the main class representing a container for entities. Programs can hold an arbitrary number of
 Registry instances any time, they do not interfere with each other.
 * *LockGuard* and *LockGuardShared*: used to protect data structures when compiled for parallel mode. Are empty when 
@@ -111,19 +109,16 @@ assert( system.Size() == 0 );
 ```
 
 You can get the current value of type *T* of an entity by calling *Get<T>(handle)*. You can get a reference to a component by calling *Get<T&>(handle)*. 
-Note that such a reference is not a standard C++ reference but instead an instance of Class *Ref<T>*, which is a wrapper around *T&*. The wrapper ensures that as long as an entity is not erased, a reference to one of its components is never invalidated. This is due to the fact that components may change their place in memory due to the following operations:
+Be aware that using references is done at your own peril. This is due to the fact that components may change their place in memory due to the following operations:
 * Components are added to or erased from an entity.
 * Erasing an entity might cause another entity to be moved in order to fill the gap left by the erased entity.
-A *Ref<T>* automatically detects such operations and resets the reference to the correct memory location. 
-Note that *Ref<T>* offers an *operator()* and a conversion operator that in most cases conceal the fact that this is not a C++ reference. However, in some cases, it might be nevessary to call either this operator or the function *Get()*.
+As long as you do not carry out such operations, you can use a reference.
 
 ```C
 vecs::Handle h2 = system.Insert(5, 6.9f, 7.3);; //create a new entity with int, float and double components
-auto value = system.Get<float&>(h2);    //get Ref<float>
-float f1 = value; //implicit conversion
-float f2 = value(); //call operator() explicitly
-float f3 = value.Get(); //call Get() instead
-value = 10.0f; //implicit operator()
+auto value = system.Get<float&>(h2);    //get float&
+float f1 = value;
+value = 10.0f;
 ```
 
 If you specify more than one type, you can get a tuple holding the specified types or references. You can easily access all component values by using C++17 *structured binding*. Calling *Get<T>(handle)* on a type *T* that is not yet part of the entity will also create an empty new component for the entity.

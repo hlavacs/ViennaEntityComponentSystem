@@ -50,17 +50,17 @@ int test1() {
     assert( system.Exists(h2) );
     auto t2 = system.Types(h2);
 
-	auto value = system.Get<float&>(h2);
-	float f1 = value; //implicit operator()
-	float f2 = value(); //call operator() explicitly
-	float f3 = value.Get(); //call Get() instead
-	value = 10.0f; //implicit operator()
+	decltype(auto) value = system.Get<float&>(h2);
+	float& f1 = value; 
+	value = 10.0f; 
+	assert( system.Get<float>(h2) == 10.0f );
 
     auto [v2a, v2b] = system.Get<float, double>(h2);
     auto [v3a, v3b] = system.Get<float&, double&>(h2);
 	v3a = 100.0f;
 	v3b = 101.0;
     auto [v4a, v4b] = system.Get<float, double>(h2);
+	assert( v4a == 100.0f && v4b == 101.0 );
 
     system.Put(h2, 50, 69.0f, 73.0);
 	auto [v5a, v5b, v5c] = system.Get<int, float, double>(h2);
@@ -105,7 +105,7 @@ int test1() {
  
     auto hd1 = system.Insert(1, 10.0f, 10.0);
     auto hd2 = system.Insert(2, 20.0f );
-    auto hd3 = system.Insert(3, 30.0, "AAA");
+    auto hd3 = system.Insert(3, 30.0, std::string("AAA"));
     auto hd4 = system.Insert(4, 40.0f, 40.0);
     auto hd5 = system.Insert(5);
     auto hd6 = system.Insert(6, 60.0f, 60.0);
@@ -180,8 +180,8 @@ size_t test_iterate( auto& system, int m ) {
 	auto t1 = std::chrono::high_resolution_clock::now();
 
     for( auto [handle, i, f] : system.template GetView<vecs::Handle, int&, float&>() ) {
-        i = i() + (int)f();
-		f = (float)i();
+        i = i + f;
+		f = i;
 		//system.template Has<int>(handle);
 		//system.Exists(handle);
 	}
@@ -313,21 +313,24 @@ void test5() {
 	jobs.push_back( [&](handles_t& handles) { 
 		if( handles.size()>0) { 
 			auto h = SelectRandom(handles, dis(gen)*handles.size());
-			system.Get<int&>(*h) = GetInt();			
+			auto v = system.Get<int&>(*h);
+			v = GetInt();			
 		};
 	} );
 
 	jobs.push_back( [&](handles_t& hs) { 
 		if( hs.size()>0) {
 			auto h = SelectRandom(hs, dis(gen)*hs.size());
-			system.Get<float&>(*h) = GetFloat();
+			auto v = system.Get<float&>(*h);
+			v = GetFloat();
 		};
 	} );
 
 	jobs.push_back( [&](handles_t& hs) { 
 		if( hs.size()>0) {
 			auto h = SelectRandom(hs, dis(gen)*hs.size());
-			system.Get<double&>(*h) = GetDouble();
+			auto db = system.Get<double&>(*h);
+			db = GetDouble();
 		};
 	} );
 
