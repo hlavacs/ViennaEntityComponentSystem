@@ -27,10 +27,48 @@ using namespace std::chrono_literals;
 
 namespace vecs {
 
+	//----------------------------------------------------------------------------------------------
+	//Handles
+
+	/// @brief A handle for an entity or a component. 
+	struct Handle {
+		uint32_t m_index{std::numeric_limits<uint32_t>::max()}; ///< Index of the entity in the slot map.
+		uint32_t m_version{0}; ///< Version of the entity in the slot map. If the version is different from the slot version, the entity is also invalid.
+
+		bool IsValid() const { return m_index != std::numeric_limits<uint32_t>::max(); }
+		bool operator==(const Handle& other) const { return m_index == other.m_index && m_version == other.m_version; }
+		bool operator!=(const Handle& other) const { return !(*this == other); }
+		bool operator<(const Handle& other) const { return m_index < other.m_index; }
+	};
+
+	inline bool IsValid(const Handle& handle) {
+		return handle.IsValid();
+	}
+
+	inline std::ostream& operator<<(std::ostream& os, const vecs::Handle& handle) {
+    	return os << "{" <<  handle.m_index << ", " << handle.m_version << "}"; 
+	}
 
 	//----------------------------------------------------------------------------------------------
-	//Conveneience functions
+	//Registry concepts and types
 
+	template<typename U>
+	concept VecsPOD = (!std::is_reference_v<U> && !std::is_pointer_v<U>);
+	
+	template<typename... Ts>
+	concept VecsArchetype = (vtll::unique<vtll::tl<Ts...>>::value && (sizeof...(Ts) > 0) && (!std::is_same_v<Handle, std::decay_t<Ts>> && ...));
+
+	template<typename... Ts>
+	concept VecsView = ((vtll::unique<vtll::tl<Ts...>>::value) && (sizeof...(Ts) > 0) && (!std::is_same_v<Handle&, Ts> && ...));
+
+	template<typename... Ts>
+	concept VecsIterator = (vtll::unique<vtll::tl<Ts...>>::value);
+
+	template<typename... Ts> requires VecsIterator<Ts...> class Iterator;
+	template<typename... Ts> requires VecsView<Ts...> class View;
+
+	//----------------------------------------------------------------------------------------------
+	//Convenience functions
 
 	template <typename> struct is_tuple : std::false_type {};
 	template <typename ...Ts> struct is_tuple<std::tuple<Ts...>> : std::true_type {};
@@ -138,6 +176,31 @@ namespace vecs {
 		mutex_t* m_mutex{nullptr}; ///< Pointer to the mutex.
 	};
 
+	template<int LTYPE>
+		requires (LTYPE == LOCKGUARDTYPE_SEQUENTIAL || LTYPE == LOCKGUARDTYPE_PARALLEL)
+	struct UnlockGuardShared {
+
+		/// @brief Constructor for a single mutex, locks the mutex.
+		template<typename T>
+		UnlockGuardShared(T* ptr) { 
+			if constexpr (LTYPE == LOCKGUARDTYPE_PARALLEL) { 
+				if(ptr!=nullptr) {
+					m_mutex = &ptr->GetMutex();
+					m_mutex->unlock_shared(); 
+				}
+			}
+		}
+
+		/// @brief Destructor, unlocks the mutex.
+		~UnlockGuardShared() { 
+			if constexpr (LTYPE == LOCKGUARDTYPE_PARALLEL) { 
+				if(m_mutex!=nullptr) m_mutex->lock_shared(); 
+			}
+		}
+
+		mutex_t* m_mutex{nullptr}; ///< Pointer to the mutex.
+	};
+
 
 	//----------------------------------------------------------------------------------------------
 	//Segmented Stack
@@ -186,8 +249,7 @@ namespace vecs {
 			/// @param index The index of the value.
 			auto operator[](size_t index) -> T& {
 				assert(index < m_size);
-				decltype(auto) v = (T&)(*m_segments[Segment(index)])[Offset(index)];
-				return v;
+				return (*m_segments[Segment(index)])[Offset(index)];
 			}
 
 			/// @brief Get the value at an index.
@@ -220,28 +282,6 @@ namespace vecs {
 
 
 
-	//----------------------------------------------------------------------------------------------
-	//Handles
-
-	/// @brief A handle for an entity or a component. 
-	struct Handle {
-		uint32_t m_index{std::numeric_limits<uint32_t>::max()}; ///< Index of the entity in the slot map.
-		uint32_t m_version{0}; ///< Version of the entity in the slot map. If the version is different from the slot version, the entity is also invalid.
-
-		bool IsValid() const { return m_index != std::numeric_limits<uint32_t>::max(); }
-		bool operator==(const Handle& other) const { return m_index == other.m_index && m_version == other.m_version; }
-		bool operator!=(const Handle& other) const { return !(*this == other); }
-		bool operator<(const Handle& other) const { return m_index < other.m_index; }
-	};
-
-	inline bool IsValid(const Handle& handle) {
-		return handle.IsValid();
-	}
-
-	inline std::ostream& operator<<(std::ostream& os, const vecs::Handle& handle) {
-    	return os << "{" <<  handle.m_index << ", " << handle.m_version << "}"; 
-	}
-
 
 	//----------------------------------------------------------------------------------------------
 	//Slot Maps
@@ -252,8 +292,7 @@ namespace vecs {
 	/// to the slot map and a version counter. If the version counter of the slot is different from the version counter of the handle,
 	/// the slot is invalid.
 	/// @tparam T The value type of the slot map.
-	template<typename T>
-			requires (!std::is_reference_v<T> && !std::is_pointer_v<T>)
+	template<VecsPOD T>
 	class SlotMap {
 
 		/// @brief A slot in the slot map.
@@ -360,35 +399,19 @@ namespace vecs {
 	};
 
 
-	//----------------------------------------------------------------------------------------------
-	//Registry concepts and types
-
-	template<typename... Ts>
-	concept VecsArchetype = (vtll::unique<vtll::tl<Ts...>>::value && (sizeof...(Ts) > 0) && (!std::is_same_v<Handle, std::decay_t<Ts>> && ...));
-
-	template<typename... Ts>
-	concept VecsView = ((vtll::unique<vtll::tl<Ts...>>::value) && (sizeof...(Ts) > 0) && (!std::is_same_v<Handle&, Ts> && ...));
-
-	template<typename... Ts>
-	concept VecsIterator = (vtll::unique<vtll::tl<Ts...>>::value);
-
-	template<typename U>
-	concept VecsRef = (!std::is_reference_v<U>);
-
-	template<typename... Ts> requires VecsIterator<Ts...> class Iterator;
-	template<typename... Ts> requires VecsView<Ts...> class View;
-
 
 	//----------------------------------------------------------------------------------------------
 	//Registry 
 
-	using RegistryType = int;
 	const int REGISTRYTYPE_SEQUENTIAL = 0;
 	const int REGISTRYTYPE_PARALLEL = 1;
 
+	template<int T>
+	concept RegistryType = (T == REGISTRYTYPE_SEQUENTIAL || T == REGISTRYTYPE_PARALLEL);
+
 	/// @brief A registry for entities and components.
-	template <RegistryType RTYPE>
-		requires (RTYPE == REGISTRYTYPE_SEQUENTIAL || RTYPE == REGISTRYTYPE_PARALLEL)
+	template <int RTYPE>
+		requires RegistryType<RTYPE>
 	class Registry {
 
 		struct TypeSetAndHash {
@@ -435,8 +458,7 @@ namespace vecs {
 		/// @brief A map of components of the same type.
 		/// @tparam U The value type for this comoonent map. Note that the type is decayed.
 		/// If you want to store a pointer or reference, use a struct to wrap it.
-		template<typename T>
-			requires (!std::is_reference_v<T> && !std::is_pointer_v<T>)
+		template<VecsPOD T>
 		class ComponentMap : public ComponentMapBase {
 
 		public:
@@ -463,8 +485,7 @@ namespace vecs {
 			/// @return Reference to the component value.
 			auto Get(std::size_t index) -> T& {
 				assert(index < m_data.size());
-				decltype(auto) v = m_data[index];
-				return v;
+				return m_data[index];
 			};
 
 			/// @brief Get reference to the data container of the components.
@@ -539,8 +560,7 @@ namespace vecs {
 		/// All entities that have the same components are stored in the same archetype.
 		class Archetype {
 
-			template <RegistryType> requires (RTYPE == REGISTRYTYPE_SEQUENTIAL || RTYPE == REGISTRYTYPE_PARALLEL)
-			friend class Registry;
+			template <int T> requires RegistryType<T> friend class Registry;
 
 		public:
 
@@ -592,8 +612,7 @@ namespace vecs {
 			/// @return The component value.
 			template<typename T>
 			[[nodiscard]] auto Get(size_t archIndex) -> T& {
-				decltype(auto) v = Map<T>()->Get(archIndex);
-				return v;
+				return Map<T>()->Get(archIndex);
 			}
 
 			/// @brief Get component values of an entity.
@@ -670,7 +689,7 @@ namespace vecs {
 		
 			/// @brief Get the change counter of the archetype. It is increased when a change occurs
 			/// that might invalidate a Ref object, e.g. when an entity is moved to another archetype, or erased.
-			size_t GetChangeCounter() {
+			auto GetChangeCounter() -> size_t {
 				return m_changeCounter;
 			}
 
@@ -749,9 +768,15 @@ namespace vecs {
 			std::unordered_map<size_t, std::unique_ptr<ComponentMapBase>> m_maps; //map from type index to component data
 		}; //end of Archetype
 
-	public:
-
+	public:	
+		
 		//----------------------------------------------------------------------------------------------
+
+		struct ArchetypeAndSize {
+			Archetype* 	m_archetype;	//pointer to the archetype
+			size_t 		m_size;			//size of the archetype
+			ArchetypeAndSize(Archetype* arch, size_t size) : m_archetype{arch}, m_size{size} {}
+		};
 
 		/// @brief Used for iterating over entity components. Iterators are created by a view. 
 		/// When iterating over an archetype, the archetype is locked in shared mode to prevent changes.
@@ -767,11 +792,13 @@ namespace vecs {
 			/// @brief Iterator constructor saving a list of archetypes and the current index.
 			/// @param arch List of archetypes. 
 			/// @param archidx First archetype index.
-			Iterator( Registry<RTYPE>& system, std::vector<Archetype*>& arch, size_t archidx) 
-				: m_system{system}, m_archetypes{arch}, m_archidx{archidx} {
+			Iterator( Registry<RTYPE>& system, std::vector<ArchetypeAndSize>& arch, size_t archidx) 
+				: m_system(system), m_archetypes{arch}, m_archidx{archidx} {
 					
 				system.increaseIterators(); //Tell the system that an iterator is created
-				if( m_archetypes.size() > 0 ) { m_size = m_archetypes[0]->Size(); }
+				if( m_archetypes.size() > 0 ) { 
+					m_size = std::min(m_archetypes.front().m_size, m_archetypes.front().m_archetype->Size());
+				}
 				Next(); //go to the first entity
 			}
 
@@ -796,7 +823,7 @@ namespace vecs {
 
 			/// @brief Access the content the iterator points to.
 			auto operator*() {
-				assert( m_archetype && m_entidx < m_archetype->Size() );
+				assert( m_archetype && m_entidx < m_size );
 				Handle handle = m_mapHandle->Get(m_entidx);
 				auto tup = std::make_tuple( Get<Ts>(m_system, handle, m_archetype)... );
 				if constexpr (sizeof...(Ts) == 1) { return std::get<0>(tup); }
@@ -820,14 +847,14 @@ namespace vecs {
 
 			/// @brief Go to the next entity. If this means changing the archetype, unlock the current archetype and lock the new one.
 			void Next() {
-				while( m_archidx < m_archetypes.size() && m_entidx >= std::min(m_size, m_archetypes[m_archidx]->Size()) ) {
+				while( m_archidx < m_archetypes.size() && m_entidx >= std::min(m_archetypes[m_archidx].m_size, m_archetypes[m_archidx].m_archetype->Size()) ) {
 					if( m_isLocked ) UnlockShared();
 					++m_archidx;
 					m_entidx = 0;
 				} 
 				if( m_archidx < m_archetypes.size() ) {
-					m_archetype = m_archetypes[m_archidx];
-					m_size = m_archetype->Size();
+					m_archetype = m_archetypes[m_archidx].m_archetype;
+					m_size = std::min(m_archetypes[m_archidx].m_size, m_archetypes[m_archidx].m_archetype->Size());
 					m_mapHandle = m_archetype->template Map<Handle>();
 					LockShared();
 				} else {
@@ -838,9 +865,9 @@ namespace vecs {
 			/// @brief Lock the archetype in shared mode.
 			void LockShared() {
 				if constexpr (RTYPE == REGISTRYTYPE_PARALLEL) {
-					if( !m_archetype ) return;
-					if( m_isLocked ) return;
+					if( !m_archetype || m_isLocked ) return;
 					m_archetype->GetMutex().lock_shared();
+					m_system.m_currentArchetype = m_archetype;
 					m_isLocked = true;
 				}
 			}
@@ -848,17 +875,17 @@ namespace vecs {
 			/// @brief Unlock the archetype.
 			void UnlockShared() {
 				if constexpr (RTYPE == REGISTRYTYPE_PARALLEL) {
-					if( !m_archetype ) return;
-					if( !m_isLocked ) return;
+					if( !m_archetype || !m_isLocked ) return;
 					m_archetype->GetMutex().unlock_shared();
+					m_system.m_currentArchetype = nullptr;
 					m_isLocked = false;
 				}
 			}
 
 			Registry<RTYPE>& 		m_system; ///< Reference to the registry system.
-			Archetype*				m_archetype{nullptr}; ///< Pointer to the current archetype.
+			Archetype*		 		m_archetype{nullptr}; ///< Pointer to the current archetype.
 			ComponentMap<Handle>*	m_mapHandle{nullptr}; ///< Pointer to the comp map holding the handle of the current archetype.
-			std::vector<Archetype*>& m_archetypes; ///< List of archetypes.
+			std::vector<ArchetypeAndSize>& m_archetypes; ///< List of archetypes.
 			size_t 	m_archidx{0};	///< Index of the current archetype.
 			size_t 	m_size{0};		///< Size of the current archetype.
 			size_t 	m_entidx{0};		///< Index of the current entity.
@@ -921,15 +948,15 @@ namespace vecs {
 			inline auto FindAndCopy(size_t hs) -> bool {
 				if( m_system.m_searchCacheMap.contains(hs) ) {
 					for( auto& arch : m_system.m_searchCacheMap[hs] ) {
-						m_archetypes.emplace_back( arch );
+						m_archetypes.emplace_back( arch, arch->Size() );
 					}
 					return true;
 				}
 				return false;
 			}
 
-			Registry<RTYPE>& 		m_system;	///< Reference to the registry system.
-			std::vector<Archetype*> m_archetypes;	///< List of archetypes.
+			Registry<RTYPE>& 				m_system;	///< Reference to the registry system.
+			std::vector<ArchetypeAndSize>  	m_archetypes;	///< List of archetypes.
 		}; //end of View
 
 
@@ -951,7 +978,7 @@ namespace vecs {
 		template<typename... Ts>
 			requires ((sizeof...(Ts) > 0) && (vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
 		[[nodiscard]] auto Insert( Ts&&... component ) -> Handle {
-			assert(CheckDelay());
+			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 
 			LockGuard<RTYPE> lock(&GetMutex()); //lock the mutex
 			auto [handle, slot] = m_entities.Insert( {nullptr, 0} ); //get a slot for the entity
@@ -970,7 +997,6 @@ namespace vecs {
 				archIndex = arch->Insert( handle, std::forward<Ts>(component)... );
 				slot.m_value = { arch, archIndex };
 			}
-
 			return handle;
 		}
 
@@ -978,7 +1004,7 @@ namespace vecs {
 		/// @param handle The handle of the entity.
 		/// @return true if the entity exists, else false.
 		bool Exists(Handle handle) {
-			assert(CheckDelay());
+			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			LockGuardShared<RTYPE> lock(&GetMutex()); //lock the mutex
 			auto& slot = m_entities[handle];
 			return slot.m_version == handle.m_version;
@@ -990,7 +1016,7 @@ namespace vecs {
 		/// @return true if the entity has the component, else false.
 		template<typename T>
 		bool Has(Handle handle) {
-			assert(CheckDelay());
+			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			assert(Exists(handle));
 			LockGuardShared<RTYPE> lock(&GetMutex()); //lock the system
 			auto arch = m_entities[handle].m_value.m_archetypePtr;
@@ -1001,7 +1027,7 @@ namespace vecs {
 		/// @param handle The handle of the entity.
 		/// @return A vector of type indices of the components.
 		const auto& Types(Handle handle) {
-			assert(CheckDelay());
+			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			assert(Exists(handle));
 			LockGuardShared<RTYPE> lock(&GetMutex()); //lock the system
 			auto arch = m_entities[handle].m_value.m_archetypePtr;
@@ -1011,7 +1037,7 @@ namespace vecs {
 
 		template<typename T>
 		[[nodiscard]] auto Get(Handle handle) -> T {
-			assert(CheckDelay());
+			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			return Get2<T>(handle);
 		}
 
@@ -1022,7 +1048,7 @@ namespace vecs {
 		template<typename... Ts>
 			requires (sizeof...(Ts)>1 && vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<Ts...>, Handle&>::value)
 		[[nodiscard]] auto Get(Handle handle) -> std::tuple<Ts...> {
-			assert(CheckDelay());
+			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			return Get2<Ts...>(handle);
 		}
 
@@ -1034,6 +1060,7 @@ namespace vecs {
 		template<typename U>
 			requires (!is_tuple<U>::value && !std::is_same_v<std::decay_t<U>, Handle>)
 		void Put(Handle handle, U&& v) {
+			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			assert(Exists(handle));
 			using T = std::decay_t<U>;
 			Put2(handle, std::forward<T>(v));
@@ -1046,6 +1073,7 @@ namespace vecs {
 		template<typename... Ts>
 			requires (vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<std::decay_t<Ts>...>, Handle>::value)
 		void Put(Handle handle, std::tuple<Ts...>& v) {
+			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			Put2(handle, std::forward<Ts>(std::get<Ts>(v))...);
 		}
 
@@ -1056,6 +1084,7 @@ namespace vecs {
 		template<typename... Ts>
 			requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<std::decay_t<Ts>...>, Handle>::value)
 		void Put(Handle handle, Ts&&... vs) {
+			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			Put2(handle, std::forward<Ts>(vs)...);
 		}
 		
@@ -1065,7 +1094,7 @@ namespace vecs {
 		template<typename... Ts>
 			requires (vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
 		void Erase(Handle handle) {
-			assert(CheckDelay());
+			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			assert( (Has<Ts>(handle) && ...) );
 
 			LockGuard<RTYPE> lock(&GetMutex()); //lock the mutex
@@ -1090,7 +1119,7 @@ namespace vecs {
 		/// @brief Erase an entity from the registry.
 		/// @param handle The handle of the entity.
 		void Erase(Handle handle) {
-			assert(CheckDelay());
+			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			assert(Exists(handle));
 			LockGuard<RTYPE> lock(&GetMutex()); //lock the mutex
 			auto& value = m_entities[handle].m_value;
@@ -1101,7 +1130,7 @@ namespace vecs {
 
 		/// @brief Clear the registry by removing all entities.
 		void Clear() {
-			assert(CheckDelay());
+			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			LockGuard<RTYPE> lock(&GetMutex()); //lock the mutex
 			for( auto& arch : m_archetypes ) {
 				arch.second->Clear();
@@ -1131,7 +1160,7 @@ namespace vecs {
 		/// @brief Validate the registry.
 		/// Make sure all archetypes have the same size in all component maps.
 		void Validate() {
-			assert(CheckDelay());
+			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			LockGuardShared<RTYPE> lock(&GetMutex());
 			for( auto& it : m_archetypes ) {
 				auto arch = it.second.get();
@@ -1153,16 +1182,26 @@ namespace vecs {
 			return --m_numIterators;
 		}
 
-		/// @brief Check if a transaction must be delayed.
-		/// @return true if the transaction must be delayed, else false.
-		bool CheckDelay() {
+		inline bool CheckUnlockArchetype() {
 			if constexpr( RTYPE == REGISTRYTYPE_PARALLEL ) {
-				if( m_numIterators > 0 ) {
-					return false;
+				if( m_currentArchetype ) {
+					m_currentArchetype->GetMutex().unlock_shared();
+					return true;
 				}
 			}
-			return true;
+			return false;
 		}
+
+		inline bool CheckLockArchetype() {
+			if constexpr( RTYPE == REGISTRYTYPE_PARALLEL ) {
+				if( m_currentArchetype ) {
+					m_currentArchetype->GetMutex().lock_shared();
+					return true;
+				}
+			}
+			return false;
+		}
+
 
 		/// @brief Delay a transaction until all iterators are destroyed.
 		bool DelayTransaction( auto&& func ) {
@@ -1237,9 +1276,6 @@ namespace vecs {
 		template<typename U>
 		[[nodiscard]] auto Get2(Handle handle) -> U& {
 			using T = std::decay_t<U>;
-
-			std::cout << "Get2 return type: " << typeid(U).name() << std::endl;
-
 			std::vector<size_t> newTypes;
 			{
 				LockGuardShared<RTYPE> lock(&m_mutex); //lock the mutex
@@ -1365,10 +1401,11 @@ namespace vecs {
 		mutex_t 					m_mutex; //mutex for thread safety
 		SlotMap<ArchetypeAndIndex> 	m_entities;
 		std::unordered_map<size_t, std::unique_ptr<Archetype>> 	m_archetypes; //Mapping vector of type set hash to archetype 1:1
-		std::unordered_map<size_t, std::set<Archetype*>> 		m_searchCacheMap; //Mapping vector of hash to archetype, 1:N
-		std::vector<TypeSetAndHash> 							m_searchCacheSet; //These type combinations have been searched for
-		inline static thread_local size_t 								m_numIterators{0}; //thread local variable for locking
-		inline static thread_local std::vector<std::function<void()>> 	m_delayedTransactions; //thread local variable for locking
+		std::unordered_map<size_t, std::set<Archetype*>> m_searchCacheMap; //Mapping vector of hash to archetype, 1:N
+		std::vector<TypeSetAndHash> 					 m_searchCacheSet; //These type combinations have been searched for
+		inline static thread_local size_t 		m_numIterators{0}; //thread local variable for locking
+		inline static thread_local Archetype* 	m_currentArchetype{nullptr}; //is there an iterator now
+		inline static thread_local std::vector<std::function<void()>> m_delayedTransactions; //thread local variable for locking
 	};
 
 } //end of namespace vecs
