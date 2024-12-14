@@ -845,10 +845,8 @@ namespace vecs {
 				auto operator!=(const Iterator& other) -> bool { return m_bucketIdx != other.m_bucketIdx; }
 			private:
 				void Next() {
-					++m_bucketIdx; 
-					while( m_bucketIdx < m_hashMap.m_buckets.size() && !m_hashMap.m_buckets[m_bucketIdx].m_first ) { 
-						++m_bucketIdx; 
-					}
+					do {++m_bucketIdx; }
+					while( m_bucketIdx < m_hashMap.m_buckets.size() && !m_hashMap.m_buckets[m_bucketIdx].m_first );
 					if( m_bucketIdx < m_hashMap.m_buckets.size() ) { m_pair = &m_hashMap.m_buckets[m_bucketIdx].m_first; } 
 				}
 				HashMap& m_hashMap;
