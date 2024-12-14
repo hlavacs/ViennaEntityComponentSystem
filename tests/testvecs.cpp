@@ -21,9 +21,17 @@ int test1() {
 
 	{
 		vecs::Registry<vecs::REGISTRYTYPE_PARALLEL>::HashMap<int> hm;
-		auto h = hm[1];
-		auto h2 = hm[2];
-		auto h3 = hm[3];
+		hm.Insert(1,1);
+		hm.Insert(2,2);
+		hm.Insert(3,3);
+
+		int h1 = *hm[1];
+		int h2 = *hm[2];
+		int h3 = *hm[3];
+
+		for( auto v : hm ) {
+			std::cout << v.first << " " << v.second << std::endl;
+		}	
 
 	}
 
