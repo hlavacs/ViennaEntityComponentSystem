@@ -827,6 +827,23 @@ namespace vecs {
 
 			using Map = std::vector<Bucket>; ///< Type of the map.
 
+			class Iterator {
+			public:
+				Iterator(HashMap& map, size_t bucketIdx) : m_hashMap{map}, m_bucketIdx{bucketIdx} { Next(); }
+				~Iterator() = default;
+				auto operator++() { Next(); return *this; }
+				auto operator*() { return (*m_pair)->m_value; }
+				auto operator!=(const Iterator& other) -> bool { return m_bucketIdx != other.m_bucketIdx; }
+			private:
+				void Next() {
+					while( m_bucketIdx < m_hashMap.m_map.size() && m_hashMap.m_map[m_bucketIdx].m_first == nullptr ) { ++m_bucketIdx; }
+					if( m_bucketIdx < m_hashMap.m_map.size() ) { m_pair = &m_hashMap.m_map[m_bucketIdx].m_first; } else { m_pair = nullptr; }
+				}
+				HashMap& m_hashMap;
+				std::unique_ptr<Pair>* m_pair;
+				size_t m_bucketIdx;
+			};
+
 		public:
 
 			/// @brief Constructor, creates the hash map.
@@ -864,6 +881,9 @@ namespace vecs {
 				if( (*pair) != nullptr ) { return &(*pair)->m_value; }
 				return nullptr;
 			}
+
+			auto begin() -> Iterator { return Iterator(*this, 0); }
+			auto end() -> Iterator { return Iterator(*this, m_map.size()); }
 
 		private:
 
