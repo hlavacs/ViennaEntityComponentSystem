@@ -11,8 +11,28 @@ int test1() {
 
 	std::cout << "test 1.1 slotmap" << std::endl;
 
+
+	{
+		vecs::Stack<int> stack;
+
+		std::vector<vecs::Stack<int>> v;
+		v.push_back( stack );
+	}
+
+	{
+		vecs::HashMap<int> hm;
+		auto h = hm[1];
+		auto h2 = hm[2];
+		auto h3 = hm[3];
+
+	}
+
 	{
 		vecs::SlotMap<int> sm;
+		std::vector<vecs::SlotMap<int>> v;
+
+		v.push_back( sm );
+
 		auto [h1, v1] = sm.Insert(1);
 		auto [h2, v2] = sm.Insert(2);
 		auto [h3, v3] = sm.Insert(3);
