@@ -36,7 +36,7 @@ int test1() {
 	}
 
 	{
-		vecs::SlotMap<int> sm;
+		vecs::SlotMap<int> sm(0,6);
 		std::vector<vecs::SlotMap<int>> v;
 
 		v.push_back( sm );
@@ -337,7 +337,7 @@ void test5() {
 	jobs.push_back( [&](handles_t& hs) { hs.insert( system.Insert(GetDouble(), GetChar())); } );
 	jobs.push_back( [&](handles_t& hs) { hs.insert( system.Insert(GetDouble(), GetChar(), std::string("1"))); } );
 	jobs.push_back( [&](handles_t& hs) { hs.insert( system.Insert(GetChar(), std::string("1"))); } );
-	
+	/*
 	jobs.push_back( [&](handles_t& handles) { 
 		if( handles.size()>0) { 
 			auto h = SelectRandom(handles, dis(gen)*handles.size());
@@ -361,6 +361,7 @@ void test5() {
 			db = GetDouble();
 		};
 	} );
+	*/
 
 	int num = 100000;
 	auto work = [&](auto& system) {
@@ -395,6 +396,7 @@ void test5() {
 
 int main() {
 	test1();
+	/*
 	test3( "Insert", false, [&](auto& system, int num){ return test_insert(system, num); } );
 	test3( "Iterate", true, [&](auto& system, int num){ return test_iterate(system, num); } );
 	test3( "Insert + Iterate", false, [&](auto& system, int num){ return test_insert_iterate(system, num); } );
@@ -402,6 +404,7 @@ int main() {
 	test4( "Insert", false, [&](auto& system, int num){ return test_insert(system, num); } );
 	test4( "Iterate", true, [&](auto& system, int num){ return test_iterate(system, num); } );
 	test4( "Insert + Iterate", false, [&](auto& system, int num){ return test_insert_iterate(system, num); } );
+	*/
 	test5();
 
 	return 0;

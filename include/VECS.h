@@ -137,7 +137,9 @@ namespace vecs {
 		/// @brief Constructor for a single mutex.
 		/// @param mutex Pointer to the mutex.
 		LockGuard(mutex_t* mutex) : m_mutex{mutex}, m_other{nullptr} { 
-			if constexpr (LTYPE == LOCKGUARDTYPE_PARALLEL) { m_mutex->lock(); }
+			if constexpr (LTYPE == LOCKGUARDTYPE_PARALLEL) { 
+				m_mutex->lock(); 
+			}
 		}
 
 		/// @brief Constructor for two mutexes. This is necessary if an entity must be moved from one archetype to another, because
@@ -221,7 +223,7 @@ namespace vecs {
 		requires (!std::is_reference_v<T> && !std::is_pointer_v<T>)
 	class Stack {
 
-		using segment_t = std::unique_ptr<std::vector<T>>;
+		using segment_t = std::shared_ptr<std::vector<T>>;
 		using stack_t = std::vector<segment_t>;
 
 		public:
@@ -230,16 +232,14 @@ namespace vecs {
 			/// @param segmentBits The number of bits for the segment size.
 			Stack(size_t segmentBits = 6) : m_size{0}, m_segmentBits(segmentBits), m_segmentSize{1ul<<segmentBits}, m_segments{} {
 				assert(segmentBits > 0);
-				m_segments.emplace_back( std::make_unique<std::vector<T>>(m_segmentSize) );
+				m_segments.emplace_back( std::make_shared<std::vector<T>>(m_segmentSize) );
 			}
 
 			~Stack() = default;
 
-			Stack(const Stack& other) : m_size{0}, m_segmentBits(6), m_segmentSize{1ul<<6}, m_segments{} {
-				m_size = other.m_size;	///< Size of the stack.
-				m_segmentBits = other.m_segmentBits;	///< Number of bits for the segment size.
-				m_segmentSize = other.m_segmentSize; ///< Size of a segment.
-				m_segments.emplace_back( std::make_unique<std::vector<T>>(m_segmentSize) );
+			Stack( const Stack& other) : m_size{other.m_size}, m_segmentBits(other.m_segmentBits), 
+				m_segmentSize{other.m_segmentSize}, m_segments{} {
+				m_segments.emplace_back( std::make_shared<std::vector<T>>(m_segmentSize) );
 			}
 
 			/// @brief Push a value to the back of the stack.
@@ -247,11 +247,11 @@ namespace vecs {
 			template<typename U>
 				requires std::is_convertible_v<U, T>
 			void push_back(U&& value) {
-				if( Segment(m_size) == m_segments.size() ) {
-					m_segments.emplace_back( std::make_unique<std::vector<T>>(m_segmentSize) );
+				while( Segment(m_size) >= m_segments.size() ) {
+					m_segments.emplace_back( std::make_shared<std::vector<T>>(m_segmentSize) );
 				}
 				++m_size;
-				operator[](size()-1) = std::forward<U>(value);
+				operator[](m_size - 1) = std::forward<U>(value);
 			}
 
 			/// @brief Pop the last value from the stack.
@@ -265,19 +265,21 @@ namespace vecs {
 
 			/// @brief Get the value at an index.
 			/// @param index The index of the value.
-			auto operator[](size_t index) -> T& {
+			auto operator[](size_t index) const -> T&  {
 				assert(index < m_size);
+				auto seg = Segment(index);
+				auto off = Offset(index);
 				return (*m_segments[Segment(index)])[Offset(index)];
 			}
 
 			/// @brief Get the value at an index.
-			auto size() -> size_t { return m_size; }
+			auto size() const -> size_t  { return m_size; }
 
 			/// @brief Clear the stack. Make sure that one segment is always available.
 			void clear() {
 				m_size = 0;
 				m_segments.clear();
-				m_segments.emplace_back( std::make_unique<std::vector<T>>(m_segmentSize) );
+				m_segments.emplace_back( std::make_shared<std::vector<T>>(m_segmentSize) );
 			}
 
 		private:
@@ -285,17 +287,17 @@ namespace vecs {
 			/// @brief Compute the segment index of an entity index.
 			/// @param index Entity index.
 			/// @return Index of the segment.
-			inline size_t Segment(size_t index) { return index >> m_segmentBits; }
+			inline size_t Segment(size_t index) const { return index >> m_segmentBits; }
 
 			/// @brief Compute the offset of an entity index in a segment.
 			/// @param index Entity index.
 			/// @return Offset in the segment.
-			inline size_t Offset(size_t index) { return index & (m_segmentSize-1ul); }
+			inline size_t Offset(size_t index) const { return index & (m_segmentSize-1ul); }
 
 			size_t m_size{0};	///< Size of the stack.
 			size_t m_segmentBits;	///< Number of bits for the segment size.
 			size_t m_segmentSize; ///< Size of a segment.
-			stack_t m_segments;	///< Vector holding unique pointers to the segments.
+			stack_t m_segments{100};	///< Vector holding unique pointers to the segments.
 	};
 
 
@@ -342,15 +344,23 @@ namespace vecs {
 
 		/// @brief Constructor, creates the slot map and prefills it with an empty list.
 		/// @param size Size of the initial slot map.
-		SlotMap(uint32_t storageIndex = 0, int64_t size = 1<<10) {
+		SlotMap(uint32_t storageIndex, int64_t bits) {
 			m_firstFree = 0;
+			int64_t size = 1 << bits;
 			for( int64_t i = 1; i <= size-1; ++i ) { //create the free list
 				m_slots.push_back( Slot( int64_t{i}, size_t{0uL}, T{} ) );
 			}
 			m_slots.push_back( Slot(int64_t{-1}, size_t{0}, T{}) ); //last slot
 		}
 
-		SlotMap( const SlotMap& other ) = default; ///< Copy constructor.
+		SlotMap( const SlotMap& other ) {
+			m_firstFree = 0;
+			int64_t size = other.m_slots.size();
+			for( int64_t i = 1; i <= size-1; ++i ) { //create the free list
+				m_slots.push_back( Slot( int64_t{i}, size_t{0uL}, T{} ) );
+			}
+			m_slots.push_back( Slot(int64_t{-1}, size_t{0}, T{}) ); //last slot
+		}
 		
 		~SlotMap() = default; ///< Destructor.
 		
@@ -447,7 +457,7 @@ namespace vecs {
 
 
 		using NUMBER_SLOTMAPS = std::conditional_t< RTYPE == REGISTRYTYPE_SEQUENTIAL, 
-			std::integral_constant<int, 1>, std::integral_constant<int, 8>>;
+			std::integral_constant<int, 1>, std::integral_constant<int, 32>>;
 	
 
 
@@ -1082,11 +1092,11 @@ namespace vecs {
 				auto types = std::vector<size_t>({Type<Ts>()...});
 				auto hs = Hash(types);
 				{
-					LockGuardShared<RTYPE> lock(&m_system.GetMutex()); //lock the system
+					//LockGuardShared<RTYPE> lock(&m_system.GetMutex()); //lock the system
 					if(FindAndCopy(hs) ) return Iterator<Ts...>{m_system, m_archetypes, 0};
 				}
 
-				LockGuard<RTYPE> lock(&m_system.GetMutex()); //lock the system
+				//LockGuard<RTYPE> lock(&m_system.GetMutex()); //lock the system
 				if(FindAndCopy(hs) ) return Iterator<Ts...>{m_system, m_archetypes, 0};
 
 				auto& archetypes = m_system.m_searchCacheMap[hs]; //create empty set
@@ -1099,8 +1109,8 @@ namespace vecs {
 					};
 					if( (func.template operator()<Ts>() && ...) ) archetypes.insert(arch);
 				}
-				m_system.m_searchCacheSet.emplace_back(TypeSetAndHash{{}, hs});
-				( m_system.m_searchCacheSet.back().m_types.insert(Type<Ts>()), ... );
+				//m_system.m_searchCacheSet.emplace_back(TypeSetAndHash{{}, hs});
+				//( m_system.m_searchCacheSet.back().m_types.insert(Type<Ts>()), ... );
 				return Iterator<Ts...>{m_system, m_archetypes, 0};
 			}
 
@@ -1159,10 +1169,10 @@ namespace vecs {
 			requires ((sizeof...(Ts) > 0) && (vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
 		[[nodiscard]] auto Insert( Ts&&... component ) -> Handle {
 			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
-			LockGuard<RTYPE> lock(&GetMutex()); //lock the mutex
 
 			static uint32_t slotMapIndex = NUMBER_SLOTMAPS::value - 1;
 			slotMapIndex = (slotMapIndex + 1) & (NUMBER_SLOTMAPS::value - 1);
+			LockGuard<RTYPE> lock(&GetMutex(slotMapIndex)); //lock the mutex
 			auto [handle, slot] = m_entities[slotMapIndex].m_slotMap.Insert( {nullptr, 0} ); //get a slot for the entity
 
 			size_t archIndex;
@@ -1170,7 +1180,7 @@ namespace vecs {
 			size_t hs = Hash(types);
 			if( !m_archetypes.contains( hs ) ) { //not found
 				auto arch = std::make_unique<Archetype>( handle, archIndex, std::forward<Ts>(component)... );
-				UpdateSearchCache(arch.get());
+				//UpdateSearchCache(arch.get());
 				slot.m_value = { arch.get(), archIndex };
 				m_archetypes[hs] = std::move(arch);
 			} else {
@@ -1187,7 +1197,7 @@ namespace vecs {
 		/// @return true if the entity exists, else false.
 		bool Exists(Handle handle) {
 			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
-			LockGuardShared<RTYPE> lock(&GetMutex()); //lock the mutex
+			LockGuardShared<RTYPE> lock(&GetMutex(handle.GetStorageIndex())); //lock the mutex
 			auto& slot = m_entities[handle.GetStorageIndex()].m_slotMap[handle];
 			return slot.m_version == handle.GetVersion();
 		}
@@ -1200,7 +1210,7 @@ namespace vecs {
 		bool Has(Handle handle) {
 			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			assert(Exists(handle));
-			LockGuardShared<RTYPE> lock(&GetMutex()); //lock the system
+			LockGuardShared<RTYPE> lock(&GetMutex(handle.GetStorageIndex())); //lock the system
 			auto arch = m_entities[handle.GetStorageIndex()].m_slotMap[handle].m_value.m_archetypePtr;
 			return arch->Has(Type<T>());
 		}
@@ -1211,7 +1221,7 @@ namespace vecs {
 		const auto& Types(Handle handle) {
 			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			assert(Exists(handle));
-			LockGuardShared<RTYPE> lock(&GetMutex()); //lock the system
+			LockGuardShared<RTYPE> lock(&GetMutex(handle.GetStorageIndex())); //lock the system
 			auto arch = m_entities[handle.GetStorageIndex()].m_slotMap[handle].m_value.m_archetypePtr;
 			return arch->Types();
 		}
@@ -1279,7 +1289,7 @@ namespace vecs {
 			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			assert( (Has<Ts>(handle) && ...) );
 
-			LockGuard<RTYPE> lock(&GetMutex()); //lock the mutex
+			LockGuard<RTYPE> lock(&GetMutex(handle.GetStorageIndex())); //lock the mutex
 			auto value = &m_entities[handle.GetStorageIndex()].m_slotMap[handle].m_value;
 			auto oldArch = value->m_archetypePtr;
 			std::set<size_t> types = oldArch->Types();
@@ -1290,7 +1300,7 @@ namespace vecs {
 				auto archPtr = std::make_unique<Archetype>();
 				arch = archPtr.get();
 				arch->Clone(*oldArch, types);
-				UpdateSearchCache(arch);
+				//UpdateSearchCache(arch);
 				m_archetypes[hs] = std::move(archPtr);
 			} else { arch = m_archetypes[hs].get(); }
 			LockGuard<RTYPE> lock2(&arch->GetMutex(), &oldArch->GetMutex());
@@ -1303,7 +1313,7 @@ namespace vecs {
 		void Erase(Handle handle) {
 			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			assert(Exists(handle));
-			LockGuard<RTYPE> lock(&GetMutex()); //lock the mutex
+			LockGuard<RTYPE> lock(&GetMutex(handle.GetStorageIndex())); //lock the mutex
 			auto& value = m_entities[handle.GetStorageIndex()].m_slotMap[handle].m_value;
 			LockGuard<RTYPE> lock2(&value.m_archetypePtr->GetMutex()); //lock the archetype
 			value.m_archetypePtr->Erase(value.m_archIndex, m_entities[handle.GetStorageIndex()]); //erase the entity from the archetype (do both locked)
@@ -1313,11 +1323,13 @@ namespace vecs {
 		/// @brief Clear the registry by removing all entities.
 		void Clear() {
 			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
-			LockGuard<RTYPE> lock(&GetMutex()); //lock the mutex
+
 			for( auto& arch : m_archetypes ) {
+				LockGuard<RTYPE> lock(&arch.second->GetMutex()); //lock the mutex
 				arch.second->Clear();
 			}
 			for( auto& slotmap : m_entities ) {
+				LockGuard<RTYPE> lock(&slotmap.m_mutex); //lock the mutex
 				slotmap.m_slotMap.Clear();
 			}
 		}
@@ -1410,8 +1422,8 @@ namespace vecs {
 
 		/// @brief Get the mutex of the archetype.
 		/// @return Reference to the mutex.
-		[[nodiscard]] inline auto GetMutex() -> mutex_t& {
-			return m_mutex;
+		[[nodiscard]] inline auto GetMutex(uint32_t index) -> mutex_t& {
+			return m_mutex; //m_entities[index].m_mutex;
 		}
 
 	private:
@@ -1428,7 +1440,7 @@ namespace vecs {
 
 			std::vector<size_t> newTypes;
 			{
-				LockGuardShared<RTYPE> lock(&GetMutex()); //lock the mutex
+				LockGuardShared<RTYPE> lock(&GetMutex(handle.GetStorageIndex())); //lock the mutex
 				auto value = GetArchetype<std::decay_t<Ts>...>(handle, newTypes);
 				//value->m_archetypePtr->Print();	
 				if(newTypes.empty()) {
@@ -1437,7 +1449,7 @@ namespace vecs {
 				};
 			}
 
-			LockGuard<RTYPE> lock1(&GetMutex()); //lock the mutex
+			LockGuard<RTYPE> lock1(&GetMutex(handle.GetStorageIndex())); //lock the mutex
 			auto value = GetArchetype<std::decay_t<Ts>...>(handle, newTypes);
 			auto arch = value->m_archetypePtr;
 			if(newTypes.empty()) {
@@ -1560,7 +1572,7 @@ namespace vecs {
 					}
 				};
 				( func.template operator()<std::decay_t<Ts>>(), ...  );
-				UpdateSearchCache(newArch);
+				//UpdateSearchCache(newArch);
 
 				m_archetypes[hs] = std::move(newArchUnique);
 			} else { 
