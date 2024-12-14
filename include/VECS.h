@@ -417,90 +417,6 @@ namespace vecs {
 		Stack<Slot> m_slots; ///< Container of slots.
 	};
 
-
-	//----------------------------------------------------------------------------------------------
-	//Hash Map
-
-	/// @brief A lock free hash map for storing a map from key to value.
-	/// The hash map is implemented as a vector of buckets. Each bucket is a list of key-value pairs.
-
-	template<typename T>
-	class HashMap {
-
-		/// @brief A key-ptr pair in the hash map.
-		struct Pair {
-			size_t m_key;	///< The key of the pair.
-			T m_value; ///< The value of the pair.
-			std::unique_ptr<Pair> m_next{nullptr}; ///< Pointer to the next pair.
-		};
-
-		/// @brief A bucket in the hash map.
-		struct Bucket {
-			std::mutex m_mutex; ///< Mutex for adding something to the bucket.
-			std::unique_ptr<Pair> m_first{nullptr}; ///< Pointer to the first pair
-
-			Bucket() = default;
-			Bucket(const Bucket& other) {};
-		};
-
-		using Map = std::vector<Bucket>; ///< Type of the map.
-
-	public:
-
-		/// @brief Constructor, creates the hash map.
-		HashMap(size_t bits = 10) : m_map{} {
-			size_t size = 1<<bits;
-			for( int i = 0; i < size; ++i ) {
-				m_map.emplace_back();
-			}
-		}
-
-		/// @brief Destructor, destroys the hash map.
-		~HashMap() = default;
-
-		/// @brief Insert a key-value pair in the hash map.
-		/// @param key The key of the pair.
-		/// @param value The value of the pair.
-		void Insert(size_t key, T&& value) {
-			auto& bucket = m_map[key & (m_map.size()-1)];
-			std::unique_ptr<Pair>* pair = Find(&bucket.m_first, key);
-			if( (*pair) != nullptr ) { return &(*pair)->m_value; }
-
-			bucket.m_mutex.lock();
-			pair = Find(pair, key);
-			if( (*pair) != nullptr ) { return &(*pair)->m_value; }
-			*pair = std::make_unique<Pair>(key, std::move(value) );
-			bucket.m_mutex.unlock();
-			return &(*pair)->m_value;
-		}
-
-		/// @brief Find a pair in the bucket.
-		/// @param key Find this key
-		/// @return Pointer to the value.
-		T* operator[](size_t key) {
-			auto& bucket = m_map[key & (m_map.size()-1)];
-			std::unique_ptr<Pair>* pair = Find(&bucket.m_first, key);
-			if( (*pair) != nullptr ) { return &(*pair)->m_value; }
-			return nullptr;
-		}
-
-	private:
-
-		/// @brief Find a pair in the bucket.
-		/// @param pair Start of the list of pairs.
-		/// @param key Find this key
-		/// @return Pointer to the pair.
-		std::unique_ptr<Pair>* Find(std::unique_ptr<Pair>* pair, size_t key) {
-			while( (*pair) != nullptr && (*pair)->m_key != key ) {
-				pair = &(*pair)->m_next;
-			}
-			return pair;
-		}
-
-		Map m_map; ///< The map of buckets.
-	};
-
-
 	//----------------------------------------------------------------------------------------------
 	//Registry 
 
@@ -533,6 +449,7 @@ namespace vecs {
 		using NUMBER_SLOTMAPS = std::conditional_t< RTYPE == REGISTRYTYPE_SEQUENTIAL, 
 			std::integral_constant<int, 1>, std::integral_constant<int, 8>>;
 	
+
 
 		//----------------------------------------------------------------------------------------------
 		//ComponentMapBase
@@ -883,6 +800,88 @@ namespace vecs {
 
 	public:	
 		
+		//----------------------------------------------------------------------------------------------
+		//Hash Map
+
+		/// @brief A hash map for storing a map from key to value.
+		/// The hash map is implemented as a vector of buckets. Each bucket is a list of key-value pairs.
+		
+		template<typename T>
+		class HashMap {
+
+			/// @brief A key-ptr pair in the hash map.
+			struct Pair {
+				size_t m_key;	///< The key of the pair.
+				T m_value; ///< The value of the pair.
+				std::unique_ptr<Pair> m_next{nullptr}; ///< Pointer to the next pair.
+			};
+
+			/// @brief A bucket in the hash map.
+			struct Bucket {
+				mutex_t m_mutex; ///< Mutex for adding something to the bucket.
+				std::unique_ptr<Pair> m_first{nullptr}; ///< Pointer to the first pair
+
+				Bucket() = default;
+				Bucket(const Bucket& other) {};
+			};
+
+			using Map = std::vector<Bucket>; ///< Type of the map.
+
+		public:
+
+			/// @brief Constructor, creates the hash map.
+			HashMap(size_t bits = 10) : m_map{} {
+				size_t size = 1<<bits;
+				for( int i = 0; i < size; ++i ) {
+					m_map.emplace_back();
+				}
+			}
+
+			/// @brief Destructor, destroys the hash map.
+			~HashMap() = default;
+
+			/// @brief Insert a key-value pair in the hash map.
+			/// @param key The key of the pair.
+			/// @param value The value of the pair.
+			void Insert(size_t key, T&& value) {
+				auto& bucket = m_map[key & (m_map.size()-1)];
+				std::unique_ptr<Pair>* pair = Find(&bucket.m_first, key);
+				if( (*pair) != nullptr ) { return &(*pair)->m_value; }
+
+				LockGuard<RTYPE> lock(&bucket.m_mutex);
+				pair = Find(pair, key);
+				if( (*pair) != nullptr ) { return &(*pair)->m_value; }
+				*pair = std::make_unique<Pair>(key, std::move(value) );
+				return &(*pair)->m_value;
+			}
+
+			/// @brief Find a pair in the bucket.
+			/// @param key Find this key
+			/// @return Pointer to the value.
+			T* operator[](size_t key) {
+				auto& bucket = m_map[key & (m_map.size()-1)];
+				std::unique_ptr<Pair>* pair = Find(&bucket.m_first, key);
+				if( (*pair) != nullptr ) { return &(*pair)->m_value; }
+				return nullptr;
+			}
+
+		private:
+
+			/// @brief Find a pair in the bucket.
+			/// @param pair Start of the list of pairs.
+			/// @param key Find this key
+			/// @return Pointer to the pair.
+			std::unique_ptr<Pair>* Find(std::unique_ptr<Pair>* pair, size_t key) {
+				while( (*pair) != nullptr && (*pair)->m_key != key ) {
+					pair = &(*pair)->m_next;
+				}
+				return pair;
+			}
+
+			Map m_map; ///< The map of buckets.
+		};
+
+
 		//----------------------------------------------------------------------------------------------
 
 		struct ArchetypeAndSize {

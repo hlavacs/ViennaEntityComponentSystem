@@ -20,7 +20,7 @@ int test1() {
 	}
 
 	{
-		vecs::HashMap<int> hm;
+		vecs::Registry<vecs::REGISTRYTYPE_PARALLEL>::HashMap<int> hm;
 		auto h = hm[1];
 		auto h2 = hm[2];
 		auto h3 = hm[3];
