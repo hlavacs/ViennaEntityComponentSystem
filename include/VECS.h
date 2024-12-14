@@ -338,7 +338,7 @@ namespace vecs {
 
 		/// @brief Constructor, creates the slot map and prefills it with an empty list.
 		/// @param size Size of the initial slot map.
-		SlotMap(int64_t size = 1<<10) {
+		SlotMap(uint32_t storageIndex = 0, int64_t size = 1<<10) {
 			m_firstFree = 0;
 			for( int64_t i = 1; i <= size-1; ++i ) { //create the free list
 				m_slots.push_back( Slot( int64_t{i}, size_t{0uL}, T{} ) );
@@ -365,7 +365,7 @@ namespace vecs {
 			}
 			slot->m_value = std::forward<T>(value);
 			++m_size;
-			return { Handle{ (uint32_t)index, (uint32_t)slot->m_version}, *slot};			
+			return { Handle{ (uint32_t)index, (uint32_t)slot->m_version, m_storageIndex}, *slot};			
 		}
 
 		/// @brief Erase a value from the slot map.
@@ -405,6 +405,7 @@ namespace vecs {
 		}
 
 	private:
+		uint32_t m_storageIndex{0}; ///< Index of the storage.
 		size_t m_size{0}; ///< Size of the slot map. This is the size of the Stack minus the free slots.
 		int64_t m_firstFree{-1}; ///< Index of the first free slot. If -1 then there are no free slots.
 		Stack<Slot> m_slots; ///< Container of slots.
@@ -426,12 +427,15 @@ namespace vecs {
 		requires RegistryType<RTYPE>
 	class Registry {
 
+		/// @brief Entry for the seach cache
 		struct TypeSetAndHash {
 			std::set<size_t> m_types;	//set of types that have been searched for
 			size_t m_hash;				//hash of the set
 		};
+
+		using NUMBER_SLOTMAPS = std::conditional_t< RTYPE == REGISTRYTYPE_SEQUENTIAL, 
+			std::integral_constant<int, 1>, std::integral_constant<int, 8>>;
 	
-	private:
 
 		//----------------------------------------------------------------------------------------------
 		//ComponentMapBase
@@ -645,7 +649,7 @@ namespace vecs {
 			}
 
 			/// @brief Move components from another archetype to this one.
-			size_t Move( auto& types, size_t other_index, Archetype& other, auto& slotmap) {			
+			size_t Move( auto& types, size_t other_index, Archetype& other, SlotMap<ArchetypeAndIndex>& slotmap) {			
 				for( auto& ti : types ) { //go through all maps
 					assert( m_maps.contains(ti) );
 					m_maps[ti]->Move(other.Map(ti), other_index); //insert the new value
@@ -741,7 +745,7 @@ namespace vecs {
 			/// This might result in a reindexing of the moved entity in the slot map. Thus we need a ref to the slot map
 			/// @param index The index of the entity in the archetype.
 			/// @param slotmap Reference to the slot map of the registry.
-			void Erase2(size_t index, auto& slotmap) {
+			void Erase2(size_t index, SlotMap<ArchetypeAndIndex>& slotmap) {
 				size_t last{index};
 				for( auto& it : m_maps ) {
 					last = it.second->Erase(index); //Erase from the component map
@@ -974,13 +978,23 @@ namespace vecs {
 
 		//----------------------------------------------------------------------------------------------
 
-		Registry() = default; ///< Constructor.
+		Registry() { ///< Constructor.
+			//m_entities.reserve(NUMBER_SLOTMAPS::value); //resize the slot storage
+			for( int i = 0; i < NUMBER_SLOTMAPS::value; ++i ) {
+				//m_entities.emplace_back(i); //add the first slot
+			}
+		};
+
 		~Registry() = default;	///< Destructor.
 
 		/// @brief Get the number of entities in the system.
 		/// @return The number of entities.
 		size_t Size() {
-			return m_entities.Size();
+			int size = 0;
+			for( auto& slot : m_entities ) {
+				size += slot.Size();
+			}
+			return size;
 		}
 
 		/// @brief Create an entity with components.
@@ -991,9 +1005,11 @@ namespace vecs {
 			requires ((sizeof...(Ts) > 0) && (vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
 		[[nodiscard]] auto Insert( Ts&&... component ) -> Handle {
 			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
-
 			LockGuard<RTYPE> lock(&GetMutex()); //lock the mutex
-			auto [handle, slot] = m_entities.Insert( {nullptr, 0} ); //get a slot for the entity
+
+			static uint32_t slotMapIndex = 0;
+			++slotMapIndex;
+			auto [handle, slot] = m_entities[slotMapIndex].Insert( {nullptr, 0} ); //get a slot for the entity
 
 			size_t archIndex;
 			std::vector<size_t> types = {Type<Handle>(), Type<Ts>()...};
@@ -1042,7 +1058,7 @@ namespace vecs {
 			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			assert(Exists(handle));
 			LockGuardShared<RTYPE> lock(&GetMutex()); //lock the system
-			auto arch = m_entities[handle].m_value.m_archetypePtr;
+			auto arch = m_entities[handle.GetStorageIndex()][handle].m_value.m_archetypePtr;
 			return arch->Types();
 		}
 
@@ -1110,7 +1126,7 @@ namespace vecs {
 			assert( (Has<Ts>(handle) && ...) );
 
 			LockGuard<RTYPE> lock(&GetMutex()); //lock the mutex
-			auto value = &m_entities[handle].m_value;
+			auto value = &m_entities[handle.GetStorageIndex()][handle].m_value;
 			auto oldArch = value->m_archetypePtr;
 			std::set<size_t> types = oldArch->Types();
 			(types.erase(Type<Ts>()), ... );
@@ -1125,7 +1141,7 @@ namespace vecs {
 			} else { arch = m_archetypes[hs].get(); }
 			LockGuard<RTYPE> lock2(&arch->GetMutex(), &oldArch->GetMutex());
 			value->m_archetypePtr = arch;
-			value->m_archIndex = arch->Move(types, value->m_archIndex, *oldArch, m_entities);
+			value->m_archIndex = arch->Move(types, value->m_archIndex, *oldArch, m_entities[handle.GetStorageIndex()]);
 		}
 
 		/// @brief Erase an entity from the registry.
@@ -1134,10 +1150,10 @@ namespace vecs {
 			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			assert(Exists(handle));
 			LockGuard<RTYPE> lock(&GetMutex()); //lock the mutex
-			auto& value = m_entities[handle].m_value;
+			auto& value = m_entities[handle.GetStorageIndex()][handle].m_value;
 			LockGuard<RTYPE> lock2(&value.m_archetypePtr->GetMutex()); //lock the archetype
-			value.m_archetypePtr->Erase(value.m_archIndex, m_entities); //erase the entity from the archetype (do both locked)
-			m_entities.Erase(handle); //erase the entity from the entity list
+			value.m_archetypePtr->Erase(value.m_archIndex, m_entities[handle.GetStorageIndex()]); //erase the entity from the archetype (do both locked)
+			m_entities[handle.GetStorageIndex()].Erase(handle); //erase the entity from the entity list
 		}
 
 		/// @brief Clear the registry by removing all entities.
@@ -1147,7 +1163,9 @@ namespace vecs {
 			for( auto& arch : m_archetypes ) {
 				arch.second->Clear();
 			}
-			m_entities.Clear();
+			for( auto& slotmap : m_entities ) {
+				slotmap.Clear();
+			}
 		}
 
 		/// @brief Get a view of entities with specific components.
@@ -1276,7 +1294,7 @@ namespace vecs {
 			
 			value->m_archetypePtr = newArch;
 			LockGuard<RTYPE> lock2(&arch->GetMutex()); //lock old archetype, new one cannot be seen yet
-			value->m_archIndex = newArch->Move(arch->Types(), value->m_archIndex, *arch, m_entities); //move values
+			value->m_archIndex = newArch->Move(arch->Types(), value->m_archIndex, *arch, m_entities[handle.GetStorageIndex()]); //move values
 			( func.template operator()<Ts>(newArch, value->m_archIndex, std::forward<Ts>(vs)), ... );
 			return;
 		}
@@ -1309,7 +1327,7 @@ namespace vecs {
 			auto newArch = CreateArchetype<T>(handle, newTypes);
 			value->m_archetypePtr = newArch;
 			LockGuard<RTYPE> lock2(&arch->GetMutex()); //lock old archetype, new one cannot be seen yet
-			value->m_archIndex = newArch->Move(arch->Types(), value->m_archIndex, *arch, m_entities); //move values		
+			value->m_archIndex = newArch->Move(arch->Types(), value->m_archIndex, *arch, m_entities[handle.GetStorageIndex()]); //move values		
 			decltype(auto) v = newArch->template Get<T>(value->m_archIndex);
 			return v;
 		}
@@ -1340,7 +1358,7 @@ namespace vecs {
 			auto newArch = CreateArchetype<std::decay_t<Ts>...>(handle, newTypes);		
 			value->m_archetypePtr = newArch;
 			LockGuard<RTYPE> lock2(&arch->GetMutex()); //lock old archetype, new one cannot be seen yet
-			value->m_archIndex = newArch->Move(arch->Types(), value->m_archIndex, *arch, m_entities); //move values
+			value->m_archIndex = newArch->Move(arch->Types(), value->m_archIndex, *arch, m_entities[handle.GetStorageIndex()]); //move values
 			return std::tuple<Ts...>{ newArch->template Get<Ts>(value->m_archIndex)... };
 		}
 
@@ -1353,7 +1371,7 @@ namespace vecs {
 		inline auto GetArchetype(Handle handle, std::vector<size_t>& newTypes) -> ArchetypeAndIndex* {		
 			newTypes.clear();
 			newTypes.reserve(sizeof...(Ts));
-			auto value = &m_entities[handle].m_value;
+			auto value = &m_entities[handle.GetStorageIndex()][handle].m_value;
 			
 			auto func = [&]<typename T>(){ if(!value->m_archetypePtr->Has(Type<T>())) newTypes.emplace_back(Type<T>()); };
 			( func.template operator()<std::decay_t<Ts>>(), ...  );
@@ -1410,9 +1428,9 @@ namespace vecs {
 			}
 		}
 
-		mutex_t 					m_mutex; //mutex for thread safety
-		SlotMap<ArchetypeAndIndex> 	m_entities;
-		
+		mutex_t m_mutex; //mutex for thread safety
+		std::vector<SlotMap<ArchetypeAndIndex>> m_entities;
+
 		std::unordered_map<size_t, std::unique_ptr<Archetype>> 	m_archetypes; //Mapping vector of type set hash to archetype 1:1
 		std::unordered_map<size_t, std::set<Archetype*>> m_searchCacheMap; //Mapping vector of hash to archetype, 1:N
 		std::vector<TypeSetAndHash> 					 m_searchCacheSet; //These type combinations have been searched for
