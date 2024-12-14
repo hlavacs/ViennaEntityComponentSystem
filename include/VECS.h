@@ -811,9 +811,10 @@ namespace vecs {
 
 			/// @brief A key-ptr pair in the hash map.
 			struct Pair {
-				size_t m_key;	///< The key of the pair.
-				T m_value; ///< The value of the pair.
+				std::pair<size_t, T> m_keyValue; ///< The key-value pair.
 				std::unique_ptr<Pair> m_next{}; ///< Pointer to the next pair.
+				size_t& Key() { return m_keyValue.first; }
+				T& Value() { return m_keyValue.second; };
 			};
 
 			/// @brief A bucket in the hash map.
@@ -827,31 +828,36 @@ namespace vecs {
 
 			using Map = std::vector<Bucket>; ///< Type of the map.
 
+			/// @brief Iterator for the hash map.
 			class Iterator {
 			public:
+				/// @brief Constructor for the iterator.
+				/// @param map The hash map.
+				/// @param bucketIdx Index of the bucket.
 				Iterator(HashMap& map, size_t bucketIdx) : m_hashMap{map}, m_bucketIdx{bucketIdx}, m_pair{nullptr} {
 					if( m_bucketIdx >= m_hashMap.m_buckets.size() ) return;
 					m_pair = &m_hashMap.m_buckets[m_bucketIdx].m_first;
 					if( !*m_pair ) Next();
 				}	
 
-				~Iterator() = default;
-				auto operator++() { 
+				~Iterator() = default; ///< Destructor.
+				auto operator++() {  /// @brief Increment the iterator.
 					if( *m_pair ) { m_pair = &(*m_pair)->m_next;  if( *m_pair ) { return *this; } }
 					Next(); 
 					return *this; 
 				}
-				auto operator*() { return std::make_pair( (*m_pair)->m_key, (*m_pair)->m_value ); }
-				auto operator!=(const Iterator& other) -> bool { return m_bucketIdx != other.m_bucketIdx; }
+				auto& operator*() { return (*m_pair)->m_keyValue; } ///< Dereference the iterator.
+				auto operator!=(const Iterator& other) -> bool { return m_bucketIdx != other.m_bucketIdx; } ///< Compare the iterator.
 			private:
+				/// @brief Move to the next bucket.
 				void Next() {
 					do {++m_bucketIdx; }
 					while( m_bucketIdx < m_hashMap.m_buckets.size() && !m_hashMap.m_buckets[m_bucketIdx].m_first );
 					if( m_bucketIdx < m_hashMap.m_buckets.size() ) { m_pair = &m_hashMap.m_buckets[m_bucketIdx].m_first; } 
 				}
-				HashMap& m_hashMap;
-				std::unique_ptr<Pair>* m_pair;
-				size_t m_bucketIdx;
+				HashMap& m_hashMap;	///< Reference to the hash map.
+				std::unique_ptr<Pair>* m_pair;	///< Pointer to the pair.
+				size_t m_bucketIdx;	///< Index of the current bucket.
 			};
 
 		public:
@@ -870,29 +876,49 @@ namespace vecs {
 			/// @brief Insert a key-value pair in the hash map.
 			/// @param key The key of the pair.
 			/// @param value The value of the pair.
-			void Insert(size_t key, T&& value) {
+			T& Insert(size_t key, T&& value) {
 				auto& bucket = m_buckets[key & (m_buckets.size()-1)];
 				std::unique_ptr<Pair>* pair = Find(&bucket.m_first, key);
-				if( (*pair) != nullptr ) { return; }
+				if( (*pair) != nullptr ) { return (*pair)->Value();; }
 
 				LockGuard<RTYPE> lock(&bucket.m_mutex);
 				pair = Find(pair, key);
-				if( (*pair) != nullptr ) { return; }
-				*pair = std::make_unique<Pair>(key, std::move(value) );
+				if( (*pair) != nullptr ) { return (*pair)->Value();; }
+				*pair = std::make_unique<Pair>( std::make_pair(key, std::move(value)) );
 				m_size++;
+				return (*pair)->Value();
 			}
 
 			/// @brief Find a pair in the bucket.
 			/// @param key Find this key
 			/// @return Pointer to the value.
-			T* operator[](size_t key) {
+			T& operator[](size_t key) {
 				auto& bucket = m_buckets[key & (m_buckets.size()-1)];
 				std::unique_ptr<Pair>* pair = Find(&bucket.m_first, key);
-				if( (*pair) != nullptr ) { return &(*pair)->m_value; }
+				if( (*pair) != nullptr ) { return (*pair)->Value(); }
+				return Insert(key, T{}); //insert a new value
+			}
+
+			/// @brief Get a value from the hash map.
+			/// @param key The key of the value.
+			/// @return Pointer to the value.
+			T* get(size_t key) {
+				auto& bucket = m_buckets[key & (m_buckets.size()-1)];
+				std::unique_ptr<Pair>* pair = Find(&bucket.m_first, key);
+				if( (*pair) != nullptr ) { return (*pair)->Value(); }
 				return nullptr;
 			}
 
-			size_t Size() { return m_size; }
+			/// @brief Test whether the hash map contains a key.
+			/// @param key The key to test.
+			/// @return true if the key is in the hash map, else false.
+			bool contains(size_t key) {
+				auto& bucket = m_buckets[key & (m_buckets.size()-1)];
+				std::unique_ptr<Pair>* pair = Find(&bucket.m_first, key);
+				return (*pair) != nullptr;
+			}
+
+			size_t Size() { return m_size; } ///< Get the number of items in the hash map.
 
 			auto begin() -> Iterator { return Iterator(*this, 0); }
 			auto end() -> Iterator { return Iterator(*this, m_buckets.size()); }
@@ -904,7 +930,7 @@ namespace vecs {
 			/// @param key Find this key
 			/// @return Pointer to the pair.
 			std::unique_ptr<Pair>* Find(std::unique_ptr<Pair>* pair, size_t key) {
-				while( (*pair) != nullptr && (*pair)->m_key != key ) { pair = &(*pair)->m_next; }
+				while( (*pair) != nullptr && (*pair)->Key() != key ) { pair = &(*pair)->m_next; }
 				return pair;
 			}
 
@@ -915,6 +941,7 @@ namespace vecs {
 
 		//----------------------------------------------------------------------------------------------
 
+		/// @brief A structure holding a pointer to an archetype and the current size of the archetype.
 		struct ArchetypeAndSize {
 			Archetype* 	m_archetype;	//pointer to the archetype
 			size_t 		m_size;			//size of the archetype
@@ -1557,7 +1584,7 @@ namespace vecs {
 
 		mutex_t m_mutex; //mutex for thread safety
 		std::vector<SlotMapAndMutex<ArchetypeAndIndex>> m_entities;
-		std::unordered_map<size_t, std::unique_ptr<Archetype>> m_archetypes; //Mapping vector of type set hash to archetype 1:1
+		HashMap<std::unique_ptr<Archetype>> m_archetypes; //Mapping vector of type set hash to archetype 1:1
 
 		std::unordered_map<size_t, std::set<Archetype*>> m_searchCacheMap; //Mapping vector of hash to archetype, 1:N
 		std::vector<TypeSetAndHash> 					 m_searchCacheSet; //These type combinations have been searched for

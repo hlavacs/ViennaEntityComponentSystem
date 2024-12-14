@@ -25,9 +25,9 @@ int test1() {
 		hm.Insert(2,2);
 		hm.Insert(3,3);
 
-		int h1 = *hm[1];
-		int h2 = *hm[2];
-		int h3 = *hm[3];
+		int h1 = hm[1];
+		int h2 = hm[2];
+		int h3 = hm[3];
 
 		for( auto v : hm ) {
 			std::cout << v.first << " " << v.second << std::endl;
