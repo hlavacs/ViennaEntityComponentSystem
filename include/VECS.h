@@ -32,13 +32,25 @@ namespace vecs {
 
 	/// @brief A handle for an entity or a component. 
 	struct Handle {
-		uint32_t m_index{std::numeric_limits<uint32_t>::max()}; ///< Index of the entity in the slot map.
-		uint32_t m_version{0}; ///< Version of the entity in the slot map. If the version is different from the slot version, the entity is also invalid.
 
+	public:
+		Handle() = default; ///< Default constructor.
+
+		Handle(uint32_t index, uint32_t version, uint32_t storageIndex=0) : m_index{index}, m_version{version & 0xFFFFFF} {
+			m_version += storageIndex << 24;
+		};
+
+		uint32_t GetIndex() const { return m_index; }
+		uint32_t GetVersion() const { return m_version & 0xFFFFFF; }
+		uint32_t GetStorageIndex() const { return (m_version >> 24) & 0xFF; }
 		bool IsValid() const { return m_index != std::numeric_limits<uint32_t>::max(); }
 		bool operator==(const Handle& other) const { return m_index == other.m_index && m_version == other.m_version; }
 		bool operator!=(const Handle& other) const { return !(*this == other); }
 		bool operator<(const Handle& other) const { return m_index < other.m_index; }
+
+	private:
+		uint32_t m_index{std::numeric_limits<uint32_t>::max()}; ///< Index of the entity in the slot map.
+		uint32_t m_version{0}; ///< Version of the entity in the slot map. If the version is different from the slot version, the entity is also invalid.
 	};
 
 	inline bool IsValid(const Handle& handle) {
@@ -46,7 +58,7 @@ namespace vecs {
 	}
 
 	inline std::ostream& operator<<(std::ostream& os, const vecs::Handle& handle) {
-    	return os << "{" <<  handle.m_index << ", " << handle.m_version << "}"; 
+    	return os << "{" <<  handle.GetIndex() << ", " << handle.GetVersion() << "}"; 
 	}
 
 	//----------------------------------------------------------------------------------------------
@@ -359,10 +371,10 @@ namespace vecs {
 		/// @brief Erase a value from the slot map.
 		/// @param handle The handle of the value to erase.
 		void Erase(Handle handle) {
-			auto& slot = m_slots[handle.m_index];
+			auto& slot = m_slots[handle.GetIndex()];
 			++slot.m_version;	//increment the version to invalidate the slot
 			slot.m_nextFree = m_firstFree;	
-			m_firstFree = handle.m_index; //add the slot to the free list
+			m_firstFree = handle.GetIndex(); //add the slot to the free list
 			--m_size;
 		}
 
@@ -370,7 +382,7 @@ namespace vecs {
 		/// @param handle The handle of the value to get.
 		/// @return Reference to the value.
 		auto operator[](Handle handle) -> Slot& {
-			return m_slots[handle.m_index];
+			return m_slots[handle.GetIndex()];
 		}
 
 		/// @brief Get the size of the slot map.
@@ -1007,7 +1019,7 @@ namespace vecs {
 			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			LockGuardShared<RTYPE> lock(&GetMutex()); //lock the mutex
 			auto& slot = m_entities[handle];
-			return slot.m_version == handle.m_version;
+			return slot.m_version == handle.GetVersion();
 		}
 
 		/// @brief Test if an entity has a component.
@@ -1400,6 +1412,7 @@ namespace vecs {
 
 		mutex_t 					m_mutex; //mutex for thread safety
 		SlotMap<ArchetypeAndIndex> 	m_entities;
+		
 		std::unordered_map<size_t, std::unique_ptr<Archetype>> 	m_archetypes; //Mapping vector of type set hash to archetype 1:1
 		std::unordered_map<size_t, std::set<Archetype*>> m_searchCacheMap; //Mapping vector of hash to archetype, 1:N
 		std::vector<TypeSetAndHash> 					 m_searchCacheSet; //These type combinations have been searched for
