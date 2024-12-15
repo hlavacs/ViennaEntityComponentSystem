@@ -145,10 +145,12 @@ int test1() {
 
 	//auto hhh = system.Get<vecs::Handle&>(hd1); //compile error
 
+	std::cout << "Loop Handle: " << std::endl;
     for( auto handle : system.template GetView<vecs::Handle>() ) {
         std::cout << "Handle: "<< handle << std::endl;
     }
 
+	std::cout << "Loop Handle int& float " << std::endl;
     for( auto [handle, i, f] : system.template GetView<vecs::Handle, int&, float>() ) {
         std::cout << "Handle: "<< handle << " int: " << i << " float: " << f << std::endl;
 		i = 100;
@@ -160,11 +162,17 @@ int test1() {
 		//auto h2 = system.Insert(5, 5.5f);
     }
 
+	std::cout << "Loop Handle int& float& " << std::endl;
     for( auto [handle, i, f] : system.template GetView<vecs::Handle, int&, float&>() ) {
         std::cout << "Handle: "<< handle << " int: " << i << " float: " << f << std::endl;
 	}
 
-    assert( system.Size() > 0 );
+	std::cout << "Loop Yes No " << std::endl;
+    for( auto [handle, i] : system.template GetView<vecs::Yes<vecs::Handle, int>, vecs::No<float>>() ) {
+        std::cout << "Handle: "<< handle << " int: " << i << std::endl;
+	}
+    
+	assert( system.Size() > 0 );
     system.Clear();
     assert( system.Size() == 0 );
 
@@ -337,7 +345,7 @@ void test5() {
 	jobs.push_back( [&](handles_t& hs) { hs.insert( system.Insert(GetDouble(), GetChar())); } );
 	jobs.push_back( [&](handles_t& hs) { hs.insert( system.Insert(GetDouble(), GetChar(), std::string("1"))); } );
 	jobs.push_back( [&](handles_t& hs) { hs.insert( system.Insert(GetChar(), std::string("1"))); } );
-	/*
+	
 	jobs.push_back( [&](handles_t& handles) { 
 		if( handles.size()>0) { 
 			auto h = SelectRandom(handles, dis(gen)*handles.size());
@@ -361,15 +369,22 @@ void test5() {
 			db = GetDouble();
 		};
 	} );
-	*/
 
-	int num = 100000;
+	jobs.push_back( [&](handles_t& hs) { 
+		if( hs.size()>0) {
+			auto h = SelectRandom(hs, dis(gen)*hs.size());
+			auto db = system.Get<double&>(*h);
+		};
+	} );
+
+
+	int num = 1000000;
 	auto work = [&](auto& system) {
-		std::set<vecs::Handle> lh;
+		std::set<vecs::Handle> hs;
 
 		for( int i=0; i<num; ++i ) {
 			size_t idx = std::min( (size_t)dis(gen)*jobs.size(), jobs.size()-1);
-			jobs[idx](lh);
+			jobs[idx](hs);
 		};
 	};
 
@@ -396,7 +411,7 @@ void test5() {
 
 int main() {
 	test1();
-	/*
+	
 	test3( "Insert", false, [&](auto& system, int num){ return test_insert(system, num); } );
 	test3( "Iterate", true, [&](auto& system, int num){ return test_iterate(system, num); } );
 	test3( "Insert + Iterate", false, [&](auto& system, int num){ return test_insert_iterate(system, num); } );
@@ -404,8 +419,11 @@ int main() {
 	test4( "Insert", false, [&](auto& system, int num){ return test_insert(system, num); } );
 	test4( "Iterate", true, [&](auto& system, int num){ return test_iterate(system, num); } );
 	test4( "Insert + Iterate", false, [&](auto& system, int num){ return test_insert_iterate(system, num); } );
-	*/
-	test5();
+	
+	for( int i=0; i<1000; ++i ) {
+		std::cout << "test 5 " << i << std::endl;
+		test5();
+	}	
 
 	return 0;
 }

@@ -19,6 +19,7 @@
 #include <bitset>
 #include <algorithm>    // std::sort
 #include <shared_mutex>
+#include <thread>
 #include <VTLL.h>
 
 
@@ -60,6 +61,7 @@ namespace vecs {
 	inline std::ostream& operator<<(std::ostream& os, const vecs::Handle& handle) {
     	return os << "{" <<  handle.GetIndex() << ", " << handle.GetVersion() << "}"; 
 	}
+	
 
 	//----------------------------------------------------------------------------------------------
 	//Registry concepts and types
@@ -116,6 +118,12 @@ namespace vecs {
 		return std::type_index(typeid(T)).hash_code();
 	}
 
+
+	template<typename... Ts>
+	struct Yes {};
+
+	template<typename... Ts>
+	struct No {};
 
 	//----------------------------------------------------------------------------------------------
 	//Mutexes and Locks
@@ -237,8 +245,7 @@ namespace vecs {
 
 			~Stack() = default;
 
-			Stack( const Stack& other) : m_size{other.m_size}, m_segmentBits(other.m_segmentBits), 
-				m_segmentSize{other.m_segmentSize}, m_segments{} {
+			Stack( const Stack& other) : m_size{other.m_size}, m_segmentBits(other.m_segmentBits), m_segmentSize{other.m_segmentSize}, m_segments{} {
 				m_segments.emplace_back( std::make_shared<std::vector<T>>(m_segmentSize) );
 			}
 
@@ -344,7 +351,7 @@ namespace vecs {
 
 		/// @brief Constructor, creates the slot map and prefills it with an empty list.
 		/// @param size Size of the initial slot map.
-		SlotMap(uint32_t storageIndex, int64_t bits) {
+		SlotMap(uint32_t storageIndex, int64_t bits) : m_storageIndex{storageIndex} {
 			m_firstFree = 0;
 			int64_t size = 1 << bits;
 			for( int64_t i = 1; i <= size-1; ++i ) { //create the free list
@@ -353,7 +360,7 @@ namespace vecs {
 			m_slots.push_back( Slot(int64_t{-1}, size_t{0}, T{}) ); //last slot
 		}
 
-		SlotMap( const SlotMap& other ) {
+		SlotMap( const SlotMap& other ) : m_storageIndex{other.m_storageIndex} {
 			m_firstFree = 0;
 			int64_t size = other.m_slots.size();
 			for( int64_t i = 1; i <= size-1; ++i ) { //create the free list
@@ -457,7 +464,7 @@ namespace vecs {
 
 
 		using NUMBER_SLOTMAPS = std::conditional_t< RTYPE == REGISTRYTYPE_SEQUENTIAL, 
-			std::integral_constant<int, 1>, std::integral_constant<int, 32>>;
+			std::integral_constant<int, 1>, std::integral_constant<int, 16>>;
 	
 
 
@@ -1075,6 +1082,7 @@ namespace vecs {
 
 		//----------------------------------------------------------------------------------------------
 
+
 		/// @brief A view of entities with specific components.
 		/// @tparam ...Ts The types of the components.
 		template<typename... Ts>
@@ -1092,11 +1100,11 @@ namespace vecs {
 				auto types = std::vector<size_t>({Type<Ts>()...});
 				auto hs = Hash(types);
 				{
-					//LockGuardShared<RTYPE> lock(&m_system.GetMutex()); //lock the system
+					LockGuardShared<RTYPE> lock(&m_system.GetMutex()); //lock the cache
 					if(FindAndCopy(hs) ) return Iterator<Ts...>{m_system, m_archetypes, 0};
 				}
 
-				//LockGuard<RTYPE> lock(&m_system.GetMutex()); //lock the system
+				LockGuard<RTYPE> lock(&m_system.GetMutex()); //lock the cache
 				if(FindAndCopy(hs) ) return Iterator<Ts...>{m_system, m_archetypes, 0};
 
 				auto& archetypes = m_system.m_searchCacheMap[hs]; //create empty set
@@ -1109,8 +1117,9 @@ namespace vecs {
 					};
 					if( (func.template operator()<Ts>() && ...) ) archetypes.insert(arch);
 				}
-				//m_system.m_searchCacheSet.emplace_back(TypeSetAndHash{{}, hs});
-				//( m_system.m_searchCacheSet.back().m_types.insert(Type<Ts>()), ... );
+				m_system.m_searchCacheSet.emplace_back(TypeSetAndHash{{}, hs});
+				( m_system.m_searchCacheSet.back().m_types.insert(Type<Ts>()), ... );
+				FindAndCopy(hs);
 				return Iterator<Ts...>{m_system, m_archetypes, 0};
 			}
 
@@ -1124,7 +1133,6 @@ namespace vecs {
 			/// @brief Find archetypes with the same components in the search cache and copy them to the list.
 			/// @param hs Hash of the types of the components.
 			/// @return true if the archetypes were found in the cache, else false.
-			[[nodiscard]]
 			inline auto FindAndCopy(size_t hs) -> bool {
 				if( m_system.m_searchCacheMap.contains(hs) ) {
 					for( auto& arch : m_system.m_searchCacheMap[hs] ) {
@@ -1138,6 +1146,77 @@ namespace vecs {
 			Registry<RTYPE>& 				m_system;	///< Reference to the registry system.
 			std::vector<ArchetypeAndSize>  	m_archetypes;	///< List of archetypes.
 		}; //end of View
+
+		//----------------------------------------------------------------------------------------------
+
+
+		template< template<typename...> typename Y, typename... Ts, template<typename...> typename N,  typename... Us >
+			requires (VecsView<Ts...>)
+		class View<Y<Ts...>, N<Us...>> {
+
+		public:
+			View(Registry<RTYPE>& system) : m_system{system} {} ///< Constructor.
+
+			/// @brief Get an iterator to the first entity. 
+			/// The archetype is locked in shared mode to prevent changes. 
+			/// @return Iterator to the first entity.
+			auto begin() {
+				m_archetypes.clear();
+				auto types = std::vector<size_t>({ Type<Yes<Ts...>>(), Type<No<Us...>>() } );
+				auto hs = Hash(types);
+				{
+					LockGuardShared<RTYPE> lock(&m_system.GetMutex()); //lock the cache
+					if(FindAndCopy(hs) ) return Iterator<Ts...>{m_system, m_archetypes, 0};
+				}
+
+				LockGuard<RTYPE> lock(&m_system.GetMutex()); //lock the cache
+				if(FindAndCopy(hs) ) return Iterator<Ts...>{m_system, m_archetypes, 0};
+
+				auto& archetypes = m_system.m_searchCacheMap[hs]; //create empty set
+				assert(archetypes.size() == 0);
+				
+				for( auto& it : m_system.m_archetypes ) {
+
+					auto arch = it.second.get();
+					bool found = false;
+					auto func = [&]<typename T>() {
+						if( arch->Types().contains(Type<T>())) return true;
+						return false;
+					};
+
+					found = (func.template operator()<Ts>() && ...) && (!func.template operator()<Us>() && ...);
+					if(found) archetypes.insert(arch);
+				}
+				m_system.m_searchCacheSet.emplace_back(TypeSetAndHash{{}, hs});
+				( m_system.m_searchCacheSet.back().m_types.insert(Type<Ts>()), ... );
+				FindAndCopy(hs);
+				return Iterator<Ts...>{m_system, m_archetypes, 0};
+			}
+
+			/// @brief Get an iterator to the end of the view.
+			auto end() {
+				return Iterator<Ts...>{m_system, m_archetypes, m_archetypes.size()};
+			}
+
+		private:
+
+			/// @brief Find archetypes with the same components in the search cache and copy them to the list.
+			/// @param hs Hash of the types of the components.
+			/// @return true if the archetypes were found in the cache, else false.
+			inline auto FindAndCopy(size_t hs) -> bool {
+				if( m_system.m_searchCacheMap.contains(hs) ) {
+					for( auto& arch : m_system.m_searchCacheMap[hs] ) {
+						m_archetypes.emplace_back( arch, arch->Size() );
+					}
+					return true;
+				}
+				return false;
+			}
+
+			Registry<RTYPE>& 				m_system;	///< Reference to the registry system.
+			std::vector<ArchetypeAndSize>  	m_archetypes;	///< List of archetypes.
+
+		};
 
 
 		//----------------------------------------------------------------------------------------------
@@ -1170,8 +1249,7 @@ namespace vecs {
 		[[nodiscard]] auto Insert( Ts&&... component ) -> Handle {
 			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 
-			static uint32_t slotMapIndex = NUMBER_SLOTMAPS::value - 1;
-			slotMapIndex = (slotMapIndex + 1) & (NUMBER_SLOTMAPS::value - 1);
+			size_t slotMapIndex = GetSlotmapIndex();
 			LockGuard<RTYPE> lock(&GetMutex(slotMapIndex)); //lock the mutex
 			auto [handle, slot] = m_entities[slotMapIndex].m_slotMap.Insert( {nullptr, 0} ); //get a slot for the entity
 
@@ -1180,7 +1258,7 @@ namespace vecs {
 			size_t hs = Hash(types);
 			if( !m_archetypes.contains( hs ) ) { //not found
 				auto arch = std::make_unique<Archetype>( handle, archIndex, std::forward<Ts>(component)... );
-				//UpdateSearchCache(arch.get());
+				UpdateSearchCache(arch.get());
 				slot.m_value = { arch.get(), archIndex };
 				m_archetypes[hs] = std::move(arch);
 			} else {
@@ -1300,7 +1378,7 @@ namespace vecs {
 				auto archPtr = std::make_unique<Archetype>();
 				arch = archPtr.get();
 				arch->Clone(*oldArch, types);
-				//UpdateSearchCache(arch);
+				UpdateSearchCache(arch);
 				m_archetypes[hs] = std::move(archPtr);
 			} else { arch = m_archetypes[hs].get(); }
 			LockGuard<RTYPE> lock2(&arch->GetMutex(), &oldArch->GetMutex());
@@ -1423,8 +1501,16 @@ namespace vecs {
 		/// @brief Get the mutex of the archetype.
 		/// @return Reference to the mutex.
 		[[nodiscard]] inline auto GetMutex(uint32_t index) -> mutex_t& {
-			return m_mutex; //m_entities[index].m_mutex;
+			return m_entities[index].m_mutex;
 		}
+
+		/// @brief Get the mutex of the archetype.
+		/// @return Reference to the mutex.
+		[[nodiscard]] inline auto GetMutex() -> mutex_t& {
+			return m_mutex; 
+		}
+
+
 
 	private:
 
@@ -1572,7 +1658,7 @@ namespace vecs {
 					}
 				};
 				( func.template operator()<std::decay_t<Ts>>(), ...  );
-				//UpdateSearchCache(newArch);
+				UpdateSearchCache(newArch);
 
 				m_archetypes[hs] = std::move(newArchUnique);
 			} else { 
@@ -1583,9 +1669,13 @@ namespace vecs {
 			return newArch;
 		}
 
-		/// @brief Update the search cache with a new archetype.
+		/// @brief Update the search cache with a new archetype. m_searchCacheSet contains the types of 
+		/// the components that have been searched for.	FInd those previous search results that include 
+		/// all components that are searched for. Add them to the set of archetypes that yielded a result
+		/// for this particular search.
 		/// @param arch Pointer to the new archetype.
 		void UpdateSearchCache(Archetype* arch) {
+			LockGuard<RTYPE> lock(&arch->GetMutex()); //lock the cache
 			auto types = arch->Types();
 			for( auto& ts : m_searchCacheSet ) {
 				if( std::includes(types.begin(), types.end(), ts.m_types.begin(), ts.m_types.end()) ) {
@@ -1594,7 +1684,14 @@ namespace vecs {
 			}
 		}
 
+		size_t GetSlotmapIndex() {
+			//return std::hash<std::thread::id>{}(std::this_thread::get_id()) & (NUMBER_SLOTMAPS::value - 1);
+			m_slotMapIndex = (m_slotMapIndex + 1) & (NUMBER_SLOTMAPS::value - 1);
+			return m_slotMapIndex;
+		}
+
 		mutex_t m_mutex; //mutex for thread safety
+		inline static thread_local size_t m_slotMapIndex = NUMBER_SLOTMAPS::value - 1;
 		std::vector<SlotMapAndMutex<ArchetypeAndIndex>> m_entities;
 		HashMap<std::unique_ptr<Archetype>> m_archetypes; //Mapping vector of type set hash to archetype 1:1
 
