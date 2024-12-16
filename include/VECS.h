@@ -44,6 +44,7 @@ namespace vecs {
 		uint32_t GetIndex() const { return m_index; }
 		uint32_t GetVersion() const { return m_version & 0xFFFFFF; }
 		uint32_t GetStorageIndex() const { return (m_version >> 24) & 0xFF; }
+		uint64_t GetVersionedIndex() const { return (uint64_t)m_version + ((uint64_t)m_index << 24); }
 		bool IsValid() const { return m_index != std::numeric_limits<uint32_t>::max(); }
 		bool operator==(const Handle& other) const { return m_index == other.m_index && m_version == other.m_version; }
 		bool operator!=(const Handle& other) const { return !(*this == other); }
@@ -146,7 +147,7 @@ namespace vecs {
 		/// @param mutex Pointer to the mutex.
 		LockGuard(mutex_t* mutex) : m_mutex{mutex}, m_other{nullptr} { 
 			if constexpr (LTYPE == LOCKGUARDTYPE_PARALLEL) { 
-				m_mutex->lock(); 
+				if(mutex) m_mutex->lock(); 
 			}
 		}
 
@@ -156,20 +157,20 @@ namespace vecs {
 		/// @param other Pointer to the other mutex.
 		LockGuard(mutex_t* mutex, mutex_t* other) : m_mutex{mutex}, m_other{other} { 
 			if constexpr (LTYPE == LOCKGUARDTYPE_PARALLEL) {
-				std::min(m_mutex, m_other)->lock();	///lock the mutexes in the correct order
-				std::max(m_mutex, m_other)->lock();
+				if(mutex && other) { 
+					std::min(m_mutex, m_other)->lock();	///lock the mutexes in the correct order
+					std::max(m_mutex, m_other)->lock();				
+				} else if(m_mutex) m_mutex->lock();
 			}
 		}
 
 		/// @brief Destructor, unlocks the mutexes.
 		~LockGuard() { 
 			if constexpr (LTYPE == LOCKGUARDTYPE_PARALLEL) {
-				if(m_other) { 
+				if(m_mutex && m_other) { 
 					std::max(m_mutex, m_other)->unlock();
 					std::min(m_mutex, m_other)->unlock();	///lock the mutexes in the correct order
-					return;
-				}
-				m_mutex->unlock();
+				} else if(m_mutex) m_mutex->unlock();
 			}
 		}
 
@@ -493,6 +494,7 @@ namespace vecs {
 			virtual auto Insert() -> size_t = 0;
 			virtual auto Erase(size_t index) -> size_t = 0;
 			virtual void Move(ComponentMapBase* other, size_t from) = 0;
+			virtual void Swap(size_t index1, size_t index2) = 0;
 			virtual auto Size() -> size_t= 0;
 			virtual auto Clone() -> std::unique_ptr<ComponentMapBase> = 0;
 			virtual void Clear() = 0;
@@ -560,6 +562,11 @@ namespace vecs {
 			void Move(ComponentMapBase* other, size_t from) override {
 				m_data.push_back( static_cast<ComponentMap<std::decay_t<T>>*>(other)->Get(from) );
 			};
+
+			/// @brief Swap two components in the map.
+			void Swap(size_t index1, size_t index2) override {
+				std::swap(m_data[index1], m_data[index2]);
+			}
 
 			/// @brief Get the size of the map.
 			/// @return The size of the map.
@@ -689,6 +696,16 @@ namespace vecs {
 				++other.m_changeCounter;
 				++m_changeCounter;
 				return m_maps[Type<Handle>()]->Size() - 1; //return the index of the new entity
+			}
+
+			/// @brief Swap two entities in the archetype.
+			void Swap(ArchetypeAndIndex& slot1, ArchetypeAndIndex& slot2) {
+				assert( slot1.m_value.m_archetypePtr == slot2.m_value.m_archetypePtr );
+				for( auto& map : m_maps ) {
+					map.second->Swap(slot1.m_value.m_archindex, slot2.m_value.m_archindex);
+				}
+				std::swap(slot1.m_value.m_archindex, slot2.m_value.m_archindex);
+				++m_changeCounter;
 			}
 
 			void Clone(Archetype& other, auto& types) {
@@ -1476,7 +1493,6 @@ namespace vecs {
 			return false;
 		}
 
-
 		/// @brief Delay a transaction until all iterators are destroyed.
 		bool DelayTransaction( auto&& func ) {
 			if constexpr( RTYPE == REGISTRYTYPE_PARALLEL ) {
@@ -1510,7 +1526,31 @@ namespace vecs {
 			return m_mutex; 
 		}
 
+		/// @brief Get the index of the entity in the archetype
+		auto GetArchetypeIndex( Handle handle ) {
+			LockGuardShared<RTYPE> lock(&GetMutex(handle.GetStorageIndex())); //lock the system
+			return m_entities[handle.GetStorageIndex()].m_slotMap[handle].m_value.m_archIndex;
+		}
 
+		/// @brief Swap two entities.
+		/// @param h1 The handle of the first entity.
+		/// @param h2 The handle of the second entity.
+		/// @return true if the entities were swapped, else false.
+		bool Swap( Handle h1, Handle h2 ) {
+			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
+			size_t index1 = h1.GetStorageIndex();
+			size_t index2 = h2.GetStorageIndex();
+			mutex_t* m1 = &GetMutex(index1);
+			mutex_t* m2 = &GetMutex(index2);
+			if( index1 == index2 ) { m2 = nullptr; } //same slotmap -> only lock once
+			LockGuard<RTYPE> lock(m1, m2); //lock the slotmap(s)
+			auto& slot1 = m_entities[index1].m_slotMap[h1];
+			auto& slot2 = m_entities[index2].m_slotMap[h2];
+			if( slot1.m_archetypePtr != slot2.m_archetypePtr ) return false;
+			LockGuard<RTYPE> lock2(&slot1.m_archetypePtr->GetMutex()); //lock the archetype
+			slot1.m_archetypePtr->Swap(slot1, slot2);
+			return true;
+		}
 
 	private:
 
