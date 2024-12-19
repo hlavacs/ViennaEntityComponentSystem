@@ -342,7 +342,7 @@ namespace vecs {
 			size_t m_size{0};	///< Size of the stack.
 			size_t m_segmentBits;	///< Number of bits for the segment size.
 			size_t m_segmentSize; ///< Size of a segment.
-			stack_t m_segments{100};	///< Vector holding unique pointers to the segments.
+			stack_t m_segments{10};	///< Vector holding unique pointers to the segments.
 	};
 
 
@@ -466,7 +466,7 @@ namespace vecs {
 		}
 
 	private:
-		uint32_t m_storageIndex{0}; ///< Index of the storage.
+		size_t m_storageIndex{0}; ///< Index of the storage.
 		size_t m_size{0}; ///< Size of the slot map. This is the size of the Stack minus the free slots.
 		int64_t m_firstFree{-1}; ///< Index of the first free slot. If -1 then there are no free slots.
 		Stack<Slot> m_slots; ///< Container of slots.
