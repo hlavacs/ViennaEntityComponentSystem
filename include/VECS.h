@@ -33,12 +33,12 @@ namespace vecs {
 	//Handles
 
 	/// @brief A handle for an entity or a component. 
-	struct Handle {
+	struct Handle0 {
 
 	public:
-		Handle() = default; ///< Default constructor.
+		Handle0() = default; ///< Default constructor.
 
-		Handle(uint32_t index, uint32_t version, uint32_t storageIndex=0) : m_index{index}, m_version{version & 0xFFFFFF} {
+		Handle0(uint32_t index, uint32_t version, uint32_t storageIndex=0) : m_index{index}, m_version{version & 0xFFFFFF} {
 			m_version += storageIndex << 24;
 		};
 
@@ -47,9 +47,9 @@ namespace vecs {
 		size_t GetStorageIndex() const { return (m_version >> 24) & 0xFF; }
 		size_t GetVersionedIndex() const { return (size_t)m_version + ((size_t)m_index << 24); }
 		bool IsValid() const { return m_index != std::numeric_limits<uint32_t>::max(); }
-		bool operator==(const Handle& other) const { return m_index == other.m_index && m_version == other.m_version; }
-		bool operator!=(const Handle& other) const { return !(*this == other); }
-		bool operator<(const Handle& other) const { return m_index < other.m_index; }
+		bool operator==(const Handle0& other) const { return m_index == other.m_index && m_version == other.m_version; }
+		bool operator!=(const Handle0& other) const { return !(*this == other); }
+		bool operator<(const Handle0& other) const { return m_index < other.m_index; }
 
 	private:
 		uint32_t m_index{std::numeric_limits<uint32_t>::max()}; ///< Index of the entity in the slot map.
@@ -63,8 +63,8 @@ namespace vecs {
 							std::integral_constant<size_t, std::numeric_limits<size_t>::max()>>; ///< Strong type for the handle type.
 
 		const size_t index_bits = 36; ///< Number of bits for the index.
-		const size_t version_bits = 22; ///< Number of bits for the version.
-		const size_t storage_bits = 6; ///< Number of bits for the storage.
+		const size_t version_bits = 20; ///< Number of bits for the version.
+		const size_t storage_bits = 8; ///< Number of bits for the storage.
 
 	public:
 		Handle1() = default; ///< Default constructor.
@@ -90,12 +90,14 @@ namespace vecs {
 		type_t m_value; ///< Strong type for the handle.
 	};
 
+	using Handle = Handle1; ///< Type of the handle.
+
 	inline bool IsValid(const Handle& handle) {
 		return handle.IsValid();
 	}
 
 	inline std::ostream& operator<<(std::ostream& os, const vecs::Handle& handle) {
-    	return os << "{" <<  handle.GetIndex() << ", " << handle.GetVersion() << "}"; 
+    	return os << "{" <<  handle.GetIndex() << ", " << handle.GetVersion() << ", " << handle.GetStorageIndex() << "}"; 
 	}
 	
 
