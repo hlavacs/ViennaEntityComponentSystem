@@ -34,6 +34,31 @@ namespace vecs {
 
 	/// @brief A handle for an entity or a component. 
 	struct Handle {
+
+	public:
+		Handle() = default; ///< Default constructor.
+
+		Handle(uint32_t index, uint32_t version, uint32_t storageIndex=0) : m_index{index}, m_version{version & 0xFFFFFF} {
+			m_version += storageIndex << 24;
+		};
+
+		uint32_t GetIndex() const { return m_index; }
+		uint32_t GetVersion() const { return m_version & 0xFFFFFF; }
+		uint32_t GetStorageIndex() const { return (m_version >> 24) & 0xFF; }
+		uint64_t GetVersionedIndex() const { return (uint64_t)m_version + ((uint64_t)m_index << 24); }
+		bool IsValid() const { return m_index != std::numeric_limits<uint32_t>::max(); }
+		bool operator==(const Handle& other) const { return m_index == other.m_index && m_version == other.m_version; }
+		bool operator!=(const Handle& other) const { return !(*this == other); }
+		bool operator<(const Handle& other) const { return m_index < other.m_index; }
+
+	private:
+		uint32_t m_index{std::numeric_limits<uint32_t>::max()}; ///< Index of the entity in the slot map.
+		uint32_t m_version{0}; ///< Version of the entity in the slot map. If the version is different from the slot version, the entity is also invalid.
+	};
+
+
+	/// @brief A handle for an entity or a component. 
+	struct Handle1 {
 		using type_t = typename vsty::strong_type_t<size_t, vsty::counter<>, 
 							std::integral_constant<size_t, std::numeric_limits<size_t>::max()>>; ///< Strong type for the handle type.
 
@@ -42,9 +67,9 @@ namespace vecs {
 		const size_t storage_bits = 6; ///< Number of bits for the storage.
 
 	public:
-		Handle() = default; ///< Default constructor.
+		Handle1() = default; ///< Default constructor.
 
-		Handle(size_t index, size_t version, size_t storageIndex=0) : 
+		Handle1(size_t index, size_t version, size_t storageIndex=0) : 
 			m_value{std::numeric_limits<size_t>::max()} { 
 			m_value.set_bits(index, 0, index_bits);
 			m_value.set_bits(version, index_bits, version_bits);
@@ -56,10 +81,10 @@ namespace vecs {
 		size_t GetStorageIndex() const { return m_value.get_bits(index_bits + version_bits); }
 		size_t GetVersionedIndex() const { return (GetVersion() << version_bits) + GetIndex(); }
 		bool IsValid() const { return m_value != std::numeric_limits<uint32_t>::max(); }
-		Handle& operator=(const Handle& other) { m_value = other.m_value; return *this; }
-		bool operator==(const Handle& other) const { return GetIndex() == other.GetIndex() && GetVersion() == other.GetVersion(); }
-		bool operator!=(const Handle& other) const { return !(*this == other); }
-		bool operator<(const Handle& other) const { return GetIndex() < other.GetIndex(); }
+		Handle1& operator=(const Handle1& other) { m_value = other.m_value; return *this; }
+		bool operator==(const Handle1& other) const { return GetIndex() == other.GetIndex() && GetVersion() == other.GetVersion(); }
+		bool operator!=(const Handle1& other) const { return !(*this == other); }
+		bool operator<(const Handle1& other) const { return GetIndex() < other.GetIndex(); }
 
 	private:
 		type_t m_value; ///< Strong type for the handle.
