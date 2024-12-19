@@ -25,6 +25,7 @@ set(INCLUDE ${PROJECT_SOURCE_DIR}/include)
 set(EXTERN ${PROJECT_SOURCE_DIR}/extern)
 
 include_directories (${EXTERN}/ViennaTypeListLibrary/include)
+include_directories (${EXTERN}/ViennaStrongType/include)
 
 
 

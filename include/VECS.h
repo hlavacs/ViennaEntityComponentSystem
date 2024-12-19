@@ -21,6 +21,7 @@
 #include <shared_mutex>
 #include <thread>
 #include <VTLL.h>
+#include <VSTY.h>
 
 
 using namespace std::chrono_literals;
@@ -33,26 +34,35 @@ namespace vecs {
 
 	/// @brief A handle for an entity or a component. 
 	struct Handle {
+		using type_t = typename vsty::strong_type_t<size_t, vsty::counter<>, 
+							std::integral_constant<size_t, std::numeric_limits<size_t>::max()>>; ///< Strong type for the handle type.
+
+		const size_t index_bits = 36; ///< Number of bits for the index.
+		const size_t version_bits = 22; ///< Number of bits for the version.
+		const size_t storage_bits = 6; ///< Number of bits for the storage.
 
 	public:
 		Handle() = default; ///< Default constructor.
 
-		Handle(uint32_t index, uint32_t version, uint32_t storageIndex=0) : m_index{index}, m_version{version & 0xFFFFFF} {
-			m_version += storageIndex << 24;
+		Handle(size_t index, size_t version, size_t storageIndex=0) : 
+			m_value{std::numeric_limits<size_t>::max()} { 
+			m_value.set_bits(index, 0, index_bits);
+			m_value.set_bits(version, index_bits, version_bits);
+			m_value.set_bits(storageIndex, index_bits + version_bits, storage_bits);
 		};
 
-		uint32_t GetIndex() const { return m_index; }
-		uint32_t GetVersion() const { return m_version & 0xFFFFFF; }
-		uint32_t GetStorageIndex() const { return (m_version >> 24) & 0xFF; }
-		uint64_t GetVersionedIndex() const { return (uint64_t)m_version + ((uint64_t)m_index << 24); }
-		bool IsValid() const { return m_index != std::numeric_limits<uint32_t>::max(); }
-		bool operator==(const Handle& other) const { return m_index == other.m_index && m_version == other.m_version; }
+		size_t GetIndex() const { return m_value.get_bits(0, index_bits); }
+		size_t GetVersion() const { return m_value.get_bits(index_bits, version_bits); }
+		size_t GetStorageIndex() const { return m_value.get_bits(index_bits + version_bits); }
+		size_t GetVersionedIndex() const { return (GetVersion() << version_bits) + GetIndex(); }
+		bool IsValid() const { return m_value != std::numeric_limits<uint32_t>::max(); }
+		Handle& operator=(const Handle& other) { m_value = other.m_value; return *this; }
+		bool operator==(const Handle& other) const { return GetIndex() == other.GetIndex() && GetVersion() == other.GetVersion(); }
 		bool operator!=(const Handle& other) const { return !(*this == other); }
-		bool operator<(const Handle& other) const { return m_index < other.m_index; }
+		bool operator<(const Handle& other) const { return GetIndex() < other.GetIndex(); }
 
 	private:
-		uint32_t m_index{std::numeric_limits<uint32_t>::max()}; ///< Index of the entity in the slot map.
-		uint32_t m_version{0}; ///< Version of the entity in the slot map. If the version is different from the slot version, the entity is also invalid.
+		type_t m_value; ///< Strong type for the handle.
 	};
 
 	inline bool IsValid(const Handle& handle) {
@@ -918,7 +928,7 @@ namespace vecs {
 				LockGuard<RTYPE> lock(&bucket.m_mutex);
 				pair = Find(pair, key);
 				if( (*pair) != nullptr ) { return (*pair)->Value();; }
-				*pair = std::make_unique<Pair>( std::make_pair(key, std::move(value)) );
+				*pair = std::make_unique<Pair>( std::make_pair(key, std::forward<T>(value)) );
 				m_size++;
 				return (*pair)->Value();
 			}
