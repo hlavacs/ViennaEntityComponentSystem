@@ -80,7 +80,7 @@ namespace vecs {
 		size_t GetVersion() const { return m_value.get_bits(index_bits, version_bits); }
 		size_t GetStorageIndex() const { return m_value.get_bits(index_bits + version_bits); }
 		size_t GetVersionedIndex() const { return (GetVersion() << version_bits) + GetIndex(); }
-		bool IsValid() const { return m_value != std::numeric_limits<uint32_t>::max(); }
+		bool IsValid() const { return m_value != std::numeric_limits<size_t>::max(); }
 		Handle1& operator=(const Handle1& other) { m_value = other.m_value; return *this; }
 		bool operator==(const Handle1& other) const { return GetIndex() == other.GetIndex() && GetVersion() == other.GetVersion(); }
 		bool operator!=(const Handle1& other) const { return !(*this == other); }
@@ -90,7 +90,7 @@ namespace vecs {
 		type_t m_value; ///< Strong type for the handle.
 	};
 
-	using Handle = Handle0; ///< Type of the handle.
+	using Handle = Handle1; ///< Type of the handle.
 
 	inline bool IsValid(const Handle& handle) {
 		return handle.IsValid();
