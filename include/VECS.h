@@ -90,7 +90,7 @@ namespace vecs {
 		type_t m_value; ///< Strong type for the handle.
 	};
 
-	using Handle = Handle1; ///< Type of the handle.
+	using Handle = Handle0; ///< Type of the handle.
 
 	inline bool IsValid(const Handle& handle) {
 		return handle.IsValid();
