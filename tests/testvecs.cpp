@@ -61,6 +61,9 @@ int test1() {
 
     vecs::Registry<vecs::REGISTRYTYPE_PARALLEL> system;
 
+	vecs::Handle h0;
+	assert( !h0.IsValid() );
+
     vecs::Handle h1 = system.Insert(5, 5.5f);
     assert( system.Exists(h1) );
     auto t1 = system.Types(h1);
