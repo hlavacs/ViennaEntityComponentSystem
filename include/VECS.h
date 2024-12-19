@@ -42,10 +42,10 @@ namespace vecs {
 			m_version += storageIndex << 24;
 		};
 
-		uint32_t GetIndex() const { return m_index; }
-		uint32_t GetVersion() const { return m_version & 0xFFFFFF; }
-		uint32_t GetStorageIndex() const { return (m_version >> 24) & 0xFF; }
-		uint64_t GetVersionedIndex() const { return (uint64_t)m_version + ((uint64_t)m_index << 24); }
+		size_t GetIndex() const { return m_index; }
+		size_t GetVersion() const { return m_version & 0xFFFFFF; }
+		size_t GetStorageIndex() const { return (m_version >> 24) & 0xFF; }
+		size_t GetVersionedIndex() const { return (size_t)m_version + ((size_t)m_index << 24); }
 		bool IsValid() const { return m_index != std::numeric_limits<uint32_t>::max(); }
 		bool operator==(const Handle& other) const { return m_index == other.m_index && m_version == other.m_version; }
 		bool operator!=(const Handle& other) const { return !(*this == other); }
