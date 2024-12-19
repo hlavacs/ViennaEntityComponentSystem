@@ -62,8 +62,8 @@ namespace vecs {
 		using type_t = typename vsty::strong_type_t<size_t, vsty::counter<>, 
 							std::integral_constant<size_t, std::numeric_limits<size_t>::max()>>; ///< Strong type for the handle type.
 
-		const size_t index_bits = 36; ///< Number of bits for the index.
-		const size_t version_bits = 20; ///< Number of bits for the version.
+		const size_t index_bits = 32; ///< Number of bits for the index.
+		const size_t version_bits = 24; ///< Number of bits for the version.
 		const size_t storage_bits = 8; ///< Number of bits for the storage.
 
 	public:
