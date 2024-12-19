@@ -1,3 +1,6 @@
 [submodule "extern/ViennaTypeListLibrary"]
 	path = extern/ViennaTypeListLibrary
 	url = https://github.com/hlavacs/ViennaTypeListLibrary.git
+[submodule "extern/ViennaStrongType"]
+	path = extern/ViennaStrongType
+	url = https://github.com/hlavacs/ViennaStrongType.git
