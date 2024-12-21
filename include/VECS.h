@@ -32,65 +32,37 @@ namespace vecs {
 	//----------------------------------------------------------------------------------------------
 	//Handles
 
-	/// @brief A handle for an entity or a component. 
-	struct Handle0 {
-
-	public:
-		Handle0() = default; ///< Default constructor.
-
-		Handle0(uint32_t index, uint32_t version, uint32_t storageIndex=0) : m_index{index}, m_version{version & 0xFFFFFF} {
-			m_version += storageIndex << 24;
-		};
-
-		size_t GetIndex() const { return m_index; }
-		size_t GetVersion() const { return m_version & 0xFFFFFF; }
-		size_t GetStorageIndex() const { return (m_version >> 24) & 0xFF; }
-		size_t GetVersionedIndex() const { return (size_t)m_version + ((size_t)m_index << 24); }
-		bool IsValid() const { return m_index != std::numeric_limits<uint32_t>::max(); }
-		bool operator==(const Handle0& other) const { return m_index == other.m_index && m_version == other.m_version; }
-		bool operator!=(const Handle0& other) const { return !(*this == other); }
-		bool operator<(const Handle0& other) const { return m_index < other.m_index; }
-
-	private:
-		uint32_t m_index{std::numeric_limits<uint32_t>::max()}; ///< Index of the entity in the slot map.
-		uint32_t m_version{0}; ///< Version of the entity in the slot map. If the version is different from the slot version, the entity is also invalid.
-	};
-
-
-	/// @brief A handle for an entity or a component. 
-	struct Handle1 {
+	/// @brief A handle for an entity or a component.
+	template<size_t INDEX_BITS=32, size_t VERSION_BITS=24, size_t STORAGE_BITS=8>
+	struct HandleT {
 		using type_t = typename vsty::strong_type_t<size_t, vsty::counter<>, 
 							std::integral_constant<size_t, std::numeric_limits<size_t>::max()>>; ///< Strong type for the handle type.
 
-		const size_t index_bits = 32; ///< Number of bits for the index.
-		const size_t version_bits = 24; ///< Number of bits for the version.
-		const size_t storage_bits = 8; ///< Number of bits for the storage.
-
 	public:
-		Handle1() = default; ///< Default constructor.
+		HandleT() = default; ///< Default constructor.
 
-		Handle1(size_t index, size_t version, size_t storageIndex=0) : 
+		HandleT(size_t index, size_t version, size_t storageIndex=0) : 
 			m_value{std::numeric_limits<size_t>::max()} { 
-			m_value.set_bits(index, 0, index_bits);
-			m_value.set_bits(version, index_bits, version_bits);
-			m_value.set_bits(storageIndex, index_bits + version_bits, storage_bits);
+			m_value.set_bits(index, 0, INDEX_BITS);
+			m_value.set_bits(version, INDEX_BITS, VERSION_BITS);
+			m_value.set_bits(storageIndex, INDEX_BITS + VERSION_BITS, STORAGE_BITS);
 		};
 
-		size_t GetIndex() const { return m_value.get_bits(0, index_bits); }
-		size_t GetVersion() const { return m_value.get_bits(index_bits, version_bits); }
-		size_t GetStorageIndex() const { return m_value.get_bits(index_bits + version_bits); }
-		size_t GetVersionedIndex() const { return (GetVersion() << version_bits) + GetIndex(); }
+		size_t GetIndex() const { return m_value.get_bits(0, INDEX_BITS); }
+		size_t GetVersion() const { return m_value.get_bits(INDEX_BITS, VERSION_BITS); }
+		size_t GetStorageIndex() const { return m_value.get_bits(INDEX_BITS + VERSION_BITS); }
+		size_t GetVersionedIndex() const { return (GetVersion() << VERSION_BITS) + GetIndex(); }
 		bool IsValid() const { return m_value != std::numeric_limits<size_t>::max(); }
-		Handle1& operator=(const Handle1& other) { m_value = other.m_value; return *this; }
-		bool operator==(const Handle1& other) const { return GetIndex() == other.GetIndex() && GetVersion() == other.GetVersion(); }
-		bool operator!=(const Handle1& other) const { return !(*this == other); }
-		bool operator<(const Handle1& other) const { return GetIndex() < other.GetIndex(); }
+		HandleT& operator=(const HandleT& other) { m_value = other.m_value; return *this; }
+		bool operator==(const HandleT& other) const { return GetIndex() == other.GetIndex() && GetVersion() == other.GetVersion(); }
+		bool operator!=(const HandleT& other) const { return !(*this == other); }
+		bool operator<(const HandleT& other) const { return GetIndex() < other.GetIndex(); }
 
 	private:
 		type_t m_value; ///< Strong type for the handle.
 	};
 
-	using Handle = Handle1; ///< Type of the handle.
+	using Handle = HandleT<32,24,8>; ///< Type of the handle.
 
 	inline bool IsValid(const Handle& handle) {
 		return handle.IsValid();

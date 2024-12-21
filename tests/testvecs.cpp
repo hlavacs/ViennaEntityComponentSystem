@@ -63,6 +63,7 @@ int test1() {
 
 	vecs::Handle h0;
 	assert( !h0.IsValid() );
+	std::cout << "Handle size: " << sizeof(h0) << std::endl;
 
     vecs::Handle h1 = system.Insert(5, 5.5f);
     assert( system.Exists(h1) );
