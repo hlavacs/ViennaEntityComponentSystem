@@ -1456,6 +1456,9 @@ namespace vecs {
 				LockGuard<RTYPE> lock(&slotmap.m_mutex); //lock the mutex
 				slotmap.m_slotMap.Clear();
 			}
+			LockGuard<RTYPE> lock(&GetMutex()); //lock the mutex
+			m_searchCacheMap.clear();
+			m_searchCacheSet.clear();
 		}
 
 		/// @brief Get a view of entities with specific components.
@@ -1473,6 +1476,10 @@ namespace vecs {
 			std::cout << "Entities: " << Size() << std::endl;
 			for( auto& it : m_archetypes ) {
 				it.second->Print();
+			}
+			std::cout << "Cache Map " << m_searchCacheMap.size() << " Set: " << m_searchCacheSet.size() << std::endl;
+			for( auto it : m_searchCacheMap ) {
+				std::cout << "Hash: " << it.first << " Archetypes: " << it.second.size() << std::endl;
 			}
 			std::cout << std::endl << std::endl;
 		}
