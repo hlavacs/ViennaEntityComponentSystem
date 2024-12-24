@@ -1143,7 +1143,7 @@ namespace vecs {
 			/// @return Iterator to the first entity.
 			auto begin() {
 				m_archetypes.clear();
-				auto types = std::vector<size_t>({Type<Ts>()...});
+				auto types = std::vector<size_t>({Type<std::decay_t<Ts>>()...});
 				auto hs = Hash(types);
 				{
 					LockGuardShared<RTYPE> lock(&m_system.GetMutex()); //lock the cache
@@ -1158,13 +1158,13 @@ namespace vecs {
 				for( auto& it : m_system.m_archetypes ) {
 					auto arch = it.second.get();
 					auto func = [&]<typename T>() {
-						if( arch->Types().contains(Type<T>())) return true;
+						if( arch->Types().contains(Type<std::decay_t<T>>())) return true;
 						return false;
 					};
 					if( (func.template operator()<Ts>() && ...) ) archetypes.insert(arch);
 				}
 				m_system.m_searchCacheSet.emplace_back(TypeSetAndHash{{}, hs});
-				( m_system.m_searchCacheSet.back().m_types.insert(Type<Ts>()), ... );
+				( m_system.m_searchCacheSet.back().m_types.insert(Type<std::decay_t<Ts>>()), ... );
 				FindAndCopy(hs);
 				return Iterator<Ts...>{m_system, m_archetypes, 0};
 			}
@@ -1208,7 +1208,7 @@ namespace vecs {
 			/// @return Iterator to the first entity.
 			auto begin() {
 				m_archetypes.clear();
-				auto types = std::vector<size_t>({ Type<Yes<Ts...>>(), Type<No<Us...>>() } );
+				auto types = std::vector<size_t>({ Type<Yes<std::decay_t<Ts>...>>(), Type<No<std::decay_t<Us>...>>() } );
 				auto hs = Hash(types);
 				{
 					LockGuardShared<RTYPE> lock(&m_system.GetMutex()); //lock the cache
@@ -1226,7 +1226,7 @@ namespace vecs {
 					auto arch = it.second.get();
 					bool found = false;
 					auto func = [&]<typename T>() {
-						if( arch->Types().contains(Type<T>())) return true;
+						if( arch->Types().contains(Type<std::decay_t<T>>())) return true;
 						return false;
 					};
 
@@ -1234,7 +1234,7 @@ namespace vecs {
 					if(found) archetypes.insert(arch);
 				}
 				m_system.m_searchCacheSet.emplace_back(TypeSetAndHash{{}, hs});
-				( m_system.m_searchCacheSet.back().m_types.insert(Type<Ts>()), ... );
+				( m_system.m_searchCacheSet.back().m_types.insert(Type<std::decay_t<Ts>>()), ... );
 				FindAndCopy(hs);
 				return Iterator<Ts...>{m_system, m_archetypes, 0};
 			}
