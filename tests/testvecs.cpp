@@ -112,14 +112,17 @@ int test1() {
     assert( system.Has<float>(h2) );
     assert( system.Has<double>(h2) );
 
+	system.Print();
     system.Erase<int, float>(h2); //remove two components
     assert( !system.Has<int>(h2) );
     assert( !system.Has<float>(h2) );
     assert( system.Has<double>(h2) );
+	system.Print();
     system.Erase<double>(h2); //remove also the last component
     assert( system.Exists(h2)); //check that the entity still exists
 	system.Put(h2, 3.9); //add a component of type double
     assert( system.Exists(h2)); //check that the entity still exists
+	system.Print();
 	auto d = system.Get<double>(h2);
 	auto cc = system.Get<char&>(h2); //
 	cc = 'A';

@@ -246,6 +246,18 @@ namespace vecs {
 
 		public:
 
+			class Iterator {
+				public:
+				Iterator(Stack<T>& stack, size_t index) : m_stack{stack}, m_index{index} {}
+				Iterator& operator++() { ++m_index; return *this; }
+				bool operator!=(const Iterator& other) const { return m_index != other.m_index; }
+				T& operator*() { return m_stack[m_index]; }	
+
+				private:
+				Stack<T>& m_stack;
+				size_t m_index{0};
+			};
+
 			/// @brief Constructor, creates the stack.
 			/// @param segmentBits The number of bits for the segment size.
 			Stack(size_t segmentBits = 6) : m_size{0}, m_segmentBits(segmentBits), m_segmentSize{1ul<<segmentBits}, m_segments{} {
@@ -298,6 +310,9 @@ namespace vecs {
 				m_segments.clear();
 				m_segments.emplace_back( std::make_shared<std::vector<T>>(m_segmentSize) );
 			}
+
+			auto begin() -> Iterator { return Iterator{*this, 0}; }
+			auto end() -> Iterator { return Iterator{*this, m_size}; }
 
 		private:
 
@@ -740,7 +755,7 @@ namespace vecs {
 
 			/// @brief Print the archetype.
 			void Print() {
-				std::cout << "Hash: " << Hash(m_types) << std::endl;
+				std::cout << "Archetype: " << Hash(m_types) << std::endl;
 				for( auto ti : m_types ) {
 					std::cout << "Type: " << ti << " ";
 				}
@@ -750,7 +765,12 @@ namespace vecs {
 					map.second->print();
 					std::cout << std::endl;
 				}
-				std::cout << std::endl;
+				std::cout << "Entities: ";
+				auto map = Map<Handle>();
+				for( auto handle : map->Data() ) {
+					std::cout << handle << " ";
+				}
+				std::cout << std::endl << std::endl;
 			}
 
 			/// @brief Validate the archetype. Make sure all maps have the same size.
@@ -1450,9 +1470,9 @@ namespace vecs {
 		/// @brief Print the registry.
 		/// Print the number of entities and the archetypes.
 		void Print() {
-			std::cout << "Entities: " << m_entities.Size() << std::endl;
+			std::cout << "Entities: " << Size() << std::endl;
 			for( auto& it : m_archetypes ) {
-				it.second->print();
+				it.second->Print();
 			}
 			std::cout << std::endl << std::endl;
 		}
