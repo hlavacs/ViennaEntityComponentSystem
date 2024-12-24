@@ -1617,6 +1617,7 @@ namespace vecs {
 			LockGuard<RTYPE> lock2(&arch->GetMutex()); //lock old archetype, new one cannot be seen yet
 			value->m_archIndex = newArch->Move(arch->Types(), value->m_archIndex, *arch, m_entities[handle.GetStorageIndex()].m_slotMap); //move values
 			( func.template operator()<Ts>(newArch, value->m_archIndex, std::forward<Ts>(vs)), ... );
+			UpdateSearchCache(newArch); //update the search cache
 			return;
 		}
 		
@@ -1649,6 +1650,7 @@ namespace vecs {
 			value->m_archetypePtr = newArch;
 			LockGuard<RTYPE> lock2(&arch->GetMutex()); //lock old archetype, new one cannot be seen yet
 			value->m_archIndex = newArch->Move(arch->Types(), value->m_archIndex, *arch, m_entities[handle.GetStorageIndex()].m_slotMap); //move values		
+			UpdateSearchCache(newArch); //update the search cache
 			decltype(auto) v = newArch->template Get<T>(value->m_archIndex);
 			return v;
 		}
@@ -1765,7 +1767,7 @@ namespace vecs {
 		HashMap<std::unique_ptr<Archetype>> m_archetypes; //Mapping vector of type set hash to archetype 1:1
 
 		std::unordered_map<size_t, std::set<Archetype*>> m_searchCacheMap; //Mapping vector of hash to archetype, 1:N
-		std::vector<TypeSetAndHash> 					 m_searchCacheSet; //These type combinations have been searched for
+		std::vector<TypeSetAndHash> 					 m_searchCacheSet; //These type combinations have been searched for, for updating
 		inline static thread_local size_t 		m_numIterators{0}; //thread local variable for locking
 		inline static thread_local Archetype* 	m_currentArchetype{nullptr}; //is there an iterator now
 		inline static thread_local std::vector<std::function<void()>> m_delayedTransactions; //thread local variable for locking
