@@ -665,7 +665,7 @@ namespace vecs {
 			template<typename... Ts>
 				requires VecsArchetype<Ts...>
 			size_t Insert(Handle handle, Ts&& ...values ) {
-				assert( m_types.size() == sizeof...(Ts) + 1 );
+				assert( m_maps.size() == sizeof...(Ts) + 1 );
 				assert( (m_maps.contains(Type<Ts>()) && ...) );
 				(AddValue( std::forward<Ts>(values) ), ...); //insert all components, get index of the handle
 				return AddValue( handle ); //insert the handle
@@ -732,10 +732,10 @@ namespace vecs {
 				++m_changeCounter;
 			}
 
-			void Clone(Archetype& other, auto& types) {
+			void Clone(Archetype& other, const std::set<size_t>& types) {
 				for( auto& ti : types ) { //go through all maps
 					m_types.insert(ti); //add the type to the list
-					m_maps[ti] = other.Map(ti)->Clone(); //make a component map like this one
+					if( other.m_maps.contains(ti) ) m_maps[ti] = other.Map(ti)->Clone(); //make a component map like this one
 				}
 			}
 
@@ -805,6 +805,11 @@ namespace vecs {
 				m_maps[ti] = std::make_unique<ComponentMap<T>>(); //create the component map
 			};
 
+			void AddType(size_t ti) {
+				assert( !m_types.contains(ti) );
+				m_types.insert(ti);	//add the type to the list
+			};
+
 			/// @brief Add a new component value to the archetype.
 			/// @param v The component value.
 			/// @return The index of the component value.
@@ -854,11 +859,12 @@ namespace vecs {
 			}
 
 			using Size_t = std::conditional_t<RTYPE == REGISTRYTYPE_SEQUENTIAL, std::size_t, std::atomic<std::size_t>>;
+			using Map_t = std::unordered_map<size_t, std::unique_ptr<ComponentMapBase>>;
 
-			mutex_t m_mutex; //mutex for thread safety
-			Size_t m_changeCounter{0}; //changes invalidate references
-			std::set<size_t> m_types; //types of components
-			std::unordered_map<size_t, std::unique_ptr<ComponentMapBase>> m_maps; //map from type index to component data
+			mutex_t 			m_mutex; //mutex for thread safety
+			Size_t 				m_changeCounter{0}; //changes invalidate references
+			std::set<size_t> 	m_types; //types of components
+			Map_t 				m_maps; //map from type index to component data
 		}; //end of Archetype
 
 	public:	
@@ -1357,6 +1363,14 @@ namespace vecs {
 			return arch->Has(Type<T>());
 		}
 
+		bool Has(Handle handle, size_t ti) {
+			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
+			assert(Exists(handle));
+			LockGuardShared<RTYPE> lock(&GetMutex(handle.GetStorageIndex())); //lock the system
+			auto arch = m_entities[handle.GetStorageIndex()].m_slotMap[handle].m_value.m_archetypePtr;
+			return arch->Has(ti);
+		}
+
 		/// @brief Get the types of the components of an entity.
 		/// @param handle The handle of the entity.
 		/// @return A vector of type indices of the components.
@@ -1367,7 +1381,6 @@ namespace vecs {
 			auto arch = m_entities[handle.GetStorageIndex()].m_slotMap[handle].m_value.m_archetypePtr;
 			return arch->Types();
 		}
-
 
 		template<typename T>
 		[[nodiscard]] auto Get(Handle handle) -> T {
