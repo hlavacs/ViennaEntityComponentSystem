@@ -1179,7 +1179,7 @@ namespace vecs {
 			/// @brief Find archetypes with the same components in the search cache and copy them to the list.
 			/// @param hs Hash of the types of the components.
 			/// @return true if the archetypes were found in the cache, else false.
-			inline auto FindAndCopy(size_t hs) -> bool {
+			inline auto FindAndCopy2(size_t hs) -> bool {
 				if( m_system.m_searchCacheMap.contains(hs) ) {
 					for( auto& arch : m_system.m_searchCacheMap[hs] ) {
 						m_archetypes.emplace_back( arch, arch->Size() );
@@ -1187,6 +1187,14 @@ namespace vecs {
 					return true;
 				}
 				return false;
+			}
+
+			inline auto FindAndCopy(size_t hs) -> bool {
+				for( auto& arch : m_system.m_archetypes ) {
+					if( (arch.second->Types().contains(Type<std::decay_t<Ts>>()) && ...) ) 
+						m_archetypes.emplace_back( arch.second.get(), arch.second->Size() );
+				}
+				return true;
 			}
 
 			Registry<RTYPE>& 				m_system;	///< Reference to the registry system.
@@ -1249,7 +1257,7 @@ namespace vecs {
 			/// @brief Find archetypes with the same components in the search cache and copy them to the list.
 			/// @param hs Hash of the types of the components.
 			/// @return true if the archetypes were found in the cache, else false.
-			inline auto FindAndCopy(size_t hs) -> bool {
+			inline auto FindAndCopy2(size_t hs) -> bool {
 				if( m_system.m_searchCacheMap.contains(hs) ) {
 					for( auto& arch : m_system.m_searchCacheMap[hs] ) {
 						m_archetypes.emplace_back( arch, arch->Size() );
@@ -1258,6 +1266,16 @@ namespace vecs {
 				}
 				return false;
 			}
+
+			inline auto FindAndCopy(size_t hs) -> bool {
+				for( auto& arch : m_system.m_archetypes ) {
+					bool found = (arch.second->Types().contains(Type<std::decay_t<Ts>>()) && ...) && 
+								 (!arch.second->Types().contains(Type<std::decay_t<Us>>()) && ...);
+					if(found) m_archetypes.emplace_back( arch.second.get(), arch.second->Size() );
+				}
+				return true;
+			}
+
 
 			Registry<RTYPE>& 				m_system;	///< Reference to the registry system.
 			std::vector<ArchetypeAndSize>  	m_archetypes;	///< List of archetypes.
