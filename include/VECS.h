@@ -1634,7 +1634,7 @@ namespace vecs {
 			std::vector<size_t> newTypes;
 			{
 				LockGuardShared<RTYPE> lock(&GetMutex(handle.GetStorageIndex())); //lock the mutex
-				auto value = GetArchetype<std::decay_t<Ts>...>(handle, newTypes);
+				ArchetypeAndIndex* value = GetArchetype<std::decay_t<Ts>...>(handle, newTypes);
 				//value->m_archetypePtr->Print();	
 				if(newTypes.empty()) {
 					( func.template operator()<Ts>(value->m_archetypePtr, value->m_archIndex, std::forward<Ts>(vs)), ... );
@@ -1643,13 +1643,13 @@ namespace vecs {
 			}
 
 			LockGuard<RTYPE> lock1(&GetMutex(handle.GetStorageIndex())); //lock the mutex
-			auto value = GetArchetype<std::decay_t<Ts>...>(handle, newTypes);
+			ArchetypeAndIndex* value = GetArchetype<std::decay_t<Ts>...>(handle, newTypes);
 			auto arch = value->m_archetypePtr;
 			if(newTypes.empty()) {
 				( func.template operator()<Ts>(arch, value->m_archIndex, std::forward<Ts>(vs)), ... );
 				return;
 			}
-			auto newArch = CreateArchetype<std::decay_t<Ts>...>(handle, newTypes);
+			auto newArch = CreateArchetype<std::decay_t<Ts>...>(handle, value, newTypes);
 			
 			value->m_archetypePtr = newArch;
 			LockGuard<RTYPE> lock2(&arch->GetMutex()); //lock old archetype, new one cannot be seen yet
@@ -1669,7 +1669,7 @@ namespace vecs {
 			std::vector<size_t> newTypes;
 			{
 				LockGuardShared<RTYPE> lock(&m_mutex); //lock the mutex
-				auto value = GetArchetype<T>(handle, newTypes);
+				ArchetypeAndIndex* value = GetArchetype<T>(handle, newTypes);
 				auto arch = value->m_archetypePtr;
 				if(newTypes.empty()) { 
 					decltype(auto) v = arch->template Get<T>(value->m_archIndex); 
@@ -1678,13 +1678,13 @@ namespace vecs {
 			}
 
 			LockGuard<RTYPE> lock1(&m_mutex); //lock the mutex
-			auto value = GetArchetype<T>(handle, newTypes);
+			ArchetypeAndIndex* value = GetArchetype<T>(handle, newTypes);
 			auto arch = value->m_archetypePtr;
 			if(newTypes.empty()) { 
 				decltype(auto) v = arch->template Get<T>(value->m_archIndex); 
 				return v;
 			}
-			auto newArch = CreateArchetype<T>(handle, newTypes);
+			auto newArch = CreateArchetype<T>(handle, value, newTypes);
 			value->m_archetypePtr = newArch;
 			LockGuard<RTYPE> lock2(&arch->GetMutex()); //lock old archetype, new one cannot be seen yet
 			value->m_archIndex = newArch->Move(arch->Types(), value->m_archIndex, *arch, m_entities[handle.GetStorageIndex()].m_slotMap); //move values		
@@ -1705,18 +1705,18 @@ namespace vecs {
 			std::vector<size_t> newTypes;
 			{
 				LockGuardShared<RTYPE> lock(&m_mutex); //lock the mutex
-				auto value = GetArchetype<std::decay_t<Ts>...>(handle, newTypes);
+				ArchetypeAndIndex* value = GetArchetype<std::decay_t<Ts>...>(handle, newTypes);
 				auto arch = value->m_archetypePtr;
 				//value->m_archetypePtr->Print();	
 				if(newTypes.empty()) { return std::tuple<Ts...>{ arch->template Get<Ts>(value->m_archIndex)... };  }
 			}
 
 			LockGuard<RTYPE> lock1(&m_mutex); //lock the mutex
-			auto value = GetArchetype<std::decay_t<Ts>...>(handle, newTypes);
+			ArchetypeAndIndex* value = GetArchetype<std::decay_t<Ts>...>(handle, newTypes);
 			auto arch = value->m_archetypePtr;
 			if(newTypes.empty()) { return std::tuple<Ts...>{ arch->template Get<Ts>(value->m_archIndex)... } ; } 
 
-			auto newArch = CreateArchetype<std::decay_t<Ts>...>(handle, newTypes);		
+			auto newArch = CreateArchetype<std::decay_t<Ts>...>(handle, value, newTypes);		
 			value->m_archetypePtr = newArch;
 			LockGuard<RTYPE> lock2(&arch->GetMutex()); //lock old archetype, new one cannot be seen yet
 			value->m_archIndex = newArch->Move(arch->Types(), value->m_archIndex, *arch, m_entities[handle.GetStorageIndex()].m_slotMap); //move values
@@ -1726,13 +1726,13 @@ namespace vecs {
 		/// @brief Get the archetype/index of an entity and the types of the components that are currently not contained.
 		/// @tparam ...Ts The types of the components.
 		/// @param handle The handle of the entity.
-		/// @param newTypes A vector to store the types of the components that are not contained.
-		/// @return Pointer to the archetype/index of the entity.
+		/// @param newTypes A vector to store the types of the components that are not contained and should be created.
+		/// @return Slotmap value of the entity containing pointer to the archetype and index in the archetype. 
 		template<typename... Ts>
 		inline auto GetArchetype(Handle handle, std::vector<size_t>& newTypes) -> ArchetypeAndIndex* {		
 			newTypes.clear();
 			newTypes.reserve(sizeof...(Ts));
-			auto value = &m_entities[handle.GetStorageIndex()].m_slotMap[handle].m_value;
+			ArchetypeAndIndex* value = &m_entities[handle.GetStorageIndex()].m_slotMap[handle].m_value;
 			
 			auto func = [&]<typename T>(){ if(!value->m_archetypePtr->Has(Type<T>())) newTypes.emplace_back(Type<T>()); };
 			( func.template operator()<std::decay_t<Ts>>(), ...  );
@@ -1742,12 +1742,11 @@ namespace vecs {
 		/// @brief Create a new archetype with the types of the components that are not contained.
 		/// @tparam ...Ts The types of the components.
 		/// @param handle The handle of the entity.
-		/// @param newTypes A vector with the types of the components that are not contained.
+		/// @param value Pointer to the archetype/index of the entity.
+		/// @param newTypes A vector with the types of the components that are not contained and shhould be created.
 		/// @return Pointer to the new archetype.
 		template<typename... Ts>
-		inline auto CreateArchetype(Handle handle, std::vector<size_t>& newTypes) -> Archetype* {
-			auto value = GetArchetype<Ts...>(handle, newTypes);
-			if( newTypes.empty() ) return value->m_archetypePtr;
+		inline auto CreateArchetype(Handle handle, ArchetypeAndIndex* value, std::vector<size_t>& newTypes) -> Archetype* {
 			auto arch = value->m_archetypePtr;
 			std::vector<size_t> allTypes;
 			allTypes.reserve(arch->Types().size() + newTypes.size());
