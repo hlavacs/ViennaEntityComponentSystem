@@ -713,8 +713,7 @@ namespace vecs {
 			/// @brief Move components from another archetype to this one.
 			size_t Move( auto& types, size_t other_index, Archetype& other, SlotMap<ArchetypeAndIndex>& slotmap) {			
 				for( auto& ti : types ) { //go through all maps
-					assert( m_maps.contains(ti) );
-					m_maps[ti]->Move(other.Map(ti), other_index); //insert the new value
+					if( m_maps.contains(ti) ) m_maps[ti]->Move(other.Map(ti), other_index); //insert the new value
 				}
 				other.Erase2(other_index, slotmap); //erase from old component map
 				++other.m_changeCounter;
@@ -1638,26 +1637,35 @@ namespace vecs {
 
 	private:
 
+		auto GetSlotAndArch(auto handle) {
+			ArchetypeAndIndex* value = m_entities[handle.GetStorageIndex()].m_slotMap.Find(handle);
+			Archetype* arch = value->m_archetypePtr;
+			return std::make_pair(value, arch);
+		}
+
+		template<typename... Ts>
+			requires (sizeof...(Ts) > 0 && (std::is_same_v<Ts, size_t> && ...) )
+		auto CloneArchetype(Archetype* arch, std::vector<size_t>& types, Ts... tags) {
+			auto newArch = std::make_unique<Archetype>();
+			newArch->Clone(*arch, types);
+			(newArch->AddType(tags), ...);
+			UpdateSearchCache(newArch.get());
+			m_archetypes[newArch->Types()] = std::move(newArch);
+		}
+
 		template<typename... Ts>
 			requires (sizeof...(Ts) > 0 && (std::is_same_v<Ts, size_t> && ...) )
 		void AddTags2(Handle handle, Ts... tags) {
 			LockGuard<RTYPE> lock1(&GetMutex(handle.GetStorageIndex())); //lock the mutex
-			ArchetypeAndIndex* value = m_entities[handle.GetStorageIndex()].m_slotMap.Find(handle);
-			auto arch = value->m_archetypePtr;
+			auto [value, arch] = GetSlotAndArch(handle);
 			assert(!arch->Types().contains(tags) && ...);
 			std::vector<size_t> newTypes{tags...};
-			std::vector<size_t> allTypes;
-			allTypes.reserve(arch->Types().size() + newTypes.size());
-			std::copy( arch->Types().begin(), arch->Types().end(), std::back_inserter(allTypes) );
-			std::copy( newTypes.begin(), newTypes.end(), std::back_inserter(allTypes) );
-
-
-			//auto newArch = CreateArchetype<T>(handle, value, newTypes);
-			//value->m_archetypePtr = newArch;
-			//LockGuard<RTYPE> lock2(&arch->GetMutex()); //lock old archetype, new one cannot be seen yet
-			//value->m_archIndex = newArch->Move(arch->Types(), value->m_archIndex, *arch, m_entities[handle.GetStorageIndex()].m_slotMap); //move values		
-			//UpdateSearchCache(newArch); //update the search cache
-			//decltype(auto) v = newArch->template Get<T>(value->m_archIndex);
+			size_t hs = Hash(std::ranges::join_view(arch->Types(), {tags...}));
+			if( !m_archetypes.contains(hs) ) { CloneArchetype(arch, arch->Types(), tags...); } 
+			auto newArch = m_archetypes[hs].get();
+			LockGuard<RTYPE> lock2(&newArch->GetMutex()); //lock the new archetype
+			value->m_archetypePtr = newArch;
+			value->m_archIndex = newArch->Move(arch->Types(), value->m_archIndex, *arch, m_entities[handle.GetStorageIndex()].m_slotMap);
 		}
 
 		template<typename... Ts>
@@ -1845,13 +1853,18 @@ namespace vecs {
 			return m_slotMapIndex;
 		}
 
+		using SlotMaps_t = std::vector<SlotMapAndMutex<ArchetypeAndIndex>>;
+		using HashMap_t = HashMap<std::unique_ptr<Archetype>>;
+		using SearchCacheMap_t = std::unordered_map<size_t, std::set<Archetype*>>;
+		using SearchCacheSet_t = std::vector<TypeSetAndHash>;
+
 		mutex_t m_mutex; //mutex for thread safety
 		inline static thread_local size_t m_slotMapIndex = NUMBER_SLOTMAPS::value - 1;
-		std::vector<SlotMapAndMutex<ArchetypeAndIndex>> m_entities;
-		HashMap<std::unique_ptr<Archetype>> m_archetypes; //Mapping vector of type set hash to archetype 1:1
+		SlotMaps_t m_entities;
+		HashMap_t m_archetypes; //Mapping vector of type set hash to archetype 1:1
 
-		std::unordered_map<size_t, std::set<Archetype*>> m_searchCacheMap; //Mapping vector of hash to archetype, 1:N
-		std::vector<TypeSetAndHash> 					 m_searchCacheSet; //These type combinations have been searched for, for updating
+		SearchCacheMap_t m_searchCacheMap; //Mapping vector of hash to archetype, 1:N
+		SearchCacheSet_t m_searchCacheSet; //These type combinations have been searched for, for updating
 		inline static thread_local size_t 		m_numIterators{0}; //thread local variable for locking
 		inline static thread_local Archetype* 	m_currentArchetype{nullptr}; //is there an iterator now
 		inline static thread_local std::vector<std::function<void()>> m_delayedTransactions; //thread local variable for locking
