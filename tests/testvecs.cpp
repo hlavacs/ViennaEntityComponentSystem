@@ -61,83 +61,144 @@ int test1() {
 
     vecs::Registry<vecs::REGISTRYTYPE_PARALLEL> system;
 
-	vecs::Handle h0;
-	assert( !h0.IsValid() );
-	std::cout << "Handle size: " << sizeof(h0) << std::endl;
+	//Valid
+	{
+		vecs::Handle handle;
+		assert( !handle.IsValid() );
+		std::cout << "Handle size: " << sizeof(handle) << std::endl;
+	}
 
-    vecs::Handle h1 = system.Insert(5, 5.5f);
-    assert( system.Exists(h1) );
-    auto t1 = system.Types(h1);
-    auto v1 = system.Get<int>(h1);
-    assert( system.Has<int>(h1) );
-    system.Erase(h1);
-    assert( !system.Exists(h1) );
+	//Insert, Types, Get, Has, Erase, Exists
+	{
+	    vecs::Handle handle = system.Insert(5, 5.5f);
+	    assert( system.Exists(handle) );
+	    auto t1 = system.Types(handle);
+		assert( t1.size() == 3 ); //also handle!
+		std::set<size_t> types{vecs::Type<vecs::Handle>(), vecs::Type<int>(), vecs::Type<float>()};
+		std::ranges::for_each( t1, [&](auto& t){ assert( types.contains(t) ); } );
+	    auto v1 = system.Get<int>(handle);
+		assert( v1 == 5 );
+	    assert( system.Has<int>(handle) );
+	    system.Erase(handle);
+	    assert( !system.Exists(handle) );
 
-    //vecs::Handle hx = system.Insert(5, 6); //compile error
-    struct height_t { int i; }; 
-    struct weight_t { int i; }; 
-    vecs::Handle hx1 = system.Insert(5, height_t{6}, weight_t{6}); //works
+	    //vecs::Handle hx = system.Insert(5, 6); //compile error
+	    struct height_t { int i; }; 
+	    struct weight_t { int i; }; 
+	    vecs::Handle hx1 = system.Insert(5, height_t{6}, weight_t{6}); //works
+	}
 
-    auto h2 = system.Insert(5, 6.9f, 7.3);
-    assert( system.Exists(h2) );
-    auto t2 = system.Types(h2);
+	//Exists
+	{
+	    auto handle = system.Insert(5, 6.9f, 7.3);
+	    assert( system.Exists(handle) );
+	    auto t2 = system.Types(handle);
+		std::set<size_t> types{vecs::Type<vecs::Handle>(), vecs::Type<int>(), vecs::Type<float>(), vecs::Type<double>()};
+		std::ranges::for_each( t2, [&](auto& t){ assert( types.contains(t) ); } );	}
 
-	decltype(auto) value = system.Get<float&>(h2);
-	float& f1 = value; 
-	value = 10.0f; 
-	assert( system.Get<float>(h2) == 10.0f );
+	//Get
+	{
+	    auto handle = system.Insert(5, 6.9f, 7.3);
+		decltype(auto) value = system.Get<float&>(handle);
+		float& f1 = value; 
+		value = 10.0f; 
+		assert( system.Get<float>(handle) == 10.0f );
 
-    auto [v2a, v2b] = system.Get<float, double>(h2);
-    auto [v3a, v3b] = system.Get<float&, double&>(h2);
-	v3a = 100.0f;
-	v3b = 101.0;
-    auto [v4a, v4b] = system.Get<float, double>(h2);
-	assert( v4a == 100.0f && v4b == 101.0 );
+	    auto [v2a, v2b] = system.Get<float, double>(handle);
+	    auto [v3a, v3b] = system.Get<float&, double&>(handle);
+		v3a = 100.0f;
+		v3b = 101.0;
+	    auto [v4a, v4b] = system.Get<float, double>(handle);
+		assert( v4a == 100.0f && v4b == 101.0 );
+	}
 
-    system.Put(h2, 50, 69.0f, 73.0);
-	auto [v5a, v5b, v5c] = system.Get<int, float, double>(h2);
-    assert( v5b == 69.0f && v5c == 73.0 );
-    std::tuple<float,double> tup = system.Get<float, double>(h2);
-    std::get<float>(tup) = 101.0f;    
-    std::get<double>(tup) = 102.0;    
-    system.Put(h2, tup);
-	auto [v6a, v6b] = system.Get<float, double>(h2);
-    assert( v6a == 101.0f && v6b == 102.0 );
+	//Put
+	{
+	    auto handle = system.Insert(5, 6.9f, 7.3);
+	    system.Put(handle, 50, 69.0f, 73.0);
+		auto [v5a, v5b, v5c] = system.Get<int, float, double>(handle);
+	    assert( v5b == 69.0f && v5c == 73.0 );
+	    std::tuple<float,double> tup = system.Get<float, double>(handle);
+	    std::get<float>(tup) = 101.0f;    
+	    std::get<double>(tup) = 102.0;    
+	    system.Put(handle, tup);
+		auto [v6a, v6b] = system.Get<float, double>(handle);
+	    assert( v6a == 101.0f && v6b == 102.0 );
 
-    auto tup2 = system.Get<int, float, double>(h2);
-    int ii = std::get<int>(tup2);
-    auto [ivalue, fvalue, dvalue] = system.Get<int, float, double>(h2);
+	    auto tup2 = system.Get<int, float, double>(handle);
+	    int ii = std::get<int>(tup2);
+	    auto [ivalue, fvalue, dvalue] = system.Get<int, float, double>(handle);
+		assert( ivalue == 50 && fvalue == 101.0f && dvalue == 102.0 );
+	}
 
-    assert( system.Has<int>(h2) );
-    assert( system.Has<float>(h2) );
-    assert( system.Has<double>(h2) );
+	//Has
+	{
+	    auto handle = system.Insert(5, 6.9f, 7.3);
+	    system.Put(handle, 50, 69.0f, 73.0);
+	    assert( system.Has<int>(handle) );
+	    assert( system.Has<float>(handle) );
+	    assert( system.Has<double>(handle) );
+	}
 
-	system.Print();
-    system.Erase<int, float>(h2); //remove two components
-    assert( !system.Has<int>(h2) );
-    assert( !system.Has<float>(h2) );
-    assert( system.Has<double>(h2) );
-	system.Print();
-    system.Erase<double>(h2); //remove also the last component
-    assert( system.Exists(h2)); //check that the entity still exists
-	system.Put(h2, 3.9); //add a component of type double
-    assert( system.Exists(h2)); //check that the entity still exists
-	system.Print();
-	auto d = system.Get<double>(h2);
-	auto cc = system.Get<char&>(h2); //
-	cc = 'A';
-	auto dd = system.Get<char>(h2); //
-	std::string s = "AAA";
-	struct T1 {
-		const char* m_str;
-	};
+	//Erase components
+	{
+	    auto handle = system.Insert(5, 6.9f, 7.3);
+		system.Print();
+	    system.Erase<int, float>(handle); //remove two components
+	    assert( !system.Has<int>(handle) );
+	    assert( !system.Has<float>(handle) );
+	    assert( system.Has<double>(handle) );
+		system.Print();
+	    system.Erase<double>(handle); //remove also the last component
+	    assert( system.Exists(handle)); //check that the entity still exists
+	    assert( !system.Has<double>(handle) );
+	}
 
-	system.Put(h2, s, T1{"BBB"}); //
-	auto [ee, ff] = system.Get<std::string, T1>(h2); //
+	//Add components with Put
+	{
+		system.Print();
+	    auto handle = system.Insert(5, 6.9f, 7.3);
+		system.Print();
+		system.Erase<int, float, double>(handle);
+	    assert( !system.Has<int>(handle) );
+	    assert( !system.Has<float>(handle) );
+	    assert( !system.Has<double>(handle) );
+		system.Print();
+		system.Put(handle, 3.9); //add a component of type double
+	    assert( system.Exists(handle)); //check that the entity still exists
+	    assert( system.Has<double>(handle) );
+		system.Print();
+		auto d = system.Get<double>(handle);
+		auto cc = system.Get<char&>(handle); //
+		cc = 'A';
+		system.Print();
+	}
 
-    system.Erase(h2);
-    assert( !system.Exists(h2) );
+	//Add components with Get
+	{
+	    auto handle = system.Insert(5, 6.9f, 7.3);
+		auto dd = system.Get<char>(handle); //
+		std::string s = "AAA";
+		struct T1 {
+			const char* m_str;
+		};
+
+		system.Put(handle, s, T1{"BBB"}); //
+		auto [ee, ff] = system.Get<std::string, T1>(handle); //
+	}
+
+	//Erase entity
+	{
+	    auto handle = system.Insert(5, 6.9f, 7.3);
+	    system.Erase(handle);
+    	assert( !system.Exists(handle) );
+	}
  
+	//Add Tags
+
+	//Erase Tags
+
+	//for loop
     auto hd1 = system.Insert(1, 10.0f, 10.0);
     auto hd2 = system.Insert(2, 20.0f );
     auto hd3 = system.Insert(3, 30.0, std::string("AAA"));
