@@ -925,7 +925,7 @@ namespace vecs {
 				return (*pair) != nullptr;
 			}
 
-			size_t Size() { return m_size; } ///< Get the number of items in the hash map.
+			size_t size() { return m_size; } ///< Get the number of items in the hash map.
 
 			auto begin() -> Iterator { return Iterator(*this, 0); }
 			auto end() -> Iterator { return Iterator(*this, m_buckets.size()); }
