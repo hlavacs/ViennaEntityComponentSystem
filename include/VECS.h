@@ -255,6 +255,7 @@ namespace vecs {
 		}
 
 		virtual auto push_back() -> size_t = 0;
+		virtual auto pop_back() -> void = 0; 
 		virtual auto erase(size_t index) -> size_t = 0;
 		virtual void move(VectorBase* other, size_t from) = 0;
 		virtual void swap(size_t index1, size_t index2) = 0;
@@ -275,19 +276,20 @@ namespace vecs {
 
 		public:
 
+			/// @brief Iterator for the vector.
 			class Iterator {
 				public:
-				Iterator(Vector<T>& stack, size_t index) : m_stack{stack}, m_index{index} {}
+				Iterator(Vector<T>& data, size_t index) : m_data{data}, m_index{index} {}
 				Iterator& operator++() { ++m_index; return *this; }
 				bool operator!=(const Iterator& other) const { return m_index != other.m_index; }
-				T& operator*() { return m_stack[m_index]; }	
+				T& operator*() { return m_data[m_index]; }	
 
 				private:
-				Vector<T>& m_stack;
+				Vector<T>& m_data;
 				size_t m_index{0};
 			};
 
-			/// @brief Constructor, creates the stack.
+			/// @brief Constructor, creates the vector.
 			/// @param segmentBits The number of bits for the segment size.
 			Vector(size_t segmentBits = 6) : m_size{0}, m_segmentBits(segmentBits), m_segmentSize{1ul<<segmentBits}, m_segments{} {
 				assert(segmentBits > 0);
@@ -300,7 +302,7 @@ namespace vecs {
 				m_segments.emplace_back( std::make_shared<std::vector<T>>(m_segmentSize) );
 			}
 
-			/// @brief Push a value to the back of the stack.
+			/// @brief Push a value to the back of the vector.
 			/// @param value The value to push.
 			template<typename U>
 				requires std::is_convertible_v<U, T>
@@ -313,7 +315,7 @@ namespace vecs {
 				return m_size - 1;
 			}
 
-			/// @brief Pop the last value from the stack.
+			/// @brief Pop the last value from the vector.
 			void pop_back() {
 				assert(m_size > 0);
 				--m_size;
@@ -334,13 +336,14 @@ namespace vecs {
 			/// @brief Get the value at an index.
 			auto size() const -> size_t  { return m_size; }
 
-			/// @brief Clear the stack. Make sure that one segment is always available.
+			/// @brief Clear the vector. Make sure that one segment is always available.
 			void clear() {
 				m_size = 0;
 				m_segments.clear();
 				m_segments.emplace_back( std::make_shared<std::vector<T>>(m_segmentSize) );
 			}
 
+			/// @brief Erase an entity from the vector.
 			auto erase(size_t index) -> size_t {
 				size_t last = size() - 1;
 				assert(index <= last);
@@ -351,18 +354,22 @@ namespace vecs {
 				return last; //if index < last then last element was moved -> correct mapping 
 			}
 
+			/// @brief Move an entity from one vector to another.
 			void move(VectorBase* other, size_t from) {
 				push_back( static_cast<Vector<T>*>(other)[from]);
 			}
 
+			/// @brief Swap two entities in the vector.
 			void swap(size_t index1, size_t index2) {
 				std::swap( this[index1], this[index2] );
 			}
 
+			/// @brief Clone the vector.
 			auto clone() -> std::unique_ptr<VectorBase> {
 				return std::make_unique<Vector<T>>();
 			}
 
+			/// @brief Print the vector.
 			void print() {
 				std::cout << "Name: " << typeid(T).name() << " ID: " << Type<T>();
 			}
