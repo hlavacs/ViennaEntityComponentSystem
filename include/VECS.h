@@ -236,6 +236,35 @@ namespace vecs {
 	//----------------------------------------------------------------------------------------------
 	//Segmented Vector
 
+	template<typename T>
+		requires (!std::is_reference_v<T> && !std::is_pointer_v<T>)
+	class Vector;
+
+	class VectorBase {
+
+		public:
+		VectorBase() = default; //constructor
+		virtual ~VectorBase() = default; //destructor
+			
+		/// @brief Insert a new component value.
+		/// @param v The component value.
+		/// @return The index of the new component value.
+		size_t push_back(auto&& v) {
+			using T = std::decay_t<decltype(v)>;
+			return static_cast<Vector<T>*>(this)->push_back(std::forward<T>(v));
+		}
+
+		virtual auto push_back() -> size_t = 0;
+		virtual auto erase(size_t index) -> size_t = 0;
+		virtual void move(VectorBase* other, size_t from) = 0;
+		virtual void swap(size_t index1, size_t index2) = 0;
+		virtual auto size() -> size_t= 0;
+		virtual auto clone() -> std::unique_ptr<VectorBase> = 0;
+		virtual void clear() = 0;
+		virtual void print() = 0;
+	}; //end of VectorBase
+
+
 	/// @brief A vector that stores elements in segments to avoid reallocations. The size of a segment is 2^segmentBits.
 	template<typename T>
 		requires (!std::is_reference_v<T> && !std::is_pointer_v<T>)
@@ -275,12 +304,13 @@ namespace vecs {
 			/// @param value The value to push.
 			template<typename U>
 				requires std::is_convertible_v<U, T>
-			void push_back(U&& value) {
+			auto push_back(U&& value) {
 				while( Segment(m_size) >= m_segments.size() ) {
 					m_segments.emplace_back( std::make_shared<std::vector<T>>(m_segmentSize) );
 				}
 				++m_size;
 				operator[](m_size - 1) = std::forward<U>(value);
+				return m_size - 1;
 			}
 
 			/// @brief Pop the last value from the stack.
@@ -311,6 +341,32 @@ namespace vecs {
 				m_segments.emplace_back( std::make_shared<std::vector<T>>(m_segmentSize) );
 			}
 
+			auto erase(size_t index) -> size_t {
+				size_t last = size() - 1;
+				assert(index <= last);
+				if( index < last ) {
+					this[index] = std::move( this[last] ); //move the last entity to the erased one
+				}
+				pop_back(); //erase the last entity
+				return last; //if index < last then last element was moved -> correct mapping 
+			}
+
+			void move(VectorBase* other, size_t from) {
+				push_back( static_cast<Vector<T>*>(other)[from]);
+			}
+
+			void swap(size_t index1, size_t index2) {
+				std::swap( this[index1], this[index2] );
+			}
+
+			auto clone() -> std::unique_ptr<VectorBase> {
+				return std::make_unique<Vector<T>>();
+			}
+
+			void print() {
+				std::cout << "Name: " << typeid(T).name() << " ID: " << Type<T>();
+			}
+
 			auto begin() -> Iterator { return Iterator{*this, 0}; }
 			auto end() -> Iterator { return Iterator{*this, m_size}; }
 
@@ -326,7 +382,7 @@ namespace vecs {
 			/// @return Offset in the segment.
 			inline size_t Offset(size_t index) const { return index & (m_segmentSize-1ul); }
 
-			size_t m_size{0};	///< Size of the stack.
+			size_t m_size{0};	///< Size of the vector.
 			size_t m_segmentBits;	///< Number of bits for the segment size.
 			size_t m_segmentSize; ///< Size of a segment.
 			Vector_t m_segments{10};	///< Vector holding unique pointers to the segments.
