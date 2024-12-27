@@ -234,40 +234,40 @@ namespace vecs {
 
 
 	//----------------------------------------------------------------------------------------------
-	//Segmented Stack
+	//Segmented Vector
 
-	/// @brief A stack that stores elements in segments to avoid reallocations. The size of a segment is 2^segmentBits.
+	/// @brief A vector that stores elements in segments to avoid reallocations. The size of a segment is 2^segmentBits.
 	template<typename T>
 		requires (!std::is_reference_v<T> && !std::is_pointer_v<T>)
-	class Stack {
+	class Vector {
 
-		using segment_t = std::shared_ptr<std::vector<T>>;
-		using stack_t = std::vector<segment_t>;
+		using Segment_t = std::shared_ptr<std::vector<T>>;
+		using Vector_t = std::vector<Segment_t>;
 
 		public:
 
 			class Iterator {
 				public:
-				Iterator(Stack<T>& stack, size_t index) : m_stack{stack}, m_index{index} {}
+				Iterator(Vector<T>& stack, size_t index) : m_stack{stack}, m_index{index} {}
 				Iterator& operator++() { ++m_index; return *this; }
 				bool operator!=(const Iterator& other) const { return m_index != other.m_index; }
 				T& operator*() { return m_stack[m_index]; }	
 
 				private:
-				Stack<T>& m_stack;
+				Vector<T>& m_stack;
 				size_t m_index{0};
 			};
 
 			/// @brief Constructor, creates the stack.
 			/// @param segmentBits The number of bits for the segment size.
-			Stack(size_t segmentBits = 6) : m_size{0}, m_segmentBits(segmentBits), m_segmentSize{1ul<<segmentBits}, m_segments{} {
+			Vector(size_t segmentBits = 6) : m_size{0}, m_segmentBits(segmentBits), m_segmentSize{1ul<<segmentBits}, m_segments{} {
 				assert(segmentBits > 0);
 				m_segments.emplace_back( std::make_shared<std::vector<T>>(m_segmentSize) );
 			}
 
-			~Stack() = default;
+			~Vector() = default;
 
-			Stack( const Stack& other) : m_size{other.m_size}, m_segmentBits(other.m_segmentBits), m_segmentSize{other.m_segmentSize}, m_segments{} {
+			Vector( const Vector& other) : m_size{other.m_size}, m_segmentBits(other.m_segmentBits), m_segmentSize{other.m_segmentSize}, m_segments{} {
 				m_segments.emplace_back( std::make_shared<std::vector<T>>(m_segmentSize) );
 			}
 
@@ -329,7 +329,7 @@ namespace vecs {
 			size_t m_size{0};	///< Size of the stack.
 			size_t m_segmentBits;	///< Number of bits for the segment size.
 			size_t m_segmentSize; ///< Size of a segment.
-			stack_t m_segments{10};	///< Vector holding unique pointers to the segments.
+			Vector_t m_segments{10};	///< Vector holding unique pointers to the segments.
 	};
 
 
@@ -454,9 +454,9 @@ namespace vecs {
 
 	private:
 		size_t m_storageIndex{0}; ///< Index of the storage.
-		size_t m_size{0}; ///< Size of the slot map. This is the size of the Stack minus the free slots.
+		size_t m_size{0}; ///< Size of the slot map. This is the size of the Vector minus the free slots.
 		int64_t m_firstFree{-1}; ///< Index of the first free slot. If -1 then there are no free slots.
-		Stack<Slot> m_slots; ///< Container of slots.
+		Vector<Slot> m_slots; ///< Container of slots.
 	};
 
 	//----------------------------------------------------------------------------------------------
@@ -614,7 +614,7 @@ namespace vecs {
 			}
 
 		private:
-			Stack<T> m_data; //vector of component values
+			Vector<T> m_data; //vector of component values
 		}; //end of ComponentMap
 
 
@@ -705,17 +705,17 @@ namespace vecs {
 
 			/// @brief Erase an entity
 			/// @param index The index of the entity in the archetype.
-			/// @return The handle of the entity that was moved over the erased one so its index can be changed.
-			void Erase(size_t index, auto& slotmap) {
-				Erase2(index, slotmap.m_slotMap);
+			/// @param slotmaps The slot maps vector of the registry.
+			void Erase(size_t index, auto& slotmaps) {
+				Erase2(index, slotmaps);
 			}
 
 			/// @brief Move components from another archetype to this one.
-			size_t Move( auto& types, size_t other_index, Archetype& other, SlotMap<ArchetypeAndIndex>& slotmap) {			
+			size_t Move( auto& types, size_t other_index, Archetype& other, auto& slotmaps) {			
 				for( auto& ti : types ) { //go through all maps
 					if( m_maps.contains(ti) ) m_maps[ti]->Move(other.Map(ti), other_index); //insert the new value
 				}
-				other.Erase2(other_index, slotmap); //erase from old component map
+				other.Erase2(other_index, slotmaps); //erase from old component map
 				++other.m_changeCounter;
 				++m_changeCounter;
 				return m_maps[Type<Handle>()]->Size() - 1; //return the index of the new entity
@@ -731,6 +731,9 @@ namespace vecs {
 				++m_changeCounter;
 			}
 
+			/// @brief Clone the archetype.
+			/// @param other The archetype to clone.
+			/// @param types The types of the components to clone.
 			void Clone(Archetype& other, const std::set<size_t>& types) {
 				for( auto& ti : types ) { //go through all maps
 					m_types.insert(ti); //add the type to the list
@@ -826,15 +829,15 @@ namespace vecs {
 			/// @brief Erase an entity. To ensure thet consistency of the entity indices, the last entity is moved to the erased one.
 			/// This might result in a reindexing of the moved entity in the slot map. Thus we need a ref to the slot map
 			/// @param index The index of the entity in the archetype.
-			/// @param slotmap Reference to the slot map of the registry.
-			void Erase2(size_t index, SlotMap<ArchetypeAndIndex>& slotmap) {
+			/// @param slotmaps Reference to the slot maps vector of the registry.
+			void Erase2(size_t index, auto& slotmaps) {
 				size_t last{index};
 				for( auto& it : m_maps ) {
 					last = it.second->Erase(index); //Erase from the component map
 				}
 				if( index < last ) {
 					auto& lastHandle = static_cast<ComponentMap<Handle>*>(m_maps[Type<Handle>()].get())->Get(index);
-					slotmap[lastHandle].m_value.m_archIndex = index;
+					slotmaps[lastHandle.GetStorageIndex()].m_slotMap[lastHandle].m_value.m_archIndex = index;
 				}
 				++m_changeCounter;
 			}
@@ -1476,7 +1479,7 @@ namespace vecs {
 			} else { arch = m_archetypes[hs].get(); }
 			LockGuard<RTYPE> lock2(&arch->GetMutex(), &oldArch->GetMutex());
 			value->m_archetypePtr = arch;
-			value->m_archIndex = arch->Move(types, value->m_archIndex, *oldArch, m_entities[handle.GetStorageIndex()].m_slotMap);
+			value->m_archIndex = arch->Move(types, value->m_archIndex, *oldArch, m_entities);
 		}
 
 		/// @brief Erase an entity from the registry.
@@ -1487,7 +1490,7 @@ namespace vecs {
 			LockGuard<RTYPE> lock(&GetMutex(handle.GetStorageIndex())); //lock the mutex
 			auto& value = m_entities[handle.GetStorageIndex()].m_slotMap[handle].m_value;
 			LockGuard<RTYPE> lock2(&value.m_archetypePtr->GetMutex()); //lock the archetype
-			value.m_archetypePtr->Erase(value.m_archIndex, m_entities[handle.GetStorageIndex()]); //erase the entity from the archetype (do both locked)
+			value.m_archetypePtr->Erase(value.m_archIndex, m_entities); //erase the entity from the archetype (do both locked)
 			m_entities[handle.GetStorageIndex()].m_slotMap.Erase(handle); //erase the entity from the entity list
 		}
 
@@ -1665,7 +1668,7 @@ namespace vecs {
 			auto newArch = m_archetypes[hs].get();
 			LockGuard<RTYPE> lock2(&newArch->GetMutex()); //lock the new archetype
 			value->m_archetypePtr = newArch;
-			value->m_archIndex = newArch->Move(arch->Types(), value->m_archIndex, *arch, m_entities[handle.GetStorageIndex()].m_slotMap);
+			value->m_archIndex = newArch->Move(arch->Types(), value->m_archIndex, *arch, m_entities);
 		}
 
 		template<typename... Ts>
@@ -1706,7 +1709,7 @@ namespace vecs {
 			
 			value->m_archetypePtr = newArch;
 			LockGuard<RTYPE> lock2(&arch->GetMutex()); //lock old archetype, new one cannot be seen yet
-			value->m_archIndex = newArch->Move(arch->Types(), value->m_archIndex, *arch, m_entities[handle.GetStorageIndex()].m_slotMap); //move values
+			value->m_archIndex = newArch->Move(arch->Types(), value->m_archIndex, *arch, m_entities); //move values
 			( func.template operator()<Ts>(newArch, value->m_archIndex, std::forward<Ts>(vs)), ... );
 			UpdateSearchCache(newArch); //update the search cache
 			return;
@@ -1740,7 +1743,7 @@ namespace vecs {
 			auto newArch = CreateArchetype<T>(handle, value, newTypes);
 			value->m_archetypePtr = newArch;
 			LockGuard<RTYPE> lock2(&arch->GetMutex()); //lock old archetype, new one cannot be seen yet
-			value->m_archIndex = newArch->Move(arch->Types(), value->m_archIndex, *arch, m_entities[handle.GetStorageIndex()].m_slotMap); //move values		
+			value->m_archIndex = newArch->Move(arch->Types(), value->m_archIndex, *arch, m_entities); //move values		
 			UpdateSearchCache(newArch); //update the search cache
 			decltype(auto) v = newArch->template Get<T>(value->m_archIndex);
 			return v;
@@ -1772,7 +1775,7 @@ namespace vecs {
 			auto newArch = CreateArchetype<std::decay_t<Ts>...>(handle, value, newTypes);		
 			value->m_archetypePtr = newArch;
 			LockGuard<RTYPE> lock2(&arch->GetMutex()); //lock old archetype, new one cannot be seen yet
-			value->m_archIndex = newArch->Move(arch->Types(), value->m_archIndex, *arch, m_entities[handle.GetStorageIndex()].m_slotMap); //move values
+			value->m_archIndex = newArch->Move(arch->Types(), value->m_archIndex, *arch, m_entities); //move values
 			return std::tuple<Ts...>{ newArch->template Get<Ts>(value->m_archIndex)... };
 		}
 
@@ -1848,7 +1851,6 @@ namespace vecs {
 		/// @brief Get a new index of the slotmap for the current thread.
 		/// @return New index of the slotmap.
 		size_t GetSlotmapIndex() {
-			//return std::hash<std::thread::id>{}(std::this_thread::get_id()) & (NUMBER_SLOTMAPS::value - 1);
 			m_slotMapIndex = (m_slotMapIndex + 1) & (NUMBER_SLOTMAPS::value - 1);
 			return m_slotMapIndex;
 		}

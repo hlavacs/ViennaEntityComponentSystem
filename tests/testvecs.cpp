@@ -13,9 +13,9 @@ int test1() {
 
 
 	{
-		vecs::Stack<int> stack;
+		vecs::Vector<int> stack;
 
-		std::vector<vecs::Stack<int>> v;
+		std::vector<vecs::Vector<int>> v;
 		v.push_back( stack );
 	}
 
