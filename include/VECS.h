@@ -257,7 +257,7 @@ namespace vecs {
 		virtual auto push_back() -> size_t = 0;
 		virtual auto pop_back() -> void = 0; 
 		virtual auto erase(size_t index) -> size_t = 0;
-		virtual void move(VectorBase* other, size_t from) = 0;
+		virtual void copy(VectorBase* other, size_t from) = 0;
 		virtual void swap(size_t index1, size_t index2) = 0;
 		virtual auto size() const -> size_t = 0;
 		virtual auto clone() -> std::unique_ptr<VectorBase> = 0;
@@ -357,8 +357,8 @@ namespace vecs {
 				return last; //if index < last then last element was moved -> correct mapping 
 			}
 
-			/// @brief Move an entity from one vector to another.
-			void move(VectorBase* other, size_t from) override {
+			/// @brief Copy an entity from another vector to this.
+			void copy(VectorBase* other, size_t from) override {
 				push_back( (static_cast<Vector<T>*>(other))->operator[](from) );
 			}
 
@@ -396,7 +396,7 @@ namespace vecs {
 			size_t m_segmentBits;	///< Number of bits for the segment size.
 			size_t m_segmentSize; ///< Size of a segment.
 			Vector_t m_segments{10};	///< Vector holding unique pointers to the segments.
-	};
+	}; //end of Vector
 
 
 	//----------------------------------------------------------------------------------------------
@@ -651,7 +651,7 @@ namespace vecs {
 			/// @brief Move components from another archetype to this one.
 			size_t Move( auto& types, size_t other_index, Archetype& other, auto& slotmaps) {			
 				for( auto& ti : types ) { //go through all maps
-					if( m_maps.contains(ti) ) m_maps[ti]->move(other.Map(ti), other_index); //insert the new value
+					if( m_maps.contains(ti) ) m_maps[ti]->copy(other.Map(ti), other_index); //insert the new value
 				}
 				other.Erase2(other_index, slotmaps); //erase from old component map
 				++other.m_changeCounter;
@@ -815,6 +815,7 @@ namespace vecs {
 
 		/// @brief A hash map for storing a map from key to value.
 		/// The hash map is implemented as a vector of buckets. Each bucket is a list of key-value pairs.
+		/// Inserting and reading from the hash map is thread-safe, i.e., internally sysnchronized.
 		
 		template<typename T>
 		class HashMap {
@@ -836,7 +837,7 @@ namespace vecs {
 				Bucket(const Bucket& other) : m_first{} {};
 			};
 
-			using Map = std::vector<Bucket>; ///< Type of the map.
+			using Map_t = std::vector<Bucket>; ///< Type of the map.
 
 			/// @brief Iterator for the hash map.
 			class Iterator {
@@ -888,12 +889,22 @@ namespace vecs {
 			/// @param value The value of the pair.
 			T& Insert(size_t key, T&& value) {
 				auto& bucket = m_buckets[key & (m_buckets.size()-1)];
-				std::unique_ptr<Pair>* pair = Find(&bucket.m_first, key);
-				if( (*pair) != nullptr ) { return (*pair)->Value();; }
+				std::unique_ptr<Pair>* pair;
+				{
+					LockGuardShared<RTYPE> lock(&bucket.m_mutex);
+					pair = Find(&bucket.m_first, key);
+					if( (*pair) != nullptr ) { 
+						(*pair)->Value() = std::forward<T>(value);
+						return (*pair)->Value(); 
+					}
+				}
 
 				LockGuard<RTYPE> lock(&bucket.m_mutex);
 				pair = Find(pair, key);
-				if( (*pair) != nullptr ) { return (*pair)->Value();; }
+				if( (*pair) != nullptr ) { 
+					(*pair)->Value() = std::forward<T>(value);
+					return (*pair)->Value(); 
+				}
 				*pair = std::make_unique<Pair>( std::make_pair(key, std::forward<T>(value)) );
 				m_size++;
 				return (*pair)->Value();
@@ -904,9 +915,19 @@ namespace vecs {
 			/// @return Pointer to the value.
 			T& operator[](size_t key) {
 				auto& bucket = m_buckets[key & (m_buckets.size()-1)];
-				std::unique_ptr<Pair>* pair = Find(&bucket.m_first, key);
-				if( (*pair) != nullptr ) { return (*pair)->Value(); }
-				return Insert(key, T{}); //insert a new value
+				std::unique_ptr<Pair>* pair;
+				{
+					LockGuardShared<RTYPE> lock(&bucket.m_mutex);
+					pair = Find(&bucket.m_first, key);
+					if( (*pair) != nullptr ) { return (*pair)->Value(); }
+				}
+
+				LockGuard<RTYPE> lock(&bucket.m_mutex);
+				pair = Find(pair, key);
+				if( (*pair) != nullptr ) { 	return (*pair)->Value(); }
+				*pair = std::make_unique<Pair>( std::make_pair(key, T{}) );
+				m_size++;
+				return (*pair)->Value();
 			}
 
 			/// @brief Get a value from the hash map.
@@ -914,6 +935,7 @@ namespace vecs {
 			/// @return Pointer to the value.
 			T* get(size_t key) {
 				auto& bucket = m_buckets[key & (m_buckets.size()-1)];
+				LockGuardShared<RTYPE> lock(&bucket.m_mutex);
 				std::unique_ptr<Pair>* pair = Find(&bucket.m_first, key);
 				if( (*pair) != nullptr ) { return (*pair)->Value(); }
 				return nullptr;
@@ -924,6 +946,7 @@ namespace vecs {
 			/// @return true if the key is in the hash map, else false.
 			bool contains(size_t key) {
 				auto& bucket = m_buckets[key & (m_buckets.size()-1)];
+				LockGuardShared<RTYPE> lock(&bucket.m_mutex);
 				std::unique_ptr<Pair>* pair = Find(&bucket.m_first, key);
 				return (*pair) != nullptr;
 			}
@@ -938,13 +961,13 @@ namespace vecs {
 			/// @brief Find a pair in the bucket.
 			/// @param pair Start of the list of pairs.
 			/// @param key Find this key
-			/// @return Pointer to the pair.
-			std::unique_ptr<Pair>* Find(std::unique_ptr<Pair>* pair, size_t key) {
+			/// @return Pointer to the pair with the key and value, points to the unqiue_ptr of the pair.
+			auto Find(std::unique_ptr<Pair>* pair, size_t key) -> std::unique_ptr<Pair>* {
 				while( (*pair) != nullptr && (*pair)->Key() != key ) { pair = &(*pair)->m_next; }
 				return pair;
 			}
 
-			Map m_buckets; ///< The map of buckets.
+			Map_t m_buckets; ///< The map of buckets.
 			size_t m_size{0}; ///< The size of the hash map.
 		};
 
@@ -1580,18 +1603,15 @@ namespace vecs {
 
 		auto GetSlotAndArch(auto handle) {
 			ArchetypeAndIndex* value = m_entities[handle.GetStorageIndex()].m_slotMap.Find(handle);
-			Archetype* arch = value->m_archetypePtr;
-			return std::make_pair(value, arch);
+			return std::make_pair(value, value->m_archetypePtr);
 		}
 
-		template<typename... Ts>
-			requires (sizeof...(Ts) > 0 && (std::is_same_v<Ts, size_t> && ...) )
-		auto CloneArchetype(Archetype* arch, std::vector<size_t>& types, Ts... tags) {
+		auto CloneArchetype(Archetype* arch, const std::vector<size_t>& types) -> Archetype* {
 			auto newArch = std::make_unique<Archetype>();
 			newArch->Clone(*arch, types);
-			(newArch->AddType(tags), ...);
 			UpdateSearchCache(newArch.get());
 			m_archetypes[newArch->Types()] = std::move(newArch);
+			return newArch.get();
 		}
 
 		template<typename... Ts>
@@ -1600,13 +1620,12 @@ namespace vecs {
 			LockGuard<RTYPE> lock1(&GetMutex(handle.GetStorageIndex())); //lock the mutex
 			auto [value, arch] = GetSlotAndArch(handle);
 			assert(!arch->Types().contains(tags) && ...);
-			std::vector<size_t> newTypes{tags...};
-			size_t hs = Hash(std::ranges::join_view(arch->Types(), {tags...}));
-			if( !m_archetypes.contains(hs) ) { CloneArchetype(arch, arch->Types(), tags...); } 
+			std::vector<size_t> allTypes{std::ranges::join_view(arch->Types(), {tags...})};
+			size_t hs = Hash(allTypes);
+			if( !m_archetypes.contains(hs) ) { CloneArchetype(arch, allTypes); } 
 			auto newArch = m_archetypes[hs].get();
-			LockGuard<RTYPE> lock2(&newArch->GetMutex()); //lock the new archetype
-			value->m_archetypePtr = newArch;
-			value->m_archIndex = newArch->Move(arch->Types(), value->m_archIndex, *arch, m_entities);
+			LockGuard<RTYPE> lock2(&arch->GetMutex()); //lock the old archetype
+			*value = { newArch, newArch->Move(arch->Types(), value->m_archIndex, *arch, m_entities) };
 		}
 
 		template<typename... Ts>
@@ -1798,11 +1817,12 @@ namespace vecs {
 		using SearchCacheMap_t = std::unordered_map<size_t, std::set<Archetype*>>;
 		using SearchCacheSet_t = std::vector<TypeSetAndHash>;
 
-		mutex_t m_mutex; //mutex for thread safety
 		inline static thread_local size_t m_slotMapIndex = NUMBER_SLOTMAPS::value - 1;
-		SlotMaps_t m_entities;
-		HashMap_t m_archetypes; //Mapping vector of type set hash to archetype 1:1
 
+		SlotMaps_t m_entities;
+		HashMap_t m_archetypes; //Mapping vector of type set hash to archetype 1:1. Internally synchronized!
+
+		mutex_t m_mutex; //mutex for reading and writing search cache. Not needed for HashMaps.
 		SearchCacheMap_t m_searchCacheMap; //Mapping vector of hash to archetype, 1:N
 		SearchCacheSet_t m_searchCacheSet; //These type combinations have been searched for, for updating
 		inline static thread_local size_t 		m_numIterators{0}; //thread local variable for locking
