@@ -249,8 +249,8 @@ namespace vecs {
 		/// @brief Insert a new component value.
 		/// @param v The component value.
 		/// @return The index of the new component value.
-		size_t push_back(auto&& v) {
-			using T = std::decay_t<decltype(v)>;
+		template<typename T>
+		auto push_back(T&& v) -> size_t {
 			return static_cast<Vector<T>*>(this)->push_back(std::forward<T>(v));
 		}
 
@@ -259,7 +259,7 @@ namespace vecs {
 		virtual auto erase(size_t index) -> size_t = 0;
 		virtual void move(VectorBase* other, size_t from) = 0;
 		virtual void swap(size_t index1, size_t index2) = 0;
-		virtual auto size() -> size_t= 0;
+		virtual auto size() const -> size_t = 0;
 		virtual auto clone() -> std::unique_ptr<VectorBase> = 0;
 		virtual void clear() = 0;
 		virtual void print() = 0;
@@ -269,7 +269,7 @@ namespace vecs {
 	/// @brief A vector that stores elements in segments to avoid reallocations. The size of a segment is 2^segmentBits.
 	template<typename T>
 		requires (!std::is_reference_v<T> && !std::is_pointer_v<T>)
-	class Vector {
+	class Vector : public VectorBase {
 
 		using Segment_t = std::shared_ptr<std::vector<T>>;
 		using Vector_t = std::vector<Segment_t>;
@@ -305,18 +305,21 @@ namespace vecs {
 			/// @brief Push a value to the back of the vector.
 			/// @param value The value to push.
 			template<typename U>
-				requires std::is_convertible_v<U, T>
-			auto push_back(U&& value) {
+			auto push_back(U&& value) -> size_t {
 				while( Segment(m_size) >= m_segments.size() ) {
 					m_segments.emplace_back( std::make_shared<std::vector<T>>(m_segmentSize) );
 				}
 				++m_size;
-				operator[](m_size - 1) = std::forward<U>(value);
+				(*this)[m_size - 1] = std::forward<T>(value);
 				return m_size - 1;
 			}
 
+			auto push_back() -> size_t override {
+				return push_back(T{});
+			}
+
 			/// @brief Pop the last value from the vector.
-			void pop_back() {
+			void pop_back() override {
 				assert(m_size > 0);
 				--m_size;
 				if(	Offset(m_size) == 0 && m_segments.size() > 1 ) {
@@ -326,7 +329,7 @@ namespace vecs {
 
 			/// @brief Get the value at an index.
 			/// @param index The index of the value.
-			auto operator[](size_t index) const -> T&  {
+			auto operator[](size_t index) const -> T& {
 				assert(index < m_size);
 				auto seg = Segment(index);
 				auto off = Offset(index);
@@ -334,43 +337,43 @@ namespace vecs {
 			}
 
 			/// @brief Get the value at an index.
-			auto size() const -> size_t  { return m_size; }
+			auto size() const -> size_t override { return m_size; }
 
 			/// @brief Clear the vector. Make sure that one segment is always available.
-			void clear() {
+			void clear() override {
 				m_size = 0;
 				m_segments.clear();
 				m_segments.emplace_back( std::make_shared<std::vector<T>>(m_segmentSize) );
 			}
 
 			/// @brief Erase an entity from the vector.
-			auto erase(size_t index) -> size_t {
+			auto erase(size_t index) -> size_t override {
 				size_t last = size() - 1;
 				assert(index <= last);
 				if( index < last ) {
-					this[index] = std::move( this[last] ); //move the last entity to the erased one
+					(*this)[index] = std::move( (*this)[last] ); //move the last entity to the erased one
 				}
 				pop_back(); //erase the last entity
 				return last; //if index < last then last element was moved -> correct mapping 
 			}
 
 			/// @brief Move an entity from one vector to another.
-			void move(VectorBase* other, size_t from) {
-				push_back( static_cast<Vector<T>*>(other)[from]);
+			void move(VectorBase* other, size_t from) override {
+				push_back( (static_cast<Vector<T>*>(other))->operator[](from) );
 			}
 
 			/// @brief Swap two entities in the vector.
-			void swap(size_t index1, size_t index2) {
-				std::swap( this[index1], this[index2] );
+			void swap(size_t index1, size_t index2) override {
+				std::swap( (*this)[index1], (*this)[index2] );
 			}
 
 			/// @brief Clone the vector.
-			auto clone() -> std::unique_ptr<VectorBase> {
+			auto clone() -> std::unique_ptr<VectorBase> override {
 				return std::make_unique<Vector<T>>();
 			}
 
 			/// @brief Print the vector.
-			void print() {
+			void print() override {
 				std::cout << "Name: " << typeid(T).name() << " ID: " << Type<T>();
 			}
 
@@ -498,7 +501,7 @@ namespace vecs {
 
 		/// @brief Get the size of the slot map.
 		/// @return The size of the slot map.
-		auto Size() -> size_t {
+		auto Size() const -> size_t {
 			return m_size;
 		}
 
@@ -550,137 +553,9 @@ namespace vecs {
 			SlotMapAndMutex( const SlotMapAndMutex& other ) : m_slotMap{other.m_slotMap}, m_mutex{} {};
 		};
 
-
 		using NUMBER_SLOTMAPS = std::conditional_t< RTYPE == REGISTRYTYPE_SEQUENTIAL, 
 			std::integral_constant<int, 1>, std::integral_constant<int, 16>>;
 	
-
-
-		//----------------------------------------------------------------------------------------------
-		//ComponentMapBase
-
-		/// @brief Base class for component maps. They hold the components of the same type.
-		/// The component maps are stored in the archetype. An entity can have multiple components.
-		/// The components of the same entity have the same index in all component maps
-		/// The base class is used to allow access to the component maps without knowing the type.
-		/// This is useful when e.g. moving entities between archetypes.
-		class ComponentMapBase {
-
-		public:
-			ComponentMapBase() = default; //constructor
-			virtual ~ComponentMapBase() = default; //destructor
-			
-			/// @brief Insert a new component value.
-			/// @param v The component value.
-			/// @return The index of the new component value.
-			size_t Insert(auto&& v) {
-				using T = std::decay_t<decltype(v)>;
-				return static_cast<ComponentMap<T>*>(this)->Insert(std::forward<T>(v));
-			}
-
-			virtual auto Insert() -> size_t = 0;
-			virtual auto Erase(size_t index) -> size_t = 0;
-			virtual void Move(ComponentMapBase* other, size_t from) = 0;
-			virtual void Swap(size_t index1, size_t index2) = 0;
-			virtual auto Size() -> size_t= 0;
-			virtual auto Clone() -> std::unique_ptr<ComponentMapBase> = 0;
-			virtual void Clear() = 0;
-			virtual void print() = 0;
-		}; //end of ComponentMapBase
-
-		//----------------------------------------------------------------------------------------------
-		//ComponentMap
-
-		/// @brief A map of components of the same type.
-		/// @tparam U The value type for this comoonent map. Note that the type is decayed.
-		/// If you want to store a pointer or reference, use a struct to wrap it.
-		template<VecsPOD T>
-		class ComponentMap : public ComponentMapBase {
-
-		public:
-
-			ComponentMap() = default; //constructor
-
-			/// @brief Insert a new component value.
-			/// @param v The component value.
-			/// @return The index of the new component value.
-			[[nodiscard]] size_t Insert(auto&& v) {
-				m_data.push_back( std::forward<T>(v) );
-				return m_data.size() - 1;
-			};
-
-			/// @brief Insert a new empty component value.
-			/// @return The index of the new component value.
-			[[nodiscard]] size_t Insert() override{
-				m_data.push_back( T{} );
-				return m_data.size() - 1;
-			};
-
-			/// @brief Get reference to the component of an entity.
-			/// @param index The index of the component value in the map.
-			/// @return Reference to the component value.
-			auto Get(std::size_t index) -> T& {
-				assert(index < m_data.size());
-				return m_data[index];
-			};
-
-			/// @brief Get reference to the data container of the components.
-			/// @return Reference to the data container.
-			[[nodiscard]] auto& Data() {
-				return m_data;
-			};
-
-			/// @brief Erase a component from the container.
-			/// @param index The index of the component value in the map.
-			/// @return The index of the last element in the vector.
-			[[nodiscard]] auto Erase(size_t index)  -> size_t override {
-				size_t last = m_data.size() - 1;
-				assert(index <= last);
-				if( index < last ) {
-					m_data[index] = std::move( m_data[last] ); //move the last entity to the erased one
-				}
-				m_data.pop_back(); //erase the last entity
-				return last; //if index < last then last element was moved -> correct mapping 
-			};
-
-			/// @brief Move a component from another map to this map.
-			/// @param other The other map.
-			/// @param from The index of the component in the other map.
-			void Move(ComponentMapBase* other, size_t from) override {
-				m_data.push_back( static_cast<ComponentMap<std::decay_t<T>>*>(other)->Get(from) );
-			};
-
-			/// @brief Swap two components in the map.
-			void Swap(size_t index1, size_t index2) override {
-				std::swap(m_data[index1], m_data[index2]);
-			}
-
-			/// @brief Get the size of the map.
-			/// @return The size of the map.
-			[[nodiscard]] auto Size() -> size_t override {
-				return m_data.size();
-			}
-
-			/// @brief Clone a new map from this map.
-			/// @return A unique pointer to the new map.
-			[[nodiscard]] auto Clone() -> std::unique_ptr<ComponentMapBase> override {
-				return std::make_unique<ComponentMap<T>>();
-			};
-
-			/// @brief Clear the map.
-			void Clear() override {
-				m_data.clear();
-			}
-
-			void print() override {
-				std::cout << "Name: " << typeid(T).name() << " ID: " << Type<T>();
-			}
-
-		private:
-			Vector<T> m_data; //vector of component values
-		}; //end of ComponentMap
-
-
 		//----------------------------------------------------------------------------------------------
 		//Archetype
 
@@ -753,7 +628,7 @@ namespace vecs {
 			/// @return The component value.
 			template<typename T>
 			[[nodiscard]] auto Get(size_t archIndex) -> T& {
-				return Map<T>()->Get(archIndex);
+				return (*Map<T>())[archIndex];
 			}
 
 			/// @brief Get component values of an entity.
@@ -776,19 +651,19 @@ namespace vecs {
 			/// @brief Move components from another archetype to this one.
 			size_t Move( auto& types, size_t other_index, Archetype& other, auto& slotmaps) {			
 				for( auto& ti : types ) { //go through all maps
-					if( m_maps.contains(ti) ) m_maps[ti]->Move(other.Map(ti), other_index); //insert the new value
+					if( m_maps.contains(ti) ) m_maps[ti]->move(other.Map(ti), other_index); //insert the new value
 				}
 				other.Erase2(other_index, slotmaps); //erase from old component map
 				++other.m_changeCounter;
 				++m_changeCounter;
-				return m_maps[Type<Handle>()]->Size() - 1; //return the index of the new entity
+				return m_maps[Type<Handle>()]->size() - 1; //return the index of the new entity
 			}
 
 			/// @brief Swap two entities in the archetype.
 			void Swap(ArchetypeAndIndex& slot1, ArchetypeAndIndex& slot2) {
 				assert( slot1.m_value.m_archetypePtr == slot2.m_value.m_archetypePtr );
 				for( auto& map : m_maps ) {
-					map.second->Swap(slot1.m_value.m_archindex, slot2.m_value.m_archindex);
+					map.second->swap(slot1.m_value.m_archindex, slot2.m_value.m_archindex);
 				}
 				std::swap(slot1.m_value.m_archindex, slot2.m_value.m_archindex);
 				++m_changeCounter;
@@ -800,20 +675,20 @@ namespace vecs {
 			void Clone(Archetype& other, const std::set<size_t>& types) {
 				for( auto& ti : types ) { //go through all maps
 					m_types.insert(ti); //add the type to the list
-					if( other.m_maps.contains(ti) ) m_maps[ti] = other.Map(ti)->Clone(); //make a component map like this one
+					if( other.m_maps.contains(ti) ) m_maps[ti] = other.Map(ti)->clone(); //make a component map like this one
 				}
 			}
 
 			/// @brief Get the number of entites in this archetype.
 			/// @return The number of entities.
 			size_t Size() {
-				return m_maps[Type<Handle>()]->Size();
+				return m_maps[Type<Handle>()]->size();
 			}
 
 			/// @brief Clear the archetype.
 			void Clear() {
 				for( auto& map : m_maps ) {
-					map.second->Clear();
+					map.second->clear();
 				}
 				++m_changeCounter;
 			}
@@ -830,18 +705,18 @@ namespace vecs {
 					map.second->print();
 					std::cout << std::endl;
 				}
-				std::cout << "Entities: ";
-				auto map = Map<Handle>();
-				for( auto handle : map->Data() ) {
-					std::cout << handle << " ";
-				}
+				//std::cout << "Entities: ";
+				//auto map = Map<Handle>();
+				//for( auto handle : map ) {
+				//	std::cout << *handle << " ";
+				//}
 				std::cout << std::endl << std::endl;
 			}
 
 			/// @brief Validate the archetype. Make sure all maps have the same size.
 			void Validate() {
 				for( auto& map : m_maps ) {
-					assert( map.second->Size() == m_maps[Type<Handle>()]->Size() );
+					assert( map.second->size() == m_maps[Type<Handle>()]->size() );
 				}
 			}
 		
@@ -873,7 +748,7 @@ namespace vecs {
 				size_t ti = Type<T>();
 				assert( !m_types.contains(ti) );
 				m_types.insert(ti);	//add the type to the list
-				m_maps[ti] = std::make_unique<ComponentMap<T>>(); //create the component map
+				m_maps[ti] = std::make_unique<Vector<T>>(); //create the component map
 			};
 
 			/// @brief Add a new component value to the archetype.
@@ -882,11 +757,11 @@ namespace vecs {
 			template<typename U>
 			auto AddValue( U&& v ) -> size_t {
 				using T = std::decay_t<U>;
-				return m_maps[Type<T>()]->Insert(std::forward<T>(v));	//insert the component value
+				return m_maps[Type<T>()]->push_back(std::forward<T>(v));	//insert the component value
 			};
 
 			auto AddEmptyValue( size_t ti ) -> size_t {
-				return m_maps[ti]->Insert();	//insert the component value
+				return m_maps[ti]->push_back();	//insert the component value
 			};
 
 			/// @brief Erase an entity. To ensure thet consistency of the entity indices, the last entity is moved to the erased one.
@@ -896,10 +771,10 @@ namespace vecs {
 			void Erase2(size_t index, auto& slotmaps) {
 				size_t last{index};
 				for( auto& it : m_maps ) {
-					last = it.second->Erase(index); //Erase from the component map
+					last = it.second->erase(index); //Erase from the component map
 				}
 				if( index < last ) {
-					auto& lastHandle = static_cast<ComponentMap<Handle>*>(m_maps[Type<Handle>()].get())->Get(index);
+					auto& lastHandle = static_cast<Vector<Handle>*>(m_maps[Type<Handle>()].get())->operator[](index);
 					slotmaps[lastHandle.GetStorageIndex()].m_slotMap[lastHandle].m_value.m_archIndex = index;
 				}
 				++m_changeCounter;
@@ -909,23 +784,23 @@ namespace vecs {
 			/// @tparam T The type of the component.
 			/// @return Pointer to the component map.
 			template<typename U>
-			auto Map() -> ComponentMap<std::decay_t<U>>* {
+			auto Map() -> Vector<std::decay_t<U>>* {
 				auto it = m_maps.find(Type<std::decay_t<U>>());
 				assert(it != m_maps.end());
-				return static_cast<ComponentMap<std::decay_t<U>>*>(it->second.get());
+				return static_cast<Vector<std::decay_t<U>>*>(it->second.get());
 			}
 
 			/// @brief Get the data of the components.
 			/// @param ti Type index of the component.
 			/// @return Pointer to the component map base class.
-			auto Map(size_t ti) -> ComponentMapBase* {
+			auto Map(size_t ti) -> VectorBase* {
 				auto it = m_maps.find(ti);
 				assert(it != m_maps.end());
 				return it->second.get();
 			}
 
 			using Size_t = std::conditional_t<RTYPE == REGISTRYTYPE_SEQUENTIAL, std::size_t, std::atomic<std::size_t>>;
-			using Map_t = std::unordered_map<size_t, std::unique_ptr<ComponentMapBase>>;
+			using Map_t = std::unordered_map<size_t, std::unique_ptr<VectorBase>>;
 
 			mutex_t 			m_mutex; //mutex for thread safety
 			Size_t 				m_changeCounter{0}; //changes invalidate references
@@ -1129,7 +1004,7 @@ namespace vecs {
 			/// @brief Access the content the iterator points to.
 			auto operator*() {
 				assert( m_archetype && m_entidx < m_size );
-				Handle handle = m_mapHandle->Get(m_entidx);
+				Handle handle = (*m_mapHandle)[m_entidx];
 				auto tup = std::make_tuple( Get<Ts>(m_system, handle, m_archetype)... );
 				if constexpr (sizeof...(Ts) == 1) { return std::get<0>(tup); }
 				else return tup;
@@ -1147,7 +1022,7 @@ namespace vecs {
 				requires (!std::is_same_v<U, Handle&>) // && !std::is_reference_v<U>)
 			[[nodiscard]] auto Get(auto &system, Handle handle, Archetype *arch) {
 				using T = std::decay_t<U>;
-				return arch->template Map<T>()->Get(m_entidx);
+				return (*arch->template Map<T>())[m_entidx];
 			}
 
 			/// @brief Go to the next entity. If this means changing the archetype, unlock the current archetype and lock the new one.
@@ -1189,7 +1064,7 @@ namespace vecs {
 
 			Registry<RTYPE>& 		m_system; ///< Reference to the registry system.
 			Archetype*		 		m_archetype{nullptr}; ///< Pointer to the current archetype.
-			ComponentMap<Handle>*	m_mapHandle{nullptr}; ///< Pointer to the comp map holding the handle of the current archetype.
+			Vector<Handle>*	m_mapHandle{nullptr}; ///< Pointer to the comp map holding the handle of the current archetype.
 			std::vector<ArchetypeAndSize>& m_archetypes; ///< List of archetypes.
 			size_t 	m_archidx{0};	///< Index of the current archetype.
 			size_t 	m_size{0};		///< Size of the current archetype.
@@ -1747,7 +1622,7 @@ namespace vecs {
 		template<typename... Ts>
 		void Put2(Handle handle, Ts&&... vs) {
 			auto func = [&]<typename T>(Archetype* arch, size_t archIndex, T&& v) { 
-				arch->template Map<T>()->Get(archIndex) = std::forward<T>(v);
+				(*arch->template Map<T>())[archIndex] = std::forward<T>(v);
 			};
 
 			std::vector<size_t> newTypes;
