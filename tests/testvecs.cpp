@@ -218,6 +218,22 @@ int test1() {
 	}
 
 	//Erase Tags
+	{
+		auto handle = system.Insert(5, 6.9f, 7.3);
+		system.Print();
+		system.AddTags(handle, 1ul, 2ul, 3ul);
+		system.Print();
+		auto tags = system.Types(handle);
+		assert( tags.size() == 7 );
+		system.EraseTags(handle, 1ul);
+		system.Print();
+		tags = system.Types(handle);
+		assert( tags.size() == 6 );
+		system.EraseTags(handle, 2ul, 3ul);
+		system.Print();
+		tags = system.Types(handle);
+		assert( tags.size() == 4 );
+	}
 
 	//for loop
     auto hd1 = system.Insert(1, 10.0f, 10.0);

@@ -1597,19 +1597,28 @@ namespace vecs {
 
 	private:
 
+		/// @brief Get the index of the slotmap to use and the archetype.
+		/// @param handle The handle of the entity.
+		/// @return The index of the slotmap and the archetype.
 		auto GetSlotAndArch(auto handle) {
 			ArchetypeAndIndex* value = &m_entities[handle.GetStorageIndex()].m_slotMap[handle].m_value;
 			return std::make_pair(value, value->m_archetypePtr);
 		}
 
+		/// @brief Clone an archetype with a subset of components.
+		/// @param arch The archetype to clone.
+		/// @param types The types of the components to clone.
 		auto CloneArchetype(Archetype* arch, const std::vector<size_t>& types) {
 			auto newArch = std::make_unique<Archetype>();
 			newArch->Clone(*arch, types);
 			UpdateSearchCache(newArch.get());
 			m_archetypes[Hash(newArch->Types())] = std::move(newArch);
-			return;
 		}
 
+		/// @brief Add tags to an entity.
+		/// @tparam ...Ts The types of the tags must be size_t.
+		/// @param handle The handle of the entity.
+		/// @param ...tags The tags to add.
 		template<typename... Ts>
 		void AddTags2(Handle handle, Ts... tags) {
 			LockGuard<RTYPE> lock1(&GetMutex(handle.GetStorageIndex())); //lock the mutex
@@ -1624,17 +1633,22 @@ namespace vecs {
 			*value = { newArch, newArch->Move(arch->Types(), value->m_archIndex, *arch, m_entities) };
 		}
 
+		/// @brief Erase tags from an entity.
+		/// @tparam ...Ts The types of the tags must be size_t.
+		/// @param handle The handle of the entity.
+		/// @param ...tags The tags to erase.
 		template<typename... Ts>
 		void EraseTags2(Handle handle, Ts... tags) {
 			LockGuard<RTYPE> lock1(&GetMutex(handle.GetStorageIndex())); //lock the mutex
 			auto [value, arch] = GetSlotAndArch(handle);
-			std::vector<size_t> delTypes{tags...}, allTypes;
-			auto func = [&](size_t x) { return std::ranges::find_if(delTypes, [&](size_t y){ return x==y; }); };
-			std::ranges::copy_if(arch->Types(), std::back_inserter(allTypes), [&](size_t x) { return !( func.template operator()<Ts>() && ... ); });
+			std::vector<size_t> delTypes{tags...};
+			std::vector<size_t> allTypes;
+			auto found = [&](size_t x) -> bool { return std::ranges::find_if( delTypes, [&](size_t y){ return x==y; } ) != delTypes.end(); };
+			for( auto x : arch->Types() ) { if( !found(x) ) allTypes.push_back(x); }			
 			size_t hs = Hash(allTypes);
 			if( !m_archetypes.contains(hs) ) { CloneArchetype(arch, allTypes); } 
 			auto newArch = m_archetypes[hs].get();
-			LockGuard<RTYPE> lock2(&arch->GetMutex(), newArch->GetMutex()); //lock the old archetype
+			LockGuard<RTYPE> lock2(&arch->GetMutex(), &newArch->GetMutex()); //lock the old archetype
 			*value = { newArch, newArch->Move(allTypes, value->m_archIndex, *arch, m_entities) };
 		}
 
