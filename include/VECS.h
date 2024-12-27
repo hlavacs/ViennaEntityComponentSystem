@@ -884,33 +884,7 @@ namespace vecs {
 			/// @brief Destructor, destroys the hash map.
 			~HashMap() = default;
 
-			/// @brief Insert a key-value pair in the hash map.
-			/// @param key The key of the pair.
-			/// @param value The value of the pair.
-			T& Insert(size_t key, T&& value) {
-				auto& bucket = m_buckets[key & (m_buckets.size()-1)];
-				std::unique_ptr<Pair>* pair;
-				{
-					LockGuardShared<RTYPE> lock(&bucket.m_mutex);
-					pair = Find(&bucket.m_first, key);
-					if( (*pair) != nullptr ) { 
-						(*pair)->Value() = std::forward<T>(value);
-						return (*pair)->Value(); 
-					}
-				}
-
-				LockGuard<RTYPE> lock(&bucket.m_mutex);
-				pair = Find(pair, key);
-				if( (*pair) != nullptr ) { 
-					(*pair)->Value() = std::forward<T>(value);
-					return (*pair)->Value(); 
-				}
-				*pair = std::make_unique<Pair>( std::make_pair(key, std::forward<T>(value)) );
-				m_size++;
-				return (*pair)->Value();
-			}
-
-			/// @brief Find a pair in the bucket.
+			/// @brief Find a pair in the bucket. If not found, create a new pair with the given key.	
 			/// @param key Find this key
 			/// @return Pointer to the value.
 			T& operator[](size_t key) {

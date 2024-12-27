@@ -21,9 +21,9 @@ int test1() {
 
 	{
 		vecs::Registry<vecs::REGISTRYTYPE_PARALLEL>::HashMap<int> hm;
-		hm.Insert(1,1);
-		hm.Insert(2,2);
-		hm.Insert(3,3);
+		hm[1] = 1;
+		hm[2] = 2;
+		hm[3] = 3;
 
 		int h1 = hm[1];
 		int h2 = hm[2];
