@@ -1384,7 +1384,7 @@ namespace vecs {
 		/// @brief Add tags to an entity.
 		template<typename... Ts>
 			requires (sizeof...(Ts) > 0 && (std::is_same_v<Ts, size_t> && ...) )
-		void EraseTag(Handle handle, Ts... tags) {
+		void EraseTags(Handle handle, Ts... tags) {
 			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			EraseTags2(handle, tags...);
 		}
@@ -1605,7 +1605,16 @@ namespace vecs {
 		template<typename... Ts>
 			requires (sizeof...(Ts) > 0 && (std::is_same_v<Ts, size_t> && ...) )
 		void EraseTags2(Handle handle, Ts... tags) {
-
+			LockGuard<RTYPE> lock1(&GetMutex(handle.GetStorageIndex())); //lock the mutex
+			auto [value, arch] = GetSlotAndArch(handle);
+			std::vector<size_t> delTypes{tags...}, allTypes;
+			auto func = [&](size_t x) { return std::ranges::find_if(delTypes, [&](size_t y){ return x==y; }); };
+			std::ranges::copy_if(arch->Types(), std::back_inserter(allTypes), [&](size_t x) { return !( func.template operator()<Ts>() && ... ); });
+			size_t hs = Hash(allTypes);
+			if( !m_archetypes.contains(hs) ) { CloneArchetype(arch, allTypes); } 
+			auto newArch = m_archetypes[hs].get();
+			LockGuard<RTYPE> lock2(&arch->GetMutex(), newArch->GetMutex()); //lock the old archetype
+			*value = { newArch, newArch->Move(allTypes, value->m_archIndex, *arch, m_entities) };
 		}
 
 		/// @brief Change the component values of an entity.
