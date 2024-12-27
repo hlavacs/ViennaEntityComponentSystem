@@ -1286,8 +1286,7 @@ namespace vecs {
 			} else {
 				auto arch = m_archetypes[hs].get();
 				LockGuard<RTYPE> lock(&arch->GetMutex()); //lock the mutex
-				archIndex = arch->Insert( handle, std::forward<Ts>(component)... );
-				slot.m_value = { arch, archIndex };
+				slot.m_value = { arch, arch->Insert( handle, std::forward<Ts>(component)... ) };
 			}
 			return handle;
 		}

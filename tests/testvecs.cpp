@@ -177,21 +177,29 @@ int test1() {
 	//Add components with Get
 	{
 	    auto handle = system.Insert(5, 6.9f, 7.3);
+		system.Print();
 		auto dd = system.Get<char>(handle); //
+		system.Print();
 		std::string s = "AAA";
 		struct T1 {
 			const char* m_str;
 		};
 
 		system.Put(handle, s, T1{"BBB"}); //
+		system.Print();
 		auto [ee, ff] = system.Get<std::string, T1>(handle); //
+		assert( ee == "AAA" && ff.m_str == std::string{"BBB"} );
 	}
 
 	//Erase entity
 	{
+		system.Print();
 	    auto handle = system.Insert(5, 6.9f, 7.3);
+    	assert( system.Exists(handle) );
+		system.Print();
 	    system.Erase(handle);
     	assert( !system.Exists(handle) );
+		system.Print();
 	}
  
 	//Add Tags
