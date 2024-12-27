@@ -94,6 +94,12 @@ namespace vecs {
 	//----------------------------------------------------------------------------------------------
 	//Convenience functions
 
+	template<typename>
+	struct is_std_vector : std::false_type {};
+
+	template<typename T, typename A>
+	struct is_std_vector<std::vector<T,A>> : std::true_type {};
+
 	template <typename> struct is_tuple : std::false_type {};
 	template <typename ...Ts> struct is_tuple<std::tuple<Ts...>> : std::true_type {};
 
@@ -104,8 +110,9 @@ namespace vecs {
 	template <typename T>
 	inline size_t Hash( T& hashes ) {
 		std::size_t seed = 0;
-		if constexpr (std::is_same_v<std::decay_t<T>, const std::vector<size_t>&> ) 
-			std::sort(hashes.begin(), hashes.end());
+		if constexpr ( is_std_vector<std::decay_t<T>>::value ) {
+			std::ranges::sort(hashes);
+		}
 		for( auto& v : hashes ) {
 			seed ^= v + 0x9e3779b9 + (seed<<6) + (seed>>2);
 		}
@@ -115,8 +122,9 @@ namespace vecs {
 	template <typename T>
 	inline size_t Hash( T&& hashes ) {
 		std::size_t seed = 0;
-		if constexpr (std::is_same_v<std::decay_t<T>, const std::vector<size_t>&> ) 
-			std::sort(hashes.begin(), hashes.end());
+		if constexpr ( is_std_vector<std::decay_t<T>>::value ) {
+			std::ranges::sort(hashes);
+		}
 		for( auto& v : hashes ) {
 			seed ^= v + 0x9e3779b9 + (seed<<6) + (seed>>2);
 		}
@@ -687,7 +695,7 @@ namespace vecs {
 			/// @brief Clone the archetype.
 			/// @param other The archetype to clone.
 			/// @param types The types of the components to clone.
-			void Clone(Archetype& other, const std::set<size_t>& types) {
+			void Clone(Archetype& other, const auto& types) {
 				for( auto& ti : types ) { //go through all maps
 					m_types.insert(ti); //add the type to the list
 					if( other.m_maps.contains(ti) ) m_maps[ti] = other.Map(ti)->clone(); //make a component map like this one
@@ -1388,7 +1396,7 @@ namespace vecs {
 
 		/// @brief Add tags to an entity.
 		template<typename... Ts>
-			requires (sizeof...(Ts) > 0 && (std::is_same_v<Ts, size_t> && ...) )
+			requires (sizeof...(Ts) > 0 && (std::is_convertible_v<Ts, size_t> && ...) )
 		void AddTags(Handle handle, Ts... tags) {
 			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			AddTags2(handle, tags...);
@@ -1396,7 +1404,7 @@ namespace vecs {
 
 		/// @brief Add tags to an entity.
 		template<typename... Ts>
-			requires (sizeof...(Ts) > 0 && (std::is_same_v<Ts, size_t> && ...) )
+			requires (sizeof...(Ts) > 0 && (std::is_convertible_v<Ts, size_t> && ...) )
 		void EraseTags(Handle handle, Ts... tags) {
 			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			EraseTags2(handle, tags...);
@@ -1473,6 +1481,7 @@ namespace vecs {
 		void Print() {
 			std::cout << "Entities: " << Size() << std::endl;
 			for( auto& it : m_archetypes ) {
+				std::cout << "Archetype Hash: " << it.first << std::endl;
 				it.second->Print();
 			}
 			std::cout << "Cache Map " << m_searchCacheMap.size() << " Set: " << m_searchCacheSet.size() << std::endl;
@@ -1589,25 +1598,25 @@ namespace vecs {
 	private:
 
 		auto GetSlotAndArch(auto handle) {
-			ArchetypeAndIndex* value = m_entities[handle.GetStorageIndex()].m_slotMap.Find(handle);
+			ArchetypeAndIndex* value = &m_entities[handle.GetStorageIndex()].m_slotMap[handle].m_value;
 			return std::make_pair(value, value->m_archetypePtr);
 		}
 
-		auto CloneArchetype(Archetype* arch, const std::vector<size_t>& types) -> Archetype* {
+		auto CloneArchetype(Archetype* arch, const std::vector<size_t>& types) {
 			auto newArch = std::make_unique<Archetype>();
 			newArch->Clone(*arch, types);
 			UpdateSearchCache(newArch.get());
-			m_archetypes[newArch->Types()] = std::move(newArch);
-			return newArch.get();
+			m_archetypes[Hash(newArch->Types())] = std::move(newArch);
+			return;
 		}
 
 		template<typename... Ts>
-			requires (sizeof...(Ts) > 0 && (std::is_same_v<Ts, size_t> && ...) )
 		void AddTags2(Handle handle, Ts... tags) {
 			LockGuard<RTYPE> lock1(&GetMutex(handle.GetStorageIndex())); //lock the mutex
 			auto [value, arch] = GetSlotAndArch(handle);
 			assert(!arch->Types().contains(tags) && ...);
-			std::vector<size_t> allTypes{std::ranges::join_view(arch->Types(), {tags...})};
+			std::vector<size_t> allTypes{ tags...};
+			std::ranges::copy(arch->Types(), std::back_inserter(allTypes));
 			size_t hs = Hash(allTypes);
 			if( !m_archetypes.contains(hs) ) { CloneArchetype(arch, allTypes); } 
 			auto newArch = m_archetypes[hs].get();
@@ -1616,7 +1625,6 @@ namespace vecs {
 		}
 
 		template<typename... Ts>
-			requires (sizeof...(Ts) > 0 && (std::is_same_v<Ts, size_t> && ...) )
 		void EraseTags2(Handle handle, Ts... tags) {
 			LockGuard<RTYPE> lock1(&GetMutex(handle.GetStorageIndex())); //lock the mutex
 			auto [value, arch] = GetSlotAndArch(handle);
@@ -1757,10 +1765,10 @@ namespace vecs {
 		template<typename... Ts>
 		inline auto CreateArchetype(Handle handle, ArchetypeAndIndex* value, std::vector<size_t>& newTypes) -> Archetype* {
 			auto arch = value->m_archetypePtr;
-			std::vector<size_t> allTypes;
-			allTypes.reserve(arch->Types().size() + newTypes.size());
-			std::copy( arch->Types().begin(), arch->Types().end(), std::back_inserter(allTypes) );
-			std::copy( newTypes.begin(), newTypes.end(), std::back_inserter(allTypes) );
+			std::vector<size_t> allTypes; //{newTypes};
+			std::ranges::copy( newTypes, std::back_inserter(allTypes) );
+			std::ranges::copy( arch->Types(), std::back_inserter(allTypes) );
+
 			size_t hs = Hash(allTypes);
 			Archetype *newArch=nullptr;
 			if( !m_archetypes.contains(hs) ) {

@@ -71,6 +71,7 @@ int test1() {
 	//Insert, Types, Get, Has, Erase, Exists
 	{
 	    vecs::Handle handle = system.Insert(5, 5.5f);
+		system.Print();
 	    assert( system.Exists(handle) );
 	    auto t1 = system.Types(handle);
 		assert( t1.size() == 3 ); //also handle!
@@ -91,6 +92,7 @@ int test1() {
 	//Exists
 	{
 	    auto handle = system.Insert(5, 6.9f, 7.3);
+		system.Print();
 	    assert( system.Exists(handle) );
 	    auto t2 = system.Types(handle);
 		std::set<size_t> types{vecs::Type<vecs::Handle>(), vecs::Type<int>(), vecs::Type<float>(), vecs::Type<double>()};
@@ -99,6 +101,7 @@ int test1() {
 	//Get
 	{
 	    auto handle = system.Insert(5, 6.9f, 7.3);
+		system.Print();
 		decltype(auto) value = system.Get<float&>(handle);
 		float& f1 = value; 
 		value = 10.0f; 
@@ -115,6 +118,7 @@ int test1() {
 	//Put
 	{
 	    auto handle = system.Insert(5, 6.9f, 7.3);
+		system.Print();
 	    system.Put(handle, 50, 69.0f, 73.0);
 		auto [v5a, v5b, v5c] = system.Get<int, float, double>(handle);
 	    assert( v5b == 69.0f && v5c == 73.0 );
@@ -134,6 +138,7 @@ int test1() {
 	//Has
 	{
 	    auto handle = system.Insert(5, 6.9f, 7.3);
+		system.Print();
 	    system.Put(handle, 50, 69.0f, 73.0);
 	    assert( system.Has<int>(handle) );
 	    assert( system.Has<float>(handle) );
@@ -203,6 +208,14 @@ int test1() {
 	}
  
 	//Add Tags
+	{
+		auto handle = system.Insert(5, 6.9f, 7.3);
+		system.Print();
+		system.AddTags(handle, 1ul, 2ul, 3ul);
+		system.Print();
+		auto tags = system.Types(handle);
+		assert( tags.size() == 7 );
+	}
 
 	//Erase Tags
 
