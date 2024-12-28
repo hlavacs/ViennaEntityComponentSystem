@@ -209,12 +209,20 @@ int test1() {
  
 	//Add Tags
 	{
-		auto handle = system.Insert(5, 6.9f, 7.3);
+		auto handle1 = system.Insert(5, 6.9f, 7.3);
+		auto handle2 = system.Insert(6, 7.9f, 8.3);
+		auto handle3 = system.Insert(7, 8.9f, 9.3);
 		system.Print();
-		system.AddTags(handle, 1ul, 2ul, 3ul);
+		system.AddTags(handle1, 1ul, 2ul, 3ul);
+		system.AddTags(handle2, 1ul, 3ul);
+		system.AddTags(handle3, 2ul, 3ul);
 		system.Print();
-		auto tags = system.Types(handle);
+		auto tags = system.Types(handle1);
 		assert( tags.size() == 7 );
+		for( auto handle : system.template GetView<vecs::Handle>() ) {
+			std::cout << "Handle: "<< handle << std::endl;
+		}
+
 	}
 
 	//Erase Tags
