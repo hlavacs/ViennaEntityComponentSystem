@@ -219,7 +219,7 @@ int test1() {
 		system.Print();
 		auto tags = system.Types(handle1);
 		assert( tags.size() == 7 );
-		for( auto handle : system.template GetView<vecs::Handle>() ) {
+		for( auto handle : system.template GetView<vecs::Handle>(std::vector<size_t>{1ul}) ) {
 			std::cout << "Handle: "<< handle << std::endl;
 		}
 

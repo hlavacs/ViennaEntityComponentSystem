@@ -1103,7 +1103,10 @@ namespace vecs {
 		class View {
 
 		public:
-			View(Registry<RTYPE>& system) : m_system{system} {} ///< Constructor.
+			template<typename U>
+			View(Registry<RTYPE>& system, U&& tagsYes, U&& tagsNo ) : 
+				m_system{system}, m_tagsYes{std::forward<U>(tagsYes)}, m_tagsNo{std::forward<U>(tagsNo)} {
+			} ///< Constructor.
 
 			/// @brief Get an iterator to the first entity. 
 			/// The archetype is locked in shared mode to prevent changes. 
@@ -1158,13 +1161,17 @@ namespace vecs {
 
 			inline auto FindAndCopy(size_t hs) -> bool {
 				for( auto& arch : m_system.m_archetypes ) {
-					if( (arch.second->Types().contains(Type<std::decay_t<Ts>>()) && ...) ) 
-						m_archetypes.emplace_back( arch.second.get(), arch.second->Size() );
+					bool found = (arch.second->Types().contains(Type<std::decay_t<Ts>>()) && ...) && 
+		 						 (std::ranges::all_of( m_tagsYes, [&](size_t ti){ return arch.second->Types().contains(ti); } )) &&
+								 (std::ranges::none_of( m_tagsNo, [&](size_t ti){ return arch.second->Types().contains(ti); } ) );
+					if(found) m_archetypes.emplace_back( arch.second.get(), arch.second->Size() );
 				}
 				return true;
 			}
 
 			Registry<RTYPE>& 				m_system;	///< Reference to the registry system.
+			std::vector<size_t> 			m_tagsYes;	///< List of tags that must be present.
+			std::vector<size_t> 			m_tagsNo;	///< List of tags that must not be present.
 			std::vector<ArchetypeAndSize>  	m_archetypes;	///< List of archetypes.
 		}; //end of View
 
@@ -1176,7 +1183,9 @@ namespace vecs {
 		class View<Y<Ts...>, N<Us...>> {
 
 		public:
-			View(Registry<RTYPE>& system) : m_system{system} {} ///< Constructor.
+			template<typename U>
+			View(Registry<RTYPE>& system, U&& tagsYes, U&& tagsNo ) : 
+				m_system{system}, m_tagsYes{std::forward<U>(tagsYes)}, m_tagsNo{std::forward<U>(tagsNo)} {} ///< Constructor.
 
 			/// @brief Get an iterator to the first entity. 
 			/// The archetype is locked in shared mode to prevent changes. 
@@ -1237,13 +1246,18 @@ namespace vecs {
 			inline auto FindAndCopy(size_t hs) -> bool {
 				for( auto& arch : m_system.m_archetypes ) {
 					bool found = (arch.second->Types().contains(Type<std::decay_t<Ts>>()) && ...) && 
-								 (!arch.second->Types().contains(Type<std::decay_t<Us>>()) && ...);
+								 (!arch.second->Types().contains(Type<std::decay_t<Us>>()) && ...) &&
+		 						 (std::ranges::all_of( m_tagsYes, [&](size_t ti){ return arch.second->Types().contains(ti); } )) &&
+								 (std::ranges::none_of( m_tagsNo, [&](size_t ti){ return arch.second->Types().contains(ti); } ) );
+
 					if(found) m_archetypes.emplace_back( arch.second.get(), arch.second->Size() );
 				}
 				return true;
 			}
 
 			Registry<RTYPE>& 				m_system;	///< Reference to the registry system.
+			std::vector<size_t> 			m_tagsYes;	///< List of tags that must be present.
+			std::vector<size_t> 			m_tagsNo;	///< List of tags that must not be present.
 			std::vector<ArchetypeAndSize>  	m_archetypes;	///< List of archetypes.
 
 		};
@@ -1322,6 +1336,10 @@ namespace vecs {
 			return arch->Has(Type<T>());
 		}
 
+		/// @brief Test if an entity has a tag.
+		/// @param handle The handle of the entity.
+		/// @param tag The tag to test.
+		/// @return true if the entity has the tag, else false.
 		bool Has(Handle handle, size_t ti) {
 			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			assert(Exists(handle));
@@ -1341,6 +1359,10 @@ namespace vecs {
 			return arch->Types();
 		}
 
+		/// @brief Get a component value of an entity.
+		/// @tparam T The type of the component.
+		/// @param handle The handle of the entity.
+		/// @return The component value or reference to it.
 		template<typename T>
 		[[nodiscard]] auto Get(Handle handle) -> T {
 			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
@@ -1472,13 +1494,26 @@ namespace vecs {
 		/// @return A view of the entity components
 		template<typename... Ts>
 			requires (vtll::unique<vtll::tl<Ts...>>::value)
-		[[nodiscard]] auto GetView() -> View<Ts...>{
-			return {*this};
+		[[nodiscard]] auto GetView() -> View<Ts...> {
+			return {*this, std::vector<size_t>{}, std::vector<size_t>{}};
+		}
+
+		template<typename... Ts>
+			requires (vtll::unique<vtll::tl<Ts...>>::value)
+		[[nodiscard]] auto GetView(std::vector<size_t>&& yes) -> View<Ts...> {
+			return {*this, std::forward<std::vector<size_t>>(yes), std::vector<size_t>{}};
+		}
+
+		template<typename... Ts>
+			requires (vtll::unique<vtll::tl<Ts...>>::value)
+		[[nodiscard]] auto GetView(std::vector<size_t>&& yes, std::vector<size_t>&& no) -> View<Ts...> {
+			return {*this, std::forward<std::vector<size_t>>(yes), std::forward<std::vector<size_t>>(no),};
 		}
 
 		/// @brief Print the registry.
 		/// Print the number of entities and the archetypes.
 		void Print() {
+			std::cout << "-----------------------------------------------------------------------------------------------" << std::endl;
 			std::cout << "Entities: " << Size() << std::endl;
 			for( auto& it : m_archetypes ) {
 				std::cout << "Archetype Hash: " << it.first << std::endl;
