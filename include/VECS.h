@@ -1612,6 +1612,7 @@ namespace vecs {
 
 		/// @brief Get the index of the entity in the archetype
 		auto GetArchetypeIndex( Handle handle ) {
+			assert(Exists(handle));
 			LockGuardShared<RTYPE> lock(&GetMutex(handle.GetStorageIndex())); //lock the system
 			return m_entities[handle.GetStorageIndex()].m_slotMap[handle].m_value.m_archIndex;
 		}
