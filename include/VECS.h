@@ -1329,8 +1329,8 @@ namespace vecs {
 		/// @return true if the entity has the component, else false.
 		template<typename T>
 		bool Has(Handle handle) {
-			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			assert(Exists(handle));
+			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			LockGuardShared<RTYPE> lock(&GetMutex(handle.GetStorageIndex())); //lock the system
 			auto arch = m_entities[handle.GetStorageIndex()].m_slotMap[handle].m_value.m_archetypePtr;
 			return arch->Has(Type<T>());
@@ -1341,8 +1341,8 @@ namespace vecs {
 		/// @param tag The tag to test.
 		/// @return true if the entity has the tag, else false.
 		bool Has(Handle handle, size_t ti) {
-			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			assert(Exists(handle));
+			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			LockGuardShared<RTYPE> lock(&GetMutex(handle.GetStorageIndex())); //lock the system
 			auto arch = m_entities[handle.GetStorageIndex()].m_slotMap[handle].m_value.m_archetypePtr;
 			return arch->Has(ti);
@@ -1352,8 +1352,8 @@ namespace vecs {
 		/// @param handle The handle of the entity.
 		/// @return A vector of type indices of the components.
 		const auto& Types(Handle handle) {
-			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			assert(Exists(handle));
+			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			LockGuardShared<RTYPE> lock(&GetMutex(handle.GetStorageIndex())); //lock the system
 			auto arch = m_entities[handle.GetStorageIndex()].m_slotMap[handle].m_value.m_archetypePtr;
 			return arch->Types();
@@ -1365,6 +1365,7 @@ namespace vecs {
 		/// @return The component value or reference to it.
 		template<typename T>
 		[[nodiscard]] auto Get(Handle handle) -> T {
+			assert(Exists(handle));
 			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			return Get2<T>(handle);
 		}
@@ -1376,6 +1377,7 @@ namespace vecs {
 		template<typename... Ts>
 			requires (sizeof...(Ts)>1 && vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<Ts...>, Handle&>::value)
 		[[nodiscard]] auto Get(Handle handle) -> std::tuple<Ts...> {
+			assert(Exists(handle));
 			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			return Get2<Ts...>(handle);
 		}
@@ -1388,8 +1390,8 @@ namespace vecs {
 		template<typename U>
 			requires (!is_tuple<U>::value && !std::is_same_v<std::decay_t<U>, Handle>)
 		void Put(Handle handle, U&& v) {
-			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			assert(Exists(handle));
+			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			using T = std::decay_t<U>;
 			Put2(handle, std::forward<T>(v));
 		}
@@ -1401,6 +1403,7 @@ namespace vecs {
 		template<typename... Ts>
 			requires (vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<std::decay_t<Ts>...>, Handle>::value)
 		void Put(Handle handle, std::tuple<Ts...>& v) {
+			assert(Exists(handle));
 			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			Put2(handle, std::forward<Ts>(std::get<Ts>(v))...);
 		}
@@ -1412,6 +1415,7 @@ namespace vecs {
 		template<typename... Ts>
 			requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<std::decay_t<Ts>...>, Handle>::value)
 		void Put(Handle handle, Ts&&... vs) {
+			assert(Exists(handle));
 			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			Put2(handle, std::forward<Ts>(vs)...);
 		}
@@ -1420,6 +1424,7 @@ namespace vecs {
 		template<typename... Ts>
 			requires (sizeof...(Ts) > 0 && (std::is_convertible_v<Ts, size_t> && ...) )
 		void AddTags(Handle handle, Ts... tags) {
+			assert(Exists(handle));
 			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			AddTags2(handle, tags...);
 		}
@@ -1428,6 +1433,7 @@ namespace vecs {
 		template<typename... Ts>
 			requires (sizeof...(Ts) > 0 && (std::is_convertible_v<Ts, size_t> && ...) )
 		void EraseTags(Handle handle, Ts... tags) {
+			assert(Exists(handle));
 			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			EraseTags2(handle, tags...);
 		}
@@ -1438,8 +1444,8 @@ namespace vecs {
 		template<typename... Ts>
 			requires (vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
 		void Erase(Handle handle) {
-			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			assert( (Has<Ts>(handle) && ...) );
+			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 
 			LockGuard<RTYPE> lock(&GetMutex(handle.GetStorageIndex())); //lock the mutex
 			auto value = &m_entities[handle.GetStorageIndex()].m_slotMap[handle].m_value;
@@ -1463,8 +1469,8 @@ namespace vecs {
 		/// @brief Erase an entity from the registry.
 		/// @param handle The handle of the entity.
 		void Erase(Handle handle) {
-			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			assert(Exists(handle));
+			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			LockGuard<RTYPE> lock(&GetMutex(handle.GetStorageIndex())); //lock the mutex
 			auto& value = m_entities[handle.GetStorageIndex()].m_slotMap[handle].m_value;
 			LockGuard<RTYPE> lock2(&value.m_archetypePtr->GetMutex()); //lock the archetype
@@ -1615,6 +1621,7 @@ namespace vecs {
 		/// @param h2 The handle of the second entity.
 		/// @return true if the entities were swapped, else false.
 		bool Swap( Handle h1, Handle h2 ) {
+			assert(Exists(h1) && Exists(h2));
 			UnlockGuardShared<RTYPE> unlock(m_currentArchetype); //unlock the current archetype
 			size_t index1 = h1.GetStorageIndex();
 			size_t index2 = h2.GetStorageIndex();
