@@ -329,8 +329,8 @@ size_t test_iterate( auto& system, int m ) {
 	auto t1 = std::chrono::high_resolution_clock::now();
 
     for( auto [handle, i, f] : system.template GetView<vecs::Handle, int&, float&>() ) {
-        i = i + f;
-		f = i;
+        i = i + (int)f;
+		f = (float)i;
 		//system.template Has<int>(handle);
 		//system.Exists(handle);
 	}
@@ -438,7 +438,7 @@ void test5() {
 	std::mt19937 gen(rd());
 	std::uniform_real_distribution<> dis(0.0, 1.0);
 
-	auto GetInt = [&]() -> int { return dis(gen); };
+	auto GetInt = [&]() -> int { return (int)(dis(gen)*1000.0); };
 	auto GetFloat = [&]() -> float { return (float)dis(gen)*1000.0f; };
 	auto GetDouble = [&]() -> double { return (double)dis(gen)*1000.0; };
 	auto GetChar = [&]() -> char { return (char)(dis(gen)*100.0); };
@@ -461,7 +461,7 @@ void test5() {
 	
 	jobs.push_back( [&](handles_t& handles) { 
 		if( handles.size()>0) { 
-			auto h = SelectRandom(handles, dis(gen)*handles.size());
+			auto h = SelectRandom(handles, (size_t)(dis(gen))*handles.size());
 			auto v = system.Get<int&>(*h);
 			v = GetInt();			
 		};
@@ -469,7 +469,7 @@ void test5() {
 
 	jobs.push_back( [&](handles_t& hs) { 
 		if( hs.size()>0) {
-			auto h = SelectRandom(hs, dis(gen)*hs.size());
+			auto h = SelectRandom(hs, (size_t)(dis(gen)*hs.size()));
 			auto v = system.Get<float&>(*h);
 			v = GetFloat();
 		};
@@ -477,7 +477,7 @@ void test5() {
 
 	jobs.push_back( [&](handles_t& hs) { 
 		if( hs.size()>0) {
-			auto h = SelectRandom(hs, dis(gen)*hs.size());
+			auto h = SelectRandom(hs, (size_t)(dis(gen)*hs.size()));
 			auto db = system.Get<double&>(*h);
 			db = GetDouble();
 		};
@@ -485,7 +485,7 @@ void test5() {
 
 	jobs.push_back( [&](handles_t& hs) { 
 		if( hs.size()>0) {
-			auto h = SelectRandom(hs, dis(gen)*hs.size());
+			auto h = SelectRandom(hs, (size_t)(dis(gen)*hs.size()));
 			auto db = system.Get<double&>(*h);
 		};
 	} );
@@ -496,7 +496,7 @@ void test5() {
 		std::set<vecs::Handle> hs;
 
 		for( int i=0; i<num; ++i ) {
-			size_t idx = std::min( (size_t)dis(gen)*jobs.size(), jobs.size()-1);
+			size_t idx = std::min( (size_t)(dis(gen)*jobs.size()), jobs.size()-1);
 			jobs[idx](hs);
 		};
 	};

@@ -314,7 +314,7 @@ namespace vecs {
 
 			/// @brief Constructor, creates the vector.
 			/// @param segmentBits The number of bits for the segment size.
-			Vector(size_t segmentBits = 6) : m_size{0}, m_segmentBits(segmentBits), m_segmentSize{1ul<<segmentBits}, m_segments{} {
+			Vector(size_t segmentBits = 6) : m_size{0}, m_segmentBits(segmentBits), m_segmentSize{1ull<<segmentBits}, m_segments{} {
 				assert(segmentBits > 0);
 				m_segments.emplace_back( std::make_shared<std::vector<T>>(m_segmentSize) );
 			}
@@ -467,7 +467,7 @@ namespace vecs {
 		/// @param size Size of the initial slot map.
 		SlotMap(uint32_t storageIndex, int64_t bits) : m_storageIndex{storageIndex} {
 			m_firstFree = 0;
-			int64_t size = 1 << bits;
+			int64_t size = ((int64_t)1l << bits);
 			for( int64_t i = 1; i <= size-1; ++i ) { //create the free list
 				m_slots.push_back( Slot( int64_t{i}, size_t{0uL}, T{} ) );
 			}
@@ -898,7 +898,7 @@ namespace vecs {
 
 			/// @brief Constructor, creates the hash map.
 			HashMap(size_t bits = 10) : m_buckets{} {
-				size_t size = 1<<bits;
+				size_t size = (1ull << bits);
 				for( int i = 0; i < size; ++i ) {
 					m_buckets.emplace_back();
 				}
@@ -1277,7 +1277,7 @@ namespace vecs {
 		/// @brief Get the number of entities in the system.
 		/// @return The number of entities.
 		size_t Size() {
-			int size = 0;
+			size_t size = 0;
 			for( auto& slot : m_entities ) {
 				size += slot.m_slotMap.Size();
 			}
@@ -1600,7 +1600,7 @@ namespace vecs {
 
 		/// @brief Get the mutex of the archetype.
 		/// @return Reference to the mutex.
-		[[nodiscard]] inline auto GetMutex(uint32_t index) -> mutex_t& {
+		[[nodiscard]] inline auto GetMutex(size_t index) -> mutex_t& {
 			return m_entities[index].m_mutex;
 		}
 
@@ -1836,7 +1836,7 @@ namespace vecs {
 				auto func = [&]<typename T>(){ 
 					if(!arch->Has(Type<T>())) { //need the types, type indices are not enough
 						newArch->template AddComponent<T>();
-						newArch->template AddValue(T{}); 
+						newArch->AddValue(T{}); 
 					}
 				};
 				( func.template operator()<std::decay_t<Ts>>(), ...  );
