@@ -269,9 +269,10 @@ namespace vecs {
 		/// @brief Insert a new component value.
 		/// @param v The component value.
 		/// @return The index of the new component value.
-		template<typename T>
-		auto push_back(T&& v) -> size_t {
-			return static_cast<Vector<T>*>(this)->push_back(std::forward<T>(v));
+		template<typename U>
+		auto push_back(U&& v) -> size_t {
+			using T = std::decay_t<U>;
+			return static_cast<Vector<T>*>(this)->push_back(std::forward<U>(v));
 		}
 
 		virtual auto push_back() -> size_t = 0;
@@ -333,7 +334,7 @@ namespace vecs {
 					m_segments.emplace_back( std::make_shared<std::vector<T>>(m_segmentSize) );
 				}
 				++m_size;
-				(*this)[m_size - 1] = std::forward<T>(value);
+				(*this)[m_size - 1] = std::forward<U>(value);
 				return m_size - 1;
 			}
 
@@ -780,7 +781,7 @@ namespace vecs {
 			template<typename U>
 			auto AddValue( U&& v ) -> size_t {
 				using T = std::decay_t<U>;
-				return m_maps[Type<T>()]->push_back(std::forward<T>(v));	//insert the component value
+				return m_maps[Type<T>()]->push_back(std::forward<U>(v));	//insert the component value
 			};
 
 			auto AddEmptyValue( size_t ti ) -> size_t {

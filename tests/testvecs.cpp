@@ -70,6 +70,10 @@ int test1() {
 
 	//Insert, Types, Get, Has, Erase, Exists
 	{
+		std::string s = "AAA";
+		auto hhh = system.Insert(s);
+		assert( system.Exists(hhh) );
+
 	    vecs::Handle handle = system.Insert(5, 5.5f);
 		system.Print();
 	    assert( system.Exists(handle) );
