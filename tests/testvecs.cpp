@@ -224,9 +224,11 @@ int test1() {
 		auto tags = system.Types(handle1);
 		assert( tags.size() == 7 );
 		for( auto handle : system.template GetView<vecs::Handle>(std::vector<size_t>{1ul}) ) {
-			std::cout << "Handle: "<< handle << std::endl;
+			std::cout << "Handle (yes 1): "<< handle << std::endl;
 		}
-
+		for( auto handle : system.template GetView<vecs::Handle>(std::vector<size_t>{1ul}, std::vector<size_t>{2ul}) ) {
+			std::cout << "Handle (yes 1 no 2): "<< handle << std::endl;
+		}
 	}
 
 	//Erase Tags

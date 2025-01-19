@@ -203,6 +203,36 @@ for( auto [handle, i, f] : system.GetView<vecs::Handle&, int&, float&>() ) { //c
 
 Inside the for loop you can do everything as long as VECS is running in *sequential mode*. Nevertheless, of course erasing entities might result in crahes if systems still try to access them. Systems can check if entities still exist using the *Exists(handle)* function. VECS does not use C++ *std::optional* intentionally since accessing erased entities should never occur which lies in the responsibility of the programmer.
 
+## Tags
+
+Entities can be decorated with tags, which are simply *uint64_t* numbers. You can add tags to an entity with the function *AddTag()*, you can remove tags using *EraseTags()*. The *GetView()* function allows for zero, 1 or 2 parameters. If one parameter is given, then this is reference to a *std::vector<uint64_t>* having a positive tag list, i.e., only those entities that have these tags attached will be iterated over. If a second parameter is given, then this is a negative tag list, i.e., only those entities that do not have these tags will be iterated over. 
+
+```C
+auto handle1 = system.Insert(5, 6.9f, 7.3);
+auto handle2 = system.Insert(6, 7.9f, 8.3);
+auto handle3 = system.Insert(7, 8.9f, 9.3);
+system.Print();
+system.AddTags(handle1, 1ul, 2ul, 3ul);
+system.AddTags(handle2, 1ul, 3ul);
+system.AddTags(handle3, 2ul, 3ul);
+system.Print();
+auto tags = system.Types(handle1);
+assert( tags.size() == 7 );
+
+for( auto handle : system.template GetView<vecs::Handle>(std::vector<size_t>{1ul}) ) {
+	std::cout << "Handle (yes 1): "<< handle << std::endl; //finds two entities 
+}
+
+for( auto handle : system.template GetView<vecs::Handle>(std::vector<size_t>{1ul}, std::vector<size_t>ul}) ) {
+	std::cout << "Handle (yes 1 no 2): "<< handle << std::endl; //finds only one entity
+}
+
+auto handle = system.Insert(5, 6.9f, 7.3);
+system.AddTags(handle, 1ul, 2ul, 3ul);
+system.EraseTags(handle, 1ul);
+
+```
+
 ## Parallel Processing
 
 VECS can be compiled to run in parallel mode. This means that it can be accessed from several threads in parallel. VECS uses two types of mutexes to ensure no corruption of its data structures is done:
