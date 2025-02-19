@@ -24,9 +24,23 @@ endif()
 set(INCLUDE ${PROJECT_SOURCE_DIR}/include)
 set(EXTERN ${PROJECT_SOURCE_DIR}/extern)
 
-include_directories (${EXTERN}/ViennaTypeListLibrary/include)
-include_directories (${EXTERN}/ViennaStrongType/include)
+include(FetchContent) # once in the project to include the module
 
+FetchContent_Declare(ViennaStrongType
+                     GIT_REPOSITORY https://github.com/hlavacs/ViennaStrongType.git 
+                     GIT_TAG main)
+
+FetchContent_MakeAvailable(ViennaStrongType)
+
+include_directories (${ViennaStrongType_SOURCE_DIR}/include)
+
+FetchContent_Declare(ViennaTypeListLibrary
+                     GIT_REPOSITORY https://github.com/hlavacs/ViennaTypeListLibrary.git 
+                     GIT_TAG main)
+
+FetchContent_MakeAvailable(ViennaTypeListLibrary)
+
+include_directories (${ViennaTypeListLibrary_SOURCE_DIR}/include)
 
 
 # Testing
