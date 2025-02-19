@@ -76,37 +76,15 @@ namespace vecs {
 		/// @param value The value to insert.
 		/// @return A pair of the handle and reference to the slot.
 		auto Insert(T& value) -> std::pair<Handle, Slot&> {
-			int64_t index = m_firstFree;
-			Slot* slot = nullptr;
-			if( index > -1 ) { 
-				slot = &m_slots[index];
-				m_firstFree = slot->m_nextFree;
-				slot->m_nextFree = -1;
-				slot->m_value = value;
-			} else {
-				m_slots.push_back( Slot{ int64_t{-1}, size_t{0}, value } );
-				index = m_slots.size() - 1; //index of the new slot
-				slot = &m_slots[index];
-			}
-			++m_size;
-			return { Handle{ (uint32_t)index, (uint32_t)slot->m_version, m_storageIndex}, *slot};			
+			auto [handle, slot] = Insert2(std::forward<T>(value));
+			slot.m_value = value;
+			return {handle, slot};		
 		}
 
 		auto Insert(T&& value) -> std::pair<Handle, Slot&> {
-			int64_t index = m_firstFree;
-			Slot* slot = nullptr;
-			if( index > -1 ) { 
-				slot = &m_slots[index];
-				m_firstFree = slot->m_nextFree;
-				slot->m_nextFree = -1;
-				slot->m_value = std::forward<T>(value);
-			} else {
-				m_slots.push_back( Slot{ int64_t{-1}, size_t{0}, std::forward<T>(value) } );
-				index = m_slots.size() - 1; //index of the new slot
-				slot = &m_slots[index];
-			}
-			++m_size;
-			return { Handle{ (uint32_t)index, (uint32_t)slot->m_version, m_storageIndex}, *slot};			
+			auto [handle, slot] = Insert2(std::forward<T>(value));
+			slot.m_value = std::forward<T>(value);
+			return {handle, slot};				
 		}
 
 		/// @brief Erase a value from the slot map.
@@ -148,6 +126,22 @@ namespace vecs {
 		}
 
 	private:
+		auto Insert2(const T&& value) -> std::pair<Handle, Slot&> {
+			int64_t index = m_firstFree;
+			Slot* slot = nullptr;
+			if( index > -1 ) { 
+				slot = &m_slots[index];
+				m_firstFree = slot->m_nextFree;
+				slot->m_nextFree = -1;
+			} else {
+				m_slots.push_back( Slot{ int64_t{-1}, size_t{0}, {} } );
+				index = m_slots.size() - 1; //index of the new slot
+				slot = &m_slots[index];
+			}
+			++m_size;
+			return { Handle{ (uint32_t)index, (uint32_t)slot->m_version, m_storageIndex}, *slot};	
+		}
+
 		size_t m_storageIndex{0}; ///< Index of the storage.
 		size_t m_size{0}; ///< Size of the slot map. This is the size of the Vector minus the free slots.
 		int64_t m_firstFree{-1}; ///< Index of the first free slot. If -1 then there are no free slots.
