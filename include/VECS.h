@@ -24,63 +24,21 @@
 #include <VSTY.h>
 
 
+#include "VECSVector.h"
+#include "VECSHashMap.h"
+#include "VECSArchetype.h"
+#include "VECSSlotMap.h"
+#include "VECSMutex.h"
+#include "VECSHandle.h"
+
 using namespace std::chrono_literals;
 
 
 namespace vecs {
 
-	//----------------------------------------------------------------------------------------------
-	//Handles
-
-	/// @brief A handle for an entity or a component.
-	template<size_t INDEX_BITS=32, size_t VERSION_BITS=24, size_t STORAGE_BITS=8>
-	struct HandleT {
-		using type_t = typename vsty::strong_type_t<size_t, vsty::counter<>, 
-							std::integral_constant<size_t, std::numeric_limits<size_t>::max()>>; ///< Strong type for the handle type.
-
-	public:
-		HandleT() = default; ///< Default constructor.
-
-		HandleT(size_t index, size_t version, size_t storageIndex=0) : 
-			m_value{std::numeric_limits<size_t>::max()} { 
-			m_value.set_bits(index, 0, INDEX_BITS);
-			m_value.set_bits(version, INDEX_BITS, VERSION_BITS);
-			m_value.set_bits(storageIndex, INDEX_BITS + VERSION_BITS, STORAGE_BITS);
-		};
-
-		size_t GetIndex() const { return m_value.get_bits(0, INDEX_BITS); }
-		size_t GetVersion() const { return m_value.get_bits(INDEX_BITS, VERSION_BITS); }
-		size_t GetStorageIndex() const { return m_value.get_bits(INDEX_BITS + VERSION_BITS); }
-		size_t GetVersionedIndex() const { return (GetVersion() << VERSION_BITS) + GetIndex(); }
-		bool IsValid() const { return m_value != std::numeric_limits<size_t>::max(); }
-		HandleT& operator=(const HandleT& other) { m_value = other.m_value; return *this; }
-		bool operator==(const HandleT& other) const { return GetIndex() == other.GetIndex() && GetVersion() == other.GetVersion(); }
-		bool operator!=(const HandleT& other) const { return !(*this == other); }
-		bool operator<(const HandleT& other) const { return GetIndex() < other.GetIndex(); }
-
-	private:
-		type_t m_value; ///< Strong type for the handle.
-	};
-
-	using Handle = HandleT<32,24,8>; ///< Type of the handle.
-
-	inline bool IsValid(const Handle& handle) {
-		return handle.IsValid();
-	}
-
-	inline std::ostream& operator<<(std::ostream& os, const vecs::Handle& handle) {
-    	return os << "{" <<  handle.GetIndex() << ", " << handle.GetVersion() << ", " << handle.GetStorageIndex() << "}"; 
-	}
-	
 
 	//----------------------------------------------------------------------------------------------
 	//Registry concepts and types
-
-	template<typename U>
-	concept VecsPOD = (!std::is_reference_v<U> && !std::is_pointer_v<U>);
-	
-	template<typename... Ts>
-	concept VecsArchetype = (vtll::unique<vtll::tl<Ts...>>::value && (sizeof...(Ts) > 0) && (!std::is_same_v<Handle, std::decay_t<Ts>> && ...));
 
 	template<typename... Ts>
 	concept VecsView = ((vtll::unique<vtll::tl<Ts...>>::value) && (sizeof...(Ts) > 0) && (!std::is_same_v<Handle&, Ts> && ...));
@@ -131,423 +89,11 @@ namespace vecs {
 		return seed;
 	}
 
-	template<typename T>
-	inline auto Type() -> std::size_t {
-		return std::type_index(typeid(T)).hash_code();
-	}
-
-
 	template<typename... Ts>
 	struct Yes {};
 
 	template<typename... Ts>
 	struct No {};
-
-	//----------------------------------------------------------------------------------------------
-	//Mutexes and Locks
-
-	using mutex_t = std::shared_mutex; ///< Shared mutex type
-
-	using LockGuardType = int; ///< Type of the lock guard.
-	const int LOCKGUARDTYPE_SEQUENTIAL = 0;
-	const int LOCKGUARDTYPE_PARALLEL = 1;
-
-	/// @brief An exclusive lock guard for a mutex, meaning that only one thread can lock the mutex at a time.
-	/// A LockGuard is used to lock and unlock a mutex in a RAII manner.
-	/// In case of two simultaneous locks, the mutexes are locked in the correct order to avoid deadlocks.
-	/// @tparam LTYPE Type of the lock guard.
-	template<int LTYPE>
-		requires (LTYPE == LOCKGUARDTYPE_SEQUENTIAL || LTYPE == LOCKGUARDTYPE_PARALLEL)
-	struct LockGuard {
-
-		/// @brief Constructor for a single mutex.
-		/// @param mutex Pointer to the mutex.
-		LockGuard(mutex_t* mutex) : m_mutex{mutex}, m_other{nullptr} { 
-			if constexpr (LTYPE == LOCKGUARDTYPE_PARALLEL) { 
-				if(mutex) m_mutex->lock(); 
-			}
-		}
-
-		/// @brief Constructor for two mutexes. This is necessary if an entity must be moved from one archetype to another, because
-		/// the entity components change. In this case, two mutexes must be locked.
-		/// @param mutex Pointer to the mutex.
-		/// @param other Pointer to the other mutex.
-		LockGuard(mutex_t* mutex, mutex_t* other) : m_mutex{mutex}, m_other{other} { 
-			if constexpr (LTYPE == LOCKGUARDTYPE_PARALLEL) {
-				if(mutex && other) { 
-					std::min(m_mutex, m_other)->lock();	///lock the mutexes in the correct order
-					std::max(m_mutex, m_other)->lock();				
-				} else if(m_mutex) m_mutex->lock();
-			}
-		}
-
-		/// @brief Destructor, unlocks the mutexes.
-		~LockGuard() { 
-			if constexpr (LTYPE == LOCKGUARDTYPE_PARALLEL) {
-				if(m_mutex && m_other) { 
-					std::max(m_mutex, m_other)->unlock();
-					std::min(m_mutex, m_other)->unlock();	///lock the mutexes in the correct order
-				} else if(m_mutex) m_mutex->unlock();
-			}
-		}
-
-		mutex_t* m_mutex{nullptr};
-		mutex_t* m_other{nullptr};
-	};
-
-	/// @brief A lock guard for a shared mutex in RAII manner. Several threads can lock the mutex in shared mode at the same time.
-	/// This is used to make sure that data structures are not modified while they are read.
-	/// @tparam LTYPE Type of the lock guard.
-	template<int LTYPE>
-		requires (LTYPE == LOCKGUARDTYPE_SEQUENTIAL || LTYPE == LOCKGUARDTYPE_PARALLEL)
-	struct LockGuardShared {
-
-		/// @brief Constructor for a single mutex, locks the mutex.
-		LockGuardShared(mutex_t* mutex) : m_mutex{mutex} { 
-			if constexpr (LTYPE == LOCKGUARDTYPE_PARALLEL) { m_mutex->lock_shared(); }
-		}
-
-		/// @brief Destructor, unlocks the mutex.
-		~LockGuardShared() { 
-			if constexpr (LTYPE == LOCKGUARDTYPE_PARALLEL) { m_mutex->unlock_shared(); }
-		}
-
-		mutex_t* m_mutex{nullptr}; ///< Pointer to the mutex.
-	};
-
-	template<int LTYPE>
-		requires (LTYPE == LOCKGUARDTYPE_SEQUENTIAL || LTYPE == LOCKGUARDTYPE_PARALLEL)
-	struct UnlockGuardShared {
-
-		/// @brief Constructor for a single mutex, locks the mutex.
-		template<typename T>
-		UnlockGuardShared(T* ptr) { 
-			if constexpr (LTYPE == LOCKGUARDTYPE_PARALLEL) { 
-				if(ptr!=nullptr) {
-					m_mutex = &ptr->GetMutex();
-					m_mutex->unlock_shared(); 
-				}
-			}
-		}
-
-		/// @brief Destructor, unlocks the mutex.
-		~UnlockGuardShared() { 
-			if constexpr (LTYPE == LOCKGUARDTYPE_PARALLEL) { 
-				if(m_mutex!=nullptr) m_mutex->lock_shared(); 
-			}
-		}
-
-		mutex_t* m_mutex{nullptr}; ///< Pointer to the mutex.
-	};
-
-
-	//----------------------------------------------------------------------------------------------
-	//Segmented Vector
-
-	template<typename T>
-		requires (!std::is_reference_v<T> && !std::is_pointer_v<T>)
-	class Vector;
-
-	class VectorBase {
-
-		/// @brief Iterator for the vector.
-		class Iterator {
-		public:
-			Iterator(VectorBase& data, size_t index) : m_data{data}, m_index{index} {}
-			Iterator& operator++() { ++m_index; return *this; }
-			bool operator!=(const Iterator& other) const { return m_index != other.m_index; }
-			void* operator*() { return &m_data; }	
-		private:
-			VectorBase& m_data;
-			size_t m_index{0};
-		};
-
-		public:
-		VectorBase() = default; //constructor
-		virtual ~VectorBase() = default; //destructor
-			
-		/// @brief Insert a new component value.
-		/// @param v The component value.
-		/// @return The index of the new component value.
-		template<typename U>
-		auto push_back(U&& v) -> size_t {
-			using T = std::decay_t<U>;
-			return static_cast<Vector<T>*>(this)->push_back(std::forward<U>(v));
-		}
-
-		virtual auto push_back() -> size_t = 0;
-		virtual auto pop_back() -> void = 0; 
-		virtual auto erase(size_t index) -> size_t = 0;
-		virtual void copy(VectorBase* other, size_t from) = 0;
-		virtual void swap(size_t index1, size_t index2) = 0;
-		virtual auto size() const -> size_t = 0;
-		virtual auto clone() -> std::unique_ptr<VectorBase> = 0;
-		virtual void clear() = 0;
-		virtual void print() = 0;
-
-		auto begin() -> Iterator { return Iterator{*this, 0}; }
-		auto end() -> Iterator { return Iterator{*this, size()}; }
-	}; //end of VectorBase
-
-
-	/// @brief A vector that stores elements in segments to avoid reallocations. The size of a segment is 2^segmentBits.
-	template<typename T>
-		requires (!std::is_reference_v<T> && !std::is_pointer_v<T>)
-	class Vector : public VectorBase {
-
-		using Segment_t = std::shared_ptr<std::vector<T>>;
-		using Vector_t = std::vector<Segment_t>;
-
-		public:
-
-			/// @brief Iterator for the vector.
-			class Iterator {
-				public:
-				Iterator(Vector<T>& data, size_t index) : m_data{data}, m_index{index} {}
-				Iterator& operator++() { ++m_index; return *this; }
-				bool operator!=(const Iterator& other) const { return m_index != other.m_index; }
-				T& operator*() { return m_data[m_index]; }	
-
-				private:
-				Vector<T>& m_data;
-				size_t m_index{0};
-			};
-
-			/// @brief Constructor, creates the vector.
-			/// @param segmentBits The number of bits for the segment size.
-			Vector(size_t segmentBits = 6) : m_size{0}, m_segmentBits(segmentBits), m_segmentSize{1ull<<segmentBits}, m_segments{} {
-				assert(segmentBits > 0);
-				m_segments.emplace_back( std::make_shared<std::vector<T>>(m_segmentSize) );
-			}
-
-			~Vector() = default;
-
-			Vector( const Vector& other) : m_size{other.m_size}, m_segmentBits(other.m_segmentBits), m_segmentSize{other.m_segmentSize}, m_segments{} {
-				m_segments.emplace_back( std::make_shared<std::vector<T>>(m_segmentSize) );
-			}
-
-			/// @brief Push a value to the back of the vector.
-			/// @param value The value to push.
-			template<typename U>
-			auto push_back(U&& value) -> size_t {
-				while( Segment(m_size) >= m_segments.size() ) {
-					m_segments.emplace_back( std::make_shared<std::vector<T>>(m_segmentSize) );
-				}
-				++m_size;
-				(*this)[m_size - 1] = std::forward<U>(value);
-				return m_size - 1;
-			}
-
-			auto push_back() -> size_t override {
-				return push_back(T{});
-			}
-
-			/// @brief Pop the last value from the vector.
-			void pop_back() override {
-				assert(m_size > 0);
-				--m_size;
-				if(	Offset(m_size) == 0 && m_segments.size() > 1 ) {
-					m_segments.pop_back();
-				}
-			}
-
-			/// @brief Get the value at an index.
-			/// @param index The index of the value.
-			auto operator[](size_t index) const -> T& {
-				assert(index < m_size);
-				auto seg = Segment(index);
-				auto off = Offset(index);
-				return (*m_segments[Segment(index)])[Offset(index)];
-			}
-
-			/// @brief Get the value at an index.
-			auto size() const -> size_t override { return m_size; }
-
-			/// @brief Clear the vector. Make sure that one segment is always available.
-			void clear() override {
-				m_size = 0;
-				m_segments.clear();
-				m_segments.emplace_back( std::make_shared<std::vector<T>>(m_segmentSize) );
-			}
-
-			/// @brief Erase an entity from the vector.
-			auto erase(size_t index) -> size_t override {
-				size_t last = size() - 1;
-				assert(index <= last);
-				if( index < last ) {
-					(*this)[index] = std::move( (*this)[last] ); //move the last entity to the erased one
-				}
-				pop_back(); //erase the last entity
-				return last; //if index < last then last element was moved -> correct mapping 
-			}
-
-			/// @brief Copy an entity from another vector to this.
-			void copy(VectorBase* other, size_t from) override {
-				push_back( (static_cast<Vector<T>*>(other))->operator[](from) );
-			}
-
-			/// @brief Swap two entities in the vector.
-			void swap(size_t index1, size_t index2) override {
-				std::swap( (*this)[index1], (*this)[index2] );
-			}
-
-			/// @brief Clone the vector.
-			auto clone() -> std::unique_ptr<VectorBase> override {
-				return std::make_unique<Vector<T>>();
-			}
-
-			/// @brief Print the vector.
-			void print() override {
-				std::cout << "Name: " << typeid(T).name() << " ID: " << Type<T>();
-			}
-
-			auto begin() -> Iterator { return Iterator{*this, 0}; }
-			auto end() -> Iterator { return Iterator{*this, m_size}; }
-
-		private:
-
-			/// @brief Compute the segment index of an entity index.
-			/// @param index Entity index.
-			/// @return Index of the segment.
-			inline size_t Segment(size_t index) const { return index >> m_segmentBits; }
-
-			/// @brief Compute the offset of an entity index in a segment.
-			/// @param index Entity index.
-			/// @return Offset in the segment.
-			inline size_t Offset(size_t index) const { return index & (m_segmentSize-1ul); }
-
-			size_t m_size{0};	///< Size of the vector.
-			size_t m_segmentBits;	///< Number of bits for the segment size.
-			size_t m_segmentSize; ///< Size of a segment.
-			Vector_t m_segments{10};	///< Vector holding unique pointers to the segments.
-	}; //end of Vector
-
-
-	//----------------------------------------------------------------------------------------------
-	//Slot Maps
-
-
-	/// @brief A slot map for storing a map from handle to archetype and index in the archetype.
-	/// A slot map can never shrink. If an entity is erased, the slot is added to the free list. A handle holds an index
-	/// to the slot map and a version counter. If the version counter of the slot is different from the version counter of the handle,
-	/// the slot is invalid.
-	/// @tparam T The value type of the slot map.
-	template<VecsPOD T>
-	class SlotMap {
-
-		/// @brief A slot in the slot map.
-		struct Slot {
-			int64_t m_nextFree; //index of the next free slot in the free list. 
-			size_t m_version;	//version of the slot
-			T 	   m_value{};	//value of the slot
-
-			Slot() = default;
-
-			/// @brief Constructor, creates a slot.
-			/// @param next Next free slot in the free list.
-			/// @param version Version counter of the slot to avoid accessing erased slots.
-			/// @param value Value stored in the slot.
-			Slot(const int64_t&& next, const size_t&& version, T&& value) : m_value{std::forward<T>(value)} {
-				m_nextFree = next;
-				m_version = version;
-			}
-
-			/// @brief Copy operator.
-			/// @param other The slot to copy.
-			Slot& operator=( const Slot& other ) {
-				m_nextFree = other.m_nextFree;
-				m_version = other.m_version;
-				m_value = other.m_value;
-				return *this;
-			}
-		};
-
-	public:
-
-		/// @brief Constructor, creates the slot map and prefills it with an empty list.
-		/// @param size Size of the initial slot map.
-		SlotMap(uint32_t storageIndex, int64_t bits) : m_storageIndex{storageIndex} {
-			m_firstFree = 0;
-			int64_t size = ((int64_t)1l << bits);
-			for( int64_t i = 1; i <= size-1; ++i ) { //create the free list
-				m_slots.push_back( Slot( int64_t{i}, size_t{0uL}, T{} ) );
-			}
-			m_slots.push_back( Slot(int64_t{-1}, size_t{0}, T{}) ); //last slot
-		}
-
-		SlotMap( const SlotMap& other ) : m_storageIndex{other.m_storageIndex} {
-			m_firstFree = 0;
-			int64_t size = other.m_slots.size();
-			for( int64_t i = 1; i <= size-1; ++i ) { //create the free list
-				m_slots.push_back( Slot( int64_t{i}, size_t{0uL}, T{} ) );
-			}
-			m_slots.push_back( Slot(int64_t{-1}, size_t{0}, T{}) ); //last slot
-		}
-		
-		~SlotMap() = default; ///< Destructor.
-		
-		/// @brief Insert a value to the slot map.
-		/// @param value The value to insert.
-		/// @return A pair of the handle and reference to the slot.
-		auto Insert(T&& value) -> std::pair<Handle, Slot&> {
-			int64_t index = m_firstFree;
-			Slot* slot = nullptr;
-			if( index > -1 ) { 
-				slot = &m_slots[index];
-				m_firstFree = slot->m_nextFree;
-				slot->m_nextFree = -1;
-			} else {
-				m_slots.push_back( Slot{ int64_t{-1}, size_t{0}, std::forward<T>(value) } );
-				index = m_slots.size() - 1; //index of the new slot
-				slot = &m_slots[index];
-			}
-			slot->m_value = std::forward<T>(value);
-			++m_size;
-			return { Handle{ (uint32_t)index, (uint32_t)slot->m_version, m_storageIndex}, *slot};			
-		}
-
-		/// @brief Erase a value from the slot map.
-		/// @param handle The handle of the value to erase.
-		void Erase(Handle handle) {
-			auto& slot = m_slots[handle.GetIndex()];
-			++slot.m_version;	//increment the version to invalidate the slot
-			slot.m_nextFree = m_firstFree;	
-			m_firstFree = handle.GetIndex(); //add the slot to the free list
-			--m_size;
-		}
-
-		/// @brief Get a value from the slot map.
-		/// @param handle The handle of the value to get.
-		/// @return Reference to the value.
-		auto operator[](Handle handle) -> Slot& {
-			return m_slots[handle.GetIndex()];
-		}
-
-		/// @brief Get the size of the slot map.
-		/// @return The size of the slot map.
-		auto Size() const -> size_t {
-			return m_size;
-		}
-
-		/// @brief Clear the slot map. This puts all slots in the free list.
-		void Clear() {
-			m_firstFree = 0;
-			m_size = 0;
-			size_t size = m_slots.size();
-			for( size_t i = 1; i <= size-1; ++i ) { 
-				m_slots[i-1].m_nextFree = i;
-				m_slots[i-1].m_version++;
-			}
-			m_slots[size-1].m_nextFree = -1;
-			m_slots[size-1].m_version++;
-		}
-
-	private:
-		size_t m_storageIndex{0}; ///< Index of the storage.
-		size_t m_size{0}; ///< Size of the slot map. This is the size of the Vector minus the free slots.
-		int64_t m_firstFree{-1}; ///< Index of the first free slot. If -1 then there are no free slots.
-		Vector<Slot> m_slots; ///< Container of slots.
-	};
 
 	//----------------------------------------------------------------------------------------------
 	//Registry 
@@ -580,403 +126,16 @@ namespace vecs {
 		using NUMBER_SLOTMAPS = std::conditional_t< RTYPE == REGISTRYTYPE_SEQUENTIAL, 
 			std::integral_constant<int, 1>, std::integral_constant<int, 16>>;
 	
-		//----------------------------------------------------------------------------------------------
-		//Archetype
-
-		/// @brief An archetype of entities with the same components. 
-		/// All entities that have the same components are stored in the same archetype. 
-		/// The components are stored in the component maps. Note that the archetype class is not templated,
-		/// but some methods including a constructor are templated. Thus the class knows only type indices
-		/// of its components, not the types themselves.
-		class Archetype;
-
-		/// @brief A pair of an archetype and an index. This is stored in the slot map.
-		struct ArchetypeAndIndex {
-			Archetype* m_archetypePtr;	//pointer to the archetype
-			size_t m_archIndex;			//index of the entity in the archetype
-		};
-
-		/// @brief An archetype of entities with the same components. 
-		/// All entities that have the same components are stored in the same archetype.
-		class Archetype {
-
-			template <int T> requires RegistryType<T> friend class Registry;
-
-		public:
-
-			Archetype() = default; //default constructor
-
-			/// @brief Constructor, called if a new entity should be created with components, and the archetype does not exist yet.
-			/// @tparam ...Ts 
-			/// @param handle The handle of the entity.
-			/// @param ...values The values of the components.
-			template<typename... Ts>
-				requires VecsArchetype<Ts...>
-			Archetype(Handle handle, size_t& archIndex, Ts&& ...values ) {
-				(AddComponent<Ts>(), ...); //insert component types
-				(AddValue( std::forward<Ts>(values) ), ...); //insert all components, get index of the handle
-				AddComponent<Handle>(); //insert the handle
-				archIndex = AddValue( handle ); //insert the handle
-			}
-
-			/// @brief Insert a new entity with components to the archetype.
-			/// @tparam ...Ts Value types of the components.
-			/// @param handle The handle of the entity.
-			/// @param ...values The values of the components.
-			/// @return The index of the entity in the archetype.
-			template<typename... Ts>
-				requires VecsArchetype<Ts...>
-			size_t Insert(Handle handle, Ts&& ...values ) {
-				assert( m_maps.size() == sizeof...(Ts) + 1 );
-				assert( (m_maps.contains(Type<Ts>()) && ...) );
-				(AddValue( std::forward<Ts>(values) ), ...); //insert all components, get index of the handle
-				return AddValue( handle ); //insert the handle
-			}
-
-			/// @brief Get referece to the types of the components.
-			/// @return A reference to the container of the types.
-			[[nodiscard]] const auto&  Types() const {
-				return m_types;
-			}
-
-			/// @brief Test if the archetype has a component.
-			/// @param ti Hash of the type index of the component.
-			/// @return true if the archetype has the component, else false.
-			bool Has(const size_t ti) {
-				return m_types.contains(ti);
-			}
-
-			/// @brief Get component value of an entity. 
-			/// @tparam T The type of the component.
-			/// @param archIndex The index of the entity in the archetype.
-			/// @return The component value.
-			template<typename T>
-			[[nodiscard]] auto Get(size_t archIndex) -> T& {
-				return (*Map<T>())[archIndex];
-			}
-
-			/// @brief Get component values of an entity.
-			/// @tparam ...Ts Types of the components to get.
-			/// @param handle Handle of the entity.
-			/// @return A tuple of the component values.
-			template<typename... Ts>
-				requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value))
-			[[nodiscard]] auto Get(size_t archIndex) -> std::tuple<Ts&...> {
-				return std::tuple<std::decay_t<Ts>&...>{ Map<std::decay_t<Ts>>()->Get(archIndex)... };
-			}
-
-			/// @brief Erase an entity
-			/// @param index The index of the entity in the archetype.
-			/// @param slotmaps The slot maps vector of the registry.
-			void Erase(size_t index, auto& slotmaps) {
-				Erase2(index, slotmaps);
-			}
-
-			/// @brief Move components from another archetype to this one.
-			size_t Move( auto& types, size_t other_index, Archetype& other, auto& slotmaps) {			
-				for( auto& ti : types ) { //go through all maps
-					if( m_maps.contains(ti) ) m_maps[ti]->copy(other.Map(ti), other_index); //insert the new value
-				}
-				other.Erase2(other_index, slotmaps); //erase from old component map
-				++other.m_changeCounter;
-				++m_changeCounter;
-				return m_maps[Type<Handle>()]->size() - 1; //return the index of the new entity
-			}
-
-			/// @brief Swap two entities in the archetype.
-			void Swap(ArchetypeAndIndex& slot1, ArchetypeAndIndex& slot2) {
-				assert( slot1.m_value.m_archetypePtr == slot2.m_value.m_archetypePtr );
-				for( auto& map : m_maps ) {
-					map.second->swap(slot1.m_value.m_archindex, slot2.m_value.m_archindex);
-				}
-				std::swap(slot1.m_value.m_archindex, slot2.m_value.m_archindex);
-				++m_changeCounter;
-			}
-
-			/// @brief Clone the archetype.
-			/// @param other The archetype to clone.
-			/// @param types The types of the components to clone.
-			void Clone(Archetype& other, const auto& types) {
-				for( auto& ti : types ) { //go through all maps
-					m_types.insert(ti); //add the type to the list
-					if( other.m_maps.contains(ti) ) m_maps[ti] = other.Map(ti)->clone(); //make a component map like this one
-				}
-			}
-
-			/// @brief Get the number of entites in this archetype.
-			/// @return The number of entities.
-			size_t Size() {
-				return m_maps[Type<Handle>()]->size();
-			}
-
-			/// @brief Clear the archetype.
-			void Clear() {
-				for( auto& map : m_maps ) {
-					map.second->clear();
-				}
-				++m_changeCounter;
-			}
-
-			/// @brief Print the archetype.
-			void Print() {
-				std::cout << "Archetype: " << Hash(m_types) << std::endl;
-				for( auto ti : m_types ) {
-					std::cout << "Type: " << ti << " ";
-				}
-				std::cout << std::endl;
-				for( auto& map : m_maps ) {
-					std::cout << "Map: ";
-					map.second->print();
-					std::cout << std::endl;
-				}
-				std::cout << "Entities: ";
-				auto map = Map<Handle>();
-				for( auto handle : *map ) {
-					std::cout << handle << " ";
-				}
-				std::cout << std::endl << std::endl;
-			}
-
-			/// @brief Validate the archetype. Make sure all maps have the same size.
-			void Validate() {
-				for( auto& map : m_maps ) {
-					assert( map.second->size() == m_maps[Type<Handle>()]->size() );
-				}
-			}
-		
-			/// @brief Get the change counter of the archetype. It is increased when a change occurs
-			/// that might invalidate a Ref object, e.g. when an entity is moved to another archetype, or erased.
-			auto GetChangeCounter() -> size_t {
-				return m_changeCounter;
-			}
-
-			/// @brief Get the mutex of the archetype.
-			/// @return Reference to the mutex.
-			[[nodiscard]] auto GetMutex() -> mutex_t& {
-				return m_mutex;
-			}
-
-			void AddType(size_t ti) {
-				assert( !m_types.contains(ti) );
-				m_types.insert(ti);	//add the type to the list
-			};
-
-
-		private:
-
-			/// @brief Add a new component to the archetype.
-			/// @tparam T The type of the component.
-			template<typename U>
-			void AddComponent() {
-				using T = std::decay_t<U>; //remove pointer or reference
-				size_t ti = Type<T>();
-				assert( !m_types.contains(ti) );
-				m_types.insert(ti);	//add the type to the list
-				m_maps[ti] = std::make_unique<Vector<T>>(); //create the component map
-			};
-
-			/// @brief Add a new component value to the archetype.
-			/// @param v The component value.
-			/// @return The index of the component value.
-			template<typename U>
-			auto AddValue( U&& v ) -> size_t {
-				using T = std::decay_t<U>;
-				return m_maps[Type<T>()]->push_back(std::forward<U>(v));	//insert the component value
-			};
-
-			auto AddEmptyValue( size_t ti ) -> size_t {
-				return m_maps[ti]->push_back();	//insert the component value
-			};
-
-			/// @brief Erase an entity. To ensure thet consistency of the entity indices, the last entity is moved to the erased one.
-			/// This might result in a reindexing of the moved entity in the slot map. Thus we need a ref to the slot map
-			/// @param index The index of the entity in the archetype.
-			/// @param slotmaps Reference to the slot maps vector of the registry.
-			void Erase2(size_t index, auto& slotmaps) {
-				size_t last{index};
-				for( auto& it : m_maps ) {
-					last = it.second->erase(index); //Erase from the component map
-				}
-				if( index < last ) {
-					auto& lastHandle = static_cast<Vector<Handle>*>(m_maps[Type<Handle>()].get())->operator[](index);
-					slotmaps[lastHandle.GetStorageIndex()].m_slotMap[lastHandle].m_value.m_archIndex = index;
-				}
-				++m_changeCounter;
-			}
-			
-			/// @brief Get the map of the components.
-			/// @tparam T The type of the component.
-			/// @return Pointer to the component map.
-			template<typename U>
-			auto Map() -> Vector<std::decay_t<U>>* {
-				auto it = m_maps.find(Type<std::decay_t<U>>());
-				assert(it != m_maps.end());
-				return static_cast<Vector<std::decay_t<U>>*>(it->second.get());
-			}
-
-			/// @brief Get the data of the components.
-			/// @param ti Type index of the component.
-			/// @return Pointer to the component map base class.
-			auto Map(size_t ti) -> VectorBase* {
-				auto it = m_maps.find(ti);
-				assert(it != m_maps.end());
-				return it->second.get();
-			}
-
-			using Size_t = std::conditional_t<RTYPE == REGISTRYTYPE_SEQUENTIAL, std::size_t, std::atomic<std::size_t>>;
-			using Map_t = std::unordered_map<size_t, std::unique_ptr<VectorBase>>;
-
-			mutex_t 			m_mutex; //mutex for thread safety
-			Size_t 				m_changeCounter{0}; //changes invalidate references
-			std::set<size_t> 	m_types; //types of components
-			Map_t 				m_maps; //map from type index to component data
-		}; //end of Archetype
 
 	public:	
 		
 		//----------------------------------------------------------------------------------------------
-		//Hash Map
-
-		/// @brief A hash map for storing a map from key to value.
-		/// The hash map is implemented as a vector of buckets. Each bucket is a list of key-value pairs.
-		/// Inserting and reading from the hash map is thread-safe, i.e., internally sysnchronized.
-		
-		template<typename T>
-		class HashMap {
-
-			/// @brief A key-ptr pair in the hash map.
-			struct Pair {
-				std::pair<size_t, T> m_keyValue; ///< The key-value pair.
-				std::unique_ptr<Pair> m_next{}; ///< Pointer to the next pair.
-				size_t& Key() { return m_keyValue.first; }
-				T& Value() { return m_keyValue.second; };
-			};
-
-			/// @brief A bucket in the hash map.
-			struct Bucket {
-				std::unique_ptr<Pair> m_first{}; ///< Pointer to the first pair
-				mutex_t m_mutex; ///< Mutex for adding something to the bucket.
-
-				Bucket() : m_first{} {};
-				Bucket(const Bucket& other) : m_first{} {};
-			};
-
-			using Map_t = std::vector<Bucket>; ///< Type of the map.
-
-			/// @brief Iterator for the hash map.
-			class Iterator {
-			public:
-				/// @brief Constructor for the iterator.
-				/// @param map The hash map.
-				/// @param bucketIdx Index of the bucket.
-				Iterator(HashMap& map, size_t bucketIdx) : m_hashMap{map}, m_bucketIdx{bucketIdx}, m_pair{nullptr} {
-					if( m_bucketIdx >= m_hashMap.m_buckets.size() ) return;
-					m_pair = &m_hashMap.m_buckets[m_bucketIdx].m_first;
-					if( !*m_pair ) Next();
-				}	
-
-				~Iterator() = default; ///< Destructor.
-				auto operator++() {  /// @brief Increment the iterator.
-					if( *m_pair ) { m_pair = &(*m_pair)->m_next;  if( *m_pair ) { return *this; } }
-					Next(); 
-					return *this; 
-				}
-				auto& operator*() { return (*m_pair)->m_keyValue; } ///< Dereference the iterator.
-				auto operator!=(const Iterator& other) -> bool { return m_bucketIdx != other.m_bucketIdx; } ///< Compare the iterator.
-			private:
-				/// @brief Move to the next bucket.
-				void Next() {
-					do {++m_bucketIdx; }
-					while( m_bucketIdx < m_hashMap.m_buckets.size() && !m_hashMap.m_buckets[m_bucketIdx].m_first );
-					if( m_bucketIdx < m_hashMap.m_buckets.size() ) { m_pair = &m_hashMap.m_buckets[m_bucketIdx].m_first; } 
-				}
-				HashMap& m_hashMap;	///< Reference to the hash map.
-				std::unique_ptr<Pair>* m_pair;	///< Pointer to the pair.
-				size_t m_bucketIdx;	///< Index of the current bucket.
-			};
-
-		public:
-
-			/// @brief Constructor, creates the hash map.
-			HashMap(size_t bits = 10) : m_buckets{} {
-				size_t size = (1ull << bits);
-				for( int i = 0; i < size; ++i ) {
-					m_buckets.emplace_back();
-				}
-			}
-
-			/// @brief Destructor, destroys the hash map.
-			~HashMap() = default;
-
-			/// @brief Find a pair in the bucket. If not found, create a new pair with the given key.	
-			/// @param key Find this key
-			/// @return Pointer to the value.
-			T& operator[](size_t key) {
-				auto& bucket = m_buckets[key & (m_buckets.size()-1)];
-				std::unique_ptr<Pair>* pair;
-				{
-					LockGuardShared<RTYPE> lock(&bucket.m_mutex);
-					pair = Find(&bucket.m_first, key);
-					if( (*pair) != nullptr ) { return (*pair)->Value(); }
-				}
-
-				LockGuard<RTYPE> lock(&bucket.m_mutex);
-				pair = Find(pair, key);
-				if( (*pair) != nullptr ) { 	return (*pair)->Value(); }
-				*pair = std::make_unique<Pair>( std::make_pair(key, T{}) );
-				m_size++;
-				return (*pair)->Value();
-			}
-
-			/// @brief Get a value from the hash map.
-			/// @param key The key of the value.
-			/// @return Pointer to the value.
-			T* get(size_t key) {
-				auto& bucket = m_buckets[key & (m_buckets.size()-1)];
-				LockGuardShared<RTYPE> lock(&bucket.m_mutex);
-				std::unique_ptr<Pair>* pair = Find(&bucket.m_first, key);
-				if( (*pair) != nullptr ) { return (*pair)->Value(); }
-				return nullptr;
-			}
-
-			/// @brief Test whether the hash map contains a key.
-			/// @param key The key to test.
-			/// @return true if the key is in the hash map, else false.
-			bool contains(size_t key) {
-				auto& bucket = m_buckets[key & (m_buckets.size()-1)];
-				LockGuardShared<RTYPE> lock(&bucket.m_mutex);
-				std::unique_ptr<Pair>* pair = Find(&bucket.m_first, key);
-				return (*pair) != nullptr;
-			}
-
-			size_t size() { return m_size; } ///< Get the number of items in the hash map.
-
-			auto begin() -> Iterator { return Iterator(*this, 0); }
-			auto end() -> Iterator { return Iterator(*this, m_buckets.size()); }
-
-		private:
-
-			/// @brief Find a pair in the bucket.
-			/// @param pair Start of the list of pairs.
-			/// @param key Find this key
-			/// @return Pointer to the pair with the key and value, points to the unqiue_ptr of the pair.
-			auto Find(std::unique_ptr<Pair>* pair, size_t key) -> std::unique_ptr<Pair>* {
-				while( (*pair) != nullptr && (*pair)->Key() != key ) { pair = &(*pair)->m_next; }
-				return pair;
-			}
-
-			Map_t m_buckets; ///< The map of buckets.
-			size_t m_size{0}; ///< The size of the hash map.
-		};
-
-
-		//----------------------------------------------------------------------------------------------
 
 		/// @brief A structure holding a pointer to an archetype and the current size of the archetype.
 		struct ArchetypeAndSize {
-			Archetype* 	m_archetype;	//pointer to the archetype
+			Archetype<RTYPE>* 	m_archetype;	//pointer to the archetype
 			size_t 		m_size;			//size of the archetype
-			ArchetypeAndSize(Archetype* arch, size_t size) : m_archetype{arch}, m_size{size} {}
+			ArchetypeAndSize(Archetype<RTYPE>* arch, size_t size) : m_archetype{arch}, m_size{size} {}
 		};
 
 		/// @brief Used for iterating over entity components. Iterators are created by a view. 
@@ -1041,7 +200,7 @@ namespace vecs {
 			/// @brief Get a component value from the archetype.
 			template<typename U>
 				requires (!std::is_same_v<U, Handle&>) // && !std::is_reference_v<U>)
-			[[nodiscard]] auto Get(auto &system, Handle handle, Archetype *arch) {
+			[[nodiscard]] auto Get(auto &system, Handle handle, Archetype<RTYPE>* arch) {
 				using T = std::decay_t<U>;
 				return (*arch->template Map<T>())[m_entidx];
 			}
@@ -1084,7 +243,7 @@ namespace vecs {
 			}
 
 			Registry<RTYPE>& 		m_system; ///< Reference to the registry system.
-			Archetype*		 		m_archetype{nullptr}; ///< Pointer to the current archetype.
+			Archetype<RTYPE>*		 		m_archetype{nullptr}; ///< Pointer to the current archetype.
 			Vector<Handle>*	m_mapHandle{nullptr}; ///< Pointer to the comp map holding the handle of the current archetype.
 			std::vector<ArchetypeAndSize>& m_archetypes; ///< List of archetypes.
 			size_t 	m_archidx{0};	///< Index of the current archetype.
@@ -1269,7 +428,7 @@ namespace vecs {
 		Registry() { ///< Constructor.
 			//m_entities.reserve(NUMBER_SLOTMAPS::value); //resize the slot storage
 			for( uint32_t i = 0; i < NUMBER_SLOTMAPS::value; ++i ) {
-				m_entities.emplace_back( SlotMapAndMutex<ArchetypeAndIndex>{ i, 6  } ); //add the first slot
+				m_entities.emplace_back( SlotMapAndMutex<typename Archetype<RTYPE>::ArchetypeAndIndex>{ i, 6  } ); //add the first slot
 			}
 		};
 
@@ -1454,7 +613,7 @@ namespace vecs {
 			std::set<size_t> types = oldArch->Types();
 			(types.erase(Type<Ts>()), ... );
 			size_t hs = Hash(types);
-			Archetype *arch;
+			Archetype<RTYPE> *arch;
 			if( !m_archetypes.contains(hs) ) {
 				auto archPtr = std::make_unique<Archetype>();
 				arch = archPtr.get();
@@ -1645,14 +804,14 @@ namespace vecs {
 		/// @param handle The handle of the entity.
 		/// @return The index of the slotmap and the archetype.
 		auto GetSlotAndArch(auto handle) {
-			ArchetypeAndIndex* value = &m_entities[handle.GetStorageIndex()].m_slotMap[handle].m_value;
+			typename Archetype<RTYPE>::ArchetypeAndIndex* value = &m_entities[handle.GetStorageIndex()].m_slotMap[handle].m_value;
 			return std::make_pair(value, value->m_archetypePtr);
 		}
 
 		/// @brief Clone an archetype with a subset of components.
 		/// @param arch The archetype to clone.
 		/// @param types The types of the components to clone.
-		auto CloneArchetype(Archetype* arch, const std::vector<size_t>& types) {
+		auto CloneArchetype(Archetype<RTYPE>* arch, const std::vector<size_t>& types) {
 			auto newArch = std::make_unique<Archetype>();
 			newArch->Clone(*arch, types);
 			UpdateSearchCache(newArch.get());
@@ -1702,14 +861,14 @@ namespace vecs {
 		/// @param ...vs The new values.
 		template<typename... Ts>
 		void Put2(Handle handle, Ts&&... vs) {
-			auto func = [&]<typename T>(Archetype* arch, size_t archIndex, T&& v) { 
+			auto func = [&]<typename T>(Archetype<RTYPE>* arch, size_t archIndex, T&& v) { 
 				(*arch->template Map<T>())[archIndex] = std::forward<T>(v);
 			};
 
 			std::vector<size_t> newTypes;
 			{
 				LockGuardShared<RTYPE> lock(&GetMutex(handle.GetStorageIndex())); //lock the mutex
-				ArchetypeAndIndex* value = GetArchetype<std::decay_t<Ts>...>(handle, newTypes);
+				typename Archetype<RTYPE>::ArchetypeAndIndex* value = GetArchetype<std::decay_t<Ts>...>(handle, newTypes);
 				//value->m_archetypePtr->Print();	
 				if(newTypes.empty()) {
 					( func.template operator()<Ts>(value->m_archetypePtr, value->m_archIndex, std::forward<Ts>(vs)), ... );
@@ -1718,7 +877,7 @@ namespace vecs {
 			}
 
 			LockGuard<RTYPE> lock1(&GetMutex(handle.GetStorageIndex())); //lock the mutex
-			ArchetypeAndIndex* value = GetArchetype<std::decay_t<Ts>...>(handle, newTypes);
+			typename Archetype<RTYPE>::ArchetypeAndIndex* value = GetArchetype<std::decay_t<Ts>...>(handle, newTypes);
 			auto arch = value->m_archetypePtr;
 			if(newTypes.empty()) {
 				( func.template operator()<Ts>(arch, value->m_archIndex, std::forward<Ts>(vs)), ... );
@@ -1744,7 +903,7 @@ namespace vecs {
 			std::vector<size_t> newTypes;
 			{
 				LockGuardShared<RTYPE> lock(&GetMutex(handle.GetStorageIndex())); //lock the mutex
-				ArchetypeAndIndex* value = GetArchetype<T>(handle, newTypes);
+				typename Archetype<RTYPE>::ArchetypeAndIndex* value = GetArchetype<T>(handle, newTypes);
 				auto arch = value->m_archetypePtr;
 				if(newTypes.empty()) { 
 					decltype(auto) v = arch->template Get<T>(value->m_archIndex); 
@@ -1753,7 +912,7 @@ namespace vecs {
 			}
 
 			LockGuard<RTYPE> lock1(&GetMutex(handle.GetStorageIndex())); //lock the mutex
-			ArchetypeAndIndex* value = GetArchetype<T>(handle, newTypes);
+			typename Archetype<RTYPE>::ArchetypeAndIndex* value = GetArchetype<T>(handle, newTypes);
 			auto arch = value->m_archetypePtr;
 			if(newTypes.empty()) { 
 				decltype(auto) v = arch->template Get<T>(value->m_archIndex); 
@@ -1780,14 +939,14 @@ namespace vecs {
 			std::vector<size_t> newTypes;
 			{
 				LockGuardShared<RTYPE> lock(&GetMutex(handle.GetStorageIndex())); //lock the mutex
-				ArchetypeAndIndex* value = GetArchetype<std::decay_t<Ts>...>(handle, newTypes);
+				typename Archetype<RTYPE>::ArchetypeAndIndex* value = GetArchetype<std::decay_t<Ts>...>(handle, newTypes);
 				auto arch = value->m_archetypePtr;
 				//value->m_archetypePtr->Print();	
 				if(newTypes.empty()) { return std::tuple<Ts...>{ arch->template Get<Ts>(value->m_archIndex)... };  }
 			}
 
 			LockGuard<RTYPE> lock1(&GetMutex(handle.GetStorageIndex())); //lock the mutex
-			ArchetypeAndIndex* value = GetArchetype<std::decay_t<Ts>...>(handle, newTypes);
+			typename Archetype<RTYPE>::ArchetypeAndIndex* value = GetArchetype<std::decay_t<Ts>...>(handle, newTypes);
 			auto arch = value->m_archetypePtr;
 			if(newTypes.empty()) { return std::tuple<Ts...>{ arch->template Get<Ts>(value->m_archIndex)... } ; } 
 
@@ -1804,10 +963,10 @@ namespace vecs {
 		/// @param newTypes A vector to store the types of the components that are not contained and should be created.
 		/// @return Slotmap value of the entity containing pointer to the archetype and index in the archetype. 
 		template<typename... Ts>
-		inline auto GetArchetype(Handle handle, std::vector<size_t>& newTypes) -> ArchetypeAndIndex* {		
+		inline auto GetArchetype(Handle handle, std::vector<size_t>& newTypes) -> Archetype<RTYPE>::ArchetypeAndIndex* {		
 			newTypes.clear();
 			newTypes.reserve(sizeof...(Ts));
-			ArchetypeAndIndex* value = &m_entities[handle.GetStorageIndex()].m_slotMap[handle].m_value;
+			typename Archetype<RTYPE>::ArchetypeAndIndex* value = &m_entities[handle.GetStorageIndex()].m_slotMap[handle].m_value;
 			
 			auto func = [&]<typename T>(){ if(!value->m_archetypePtr->Has(Type<T>())) newTypes.emplace_back(Type<T>()); };
 			( func.template operator()<std::decay_t<Ts>>(), ...  );
@@ -1821,14 +980,14 @@ namespace vecs {
 		/// @param newTypes A vector with the types of the components that are not contained and shhould be created.
 		/// @return Pointer to the new archetype.
 		template<typename... Ts>
-		inline auto CreateArchetype(Handle handle, ArchetypeAndIndex* value, std::vector<size_t>& newTypes) -> Archetype* {
+		inline auto CreateArchetype(Handle handle, Archetype<RTYPE>::ArchetypeAndIndex* value, std::vector<size_t>& newTypes) -> Archetype<RTYPE>* {
 			auto arch = value->m_archetypePtr;
 			std::vector<size_t> allTypes; //{newTypes};
 			std::ranges::copy( newTypes, std::back_inserter(allTypes) );
 			std::ranges::copy( arch->Types(), std::back_inserter(allTypes) );
 
 			size_t hs = Hash(allTypes);
-			Archetype *newArch=nullptr;
+			Archetype<RTYPE> *newArch=nullptr;
 			if( !m_archetypes.contains(hs) ) {
 				auto newArchUnique = std::make_unique<Archetype>();
 				newArch = newArchUnique.get();
@@ -1857,7 +1016,7 @@ namespace vecs {
 		/// all components that are searched for. Add them to the set of archetypes that yielded a result
 		/// for this particular search.
 		/// @param arch Pointer to the new archetype.
-		void UpdateSearchCache(Archetype* arch) {
+		void UpdateSearchCache(Archetype<RTYPE>* arch) {
 			LockGuard<RTYPE> lock(&arch->GetMutex()); //lock the cache
 			auto types = arch->Types();
 			for( auto& ts : m_searchCacheSet ) {
@@ -1874,9 +1033,9 @@ namespace vecs {
 			return m_slotMapIndex;
 		}
 
-		using SlotMaps_t = std::vector<SlotMapAndMutex<ArchetypeAndIndex>>;
-		using HashMap_t = HashMap<std::unique_ptr<Archetype>>;
-		using SearchCacheMap_t = std::unordered_map<size_t, std::set<Archetype*>>;
+		using SlotMaps_t = std::vector<SlotMapAndMutex<typename Archetype<RTYPE>::ArchetypeAndIndex>>;
+		using HashMap_t = HashMap<std::unique_ptr<Archetype<RTYPE>>>;
+		using SearchCacheMap_t = std::unordered_map<size_t, std::set<Archetype<RTYPE>*>>;
 		using SearchCacheSet_t = std::vector<TypeSetAndHash>;
 
 		inline static thread_local size_t m_slotMapIndex = NUMBER_SLOTMAPS::value - 1;
@@ -1888,7 +1047,7 @@ namespace vecs {
 		SearchCacheMap_t m_searchCacheMap; //Mapping vector of hash to archetype, 1:N
 		SearchCacheSet_t m_searchCacheSet; //These type combinations have been searched for, for updating
 		inline static thread_local size_t 		m_numIterators{0}; //thread local variable for locking
-		inline static thread_local Archetype* 	m_currentArchetype{nullptr}; //is there an iterator now
+		inline static thread_local Archetype<RTYPE>* 	m_currentArchetype{nullptr}; //is there an iterator now
 		inline static thread_local std::vector<std::function<void()>> m_delayedTransactions; //thread local variable for locking
 	};
 
