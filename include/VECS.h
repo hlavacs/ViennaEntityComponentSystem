@@ -49,51 +49,7 @@ namespace vecs {
 	template<typename... Ts> requires VecsIterator<Ts...> class Iterator;
 	template<typename... Ts> requires VecsView<Ts...> class View;
 
-	//----------------------------------------------------------------------------------------------
-	//Convenience functions
 
-	template<typename>
-	struct is_std_vector : std::false_type {};
-
-	template<typename T, typename A>
-	struct is_std_vector<std::vector<T,A>> : std::true_type {};
-
-	template <typename> struct is_tuple : std::false_type {};
-	template <typename ...Ts> struct is_tuple<std::tuple<Ts...>> : std::true_type {};
-
-	/// @brief Compute the hash of a list of hashes. If stored in a vector, make sure that hashes are sorted.
-	/// @tparam T Container type of the hashes.
-	/// @param hashes Reference to the container of the hashes.
-	/// @return Overall hash made from the hashes.
-	template <typename T>
-	inline size_t Hash( T& hashes ) {
-		std::size_t seed = 0;
-		if constexpr ( is_std_vector<std::decay_t<T>>::value ) {
-			std::ranges::sort(hashes);
-		}
-		for( auto& v : hashes ) {
-			seed ^= v + 0x9e3779b9 + (seed<<6) + (seed>>2);
-		}
-		return seed;
-	}
-
-	template <typename T>
-	inline size_t Hash( T&& hashes ) {
-		std::size_t seed = 0;
-		if constexpr ( is_std_vector<std::decay_t<T>>::value ) {
-			std::ranges::sort(hashes);
-		}
-		for( auto& v : hashes ) {
-			seed ^= v + 0x9e3779b9 + (seed<<6) + (seed>>2);
-		}
-		return seed;
-	}
-
-	template<typename... Ts>
-	struct Yes {};
-
-	template<typename... Ts>
-	struct No {};
 
 	//----------------------------------------------------------------------------------------------
 	//Registry 
@@ -461,7 +417,7 @@ namespace vecs {
 			std::vector<size_t> types = {Type<Handle>(), Type<Ts>()...};
 			size_t hs = Hash(types);
 			if( !m_archetypes.contains( hs ) ) { //not found
-				auto arch = std::make_unique<Archetype>( handle, archIndex, std::forward<Ts>(component)... );
+				auto arch = std::make_unique<Archetype<RTYPE>>( handle, archIndex, std::forward<Ts>(component)... );
 				UpdateSearchCache(arch.get());
 				slot.m_value = { arch.get(), archIndex };
 				m_archetypes[hs] = std::move(arch);
@@ -615,7 +571,7 @@ namespace vecs {
 			size_t hs = Hash(types);
 			Archetype<RTYPE> *arch;
 			if( !m_archetypes.contains(hs) ) {
-				auto archPtr = std::make_unique<Archetype>();
+				auto archPtr = std::make_unique<Archetype<RTYPE>>();
 				arch = archPtr.get();
 				arch->Clone(*oldArch, types);
 				UpdateSearchCache(arch);
@@ -812,7 +768,7 @@ namespace vecs {
 		/// @param arch The archetype to clone.
 		/// @param types The types of the components to clone.
 		auto CloneArchetype(Archetype<RTYPE>* arch, const std::vector<size_t>& types) {
-			auto newArch = std::make_unique<Archetype>();
+			auto newArch = std::make_unique<Archetype<RTYPE>>();
 			newArch->Clone(*arch, types);
 			UpdateSearchCache(newArch.get());
 			m_archetypes[Hash(newArch->Types())] = std::move(newArch);
@@ -989,7 +945,7 @@ namespace vecs {
 			size_t hs = Hash(allTypes);
 			Archetype<RTYPE> *newArch=nullptr;
 			if( !m_archetypes.contains(hs) ) {
-				auto newArchUnique = std::make_unique<Archetype>();
+				auto newArchUnique = std::make_unique<Archetype<RTYPE>>();
 				newArch = newArchUnique.get();
 				newArch->Clone(*arch, arch->Types());
 				

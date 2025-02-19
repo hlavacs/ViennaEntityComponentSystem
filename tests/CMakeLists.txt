@@ -1,7 +1,7 @@
 
 set(TARGET testvecs)
 
-set(SOURCE testvecs.cpp)
+set(SOURCE testvecs.cpp testvecs_old.cpp)
 
 set(HEADERS
   ${INCLUDE}/VECS.h

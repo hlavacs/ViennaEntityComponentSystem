@@ -20,18 +20,6 @@ namespace vecs {
 
 	class VectorBase {
 
-		/// @brief Iterator for the vector.
-		class Iterator {
-		public:
-			Iterator(VectorBase& data, size_t index) : m_data{data}, m_index{index} {}
-			Iterator& operator++() { ++m_index; return *this; }
-			bool operator!=(const Iterator& other) const { return m_index != other.m_index; }
-			void* operator*() { return &m_data; }	
-		private:
-			VectorBase& m_data;
-			size_t m_index{0};
-		};
-
 	public:
 		VectorBase() = default; //constructor
 		virtual ~VectorBase() = default; //destructor
@@ -54,9 +42,6 @@ namespace vecs {
 		virtual auto clone() -> std::unique_ptr<VectorBase> = 0;
 		virtual void clear() = 0;
 		virtual void print() = 0;
-
-		auto begin() -> Iterator { return Iterator{*this, 0}; }
-		auto end() -> Iterator { return Iterator{*this, size()}; }
 	}; //end of VectorBase
 
 

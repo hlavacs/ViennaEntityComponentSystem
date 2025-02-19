@@ -28,6 +28,11 @@ namespace vecs {
 			/// @param next Next free slot in the free list.
 			/// @param version Version counter of the slot to avoid accessing erased slots.
 			/// @param value Value stored in the slot.
+			Slot(const int64_t& next, const size_t& version, T& value) : m_value{value} {
+				m_nextFree = next;
+				m_version = version;
+			}
+
 			Slot(const int64_t&& next, const size_t&& version, T&& value) : m_value{std::forward<T>(value)} {
 				m_nextFree = next;
 				m_version = version;
@@ -51,7 +56,7 @@ namespace vecs {
 			m_firstFree = 0;
 			int64_t size = ((int64_t)1l << bits);
 			for( int64_t i = 1; i <= size-1; ++i ) { //create the free list
-				m_slots.push_back( Slot( int64_t{i}, size_t{0uL}, T{} ) );
+				m_slots.push_back( Slot(int64_t{i}, size_t{0}, T{} ) );
 			}
 			m_slots.push_back( Slot(int64_t{-1}, size_t{0}, T{}) ); //last slot
 		}
@@ -60,7 +65,7 @@ namespace vecs {
 			m_firstFree = 0;
 			int64_t size = other.m_slots.size();
 			for( int64_t i = 1; i <= size-1; ++i ) { //create the free list
-				m_slots.push_back( Slot( int64_t{i}, size_t{0uL}, T{} ) );
+				m_slots.push_back( Slot( int64_t{i}, size_t{0}, T{} ) );
 			}
 			m_slots.push_back( Slot(int64_t{-1}, size_t{0}, T{}) ); //last slot
 		}
@@ -70,6 +75,23 @@ namespace vecs {
 		/// @brief Insert a value to the slot map.
 		/// @param value The value to insert.
 		/// @return A pair of the handle and reference to the slot.
+		auto Insert(T& value) -> std::pair<Handle, Slot&> {
+			int64_t index = m_firstFree;
+			Slot* slot = nullptr;
+			if( index > -1 ) { 
+				slot = &m_slots[index];
+				m_firstFree = slot->m_nextFree;
+				slot->m_nextFree = -1;
+				slot->m_value = value;
+			} else {
+				m_slots.push_back( Slot{ int64_t{-1}, size_t{0}, value } );
+				index = m_slots.size() - 1; //index of the new slot
+				slot = &m_slots[index];
+			}
+			++m_size;
+			return { Handle{ (uint32_t)index, (uint32_t)slot->m_version, m_storageIndex}, *slot};			
+		}
+
 		auto Insert(T&& value) -> std::pair<Handle, Slot&> {
 			int64_t index = m_firstFree;
 			Slot* slot = nullptr;
@@ -77,12 +99,12 @@ namespace vecs {
 				slot = &m_slots[index];
 				m_firstFree = slot->m_nextFree;
 				slot->m_nextFree = -1;
+				slot->m_value = std::forward<T>(value);
 			} else {
 				m_slots.push_back( Slot{ int64_t{-1}, size_t{0}, std::forward<T>(value) } );
 				index = m_slots.size() - 1; //index of the new slot
 				slot = &m_slots[index];
 			}
-			slot->m_value = std::forward<T>(value);
 			++m_size;
 			return { Handle{ (uint32_t)index, (uint32_t)slot->m_version, m_storageIndex}, *slot};			
 		}
@@ -101,7 +123,9 @@ namespace vecs {
 		/// @param handle The handle of the value to get.
 		/// @return Reference to the value.
 		auto operator[](Handle handle) -> Slot& {
-			return m_slots[handle.GetIndex()];
+			auto* slot = &m_slots[handle.GetIndex()];
+			assert( slot->m_version == handle.GetVersion() );
+			return *slot;
 		}
 
 		/// @brief Get the size of the slot map.

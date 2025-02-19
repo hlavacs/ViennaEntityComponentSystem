@@ -9,53 +9,6 @@
 
 int test1() {
 
-	std::cout << "test 1.1 slotmap" << std::endl;
-
-
-	{
-		vecs::Vector<int> stack;
-
-		std::vector<vecs::Vector<int>> v;
-		v.push_back( stack );
-	}
-
-	{
-		vecs::Registry<vecs::REGISTRYTYPE_PARALLEL>::HashMap<int> hm;
-		hm[1] = 1;
-		hm[2] = 2;
-		hm[3] = 3;
-
-		int h1 = hm[1];
-		int h2 = hm[2];
-		int h3 = hm[3];
-
-		for( auto v : hm ) {
-			std::cout << v.first << " " << v.second << std::endl;
-		}	
-
-	}
-
-	{
-		vecs::SlotMap<int> sm(0,6);
-		std::vector<vecs::SlotMap<int>> v;
-
-		v.push_back( sm );
-
-		auto [h1, v1] = sm.Insert(1);
-		auto [h2, v2] = sm.Insert(2);
-		auto [h3, v3] = sm.Insert(3);
-		assert( sm.Size() == 3 );
-
-		assert( sm[h1].m_value == 1 );
-		assert( sm[h2].m_value == 2 );
-		assert( sm[h3].m_value == 3 );
-
-		sm.Erase( h1 );
-		sm.Erase( h2);
-
-		assert( sm.Size() == 1 );
-		assert( sm[h3].m_value == 3 );
-	}
 
 	std::cout << "test 1.2 system" << std::endl;
 
@@ -528,7 +481,7 @@ void test5() {
 
 
 
-int main() {
+int main_old() {
 	test1();
 	
 	test3( "Insert", false, [&](auto& system, int num){ return test_insert(system, num); } );
