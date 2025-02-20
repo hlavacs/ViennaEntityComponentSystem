@@ -97,13 +97,11 @@ namespace vecs {
 			--m_size;
 		}
 
-		/// @brief Get a value from the slot map.
+		/// @brief Get a value from the slot map. Do not assert versions here, could be used for writing!
 		/// @param handle The handle of the value to get.
 		/// @return Reference to the value.
 		auto operator[](Handle handle) -> Slot& {
-			auto* slot = &m_slots[handle.GetIndex()];
-			assert( slot->m_version == handle.GetVersion() );
-			return *slot;
+			return m_slots[handle.GetIndex()];
 		}
 
 		/// @brief Get the size of the slot map.

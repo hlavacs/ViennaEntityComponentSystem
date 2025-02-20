@@ -10,6 +10,7 @@
 #include <VECSHandle.h>
 #include <VECSVector.h>
 #include <VECSSlotMap.h>
+#include <VECSArchetype2.h>
 
 void check( bool b, std::string_view msg = "" ) {
 	if( b ) {
@@ -165,6 +166,138 @@ void test_hashmap() {
 }
 
 void test_archetype() {
+	std::print("\x1b[37m testing archetype...");
+
+	{
+		vecs2::Archetype<0> arch;
+		arch.AddComponent<int>();
+		arch.AddComponent<float>();
+		arch.AddComponent<char>();
+		arch.AddComponent<double>();
+		arch.AddComponent<std::string>();
+
+		arch.AddValue( vecs::Handle{1,2} );
+		arch.AddValue( 1 );
+		arch.AddValue( 2.0f );
+		arch.AddValue( 'a' );
+		arch.AddValue( 3.0 );
+		arch.AddValue( std::string("hello") );
+
+		check( arch.Size() == 1 );
+		check( arch.Get<int>(0) == 1 );
+		check( arch.Get<float>(0) == 2.0f );
+		check( arch.Get<char>(0) == 'a' );
+		check( arch.Get<double>(0) == 3.0 );
+		check( arch.Get<std::string>(0) == "hello" );
+
+		arch.Clear();
+		check( arch.Size() == 0 );
+
+		arch.Insert( vecs::Handle{1,2}, 1, 2.0f, 'a', 3.0, std::string("hello") );
+		check( arch.Size() == 1 );
+		check( arch.Get<int>(0) == 1 );
+		check( arch.Get<float>(0) == 2.0f );
+		check( arch.Get<char>(0) == 'a' );
+		check( arch.Get<double>(0) == 3.0 );
+		check( arch.Get<std::string>(0) == "hello" );
+
+		arch.Insert( vecs::Handle{2,3}, 2, 3.0f, 'b', 4.0, std::string("world") );
+		check( arch.Size() == 2 );
+		check( arch.Get<int>(0) == 1 );
+		check( arch.Get<float>(0) == 2.0f );
+		check( arch.Get<char>(0) == 'a' );
+		check( arch.Get<double>(0) == 3.0 );
+		check( arch.Get<std::string>(0) == "hello" );
+
+		check( arch.Get<int>(1) == 2 );
+		check( arch.Get<float>(1) == 3.0f );
+		check( arch.Get<char>(1) == 'b' );
+		check( arch.Get<double>(1) == 4.0 );
+		check( arch.Get<std::string>(1) == "world" );
+
+		vecs2::Archetype<0>::ArchetypeAndIndex slot1{&arch, 0};
+		vecs2::Archetype<0>::ArchetypeAndIndex slot2{&arch, 1};
+
+		arch.Swap( slot1, slot2 );
+		check( arch.Get<int>(0) == 2 );
+		check( arch.Get<float>(0) == 3.0f );
+		check( arch.Get<char>(0) == 'b' );
+
+		check( arch.Get<int>(1) == 1 );
+		check( arch.Get<float>(1) == 2.0f );
+		check( arch.Get<char>(1) == 'a' );
+
+		arch.Erase( 0 );
+		check( arch.Size() == 1 );
+		check( arch.Get<int>(0) == 1 );
+		check( arch.Get<float>(0) == 2.0f );
+		check( arch.Get<char>(0) == 'a' );
+
+		arch.Erase( 0 );
+		check( arch.Size() == 0 );
+
+		vecs2::Archetype<0> arch2;
+		arch2.AddComponent<int>();
+		arch2.AddComponent<float>();
+		arch2.AddComponent<char>();
+		arch2.AddComponent<double>();
+
+		arch2.Insert( vecs::Handle{1,2}, 1, 2.0f, 'a', 3.0 );
+		check( arch2.Size() == 1 );
+		check( arch2.Get<int>(0) == 1 );
+		check( arch2.Get<float>(0) == 2.0f );
+		check( arch2.Get<char>(0) == 'a' );
+		check( arch2.Get<double>(0) == 3.0 );
+
+		arch2.Insert( vecs::Handle{2,3}, 2, 3.0f, 'b', 4.0 );
+		check( arch2.Size() == 2 );
+		check( arch2.Get<int>(1) == 2 );
+		check( arch2.Get<float>(1) == 3.0f );
+		check( arch2.Get<char>(1) == 'b' );
+		check( arch2.Get<double>(1) == 4.0 );
+
+		auto [index, handle] = arch.Move( arch2, 0 );
+		check( arch.Size() == 1 );
+		check( arch2.Size() == 1 );
+		check( index == 0 );
+		check( handle == vecs::Handle{2,3} );
+		check( arch.Get<int>(0) == 1 );
+		check( arch.Get<float>(0) == 2.0f );
+		check( arch.Get<char>(0) == 'a' );
+		check( arch.Get<double>(0) == 3.0 );
+
+		auto [index1, handle1] = arch.Move( arch2, 0 );
+		check( arch.Size() == 2 );
+		check( arch2.Size() == 0 );	
+		check( index1 == 1 );
+		check( handle1 == vecs::Handle{} );
+		check( arch.Get<int>(1) == 2 );
+		check( arch.Get<float>(1) == 3.0f );
+		check( arch.Get<char>(1) == 'b' );
+		check( arch.Get<double>(1) == 4.0 );
+
+		vecs2::Archetype<0> arch3;
+		arch3.Clone( arch, {} );
+		check( arch3.Size() == 0 );
+		check( arch3.Has( vecs::Type<vecs::Handle>() ) == true );
+		check( arch3.Has( vecs::Type<int>() ) == true );
+		check( arch3.Has( vecs::Type<float>() ) == true );
+		check( arch3.Has( vecs::Type<char>() ) == true );
+		check( arch3.Has( vecs::Type<double>() ) == true );
+		check( arch3.Has( vecs::Type<std::string>() ) == true );
+
+		vecs2::Archetype<0> arch4;
+		arch4.Clone( arch, {vecs::Type<int>(), vecs::Type<double>()} );
+		check( arch4.Size() == 0 );
+		check( arch4.Has( vecs::Type<vecs::Handle>() ) == true );
+		check( arch4.Has( vecs::Type<int>() ) == false );
+		check( arch4.Has( vecs::Type<float>() ) == true );
+		check( arch4.Has( vecs::Type<char>() ) == true );
+		check( arch4.Has( vecs::Type<double>() ) == false );
+		check( arch4.Has( vecs::Type<std::string>() ) == true );
+
+	}
+	std::print("\x1b[32m passed\n");
 
 }
 
@@ -176,6 +309,7 @@ void test_registry() {
 
 }
 
+void test_vecs();
 
 int main() {
 	test_handle();
@@ -185,5 +319,6 @@ int main() {
 	test_archetype();
 	test_mutex();
 	test_registry();
+	//test_vecs();
 }
 

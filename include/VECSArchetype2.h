@@ -2,10 +2,18 @@
 
 #include <VECSHandle.h>
 
+namespace vecs2 {
 
+	using Handle = vecs::Handle;
+	template<typename T>
+	using Vector = vecs::Vector<T>;
+	using VectorBase = vecs::VectorBase;
+	using mutex_t = vecs::mutex_t;
 
-namespace vecs {
-
+	template<typename T>
+	inline auto Type() -> std::size_t {
+		return std::type_index(typeid(T)).hash_code();
+	}
 
 	//----------------------------------------------------------------------------------------------
 	//Convenience functions
@@ -67,16 +75,8 @@ namespace vecs {
 	/// The components are stored in the component maps. Note that the archetype class is not templated,
 	/// but some methods including a constructor are templated. Thus the class knows only type indices
 	/// of its components, not the types themselves.
-	template<int ATYPE>
-	class Archetype;
-
-
-
-	/// @brief An archetype of entities with the same components. 
-	/// All entities that have the same components are stored in the same archetype.
 	template<int ATYPE = ARCHETYPE_SEQUENTIAL>
 	class Archetype {
-		//template <int T> requires RegistryType<T> friend class Registry;
 
 	public:
 
@@ -86,7 +86,11 @@ namespace vecs {
 			size_t m_archIndex;			//index of the entity in the archetype
 		};	
 
-		Archetype() = default; //default constructor
+		/// @brief Constructor, creates the archetype.
+		Archetype() {
+			AddComponent<Handle>(); //insert the handle			
+		}
+
 		/// @brief Constructor, called if a new entity should be created with components, and the archetype does not exist yet.
 		/// @tparam ...Ts 
 		/// @param handle The handle of the entity.
@@ -94,9 +98,9 @@ namespace vecs {
 		template<typename... Ts>
 			requires VecsArchetype<Ts...>
 		Archetype(Handle handle, size_t& archIndex, Ts&& ...values ) {
+			AddComponent<Handle>(); //insert the handle
 			(AddComponent<Ts>(), ...); //insert component types
 			(AddValue( std::forward<Ts>(values) ), ...); //insert all components, get index of the handle
-			AddComponent<Handle>(); //insert the handle
 			archIndex = AddValue( handle ); //insert the handle
 		}
 
@@ -131,9 +135,12 @@ namespace vecs {
 		/// @tparam T The type of the component.
 		/// @param archIndex The index of the entity in the archetype.
 		/// @return The component value.
-		template<typename T>
-		[[nodiscard]] auto Get(size_t archIndex) -> T& {
-			return (*Map<T>())[archIndex];
+		template<typename U>
+		[[nodiscard]] auto Get(size_t archIndex) -> U& {
+			using T = std::decay_t<U>;
+			assert( m_maps.contains(Type<T>()) );
+			assert( m_maps[Type<T>()]->size() > archIndex );
+			return (*Map<U>())[archIndex]; //Map<U>() decays the type
 		}
 
 		/// @brief Get component values of an entity.
@@ -149,38 +156,41 @@ namespace vecs {
 		/// @brief Erase an entity
 		/// @param index The index of the entity in the archetype.
 		/// @param slotmaps The slot maps vector of the registry.
-		void Erase(size_t index, auto& slotmaps) {
-			Erase2(index, slotmaps);
+		auto Erase(size_t index) -> Handle {
+			return Erase2(index);
 		}
 
 		/// @brief Move components from another archetype to this one.
-		size_t Move( auto& types, size_t other_index, Archetype& other, auto& slotmaps) {			
-			for( auto& ti : types ) { //go through all maps
-				if( m_maps.contains(ti) ) m_maps[ti]->copy(other.Map(ti), other_index); //insert the new value
+		auto Move( Archetype& other, size_t other_index ) -> std::pair<size_t, Handle> {			
+			for( auto& ti : m_types ) { //go through all maps
+				if( m_maps.contains(ti) && other.m_maps.contains(ti)) {
+					m_maps[ti]->copy(other.Map(ti), other_index); //insert the new value
+				}
 			}
-			other.Erase2(other_index, slotmaps); //erase from old component map
-			++other.m_changeCounter;
 			++m_changeCounter;
-			return m_maps[Type<Handle>()]->size() - 1; //return the index of the new entity
+			return { m_maps[Type<Handle>()]->size() - 1, other.Erase2(other_index) }; //return the index of the new entity
 		}
 
 		/// @brief Swap two entities in the archetype.
 		void Swap(ArchetypeAndIndex& slot1, ArchetypeAndIndex& slot2) {
-			assert( slot1.m_value.m_archetypePtr == slot2.m_value.m_archetypePtr );
+			assert( slot1.m_archetypePtr == slot2.m_archetypePtr );
 			for( auto& map : m_maps ) {
-				map.second->swap(slot1.m_value.m_archindex, slot2.m_value.m_archindex);
+				map.second->swap(slot1.m_archIndex, slot2.m_archIndex);
 			}
-			std::swap(slot1.m_value.m_archindex, slot2.m_value.m_archindex);
+			std::swap(slot1.m_archIndex, slot2.m_archIndex);
 			++m_changeCounter;
 		}
 
 		/// @brief Clone the archetype.
 		/// @param other The archetype to clone.
 		/// @param types The types of the components to clone.
-		void Clone(Archetype& other, const auto& types) {
-			for( auto& ti : types ) { //go through all maps
-				m_types.insert(ti); //add the type to the list
-				if( other.m_maps.contains(ti) ) m_maps[ti] = other.Map(ti)->clone(); //make a component map like this one
+		void Clone(Archetype& other, const std::vector<size_t>&& ignore) {
+			for( auto& ti : other.m_types ) { //go through all maps
+				if(std::find( ignore.begin(), ignore.end(), ti) != ignore.end()) { continue; }
+				m_types.insert(ti); //add the type to the list, could be a tag
+				if( other.m_maps.contains(ti) ) {
+					m_maps[ti] = other.Map(ti)->clone(); //make a component map like this one
+				}
 			}
 		}
 
@@ -266,30 +276,15 @@ namespace vecs {
 			return m_maps[ti]->push_back();	//insert the component value
 		};
 
-		/// @brief Erase an entity. To ensure thet consistency of the entity indices, the last entity is moved to the erased one.
-		/// This might result in a reindexing of the moved entity in the slot map. Thus we need a ref to the slot map
-		/// @param index The index of the entity in the archetype.
-		/// @param slotmaps Reference to the slot maps vector of the registry.
-		void Erase2(size_t index, auto& slotmaps) {
-			size_t last{index};
-			for( auto& it : m_maps ) {
-				last = it.second->erase(index); //Erase from the component map
-			}
-			if( index < last ) {
-				auto& lastHandle = static_cast<Vector<Handle>*>(m_maps[Type<Handle>()].get())->operator[](index);
-				slotmaps[lastHandle.GetStorageIndex()].m_slotMap[lastHandle].m_value.m_archIndex = index;
-			}
-			++m_changeCounter;
-		}
-		
 		/// @brief Get the map of the components.
 		/// @tparam T The type of the component.
 		/// @return Pointer to the component map.
 		template<typename U>
 		auto Map() -> Vector<std::decay_t<U>>* {
-			auto it = m_maps.find(Type<std::decay_t<U>>());
+			using T = std::decay_t<U>;
+			auto it = m_maps.find(Type<T>());
 			assert(it != m_maps.end());
-			return static_cast<Vector<std::decay_t<U>>*>(it->second.get());
+			return static_cast<Vector<T>*>(it->second.get());
 		}
 
 		/// @brief Get the data of the components.
@@ -302,6 +297,18 @@ namespace vecs {
 		}
 
 	private:
+
+		/// @brief Erase an entity. To ensure thet consistency of the entity indices, the last entity is moved to the erased one.
+		/// This might result in a reindexing of the moved entity in the slot map. Thus we need a ref to the slot map
+		/// @param index The index of the entity in the archetype.
+		/// @return The handle of the moved last entity.
+		auto Erase2(size_t index) -> Handle {
+			size_t last{index};
+			++m_changeCounter;
+			for( auto& it : m_maps ) { last = it.second->erase(index); } //Erase from the component map
+			return index < last ? (*Map<Handle>())[index] : Handle{}; //return the handle of the moved entity
+		}
+
 		using Size_t = std::conditional_t<ATYPE == ARCHETYPE_SEQUENTIAL, std::size_t, std::atomic<std::size_t>>;
 		using Map_t = std::unordered_map<size_t, std::unique_ptr<VectorBase>>;
 		mutex_t 			m_mutex; //mutex for thread safety
@@ -311,4 +318,7 @@ namespace vecs {
 
 	}; //end of Archetype
 
-} //namespace vecs
+} //namespace vecs2
+
+
+

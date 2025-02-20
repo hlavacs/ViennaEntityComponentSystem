@@ -481,7 +481,7 @@ void test5() {
 
 
 
-int main_old() {
+void test_vecs() {
 	test1();
 	
 	test3( "Insert", false, [&](auto& system, int num){ return test_insert(system, num); } );
@@ -496,7 +496,5 @@ int main_old() {
 		std::cout << "test 5 " << i << std::endl;
 		test5();
 	}	
-
-	return 0;
 }
 

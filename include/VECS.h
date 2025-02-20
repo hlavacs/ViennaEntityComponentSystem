@@ -27,11 +27,13 @@
 #include "VECSVector.h"
 #include "VECSHashMap.h"
 #include "VECSArchetype.h"
+#include "VECSArchetype2.h"
 #include "VECSSlotMap.h"
 #include "VECSMutex.h"
 #include "VECSHandle.h"
 
 using namespace std::chrono_literals;
+
 
 
 namespace vecs {
@@ -990,7 +992,7 @@ namespace vecs {
 		}
 
 		using SlotMaps_t = std::vector<SlotMapAndMutex<typename Archetype<RTYPE>::ArchetypeAndIndex>>;
-		using HashMap_t = HashMap<std::unique_ptr<Archetype<RTYPE>>>;
+		using HashMap_t = HashMap<std::unique_ptr<Archetype<RTYPE>>>; //change to std::map
 		using SearchCacheMap_t = std::unordered_map<size_t, std::set<Archetype<RTYPE>*>>;
 		using SearchCacheSet_t = std::vector<TypeSetAndHash>;
 
