@@ -381,6 +381,12 @@ namespace vecs2 {
 			archAndIndex.m_index = index;
 		}
 
+		void Move(Archetype<RTYPE>* newArch, Archetype<RTYPE>* oldArch, vecs2::Archetype<RTYPE>::ArchetypeAndIndex& archAndIndex) {
+			auto [newIndex, movedHandle] = newArch->Move(*oldArch, archAndIndex.m_index);
+			ReindexMovedEntity(movedHandle, archAndIndex.m_index);
+			archAndIndex = { newArch, newIndex };
+		}
+
 		/// @brief Insert a new entity with components to the registry.
 		/// @tparam ...Ts Value types of the components.
 		/// @param ...component The new values.
@@ -405,9 +411,8 @@ namespace vecs2 {
 			auto arch = archAndIndex.m_arch;
 			if( arch->Has(Type<T>()) ) { return arch->template Get<T>(archAndIndex.m_index); }
 			auto newArch = GetArchetype<T>(arch, {});
-			auto [newIndex, movedHandle] = newArch->Move(*arch, archAndIndex.m_index);
-			ReindexMovedEntity(movedHandle, archAndIndex.m_index);
-			archAndIndex = { newArch, newIndex };
+			Move(newArch, arch, archAndIndex);
+			return newArch->template Get<T>(archAndIndex.m_index);
 		}
 
 		template<typename... Ts>
@@ -416,11 +421,8 @@ namespace vecs2 {
 			auto archAndIndex = GetArchetypeAndIndex(handle);
 			auto arch = archAndIndex.m_arch;
 			if( (arch->Has(Type<Ts>()) && ...) ) { return std::tuple<Ts...>{ arch->template Get<Ts>(archAndIndex.m_index)... }; }
-
 			auto newArch = GetArchetype<Ts...>(arch, {});
-			auto [newIndex, movedHandle] = newArch->Move(*arch, archAndIndex.m_index);
-			ReindexMovedEntity(movedHandle, archAndIndex.m_index);
-			archAndIndex = { newArch, newIndex };
+			Move(newArch, arch, archAndIndex);
 			return std::tuple<Ts...>{ newArch->template Get<Ts>(archAndIndex.m_index)... };
 		}
 
@@ -430,6 +432,12 @@ namespace vecs2 {
 		/// @param ...vs The new values.
 		template<typename... Ts>
 		void Put2(Handle handle, Ts&&... vs) {
+			auto archAndIndex = GetArchetypeAndIndex(handle);
+			auto arch = archAndIndex.m_arch;
+			if( (arch->Has(Type<Ts>()) && ...) ) { arch->Put(archAndIndex.m_index, std::forward<Ts>(vs)...); return; }
+			auto newArch = GetArchetype<Ts...>(arch, {});
+			Move(newArch, arch, archAndIndex);
+			newArch->Put(archAndIndex.m_index, std::forward<Ts>(vs)...);
 		}
 		
 		/// @brief Add tags to an entity.
@@ -439,9 +447,7 @@ namespace vecs2 {
 			auto archAndIndex = GetArchetypeAndIndex(handle);
 			auto oldArch = archAndIndex.m_arch;
 			auto newArch = GetArchetype(oldArch, tags);
-			auto [newIndex, movedHandle] = newArch->Move(arch->Types(), archAndIndex.m_index);
-			ReindexMovedEntity(movedHandle, archAndIndex.m_index);
-			*archAndIndex = { newArch, newIndex };
+			Move(newArch, oldArch, archAndIndex);
 		} 
 
 		/// @brief Erase tags from an entity.

@@ -95,14 +95,14 @@ namespace vecs2 {
 		/// @tparam ...Ts 
 		/// @param handle The handle of the entity.
 		/// @param ...values The values of the components.
-		template<typename... Ts>
+		/*template<typename... Ts>
 			requires VecsArchetype<Ts...>
 		Archetype(Handle handle, size_t& archIndex, Ts&& ...values ) {
 			AddComponent<Handle>(); //insert the handle
 			(AddComponent<Ts>(), ...); //insert component types
 			(AddValue( std::forward<Ts>(values) ), ...); //insert all components, get index of the handle
 			archIndex = AddValue( handle ); //insert the handle
-		}
+		}*/
 
 		/// @brief Insert a new entity with components to the archetype.
 		/// @tparam ...Ts Value types of the components.
@@ -110,7 +110,6 @@ namespace vecs2 {
 		/// @param ...values The values of the components.
 		/// @return The index of the entity in the archetype.
 		template<typename... Ts>
-			requires VecsArchetype<Ts...>
 		size_t Insert(Handle handle, Ts&& ...values ) {
 			assert( m_maps.size() == sizeof...(Ts) + 1 );
 			assert( (m_maps.contains(Type<Ts>()) && ...) );
@@ -148,9 +147,20 @@ namespace vecs2 {
 		/// @param handle Handle of the entity.
 		/// @return A tuple of the component values.
 		template<typename... Ts>
-			requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value))
+			requires (sizeof...(Ts) > 1)
 		[[nodiscard]] auto Get(size_t archIndex) -> std::tuple<Ts&...> {
 			return std::tuple<std::decay_t<Ts>&...>{ (*Map<std::decay_t<Ts>>())[archIndex]... };
+		}
+
+		/// @brief Put component values to an entity.
+		/// @tparam ...Ts Types of the components to put.
+		/// @param archIndex The index of the entity in the archetype.
+		/// @param ...vs The component values.
+		template<typename... Ts>
+		void Put(size_t archIndex, Ts&& ...vs) {
+			assert( m_maps.contains(Type<Ts>()) && ... );
+			auto fun = [&](auto&& v){ (*Map<decltype(v)>())[archIndex] = std::forward<decltype(v)>(v); };
+			(fun(std::forward<decltype(vs)>(vs)), ... );
 		}
 
 		/// @brief Erase an entity
