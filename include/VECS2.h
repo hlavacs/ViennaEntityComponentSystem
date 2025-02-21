@@ -333,6 +333,7 @@ namespace vecs2 {
 			AddTags2(handle, std::vector<size_t>{tags...});
 		}
 		
+		/// @brief Add tags to an entity.
 		void AddTags(Handle handle, const std::vector<size_t>&& tags) {
 			AddTags2(handle, std::forward<decltype(tags)>(tags));
 		}
@@ -354,14 +355,21 @@ namespace vecs2 {
 		template<typename... Ts>
 			requires (vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
 		void Erase(Handle handle) {
-			Erase2<Ts...>(handle);
+			auto& archAndIndex = GetArchetypeAndIndex(handle);
+			auto arch = archAndIndex.m_arch;
+			assert( (arch->Has(Type<Ts>()) && ...) );
+			auto newArch = GetArchetype(arch, {}, std::vector<size_t>{Type<Ts>()...});	
+			Move(newArch, arch, archAndIndex);		
 		}
 
 		/// @brief Erase an entity from the registry.
 		/// @param handle The handle of the entity.
 		void Erase(Handle handle) {
-			Erase2(handle);
-		}
+			auto& slot = GetSlot(handle);
+			auto& archAndIndex = slot.m_value;
+			ReindexMovedEntity(archAndIndex.m_arch->Erase(archAndIndex.m_index), archAndIndex.m_index);
+			slot.m_version++; //invalidate the slot
+			--m_size;		}
 
 		/// @brief Clear the registry by removing all entities.
 		void Clear() {
@@ -539,7 +547,7 @@ namespace vecs2 {
 		}
 
 		template<typename... Ts>
-		requires (sizeof...(Ts)>1 && vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<Ts...>, Handle&>::value)
+			requires (sizeof...(Ts)>1 && vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<Ts...>, Handle&>::value)
 		[[nodiscard]] auto Get2(Handle handle) -> std::tuple<Ts...> {
 			auto& archAndIndex = GetArchetypeAndIndex(handle);
 			auto arch = archAndIndex.m_arch;
@@ -563,28 +571,6 @@ namespace vecs2 {
 			newArch->Put(archAndIndex.m_index, std::forward<Ts>(vs)...);
 		}
 		
-		/// @brief Erase components from an entity.
-		/// @tparam ...Ts The types of the components.
-		/// @param handle The handle of the entity.
-		template<typename... Ts>
-		void Erase2(Handle handle) {
-			auto& archAndIndex = GetArchetypeAndIndex(handle);
-			auto arch = archAndIndex.m_arch;
-			assert( (arch->Has(Type<Ts>()) && ...) );
-			auto newArch = GetArchetype(arch, {}, std::vector<size_t>{Type<Ts>()...});	
-			Move(newArch, arch, archAndIndex);
-		}
-
-		/// @brief Erase an entity from the registry.
-		/// @param handle The handle of the entity.
-		void Erase2(Handle handle) {
-			auto& slot = GetSlot(handle);
-			auto& archAndIndex = slot.m_value;
-			ReindexMovedEntity(archAndIndex.m_arch->Erase(archAndIndex.m_index), archAndIndex.m_index);
-			slot.m_version++; //invalidate the slot
-			--m_size;
-		}
-
 		/// @brief Add tags to an entity.
 		/// @param handle The handle of the entity.
 		/// @param ...tags The tags to add.
