@@ -329,7 +329,7 @@ namespace vecs2 {
 		}
 
 		/// @brief Get the index of the entity in the archetype
-		inline auto& GetArchetypeAndIndex( Handle handle ) {
+		auto& GetArchetypeAndIndex( Handle handle ) {
 			return GetSlot(handle).m_value;
 		}
 
@@ -345,10 +345,16 @@ namespace vecs2 {
 		/// @param tags Use also these tag hashes
 		/// @return A vector of type hashes
 		template<typename... Ts>
-		auto CreateTypeList(Archetype<RTYPE>* arch, const std::vector<size_t>&& tags) -> std::vector<size_t> {
+		auto CreateTypeList(Archetype<RTYPE>* arch, const std::vector<size_t>&& tags, const std::vector<size_t>&& ignore) -> std::vector<size_t> {
 			std::vector<size_t> all{ tags.begin(), tags.end() };
 			(AddType(all, Type<Ts>()), ...);
-			if(arch) { for( auto type : arch->Types() ) { AddType(all, type); } }
+			if(arch) { 
+				for( auto type : arch->Types() ) { 
+					if(!ContainsType(std::forward<decltype(ignore)>(ignore), type)) { 
+						AddType(all, type); 
+					} 
+				} 
+			}
 			return all;
 		}
 
@@ -358,13 +364,13 @@ namespace vecs2 {
 		/// @param tags Should have the tags of the entity.
 		/// @return A pointer to the archetype.
 		template<typename... Ts>
-		inline auto GetArchetype(Archetype<RTYPE>* arch, const std::vector<size_t>&& tags) -> Archetype<RTYPE>* {
-			size_t hs = Hash(CreateTypeList<Ts...>(arch, std::forward<decltype(tags)>(tags)));
+		auto GetArchetype(Archetype<RTYPE>* arch, const std::vector<size_t>&& tags, const std::vector<size_t>&& ignore) -> Archetype<RTYPE>* {
+			size_t hs = Hash(CreateTypeList<Ts...>(arch, std::forward<decltype(tags)>(tags), std::forward<decltype(ignore)>(ignore)));
 			if( m_archetypes.contains( hs ) ) { return m_archetypes[hs].get(); }
 
 			auto newArchUnique = std::make_unique<Archetype<RTYPE>>();
 			auto newArch = newArchUnique.get();
-			if(arch) newArch->Clone(*arch, {}); //clone old types/components and old tags
+			if(arch) newArch->Clone(*arch, std::forward<decltype(ignore)>(ignore)); //clone old types/components and old tags
 			(newArch->template AddComponent<Ts>(), ...); //add new components
 			for( auto tag : tags ) { newArch->AddType(tag); } //add new tags
 			m_archetypes[hs] = std::move(newArchUnique); //store the archetype
@@ -381,6 +387,10 @@ namespace vecs2 {
 			archAndIndex.m_index = index;
 		}
 
+		/// @brief Move an entity to a new archetype.
+		/// @param newArch The new archetype.
+		/// @param oldArch The old archetype.
+		/// @param archAndIndex The archetype and index of the entity.
 		void Move(Archetype<RTYPE>* newArch, Archetype<RTYPE>* oldArch, vecs2::Archetype<RTYPE>::ArchetypeAndIndex& archAndIndex) {
 			auto [newIndex, movedHandle] = newArch->Move(*oldArch, archAndIndex.m_index);
 			ReindexMovedEntity(movedHandle, archAndIndex.m_index);
@@ -395,7 +405,7 @@ namespace vecs2 {
 		[[nodiscard]] auto Insert2( Ts&&... component ) -> Handle {
 			size_t slotMapIndex = GetNewSlotmapIndex();
 			auto [handle, slot] = m_slotMaps[slotMapIndex].m_slotMap.Insert( {nullptr, 0} ); //get a slot for the entity
-			slot.m_value.m_arch = GetArchetype<Ts...>(nullptr, {});
+			slot.m_value.m_arch = GetArchetype<Ts...>(nullptr, {}, {});
 			slot.m_value.m_index = slot.m_value.m_arch->Insert( handle, std::forward<Ts>(component)... ); //insert the entity into the archetype
 			++m_size;
 			return handle;
@@ -407,10 +417,10 @@ namespace vecs2 {
 		/// @return Component values.
 		template<typename T>
 		[[nodiscard]] auto Get2(Handle handle) -> T& {
-			auto archAndIndex = GetArchetypeAndIndex(handle);
+			auto& archAndIndex = GetArchetypeAndIndex(handle);
 			auto arch = archAndIndex.m_arch;
 			if( arch->Has(Type<T>()) ) { return arch->template Get<T>(archAndIndex.m_index); }
-			auto newArch = GetArchetype<T>(arch, {});
+			auto newArch = GetArchetype<T>(arch, {}, {});
 			Move(newArch, arch, archAndIndex);
 			return newArch->template Get<T>(archAndIndex.m_index);
 		}
@@ -418,10 +428,10 @@ namespace vecs2 {
 		template<typename... Ts>
 		requires (sizeof...(Ts)>1 && vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<Ts...>, Handle&>::value)
 		[[nodiscard]] auto Get2(Handle handle) -> std::tuple<Ts...> {
-			auto archAndIndex = GetArchetypeAndIndex(handle);
+			auto& archAndIndex = GetArchetypeAndIndex(handle);
 			auto arch = archAndIndex.m_arch;
 			if( (arch->Has(Type<Ts>()) && ...) ) { return std::tuple<Ts...>{ arch->template Get<Ts>(archAndIndex.m_index)... }; }
-			auto newArch = GetArchetype<Ts...>(arch, {});
+			auto newArch = GetArchetype<Ts...>(arch, {}, {});
 			Move(newArch, arch, archAndIndex);
 			return std::tuple<Ts...>{ newArch->template Get<Ts>(archAndIndex.m_index)... };
 		}
@@ -432,21 +442,43 @@ namespace vecs2 {
 		/// @param ...vs The new values.
 		template<typename... Ts>
 		void Put2(Handle handle, Ts&&... vs) {
-			auto archAndIndex = GetArchetypeAndIndex(handle);
+			auto& archAndIndex = GetArchetypeAndIndex(handle);
 			auto arch = archAndIndex.m_arch;
 			if( (arch->Has(Type<Ts>()) && ...) ) { arch->Put(archAndIndex.m_index, std::forward<Ts>(vs)...); return; }
-			auto newArch = GetArchetype<Ts...>(arch, {});
+			auto newArch = GetArchetype<Ts...>(arch, {}, {});
 			Move(newArch, arch, archAndIndex);
 			newArch->Put(archAndIndex.m_index, std::forward<Ts>(vs)...);
 		}
 		
+		/// @brief Erase components from an entity.
+		/// @tparam ...Ts The types of the components.
+		/// @param handle The handle of the entity.
+		template<typename... Ts>
+		void Erase2(Handle handle) {
+			auto& archAndIndex = GetArchetypeAndIndex(handle);
+			auto arch = archAndIndex.m_arch;
+			assert( (arch->Has(Type<Ts>()) && ...) );
+			auto newArch = GetArchetype(arch, {}, std::vector<size_t>{Type<Ts>()...});	
+			Move(newArch, arch, archAndIndex);
+		}
+
+		/// @brief Erase an entity from the registry.
+		/// @param handle The handle of the entity.
+		void Erase2(Handle handle) {
+			auto& slot = GetSlot(handle);
+			auto& archAndIndex = slot.m_value;
+			ReindexMovedEntity(archAndIndex.m_arch->Erase(archAndIndex.m_index), archAndIndex.m_index);
+			slot.m_version++; //invalidate the slot
+			--m_size;
+		}
+
 		/// @brief Add tags to an entity.
 		/// @param handle The handle of the entity.
 		/// @param ...tags The tags to add.
 		void AddTags2(Handle handle, const std::vector<size_t>&& tags) {
-			auto archAndIndex = GetArchetypeAndIndex(handle);
+			auto& archAndIndex = GetArchetypeAndIndex(handle);
 			auto oldArch = archAndIndex.m_arch;
-			auto newArch = GetArchetype(oldArch, tags);
+			auto newArch = GetArchetype(oldArch, tags, {});
 			Move(newArch, oldArch, archAndIndex);
 		} 
 
@@ -455,19 +487,6 @@ namespace vecs2 {
 		/// @param ...tags The tags to erase.
 		void EraseTags2(Handle handle, const std::vector<size_t>&& tags) {
 			
-		}
-
-
-		/// @brief Erase components from an entity.
-		/// @tparam ...Ts The types of the components.
-		/// @param handle The handle of the entity.
-		template<typename... Ts>
-		void Erase2(Handle handle) {
-		}
-
-		/// @brief Erase an entity from the registry.
-		/// @param handle The handle of the entity.
-		void Erase2(Handle handle) {
 		}
 
 		using SlotMaps_t = std::vector<SlotMapAndMutex<typename Archetype<RTYPE>::ArchetypeAndIndex>>;

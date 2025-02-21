@@ -91,19 +91,6 @@ namespace vecs2 {
 			AddComponent<Handle>(); //insert the handle			
 		}
 
-		/// @brief Constructor, called if a new entity should be created with components, and the archetype does not exist yet.
-		/// @tparam ...Ts 
-		/// @param handle The handle of the entity.
-		/// @param ...values The values of the components.
-		/*template<typename... Ts>
-			requires VecsArchetype<Ts...>
-		Archetype(Handle handle, size_t& archIndex, Ts&& ...values ) {
-			AddComponent<Handle>(); //insert the handle
-			(AddComponent<Ts>(), ...); //insert component types
-			(AddValue( std::forward<Ts>(values) ), ...); //insert all components, get index of the handle
-			archIndex = AddValue( handle ); //insert the handle
-		}*/
-
 		/// @brief Insert a new entity with components to the archetype.
 		/// @tparam ...Ts Value types of the components.
 		/// @param handle The handle of the entity.
@@ -149,6 +136,8 @@ namespace vecs2 {
 		template<typename... Ts>
 			requires (sizeof...(Ts) > 1)
 		[[nodiscard]] auto Get(size_t archIndex) -> std::tuple<Ts&...> {
+			assert( (m_maps.contains(Type<Ts>()) && ...) );
+			assert( (m_maps[Type<Ts>()]->size() > archIndex && ...) );
 			return std::tuple<std::decay_t<Ts>&...>{ (*Map<std::decay_t<Ts>>())[archIndex]... };
 		}
 
@@ -159,8 +148,8 @@ namespace vecs2 {
 		template<typename... Ts>
 		void Put(size_t archIndex, Ts&& ...vs) {
 			assert( m_maps.contains(Type<Ts>()) && ... );
-			auto fun = [&](auto&& v){ (*Map<decltype(v)>())[archIndex] = std::forward<decltype(v)>(v); };
-			(fun(std::forward<decltype(vs)>(vs)), ... );
+			auto fun = [&]<typename T>(T&& v){ (*Map<std::decay_t<T>>())[archIndex] = std::forward<T>(v); };
+			(fun.template operator()(std::forward<decltype(vs)>(vs)), ... );
 		}
 
 		/// @brief Erase an entity
@@ -170,7 +159,11 @@ namespace vecs2 {
 			return Erase2(index);
 		}
 
-		/// @brief Move components from another archetype to this one.
+		/// @brief Move components from another archetype to this one. In the other archetype,
+		/// the last entity is moved to the erased one. This might result in a reindexing of the moved entity in the slot map.
+		/// @param other The other archetype.
+		/// @param other_index The index of the entity in the other archetype.
+		/// @return A pair of the index of the new entity in this archetype and the handle of the moved entity.
 		auto Move( Archetype& other, size_t other_index ) -> std::pair<size_t, Handle> {			
 			for( auto& ti : m_types ) { //go through all maps
 				if( m_maps.contains(ti) ) {
