@@ -314,11 +314,11 @@ namespace vecs2 {
 		template<typename... Ts>
 			requires (std::is_same_v<std::decay_t<Ts>, size_t> && ...)
 		void AddTags(Handle handle, Ts... tags) {
-			AddTags(handle, std::vector<size_t>{tags...});
+			AddTags2(handle, std::vector<size_t>{tags...});
 		}
 		
 		void AddTags(Handle handle, const std::vector<size_t>&& tags) {
-			AddTags(handle, std::forward<decltype(tags)>(tags));
+			AddTags2(handle, std::forward<decltype(tags)>(tags));
 		}
 
 		/// @brief Add tags to an entity.
@@ -575,7 +575,7 @@ namespace vecs2 {
 		void AddTags2(Handle handle, const std::vector<size_t>&& tags) {
 			auto& archAndIndex = GetArchetypeAndIndex(handle);
 			auto oldArch = archAndIndex.m_arch;
-			auto newArch = GetArchetype(oldArch, tags, {});
+			auto newArch = GetArchetype(oldArch, std::forward<decltype(tags)>(tags), {});
 			Move(newArch, oldArch, archAndIndex);
 		} 
 
