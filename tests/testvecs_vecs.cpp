@@ -28,7 +28,6 @@ int test1() {
 		assert( system.Exists(hhh) );
 
 	    vecs2::Handle handle = system.Insert(5, 5.5f);
-		system.Print();
 	    assert( system.Exists(handle) );
 	    auto t1 = system.Types(handle);
 		assert( t1.size() == 3 ); //also handle!
@@ -49,7 +48,6 @@ int test1() {
 	//Exists
 	{
 	    auto handle = system.Insert(5, 6.9f, 7.3);
-		system.Print();
 	    assert( system.Exists(handle) );
 	    auto t2 = system.Types(handle);
 		std::set<size_t> types{vecs2::Type<vecs2::Handle>(), vecs2::Type<int>(), vecs2::Type<float>(), vecs2::Type<double>()};
@@ -58,7 +56,6 @@ int test1() {
 	//Get
 	{
 	    auto handle = system.Insert(5, 6.9f, 7.3);
-		system.Print();
 		decltype(auto) value = system.Get<float&>(handle);
 		float& f1 = value; 
 		value = 10.0f; 
@@ -75,7 +72,6 @@ int test1() {
 	//Put
 	{
 	    auto handle = system.Insert(5, 6.9f, 7.3);
-		system.Print();
 	    system.Put(handle, 50, 69.0f, 73.0);
 		auto [v5a, v5b, v5c] = system.Get<int, float, double>(handle);
 	    assert( v5b == 69.0f && v5c == 73.0 );
@@ -95,7 +91,6 @@ int test1() {
 	//Has
 	{
 	    auto handle = system.Insert(5, 6.9f, 7.3);
-		system.Print();
 	    system.Put(handle, 50, 69.0f, 73.0);
 	    assert( system.Has<int>(handle) );
 	    assert( system.Has<float>(handle) );
@@ -105,12 +100,10 @@ int test1() {
 	//Erase components
 	{
 	    auto handle = system.Insert(5, 6.9f, 7.3);
-		system.Print();
 	    system.Erase<int, float>(handle); //remove two components
 	    assert( !system.Has<int>(handle) );
 	    assert( !system.Has<float>(handle) );
 	    assert( system.Has<double>(handle) );
-		system.Print();
 	    system.Erase<double>(handle); //remove also the last component
 	    assert( system.Exists(handle)); //check that the entity still exists
 	    assert( !system.Has<double>(handle) );
@@ -118,50 +111,39 @@ int test1() {
 
 	//Add components with Put
 	{
-		system.Print();
 	    auto handle = system.Insert(5, 6.9f, 7.3);
-		system.Print();
 		system.Erase<int, float, double>(handle);
 	    assert( !system.Has<int>(handle) );
 	    assert( !system.Has<float>(handle) );
 	    assert( !system.Has<double>(handle) );
-		system.Print();
 		system.Put(handle, 3.9); //add a component of type double
 	    assert( system.Exists(handle)); //check that the entity still exists
 	    assert( system.Has<double>(handle) );
-		system.Print();
 		auto d = system.Get<double>(handle);
 		auto cc = system.Get<char&>(handle); //
 		cc = 'A';
-		system.Print();
 	}
 
 	//Add components with Get
 	{
 	    auto handle = system.Insert(5, 6.9f, 7.3);
-		system.Print();
 		auto dd = system.Get<char>(handle); //
-		system.Print();
 		std::string s = "AAA";
 		struct T1 {
 			const char* m_str;
 		};
 
 		system.Put(handle, s, T1{"BBB"}); //
-		system.Print();
 		auto [ee, ff] = system.Get<std::string, T1>(handle); //
 		assert( ee == "AAA" && ff.m_str == std::string{"BBB"} );
 	}
 
 	//Erase entity
 	{
-		system.Print();
 	    auto handle = system.Insert(5, 6.9f, 7.3);
     	assert( system.Exists(handle) );
-		system.Print();
 	    system.Erase(handle);
     	assert( !system.Exists(handle) );
-		system.Print();
 	}
  
 	//Add Tags
@@ -169,11 +151,9 @@ int test1() {
 		auto handle1 = system.Insert(5, 6.9f, 7.3);
 		auto handle2 = system.Insert(6, 7.9f, 8.3);
 		auto handle3 = system.Insert(7, 8.9f, 9.3);
-		system.Print();
 		system.AddTags(handle1, 1ull, 2ull, 3ull);
 		system.AddTags(handle2, 1ull, 3ull);
 		system.AddTags(handle3, 2ull, 3ull);
-		system.Print();
 		auto tags = system.Types(handle1);
 		assert( tags.size() == 7 );
 		for( auto handle : system.template GetView<vecs2::Handle>(std::vector<size_t>{1}) ) {
@@ -187,17 +167,13 @@ int test1() {
 	//Erase Tags
 	{
 		auto handle = system.Insert(5, 6.9f, 7.3);
-		system.Print();
 		system.AddTags(handle, 1ull, 2ull, 3ull);
-		system.Print();
 		auto tags = system.Types(handle);
 		assert( tags.size() == 7 );
 		system.EraseTags(handle, 1ull);
-		system.Print();
 		tags = system.Types(handle);
 		assert( tags.size() == 6 );
 		system.EraseTags(handle, 2ull, 3ull);
-		system.Print();
 		tags = system.Types(handle);
 		assert( tags.size() == 4 );
 	}

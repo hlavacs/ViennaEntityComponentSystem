@@ -88,6 +88,10 @@ namespace vecs2 {
 		using NUMBER_SLOTMAPS = std::conditional_t< RTYPE == REGISTRYTYPE_SEQUENTIAL, 
 			std::integral_constant<int, 1>, std::integral_constant<int, 16>>;
 	
+		using SlotMaps_t = std::vector<SlotMapAndMutex<typename Archetype<RTYPE>::ArchetypeAndIndex>>;
+		using HashMap_t = std::map<size_t, std::unique_ptr<Archetype<RTYPE>>>; //change to std::map
+		using Size_t = std::conditional_t<RTYPE == REGISTRYTYPE_SEQUENTIAL, std::size_t, std::atomic<std::size_t>>;
+	
 
 	public:	
 		
@@ -97,7 +101,7 @@ namespace vecs2 {
 		struct ArchetypeAndSize {
 			Archetype<RTYPE>* 	m_arch;	//pointer to the archetype
 			size_t 				m_size;	//size of the archetype
-			ArchetypeAndSize(Archetype<RTYPE>* arch, size_t size) : m_archetype{arch}, m_size{size} {}
+			ArchetypeAndSize(Archetype<RTYPE>* arch, size_t size) : m_arch{arch}, m_size{size} {}
 		};
 
 
@@ -169,14 +173,25 @@ namespace vecs2 {
 		class View {
 
 		public:
-			View(Registry<RTYPE>& system, auto&& tagsYes, auto&& tagsNo ) : 
-				m_system{system}, m_tagsYes{tagsYes}, m_tagsNo{tagsNo} {
+			View(Registry<RTYPE>& system, HashMap_t& map, auto&& tagsYes, auto&& tagsNo ) : 
+				m_system{system}, m_map(map), m_tagsYes{tagsYes}, m_tagsNo{tagsNo} {
 			} ///< Constructor.
 
 			/// @brief Get an iterator to the first entity. 
 			/// The archetype is locked in shared mode to prevent changes. 
 			/// @return Iterator to the first entity.
 			auto begin() {
+				m_archetypes.clear();
+				for( auto& map : m_map ) {
+					auto arch = map.second.get();
+					bool hasTagsYes = true;
+					bool hasTagsNo = false;
+					for( auto& tag : m_tagsYes ) { if( !arch->Has(tag) ) { hasTagsYes = false; break; } }
+					for( auto& tag : m_tagsNo ) { if( arch->Has(tag) ) { hasTagsNo = true; break; } }
+					if( hasTagsYes && !hasTagsNo ) {
+						m_archetypes.push_back({arch, arch->Size()});
+					}
+				}
 				return Iterator<Ts...>{m_system, m_archetypes, 0};
 			}
 
@@ -190,6 +205,7 @@ namespace vecs2 {
 			Registry<RTYPE>& 				m_system;	///< Reference to the registry system.
 			std::vector<size_t> 			m_tagsYes;	///< List of tags that must be present.
 			std::vector<size_t> 			m_tagsNo;	///< List of tags that must not be present.
+			HashMap_t& 						m_map;		///< List of archetypes.
 			std::vector<ArchetypeAndSize>  	m_archetypes;	///< List of archetypes.
 		}; //end of View
 
@@ -360,19 +376,19 @@ namespace vecs2 {
 		template<typename... Ts>
 			requires (vtll::unique<vtll::tl<Ts...>>::value)
 		[[nodiscard]] auto GetView() -> View<Ts...> {
-			return {*this, std::vector<size_t>{}, std::vector<size_t>{}};
+			return {*this, m_archetypes, std::vector<size_t>{}, std::vector<size_t>{}};
 		}
 
 		template<typename... Ts>
 			requires (vtll::unique<vtll::tl<Ts...>>::value)
 		[[nodiscard]] auto GetView(std::vector<size_t>&& yes) -> View<Ts...> {
-			return {*this, std::forward<std::vector<size_t>>(yes), std::vector<size_t>{}};
+			return {*this, m_archetypes, std::forward<std::vector<size_t>>(yes), std::vector<size_t>{}};
 		}
 
 		template<typename... Ts>
 			requires (vtll::unique<vtll::tl<Ts...>>::value)
 		[[nodiscard]] auto GetView(std::vector<size_t>&& yes, std::vector<size_t>&& no) -> View<Ts...> {
-			return {*this, std::forward<std::vector<size_t>>(yes), std::forward<std::vector<size_t>>(no),};
+			return {*this, m_archetypes, std::forward<std::vector<size_t>>(yes), std::forward<std::vector<size_t>>(no),};
 		}
 
 		/// @brief Print the registry.
@@ -588,10 +604,6 @@ namespace vecs2 {
 			auto newArch = GetArchetype(oldArch, {}, std::forward<decltype(tags)>(tags));
 			Move(newArch, oldArch, archAndIndex);
 		}
-
-		using SlotMaps_t = std::vector<SlotMapAndMutex<typename Archetype<RTYPE>::ArchetypeAndIndex>>;
-		using HashMap_t = std::map<size_t, std::unique_ptr<Archetype<RTYPE>>>; //change to std::map
-		using Size_t = std::conditional_t<RTYPE == REGISTRYTYPE_SEQUENTIAL, std::size_t, std::atomic<std::size_t>>;
 
 		Size_t m_size{0}; //number of entities
 		SlotMaps_t m_slotMaps; //Slotmaps for entities. Internally synchronized!
