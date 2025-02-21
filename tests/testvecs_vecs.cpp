@@ -164,23 +164,22 @@ int test1() {
 		system.Print();
 	}
  
-	/*
 	//Add Tags
 	{
 		auto handle1 = system.Insert(5, 6.9f, 7.3);
 		auto handle2 = system.Insert(6, 7.9f, 8.3);
 		auto handle3 = system.Insert(7, 8.9f, 9.3);
 		system.Print();
-		system.AddTags(handle1, 1ul, 2ul, 3ul);
-		system.AddTags(handle2, 1ul, 3ul);
-		system.AddTags(handle3, 2ul, 3ul);
+		system.AddTags(handle1, 1ull, 2ull, 3ull);
+		system.AddTags(handle2, 1ull, 3ull);
+		system.AddTags(handle3, 2ull, 3ull);
 		system.Print();
 		auto tags = system.Types(handle1);
 		assert( tags.size() == 7 );
-		for( auto handle : system.template GetView<vecs2::Handle>(std::vector<size_t>{1ul}) ) {
+		for( auto handle : system.template GetView<vecs2::Handle>(std::vector<size_t>{1}) ) {
 			std::cout << "Handle (yes 1): "<< handle << std::endl;
 		}
-		for( auto handle : system.template GetView<vecs2::Handle>(std::vector<size_t>{1ul}, std::vector<size_t>{2ul}) ) {
+		for( auto handle : system.template GetView<vecs2::Handle>(std::vector<size_t>{1ull}, std::vector<size_t>{2}) ) {
 			std::cout << "Handle (yes 1 no 2): "<< handle << std::endl;
 		}
 	}
@@ -189,15 +188,15 @@ int test1() {
 	{
 		auto handle = system.Insert(5, 6.9f, 7.3);
 		system.Print();
-		system.AddTags(handle, 1ul, 2ul, 3ul);
+		system.AddTags(handle, 1ull, 2ull, 3ull);
 		system.Print();
 		auto tags = system.Types(handle);
 		assert( tags.size() == 7 );
-		system.EraseTags(handle, 1ul);
+		system.EraseTags(handle, 1ull);
 		system.Print();
 		tags = system.Types(handle);
 		assert( tags.size() == 6 );
-		system.EraseTags(handle, 2ul, 3ul);
+		system.EraseTags(handle, 2ull, 3ull);
 		system.Print();
 		tags = system.Types(handle);
 		assert( tags.size() == 4 );
@@ -228,10 +227,6 @@ int test1() {
         std::cout << "Handle: "<< handle << " int: " << i << " float: " << f << std::endl;
 		i = 100;
 		f = 100.0f;
-		system.DelayTransaction( [&](){ 
-			std::cout << "Delayed Insert" << std::endl;
-			auto h = system.Insert(5, 5.5f);
-		} );
 		//auto h2 = system.Insert(5, 5.5f);
     }
 
@@ -239,12 +234,6 @@ int test1() {
     for( auto [handle, i, f] : system.template GetView<vecs2::Handle, int&, float&>() ) {
         std::cout << "Handle: "<< handle << " int: " << i << " float: " << f << std::endl;
 	}
-
-	std::cout << "Loop Yes No " << std::endl;
-    for( auto [handle, i] : system.template GetView<vecs2::Yes<vecs2::Handle, int>, vecs2::No<float>>() ) {
-        std::cout << "Handle: "<< handle << " int: " << i << std::endl;
-	}
-    */
 
 	
 	assert( system.Size() > 0 );

@@ -95,8 +95,8 @@ namespace vecs2 {
 
 		/// @brief A structure holding a pointer to an archetype and the current size of the archetype.
 		struct ArchetypeAndSize {
-			Archetype<RTYPE>* 	m_archetype;	//pointer to the archetype
-			size_t 				m_size;			//size of the archetype
+			Archetype<RTYPE>* 	m_arch;	//pointer to the archetype
+			size_t 				m_size;	//size of the archetype
 			ArchetypeAndSize(Archetype<RTYPE>* arch, size_t size) : m_archetype{arch}, m_size{size} {}
 		};
 
@@ -114,13 +114,11 @@ namespace vecs2 {
 			/// @param archidx First archetype index.
 			Iterator( Registry<RTYPE>& system, std::vector<ArchetypeAndSize>& arch, size_t archidx) 
 				: m_system(system), m_archetypes{arch}, m_archidx{archidx} {
-				
-				
 			}
 
 			/// @brief Copy constructor.
 			Iterator(const Iterator& other) : m_system{other.m_system}, m_archetypes{other.m_archetypes}, 
-				m_archidx{other.m_archidx}, m_size{other.m_size}, m_entidx{other.m_entidx} {
+				m_archidx{other.m_archidx}, m_entidx{other.m_entidx} {
 			}
 
 			/// @brief Destructor, unlocks the archetype.
@@ -138,7 +136,9 @@ namespace vecs2 {
 
 			/// @brief Access the content the iterator points to.
 			auto operator*() {
-
+				auto tup = std::tuple<Ts...>( Get<Ts>()... );
+				if constexpr (sizeof...(Ts) == 1) { return std::get<0>(tup); }
+				else return tup;
 			}
 
 			/// @brief Compare two iterators.
@@ -148,12 +148,15 @@ namespace vecs2 {
 
 		private:
 
+			template<typename T>
+			auto Get() -> T&{
+				return (*m_archetypes[m_archidx].m_arch->template Map<T>())[m_entidx];
+			}
+
 			Registry<RTYPE>& m_system; ///< Reference to the registry system.
-			Archetype<RTYPE>* m_archetype{nullptr}; ///< Pointer to the current archetype.
 			Vector<Handle>*	m_mapHandle{nullptr}; ///< Pointer to the comp map holding the handle of the current archetype.
 			std::vector<ArchetypeAndSize>& m_archetypes; ///< List of archetypes.
 			size_t 	m_archidx{0};	///< Index of the current archetype.
-			size_t 	m_size{0};		///< Size of the current archetype.
 			size_t 	m_entidx{0};		///< Index of the current entity.
 		}; //end of Iterator
 
@@ -308,11 +311,23 @@ namespace vecs2 {
 		}
 
 		/// @brief Add tags to an entity.
+		template<typename... Ts>
+			requires (std::is_same_v<std::decay_t<Ts>, size_t> && ...)
+		void AddTags(Handle handle, Ts... tags) {
+			AddTags(handle, std::vector<size_t>{tags...});
+		}
+		
 		void AddTags(Handle handle, const std::vector<size_t>&& tags) {
-			AddTags2(handle, std::forward<decltype(tags)>(tags));
+			AddTags(handle, std::forward<decltype(tags)>(tags));
 		}
 
 		/// @brief Add tags to an entity.
+		template<typename... Ts>
+			requires (std::is_same_v<std::decay_t<Ts>, size_t> && ...)
+		void EraseTags(Handle handle, Ts... tags) {
+			EraseTags2(handle, std::vector<size_t>{tags...});
+		}
+
 		void EraseTags(Handle handle, const std::vector<size_t>&& tags) {
 			EraseTags2(handle, std::forward<decltype(tags)>(tags));
 		}
@@ -339,7 +354,6 @@ namespace vecs2 {
 			m_size = 0;
 		}
 
-		/*
 		/// @brief Get a view of entities with specific components.
 		/// @tparam ...Ts The types of the components.
 		/// @return A view of the entity components
@@ -360,7 +374,6 @@ namespace vecs2 {
 		[[nodiscard]] auto GetView(std::vector<size_t>&& yes, std::vector<size_t>&& no) -> View<Ts...> {
 			return {*this, std::forward<std::vector<size_t>>(yes), std::forward<std::vector<size_t>>(no),};
 		}
-		*/
 
 		/// @brief Print the registry.
 		/// Print the number of entities and the archetypes.
@@ -572,7 +585,7 @@ namespace vecs2 {
 		void EraseTags2(Handle handle, const std::vector<size_t>&& tags) {
 			auto& archAndIndex = GetArchetypeAndIndex(handle);
 			auto oldArch = archAndIndex.m_arch;
-			auto newArch = GetArchetype(oldArch, {}, tags);
+			auto newArch = GetArchetype(oldArch, {}, std::forward<decltype(tags)>(tags));
 			Move(newArch, oldArch, archAndIndex);
 		}
 
