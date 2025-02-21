@@ -184,11 +184,13 @@ namespace vecs2 {
 				m_archetypes.clear();
 				for( auto& map : m_map ) {
 					auto arch = map.second.get();
+					if( arch->Size() == 0 ) { continue; }
+					bool hasTypes = (arch->Has(Type<Ts>()) && ...);
 					bool hasTagsYes = true;
 					bool hasTagsNo = true;
 					for( auto& tag : m_tagsYes ) { if( !arch->Has(tag) ) { hasTagsYes = false; break; } }
 					for( auto& tag : m_tagsNo ) { if( arch->Has(tag) ) { hasTagsNo = false; break; } }
-					if( hasTagsYes && !hasTagsNo ) {
+					if( hasTypes && hasTagsYes && hasTagsNo ) {
 						m_archetypes.push_back({arch, arch->Size()});
 					}
 				}
@@ -330,26 +332,45 @@ namespace vecs2 {
 		}
 
 		/// @brief Add tags to an entity.
+		/// @tparam ...Ts The types of the tags.
+		/// @param handle The handle of the entity.
+		/// @param ...tags The tags to add.
 		template<typename... Ts>
 			requires (std::is_same_v<std::decay_t<Ts>, size_t> && ...)
 		void AddTags(Handle handle, Ts... tags) {
-			AddTags2(handle, std::vector<size_t>{tags...});
+			AddTags(handle, std::vector<size_t>{tags...});
 		}
 		
 		/// @brief Add tags to an entity.
+		/// @param handle The handle of the entity.
+		/// @param tags The tags to add.
+		/// @param ...tags The tags to add.
 		void AddTags(Handle handle, const std::vector<size_t>&& tags) {
-			AddTags2(handle, std::forward<decltype(tags)>(tags));
+			auto& archAndIndex = GetArchetypeAndIndex(handle);
+			auto oldArch = archAndIndex.m_arch;
+			auto newArch = GetArchetype(oldArch, std::forward<decltype(tags)>(tags), {});
+			Move(newArch, oldArch, archAndIndex);
 		}
 
-		/// @brief Add tags to an entity.
+		/// @brief Erase tags from an entity.
+		/// @tparam ...Ts The types of the tags.
+		/// @param handle The handle of the entity.
+		/// @param ...tags The tags to erase.
 		template<typename... Ts>
 			requires (std::is_same_v<std::decay_t<Ts>, size_t> && ...)
 		void EraseTags(Handle handle, Ts... tags) {
-			EraseTags2(handle, std::vector<size_t>{tags...});
+			EraseTags(handle, std::vector<size_t>{tags...});
 		}
 
+		/// @brief Erase tags from an entity.
+		/// @tparam ...Ts The types of the tags.
+		/// @param handle The handle of the entity.
+		/// @param ...tags The tags to erase.
 		void EraseTags(Handle handle, const std::vector<size_t>&& tags) {
-			EraseTags2(handle, std::forward<decltype(tags)>(tags));
+			auto& archAndIndex = GetArchetypeAndIndex(handle);
+			auto oldArch = archAndIndex.m_arch;
+			auto newArch = GetArchetype(oldArch, {}, std::forward<decltype(tags)>(tags));
+			Move(newArch, oldArch, archAndIndex);
 		}
 		
 		/// @brief Erase components from an entity.
@@ -445,20 +466,31 @@ namespace vecs2 {
 
 	private:
 
+		/// @brief Test if a type is in a container.
+		/// @param container The container to search.
+		/// @param hs The type hash to search for.
+		/// @return true if the type is in the container, else false.
 		bool ContainsType(auto&& container, size_t hs) {
 			return std::ranges::find(container, hs) != container.end();
 		}
 
+		/// @brief Add a type to a container, not yet in the container.
+		/// @param container The container to add to.
+		/// @param hs The type hash to add.
 		void AddType(auto&& container, size_t hs) {
 			if(!ContainsType( container, hs)) container.push_back(hs);
 		}
 
 		/// @brief Get the index of the entity in the archetype
+		/// @param handle The handle of the entity.
+		/// @return The index of the entity in the archetype.
 		auto& GetSlot( Handle handle ) {
 			return m_slotMaps[handle.GetStorageIndex()].m_slotMap[handle];
 		}
 
 		/// @brief Get the index of the entity in the archetype
+		/// @param handle The handle of the entity.
+		/// @return The index of the entity and the archetype.
 		auto& GetArchetypeAndIndex( Handle handle ) {
 			return GetSlot(handle).m_value;
 		}
@@ -533,26 +565,6 @@ namespace vecs2 {
 			auto newArch = GetArchetype<Ts...>(arch, {}, {});
 			Move(newArch, arch, archAndIndex);
 			newArch->Put(archAndIndex.m_index, std::forward<Ts>(vs)...);
-		}
-		
-		/// @brief Add tags to an entity.
-		/// @param handle The handle of the entity.
-		/// @param ...tags The tags to add.
-		void AddTags2(Handle handle, const std::vector<size_t>&& tags) {
-			auto& archAndIndex = GetArchetypeAndIndex(handle);
-			auto oldArch = archAndIndex.m_arch;
-			auto newArch = GetArchetype(oldArch, std::forward<decltype(tags)>(tags), {});
-			Move(newArch, oldArch, archAndIndex);
-		} 
-
-		/// @brief Erase tags from an entity.
-		/// @param handle The handle of the entity.
-		/// @param ...tags The tags to erase.
-		void EraseTags2(Handle handle, const std::vector<size_t>&& tags) {
-			auto& archAndIndex = GetArchetypeAndIndex(handle);
-			auto oldArch = archAndIndex.m_arch;
-			auto newArch = GetArchetype(oldArch, {}, std::forward<decltype(tags)>(tags));
-			Move(newArch, oldArch, archAndIndex);
 		}
 
 		Size_t m_size{0}; //number of entities
