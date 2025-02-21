@@ -219,7 +219,7 @@ int test1() {
     return 0;   
 }
 
-/*
+
 size_t test_insert_iterate( auto& system, int m ) {
 
 	auto t1 = std::chrono::high_resolution_clock::now();
@@ -271,7 +271,7 @@ size_t test_iterate( auto& system, int m ) {
 void test3( std::string name, bool insert, auto&& job ) {
 
 	size_t duration;
-	int num = 2000000;
+	int num = 500000;
 
 	{
 		std::cout << "test 3.1 sequential " + name << std::endl;
@@ -447,23 +447,21 @@ void test5() {
 
 }
 
-*/
 
 void test_vecs() {
 	test1();
 	
-	/*test3( "Insert", false, [&](auto& system, int num){ return test_insert(system, num); } );
+	test3( "Insert", false, [&](auto& system, int num){ return test_insert(system, num); } );
 	test3( "Iterate", true, [&](auto& system, int num){ return test_iterate(system, num); } );
 	test3( "Insert + Iterate", false, [&](auto& system, int num){ return test_insert_iterate(system, num); } );
 
-	test4( "Insert", false, [&](auto& system, int num){ return test_insert(system, num); } );
-	test4( "Iterate", true, [&](auto& system, int num){ return test_iterate(system, num); } );
-	test4( "Insert + Iterate", false, [&](auto& system, int num){ return test_insert_iterate(system, num); } );
+	//test4( "Insert", false, [&](auto& system, int num){ return test_insert(system, num); } );
+	//test4( "Iterate", true, [&](auto& system, int num){ return test_iterate(system, num); } );
+	//test4( "Insert + Iterate", false, [&](auto& system, int num){ return test_insert_iterate(system, num); } );
 	
-	for( int i=0; i<1000; ++i ) {
+	/*for( int i=0; i<1000; ++i ) {
 		std::cout << "test 5 " << i << std::endl;
 		test5();
-	}
-	*/
+	}*/
 }
 

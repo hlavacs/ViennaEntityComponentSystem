@@ -304,16 +304,15 @@ void test_mutex() {
 
 }
 
-int test1();
+void test_vecs();
 
 void test_registry() {
 	std::print("\x1b[37m testing registry...");
-	test1();
+	test_vecs();
 	std::print("\x1b[32m passed\n");
 
 }
 
-void test_vecs();
 
 int main() {
 	test_handle();
@@ -323,6 +322,5 @@ int main() {
 	test_archetype();
 	test_mutex();
 	test_registry();
-	//test_vecs();
 }
 
