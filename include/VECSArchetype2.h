@@ -191,7 +191,7 @@ namespace vecs2 {
 		/// @brief Clone the archetype.
 		/// @param other The archetype to clone.
 		/// @param ignore Ignore these types.
-		void Clone(Archetype& other, const std::vector<size_t>&& ignore) {
+		void Clone(Archetype& other, auto&& ignore) {
 			for( auto& ti : other.m_types ) { //go through all maps
 				if(std::find( ignore.begin(), ignore.end(), ti) != ignore.end()) { continue; }
 				m_types.insert(ti); //add the type to the list, could be a tag

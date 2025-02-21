@@ -96,9 +96,99 @@ namespace vecs2 {
 		/// @brief A structure holding a pointer to an archetype and the current size of the archetype.
 		struct ArchetypeAndSize {
 			Archetype<RTYPE>* 	m_archetype;	//pointer to the archetype
-			size_t 		m_size;			//size of the archetype
+			size_t 				m_size;			//size of the archetype
 			ArchetypeAndSize(Archetype<RTYPE>* arch, size_t size) : m_archetype{arch}, m_size{size} {}
 		};
+
+
+		//----------------------------------------------------------------------------------------------
+
+
+		/// @brief Used for iterating over entity components. Iterators are created by a view. 
+		template<typename... Ts>
+		class Iterator {
+
+		public:
+			/// @brief Iterator constructor saving a list of archetypes and the current index.
+			/// @param arch List of archetypes. 
+			/// @param archidx First archetype index.
+			Iterator( Registry<RTYPE>& system, std::vector<ArchetypeAndSize>& arch, size_t archidx) 
+				: m_system(system), m_archetypes{arch}, m_archidx{archidx} {
+				
+				
+			}
+
+			/// @brief Copy constructor.
+			Iterator(const Iterator& other) : m_system{other.m_system}, m_archetypes{other.m_archetypes}, 
+				m_archidx{other.m_archidx}, m_size{other.m_size}, m_entidx{other.m_entidx} {
+			}
+
+			/// @brief Destructor, unlocks the archetype.
+			~Iterator() {}
+
+			/// @brief Prefix increment operator.
+			auto operator++() {
+				++m_entidx;
+				if( m_entidx >= m_archetypes[m_archidx].m_size ) {
+					m_entidx = 0;
+					++m_archidx;
+				}
+				return *this;
+			}
+
+			/// @brief Access the content the iterator points to.
+			auto operator*() {
+
+			}
+
+			/// @brief Compare two iterators.
+			auto operator!=(const Iterator& other) -> bool {
+				return (m_archidx != other.m_archidx) || (m_entidx != other.m_entidx);
+			}
+
+		private:
+
+			Registry<RTYPE>& m_system; ///< Reference to the registry system.
+			Archetype<RTYPE>* m_archetype{nullptr}; ///< Pointer to the current archetype.
+			Vector<Handle>*	m_mapHandle{nullptr}; ///< Pointer to the comp map holding the handle of the current archetype.
+			std::vector<ArchetypeAndSize>& m_archetypes; ///< List of archetypes.
+			size_t 	m_archidx{0};	///< Index of the current archetype.
+			size_t 	m_size{0};		///< Size of the current archetype.
+			size_t 	m_entidx{0};		///< Index of the current entity.
+		}; //end of Iterator
+
+
+		//----------------------------------------------------------------------------------------------
+
+		/// @brief A view of entities with specific components.
+		/// @tparam ...Ts The types of the components.
+		template<typename... Ts>
+		class View {
+
+		public:
+			View(Registry<RTYPE>& system, auto&& tagsYes, auto&& tagsNo ) : 
+				m_system{system}, m_tagsYes{tagsYes}, m_tagsNo{tagsNo} {
+			} ///< Constructor.
+
+			/// @brief Get an iterator to the first entity. 
+			/// The archetype is locked in shared mode to prevent changes. 
+			/// @return Iterator to the first entity.
+			auto begin() {
+				return Iterator<Ts...>{m_system, m_archetypes, 0};
+			}
+
+			/// @brief Get an iterator to the end of the view.
+			auto end() {
+				return Iterator<Ts...>{m_system, m_archetypes, m_archetypes.size()};
+			}
+
+		private:
+
+			Registry<RTYPE>& 				m_system;	///< Reference to the registry system.
+			std::vector<size_t> 			m_tagsYes;	///< List of tags that must be present.
+			std::vector<size_t> 			m_tagsNo;	///< List of tags that must not be present.
+			std::vector<ArchetypeAndSize>  	m_archetypes;	///< List of archetypes.
+		}; //end of View
 
 
 		//----------------------------------------------------------------------------------------------
@@ -320,7 +410,7 @@ namespace vecs2 {
 		}
 
 		void AddType(auto&& container, size_t hs) {
-			if(!ContainsType(container, hs)) container.push_back(hs);
+			if(!ContainsType( container, hs)) container.push_back(hs);
 		}
 
 		/// @brief Get the index of the entity in the archetype
@@ -348,13 +438,7 @@ namespace vecs2 {
 		auto CreateTypeList(Archetype<RTYPE>* arch, const std::vector<size_t>&& tags, const std::vector<size_t>&& ignore) -> std::vector<size_t> {
 			std::vector<size_t> all{ tags.begin(), tags.end() };
 			(AddType(all, Type<Ts>()), ...);
-			if(arch) { 
-				for( auto type : arch->Types() ) { 
-					if(!ContainsType(std::forward<decltype(ignore)>(ignore), type)) { 
-						AddType(all, type); 
-					} 
-				} 
-			}
+			if(arch) { for( auto type : arch->Types() ) { if(!ContainsType(ignore, type)) { AddType(all, type); } } }
 			return all;
 		}
 
@@ -370,9 +454,9 @@ namespace vecs2 {
 
 			auto newArchUnique = std::make_unique<Archetype<RTYPE>>();
 			auto newArch = newArchUnique.get();
-			if(arch) newArch->Clone(*arch, std::forward<decltype(ignore)>(ignore)); //clone old types/components and old tags
+			if(arch) newArch->Clone(*arch, ignore); //clone old types/components and old tags
 			(newArch->template AddComponent<Ts>(), ...); //add new components
-			for( auto tag : tags ) { newArch->AddType(tag); } //add new tags
+			for( auto tag : tags ) { if(!ContainsType(ignore, tag)) { newArch->AddType(tag); } } //add new tags
 			m_archetypes[hs] = std::move(newArchUnique); //store the archetype
 			return newArch;
 		}
@@ -486,7 +570,10 @@ namespace vecs2 {
 		/// @param handle The handle of the entity.
 		/// @param ...tags The tags to erase.
 		void EraseTags2(Handle handle, const std::vector<size_t>&& tags) {
-			
+			auto& archAndIndex = GetArchetypeAndIndex(handle);
+			auto oldArch = archAndIndex.m_arch;
+			auto newArch = GetArchetype(oldArch, {}, tags);
+			Move(newArch, oldArch, archAndIndex);
 		}
 
 		using SlotMaps_t = std::vector<SlotMapAndMutex<typename Archetype<RTYPE>::ArchetypeAndIndex>>;

@@ -276,7 +276,7 @@ void test_archetype() {
 		check( arch.Get<double>(1) == 4.0 );
 
 		vecs2::Archetype<0> arch3;
-		arch3.Clone( arch, {} );
+		arch3.Clone( arch, std::vector<size_t>{} );
 		check( arch3.Size() == 0 );
 		check( arch3.Has( vecs::Type<vecs::Handle>() ) == true );
 		check( arch3.Has( vecs::Type<int>() ) == true );
@@ -286,7 +286,7 @@ void test_archetype() {
 		check( arch3.Has( vecs::Type<std::string>() ) == true );
 
 		vecs2::Archetype<0> arch4;
-		arch4.Clone( arch, {vecs::Type<int>(), vecs::Type<double>()} );
+		arch4.Clone( arch, std::vector<size_t>{vecs::Type<int>(), vecs::Type<double>()} );
 		check( arch4.Size() == 0 );
 		check( arch4.Has( vecs::Type<vecs::Handle>() ) == true );
 		check( arch4.Has( vecs::Type<int>() ) == false );
