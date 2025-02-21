@@ -286,7 +286,12 @@ namespace vecs2 {
 		/// @return The component value or reference to it.
 		template<typename T>
 		auto Get(Handle handle) -> T {
-			return Get2<T>(handle);
+			auto& archAndIndex = GetArchetypeAndIndex(handle);
+			auto arch = archAndIndex.m_arch;
+			if( arch->Has(Type<T>()) ) { return arch->template Get<T>(archAndIndex.m_index); }
+			auto newArch = GetArchetype<T>(arch, {}, {});
+			Move(newArch, arch, archAndIndex);
+			return newArch->template Get<T>(archAndIndex.m_index);
 		}
 
 		/// @brief Get component values of an entity.
@@ -296,19 +301,12 @@ namespace vecs2 {
 		template<typename... Ts>
 			requires (sizeof...(Ts)>1 && vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<Ts...>, Handle&>::value)
 		[[nodiscard]] auto Get(Handle handle) -> std::tuple<Ts...> {
-			return Get2<Ts...>(handle);
-		}
-
-		/// @brief Put a new component value to an entity. If the entity does not have the component, it will be created.
-		/// This might result in moving the entity to another archetype.
-		/// @tparam T The type of the component.
-		/// @param handle The handle of the entity.
-		/// @param v The new value.
-		template<typename U>
-			requires (!is_tuple<U>::value && !std::is_same_v<std::decay_t<U>, Handle>)
-		void Put(Handle handle, U&& v) {
-			using T = std::decay_t<U>;
-			Put2(handle, std::forward<T>(v));
+			auto& archAndIndex = GetArchetypeAndIndex(handle);
+			auto arch = archAndIndex.m_arch;
+			if( (arch->Has(Type<Ts>()) && ...) ) { return std::tuple<Ts...>{ arch->template Get<Ts>(archAndIndex.m_index)... }; }
+			auto newArch = GetArchetype<Ts...>(arch, {}, {});
+			Move(newArch, arch, archAndIndex);
+			return std::tuple<Ts...>{ newArch->template Get<Ts>(archAndIndex.m_index)... };
 		}
 
 		/// @brief Put new component values to an entity.
@@ -326,7 +324,7 @@ namespace vecs2 {
 		/// @param handle The handle of the entity.
 		/// @param ...vs The new values.
 		template<typename... Ts>
-			requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<std::decay_t<Ts>...>, Handle>::value)
+			requires ((vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<std::decay_t<Ts>...>, Handle>::value)
 		void Put(Handle handle, Ts&&... vs) {
 			Put2(handle, std::forward<Ts>(vs)...);
 		}
@@ -521,31 +519,6 @@ namespace vecs2 {
 			auto [newIndex, movedHandle] = newArch->Move(*oldArch, archAndIndex.m_index);
 			ReindexMovedEntity(movedHandle, archAndIndex.m_index);
 			archAndIndex = { newArch, newIndex };
-		}
-
-		/// @brief Get component values of an entity.
-		/// @tparam T The type of the components.
-		/// @param handle The handle of the entity.
-		/// @return Component values.
-		template<typename T>
-		[[nodiscard]] auto Get2(Handle handle) -> T& {
-			auto& archAndIndex = GetArchetypeAndIndex(handle);
-			auto arch = archAndIndex.m_arch;
-			if( arch->Has(Type<T>()) ) { return arch->template Get<T>(archAndIndex.m_index); }
-			auto newArch = GetArchetype<T>(arch, {}, {});
-			Move(newArch, arch, archAndIndex);
-			return newArch->template Get<T>(archAndIndex.m_index);
-		}
-
-		template<typename... Ts>
-			requires (sizeof...(Ts)>1 && vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<Ts...>, Handle&>::value)
-		[[nodiscard]] auto Get2(Handle handle) -> std::tuple<Ts...> {
-			auto& archAndIndex = GetArchetypeAndIndex(handle);
-			auto arch = archAndIndex.m_arch;
-			if( (arch->Has(Type<Ts>()) && ...) ) { return std::tuple<Ts...>{ arch->template Get<Ts>(archAndIndex.m_index)... }; }
-			auto newArch = GetArchetype<Ts...>(arch, {}, {});
-			Move(newArch, arch, archAndIndex);
-			return std::tuple<Ts...>{ newArch->template Get<Ts>(archAndIndex.m_index)... };
 		}
 
 		/// @brief Change the component values of an entity.
