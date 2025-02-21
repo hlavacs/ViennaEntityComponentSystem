@@ -185,9 +185,9 @@ namespace vecs2 {
 				for( auto& map : m_map ) {
 					auto arch = map.second.get();
 					bool hasTagsYes = true;
-					bool hasTagsNo = false;
+					bool hasTagsNo = true;
 					for( auto& tag : m_tagsYes ) { if( !arch->Has(tag) ) { hasTagsYes = false; break; } }
-					for( auto& tag : m_tagsNo ) { if( arch->Has(tag) ) { hasTagsNo = true; break; } }
+					for( auto& tag : m_tagsNo ) { if( arch->Has(tag) ) { hasTagsNo = false; break; } }
 					if( hasTagsYes && !hasTagsNo ) {
 						m_archetypes.push_back({arch, arch->Size()});
 					}
@@ -234,7 +234,12 @@ namespace vecs2 {
 		template<typename... Ts>
 			requires ((sizeof...(Ts) > 0) && (vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
 		[[nodiscard]] auto Insert( Ts&&... component ) -> Handle {
-			return Insert2<Ts...>(std::forward<Ts>(component)...);
+			size_t slotMapIndex = GetNewSlotmapIndex();
+			auto [handle, slot] = m_slotMaps[slotMapIndex].m_slotMap.Insert( {nullptr, 0} ); //get a slot for the entity
+			slot.m_value.m_arch = GetArchetype<Ts...>(nullptr, {}, {});
+			slot.m_value.m_index = slot.m_value.m_arch->Insert( handle, std::forward<Ts>(component)... ); //insert the entity into the archetype
+			++m_size;
+			return handle;
 		}
 
 		/// @brief Test if an entity exists.
@@ -516,20 +521,6 @@ namespace vecs2 {
 			auto [newIndex, movedHandle] = newArch->Move(*oldArch, archAndIndex.m_index);
 			ReindexMovedEntity(movedHandle, archAndIndex.m_index);
 			archAndIndex = { newArch, newIndex };
-		}
-
-		/// @brief Insert a new entity with components to the registry.
-		/// @tparam ...Ts Value types of the components.
-		/// @param ...component The new values.
-		/// @return Handle of new entity.
-		template<typename... Ts>
-		[[nodiscard]] auto Insert2( Ts&&... component ) -> Handle {
-			size_t slotMapIndex = GetNewSlotmapIndex();
-			auto [handle, slot] = m_slotMaps[slotMapIndex].m_slotMap.Insert( {nullptr, 0} ); //get a slot for the entity
-			slot.m_value.m_arch = GetArchetype<Ts...>(nullptr, {}, {});
-			slot.m_value.m_index = slot.m_value.m_arch->Insert( handle, std::forward<Ts>(component)... ); //insert the entity into the archetype
-			++m_size;
-			return handle;
 		}
 
 		/// @brief Get component values of an entity.
