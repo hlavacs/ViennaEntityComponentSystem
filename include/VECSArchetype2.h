@@ -82,8 +82,8 @@ namespace vecs2 {
 
 		/// @brief A pair of an archetype and an index. This is stored in the slot map.
 		struct ArchetypeAndIndex {
-			Archetype<ATYPE>* m_archetypePtr;	//pointer to the archetype
-			size_t m_archIndex;			//index of the entity in the archetype
+			Archetype<ATYPE>* m_arch;	//pointer to the archetype
+			size_t m_index;			//index of the entity in the archetype
 		};	
 
 		/// @brief Constructor, creates the archetype.
@@ -120,7 +120,7 @@ namespace vecs2 {
 
 		/// @brief Get referece to the types of the components.
 		/// @return A reference to the container of the types.
-		[[nodiscard]] const auto&  Types() const {
+		[[nodiscard]] auto& Types() {
 			return m_types;
 		}
 
@@ -150,7 +150,7 @@ namespace vecs2 {
 		template<typename... Ts>
 			requires ((sizeof...(Ts) > 1) && (vtll::unique<vtll::tl<Ts...>>::value))
 		[[nodiscard]] auto Get(size_t archIndex) -> std::tuple<Ts&...> {
-			return std::tuple<std::decay_t<Ts>&...>{ Map<std::decay_t<Ts>>()->Get(archIndex)... };
+			return std::tuple<std::decay_t<Ts>&...>{ (*Map<std::decay_t<Ts>>())[archIndex]... };
 		}
 
 		/// @brief Erase an entity
@@ -163,8 +163,12 @@ namespace vecs2 {
 		/// @brief Move components from another archetype to this one.
 		auto Move( Archetype& other, size_t other_index ) -> std::pair<size_t, Handle> {			
 			for( auto& ti : m_types ) { //go through all maps
-				if( m_maps.contains(ti) && other.m_maps.contains(ti)) {
-					m_maps[ti]->copy(other.Map(ti), other_index); //insert the new value
+				if( m_maps.contains(ti) ) {
+					if( other.m_maps.contains(ti) ) {
+						m_maps[ti]->copy(other.Map(ti), other_index); //insert the new value
+					} else {
+						m_maps[ti]->push_back(); //insert an empty value
+					}
 				}
 			}
 			++m_changeCounter;
@@ -173,17 +177,17 @@ namespace vecs2 {
 
 		/// @brief Swap two entities in the archetype.
 		void Swap(ArchetypeAndIndex& slot1, ArchetypeAndIndex& slot2) {
-			assert( slot1.m_archetypePtr == slot2.m_archetypePtr );
+			assert( slot1.m_arch == slot2.m_arch );
 			for( auto& map : m_maps ) {
-				map.second->swap(slot1.m_archIndex, slot2.m_archIndex);
+				map.second->swap(slot1.m_index, slot2.m_index);
 			}
-			std::swap(slot1.m_archIndex, slot2.m_archIndex);
+			std::swap(slot1.m_index, slot2.m_index);
 			++m_changeCounter;
 		}
 
 		/// @brief Clone the archetype.
 		/// @param other The archetype to clone.
-		/// @param types The types of the components to clone.
+		/// @param ignore Ignore these types.
 		void Clone(Archetype& other, const std::vector<size_t>&& ignore) {
 			for( auto& ti : other.m_types ) { //go through all maps
 				if(std::find( ignore.begin(), ignore.end(), ti) != ignore.end()) { continue; }

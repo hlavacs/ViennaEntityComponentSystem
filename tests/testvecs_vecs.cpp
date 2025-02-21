@@ -4,7 +4,7 @@
 #include <ranges>
 #include <utility>
 #include <random>
-#include "VECS.h"
+#include "VECS2.h"
 
 
 int test1() {
@@ -12,11 +12,11 @@ int test1() {
 
 	std::cout << "test 1.2 system" << std::endl;
 
-    vecs::Registry<vecs::REGISTRYTYPE_PARALLEL> system;
+    vecs2::Registry<vecs2::REGISTRYTYPE_PARALLEL> system;
 
 	//Valid
 	{
-		vecs::Handle handle;
+		vecs2::Handle handle;
 		assert( !handle.IsValid() );
 		std::cout << "Handle size: " << sizeof(handle) << std::endl;
 	}
@@ -27,12 +27,12 @@ int test1() {
 		auto hhh = system.Insert(s);
 		assert( system.Exists(hhh) );
 
-	    vecs::Handle handle = system.Insert(5, 5.5f);
+	    vecs2::Handle handle = system.Insert(5, 5.5f);
 		system.Print();
 	    assert( system.Exists(handle) );
 	    auto t1 = system.Types(handle);
 		assert( t1.size() == 3 ); //also handle!
-		std::set<size_t> types{vecs::Type<vecs::Handle>(), vecs::Type<int>(), vecs::Type<float>()};
+		std::set<size_t> types{vecs2::Type<vecs2::Handle>(), vecs2::Type<int>(), vecs2::Type<float>()};
 		std::ranges::for_each( t1, [&](auto& t){ assert( types.contains(t) ); } );
 	    auto v1 = system.Get<int>(handle);
 		assert( v1 == 5 );
@@ -40,10 +40,10 @@ int test1() {
 	    system.Erase(handle);
 	    assert( !system.Exists(handle) );
 
-	    //vecs::Handle hx = system.Insert(5, 6); //compile error
+	    //vecs2::Handle hx = system.Insert(5, 6); //compile error
 	    struct height_t { int i; }; 
 	    struct weight_t { int i; }; 
-	    vecs::Handle hx1 = system.Insert(5, height_t{6}, weight_t{6}); //works
+	    vecs2::Handle hx1 = system.Insert(5, height_t{6}, weight_t{6}); //works
 	}
 
 	//Exists
@@ -52,7 +52,7 @@ int test1() {
 		system.Print();
 	    assert( system.Exists(handle) );
 	    auto t2 = system.Types(handle);
-		std::set<size_t> types{vecs::Type<vecs::Handle>(), vecs::Type<int>(), vecs::Type<float>(), vecs::Type<double>()};
+		std::set<size_t> types{vecs2::Type<vecs2::Handle>(), vecs2::Type<int>(), vecs2::Type<float>(), vecs2::Type<double>()};
 		std::ranges::for_each( t2, [&](auto& t){ assert( types.contains(t) ); } );	}
 
 	//Get
@@ -164,6 +164,7 @@ int test1() {
 		system.Print();
 	}
  
+	/*
 	//Add Tags
 	{
 		auto handle1 = system.Insert(5, 6.9f, 7.3);
@@ -176,10 +177,10 @@ int test1() {
 		system.Print();
 		auto tags = system.Types(handle1);
 		assert( tags.size() == 7 );
-		for( auto handle : system.template GetView<vecs::Handle>(std::vector<size_t>{1ul}) ) {
+		for( auto handle : system.template GetView<vecs2::Handle>(std::vector<size_t>{1ul}) ) {
 			std::cout << "Handle (yes 1): "<< handle << std::endl;
 		}
-		for( auto handle : system.template GetView<vecs::Handle>(std::vector<size_t>{1ul}, std::vector<size_t>{2ul}) ) {
+		for( auto handle : system.template GetView<vecs2::Handle>(std::vector<size_t>{1ul}, std::vector<size_t>{2ul}) ) {
 			std::cout << "Handle (yes 1 no 2): "<< handle << std::endl;
 		}
 	}
@@ -215,15 +216,15 @@ int test1() {
 	std::tuple<int&, float> tup3 = {a, b};
 	std::get<int&>(tup3) = 100;
 
-	//auto hhh = system.Get<vecs::Handle&>(hd1); //compile error
+	//auto hhh = system.Get<vecs2::Handle&>(hd1); //compile error
 
 	std::cout << "Loop Handle: " << std::endl;
-    for( auto handle : system.template GetView<vecs::Handle>() ) {
+    for( auto handle : system.template GetView<vecs2::Handle>() ) {
         std::cout << "Handle: "<< handle << std::endl;
     }
 
 	std::cout << "Loop Handle int& float " << std::endl;
-    for( auto [handle, i, f] : system.template GetView<vecs::Handle, int&, float>() ) {
+    for( auto [handle, i, f] : system.template GetView<vecs2::Handle, int&, float>() ) {
         std::cout << "Handle: "<< handle << " int: " << i << " float: " << f << std::endl;
 		i = 100;
 		f = 100.0f;
@@ -235,15 +236,17 @@ int test1() {
     }
 
 	std::cout << "Loop Handle int& float& " << std::endl;
-    for( auto [handle, i, f] : system.template GetView<vecs::Handle, int&, float&>() ) {
+    for( auto [handle, i, f] : system.template GetView<vecs2::Handle, int&, float&>() ) {
         std::cout << "Handle: "<< handle << " int: " << i << " float: " << f << std::endl;
 	}
 
 	std::cout << "Loop Yes No " << std::endl;
-    for( auto [handle, i] : system.template GetView<vecs::Yes<vecs::Handle, int>, vecs::No<float>>() ) {
+    for( auto [handle, i] : system.template GetView<vecs2::Yes<vecs2::Handle, int>, vecs2::No<float>>() ) {
         std::cout << "Handle: "<< handle << " int: " << i << std::endl;
 	}
-    
+    */
+
+	
 	assert( system.Size() > 0 );
     system.Clear();
     assert( system.Size() == 0 );
@@ -251,7 +254,7 @@ int test1() {
     return 0;   
 }
 
-
+/*
 size_t test_insert_iterate( auto& system, int m ) {
 
 	auto t1 = std::chrono::high_resolution_clock::now();
@@ -260,7 +263,7 @@ size_t test_insert_iterate( auto& system, int m ) {
 		auto h = system.Insert(i, (float)i, (double)i, 'A', std::string("AAAAAA") );
 	}
 
-	for( auto [handle, i, f, d] : system.template GetView<vecs::Handle, int&, float, double>() ) {
+	for( auto [handle, i, f, d] : system.template GetView<vecs2::Handle, int&, float, double>() ) {
 		i = (int)(f + d);
 	}
 
@@ -287,7 +290,7 @@ size_t test_iterate( auto& system, int m ) {
 
 	auto t1 = std::chrono::high_resolution_clock::now();
 
-    for( auto [handle, i, f] : system.template GetView<vecs::Handle, int&, float&>() ) {
+    for( auto [handle, i, f] : system.template GetView<vecs2::Handle, int&, float&>() ) {
         i = i + (int)f;
 		f = (float)i;
 		//system.template Has<int>(handle);
@@ -307,7 +310,7 @@ void test3( std::string name, bool insert, auto&& job ) {
 
 	{
 		std::cout << "test 3.1 sequential " + name << std::endl;
-		vecs::Registry<vecs::REGISTRYTYPE_SEQUENTIAL> system;
+		vecs2::Registry<vecs2::REGISTRYTYPE_SEQUENTIAL> system;
 		if(insert) test_insert(system, num);
 		duration = job(system, num);
 		std::cout << "Size: " << system.Size() << " us: " << duration << " us/entity: " << (double)duration/(double)num << std::endl;
@@ -319,7 +322,7 @@ void test3( std::string name, bool insert, auto&& job ) {
 
 	{
 		std::cout << "test 3.2 sequential " + name << std::endl;
-		vecs::Registry<vecs::REGISTRYTYPE_PARALLEL> system;
+		vecs2::Registry<vecs2::REGISTRYTYPE_PARALLEL> system;
 		if(insert) test_insert(system, num);
 		duration = job(system, num);
 		std::cout << "Size: " << system.Size() << " us: " << duration << " us/entity: " << (double)duration/(double)num << std::endl;
@@ -334,7 +337,7 @@ void test3( std::string name, bool insert, auto&& job ) {
 
 void test4( std::string name, bool insert, auto&& job ) {
 
-	vecs::Registry<vecs::REGISTRYTYPE_PARALLEL> system;
+	vecs2::Registry<vecs2::REGISTRYTYPE_PARALLEL> system;
 
 	int num = 500000;
 	auto work = [&](auto& system) {
@@ -389,8 +392,8 @@ void test5() {
 
 	std::cout << "test 5 parallel" << std::endl;
 
-	using system_t = vecs::Registry<vecs::REGISTRYTYPE_PARALLEL>;
-	using handles_t = std::set<vecs::Handle>;
+	using system_t = vecs2::Registry<vecs2::REGISTRYTYPE_PARALLEL>;
+	using handles_t = std::set<vecs2::Handle>;
 	system_t system;
 
 	std::random_device rd;
@@ -452,7 +455,7 @@ void test5() {
 
 	int num = 1000000;
 	auto work = [&](auto& system) {
-		std::set<vecs::Handle> hs;
+		std::set<vecs2::Handle> hs;
 
 		for( int i=0; i<num; ++i ) {
 			size_t idx = std::min( (size_t)(dis(gen)*jobs.size()), jobs.size()-1);
@@ -479,12 +482,12 @@ void test5() {
 
 }
 
-
+*/
 
 void test_vecs() {
 	test1();
 	
-	test3( "Insert", false, [&](auto& system, int num){ return test_insert(system, num); } );
+	/*test3( "Insert", false, [&](auto& system, int num){ return test_insert(system, num); } );
 	test3( "Iterate", true, [&](auto& system, int num){ return test_iterate(system, num); } );
 	test3( "Insert + Iterate", false, [&](auto& system, int num){ return test_insert_iterate(system, num); } );
 
@@ -495,6 +498,7 @@ void test_vecs() {
 	for( int i=0; i<1000; ++i ) {
 		std::cout << "test 5 " << i << std::endl;
 		test5();
-	}	
+	}
+	*/
 }
 

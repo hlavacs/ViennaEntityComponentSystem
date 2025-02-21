@@ -5,8 +5,7 @@
 #include <random>
 #include <print>
 
-#include "VECS.h"
-
+#include "VECS2.h"
 #include <VECSHandle.h>
 #include <VECSVector.h>
 #include <VECSSlotMap.h>
@@ -305,7 +304,12 @@ void test_mutex() {
 
 }
 
+int test1();
+
 void test_registry() {
+	std::print("\x1b[37m testing registry...");
+	test1();
+	std::print("\x1b[32m passed\n");
 
 }
 
