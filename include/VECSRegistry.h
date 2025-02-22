@@ -1,11 +1,8 @@
 #pragma once
 
 
-using namespace std::chrono_literals;
-
 
 namespace vecs {
-
 
 	//----------------------------------------------------------------------------------------------
 	//Registry concepts and types

@@ -12,9 +12,10 @@
 namespace vecs {
 
     using mutex_t = std::shared_mutex; ///< Shared mutex type
+    using namespace std::chrono_literals;
 
     //----------------------------------------------------------------------------------------------
-	//Convenience functions
+	//Convenience 
 
 	template<typename>
 	struct is_std_vector : std::false_type {};
@@ -30,6 +31,14 @@ namespace vecs {
 
 	template<typename... Ts>
 	struct No {};
+
+    /// @brief Turn a type into a hash.
+    /// @tparam T The type to hash.
+    /// @return The hash of the type.
+    template<typename T>
+	inline auto Type() -> std::size_t {
+		return std::type_index(typeid(T)).hash_code();
+	}
 
     /// @brief Compute the hash of a list of hashes. If stored in a vector, make sure that hashes are sorted.
 	/// @tparam T Container type of the hashes.
@@ -58,7 +67,6 @@ namespace vecs {
 		}
 		return seed;
 	}
-
 }
 
 #include <VTLL.h>

@@ -5,10 +5,7 @@
 
 namespace vecs {
 
-	template<typename T>
-	inline auto Type() -> std::size_t {
-		return std::type_index(typeid(T)).hash_code();
-	}
+
 
 	//----------------------------------------------------------------------------------------------
 	//Segmented Vector

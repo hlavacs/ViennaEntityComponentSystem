@@ -5,9 +5,6 @@ namespace vecs {
 	//----------------------------------------------------------------------------------------------
 	//Mutexes and Locks
 
-	using mutex_t = std::shared_mutex; ///< Shared mutex type
-
-	using LockGuardType = int; ///< Type of the lock guard.
 	const int LOCKGUARDTYPE_SEQUENTIAL = 0;
 	const int LOCKGUARDTYPE_PARALLEL = 1;
 
