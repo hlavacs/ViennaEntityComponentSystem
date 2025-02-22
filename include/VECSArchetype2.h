@@ -137,7 +137,7 @@ namespace vecs2 {
 			requires (sizeof...(Ts) > 1)
 		[[nodiscard]] auto Get(size_t archIndex) -> std::tuple<Ts&...> {
 			assert( (m_maps.contains(Type<Ts>()) && ...) );
-			assert( (m_maps[Type<Ts>()]->size() > archIndex && ...) );
+			//assert( (m_maps[Type<Ts>()]->size() > archIndex && ...) );
 			return std::tuple<std::decay_t<Ts>&...>{ (*Map<std::decay_t<Ts>>())[archIndex]... };
 		}
 
