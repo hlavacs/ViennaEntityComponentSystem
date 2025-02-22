@@ -5,11 +5,11 @@
 #include <random>
 #include <print>
 
-#include "VECS2.h"
+#include "VECS.h"
 #include <VECSHandle.h>
 #include <VECSVector.h>
 #include <VECSSlotMap.h>
-#include <VECSArchetype2.h>
+#include <VECSArchetype.h>
 
 void check( bool b, std::string_view msg = "" ) {
 	if( b ) {
@@ -168,7 +168,7 @@ void test_archetype() {
 	std::print("\x1b[37m testing archetype...");
 
 	{
-		vecs2::Archetype<0> arch;
+		vecs::Archetype<0> arch;
 		arch.AddComponent<int>();
 		arch.AddComponent<float>();
 		arch.AddComponent<char>();
@@ -214,8 +214,8 @@ void test_archetype() {
 		check( arch.Get<double>(1) == 4.0 );
 		check( arch.Get<std::string>(1) == "world" );
 
-		vecs2::Archetype<0>::ArchetypeAndIndex slot1{&arch, 0};
-		vecs2::Archetype<0>::ArchetypeAndIndex slot2{&arch, 1};
+		vecs::Archetype<0>::ArchetypeAndIndex slot1{&arch, 0};
+		vecs::Archetype<0>::ArchetypeAndIndex slot2{&arch, 1};
 
 		arch.Swap( slot1, slot2 );
 		check( arch.Get<int>(0) == 2 );
@@ -235,7 +235,7 @@ void test_archetype() {
 		arch.Erase( 0 );
 		check( arch.Size() == 0 );
 
-		vecs2::Archetype<0> arch2;
+		vecs::Archetype<0> arch2;
 		arch2.AddComponent<int>();
 		arch2.AddComponent<float>();
 		arch2.AddComponent<char>();
@@ -275,7 +275,7 @@ void test_archetype() {
 		check( arch.Get<char>(1) == 'b' );
 		check( arch.Get<double>(1) == 4.0 );
 
-		vecs2::Archetype<0> arch3;
+		vecs::Archetype<0> arch3;
 		arch3.Clone( arch, std::vector<size_t>{} );
 		check( arch3.Size() == 0 );
 		check( arch3.Has( vecs::Type<vecs::Handle>() ) == true );
@@ -285,7 +285,7 @@ void test_archetype() {
 		check( arch3.Has( vecs::Type<double>() ) == true );
 		check( arch3.Has( vecs::Type<std::string>() ) == true );
 
-		vecs2::Archetype<0> arch4;
+		vecs::Archetype<0> arch4;
 		arch4.Clone( arch, std::vector<size_t>{vecs::Type<int>(), vecs::Type<double>()} );
 		check( arch4.Size() == 0 );
 		check( arch4.Has( vecs::Type<vecs::Handle>() ) == true );
@@ -310,7 +310,6 @@ void test_registry() {
 	std::print("\x1b[37m testing registry...");
 	test_vecs();
 	std::print("\x1b[32m passed\n");
-
 }
 
 

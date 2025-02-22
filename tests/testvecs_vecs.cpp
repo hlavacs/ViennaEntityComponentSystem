@@ -4,21 +4,22 @@
 #include <ranges>
 #include <utility>
 #include <random>
-#include "VECS2.h"
+#include "VECS.h"
 
+bool boolprint = false;
 
 int test1() {
 
 
-	std::cout << "test 1.2 system" << std::endl;
+	if(boolprint) std::cout << "test 1.2 system" << std::endl;
 
-    vecs2::Registry<vecs2::REGISTRYTYPE_PARALLEL> system;
+    vecs::Registry<vecs::REGISTRYTYPE_PARALLEL> system;
 
 	//Valid
 	{
-		vecs2::Handle handle;
+		vecs::Handle handle;
 		assert( !handle.IsValid() );
-		std::cout << "Handle size: " << sizeof(handle) << std::endl;
+		if(boolprint) std::cout << "Handle size: " << sizeof(handle) << std::endl;
 	}
 
 	//Insert, Types, Get, Has, Erase, Exists
@@ -27,11 +28,11 @@ int test1() {
 		auto hhh = system.Insert(s);
 		assert( system.Exists(hhh) );
 
-	    vecs2::Handle handle = system.Insert(5, 5.5f);
+	    vecs::Handle handle = system.Insert(5, 5.5f);
 	    assert( system.Exists(handle) );
 	    auto t1 = system.Types(handle);
 		assert( t1.size() == 3 ); //also handle!
-		std::set<size_t> types{vecs2::Type<vecs2::Handle>(), vecs2::Type<int>(), vecs2::Type<float>()};
+		std::set<size_t> types{vecs::Type<vecs::Handle>(), vecs::Type<int>(), vecs::Type<float>()};
 		std::ranges::for_each( t1, [&](auto& t){ assert( types.contains(t) ); } );
 	    auto v1 = system.Get<int>(handle);
 		assert( v1 == 5 );
@@ -39,10 +40,10 @@ int test1() {
 	    system.Erase(handle);
 	    assert( !system.Exists(handle) );
 
-	    //vecs2::Handle hx = system.Insert(5, 6); //compile error
+	    //vecs::Handle hx = system.Insert(5, 6); //compile error
 	    struct height_t { int i; }; 
 	    struct weight_t { int i; }; 
-	    vecs2::Handle hx1 = system.Insert(5, height_t{6}, weight_t{6}); //works
+	    vecs::Handle hx1 = system.Insert(5, height_t{6}, weight_t{6}); //works
 	}
 
 	//Exists
@@ -50,7 +51,7 @@ int test1() {
 	    auto handle = system.Insert(5, 6.9f, 7.3);
 	    assert( system.Exists(handle) );
 	    auto t2 = system.Types(handle);
-		std::set<size_t> types{vecs2::Type<vecs2::Handle>(), vecs2::Type<int>(), vecs2::Type<float>(), vecs2::Type<double>()};
+		std::set<size_t> types{vecs::Type<vecs::Handle>(), vecs::Type<int>(), vecs::Type<float>(), vecs::Type<double>()};
 		std::ranges::for_each( t2, [&](auto& t){ assert( types.contains(t) ); } );	}
 
 	//Get
@@ -156,11 +157,11 @@ int test1() {
 		system.AddTags(handle3, 2ull, 3ull);
 		auto tags = system.Types(handle1);
 		assert( tags.size() == 7 );
-		for( auto handle : system.template GetView<vecs2::Handle>(std::vector<size_t>{1}) ) {
-			std::cout << "Handle (yes 1): "<< handle << std::endl;
+		for( auto handle : system.template GetView<vecs::Handle>(std::vector<size_t>{1}) ) {
+			if(boolprint) std::cout << "Handle (yes 1): "<< handle << std::endl;
 		}
-		for( auto handle : system.template GetView<vecs2::Handle>(std::vector<size_t>{1ull}, std::vector<size_t>{2}) ) {
-			std::cout << "Handle (yes 1 no 2): "<< handle << std::endl;
+		for( auto handle : system.template GetView<vecs::Handle>(std::vector<size_t>{1ull}, std::vector<size_t>{2}) ) {
+			if(boolprint) std::cout << "Handle (yes 1 no 2): "<< handle << std::endl;
 		}
 	}
 
@@ -191,24 +192,24 @@ int test1() {
 	std::tuple<int&, float> tup3 = {a, b};
 	std::get<int&>(tup3) = 100;
 
-	//auto hhh = system.Get<vecs2::Handle&>(hd1); //compile error
+	//auto hhh = system.Get<vecs::Handle&>(hd1); //compile error
 
-	std::cout << "Loop Handle: " << std::endl;
-    for( auto handle : system.template GetView<vecs2::Handle>() ) {
-        std::cout << "Handle: "<< handle << std::endl;
+	if(boolprint) std::cout << "Loop Handle: " << std::endl;
+    for( auto handle : system.template GetView<vecs::Handle>() ) {
+        if(boolprint) std::cout << "Handle: "<< handle << std::endl;
     }
 
-	std::cout << "Loop Handle int& float " << std::endl;
-    for( auto [handle, i, f] : system.template GetView<vecs2::Handle, int&, float>() ) {
-        std::cout << "Handle: "<< handle << " int: " << i << " float: " << f << std::endl;
+	if(boolprint) std::cout << "Loop Handle int& float " << std::endl;
+    for( auto [handle, i, f] : system.template GetView<vecs::Handle, int&, float>() ) {
+        if(boolprint) std::cout << "Handle: "<< handle << " int: " << i << " float: " << f << std::endl;
 		i = 100;
 		f = 100.0f;
 		//auto h2 = system.Insert(5, 5.5f);
     }
 
-	std::cout << "Loop Handle int& float& " << std::endl;
-    for( auto [handle, i, f] : system.template GetView<vecs2::Handle, int&, float&>() ) {
-        std::cout << "Handle: "<< handle << " int: " << i << " float: " << f << std::endl;
+	if(boolprint) std::cout << "Loop Handle int& float& " << std::endl;
+    for( auto [handle, i, f] : system.template GetView<vecs::Handle, int&, float&>() ) {
+        if(boolprint) std::cout << "Handle: "<< handle << " int: " << i << " float: " << f << std::endl;
 	}
 
 	
@@ -228,7 +229,7 @@ size_t test_insert_iterate( auto& system, int m ) {
 		auto h = system.Insert(i, (float)i, (double)i, 'A', std::string("AAAAAA") );
 	}
 
-	for( auto [handle, i, f, d] : system.template GetView<vecs2::Handle, int&, float, double>() ) {
+	for( auto [handle, i, f, d] : system.template GetView<vecs::Handle, int&, float, double>() ) {
 		i = (int)(f + d);
 	}
 
@@ -255,7 +256,7 @@ size_t test_iterate( auto& system, int m ) {
 
 	auto t1 = std::chrono::high_resolution_clock::now();
 
-    for( auto [handle, i, f] : system.template GetView<vecs2::Handle, int&, float&>() ) {
+    for( auto [handle, i, f] : system.template GetView<vecs::Handle, int&, float&>() ) {
         i = i + (int)f;
 		f = (float)i;
 		//system.template Has<int>(handle);
@@ -274,27 +275,27 @@ void test3( std::string name, bool insert, auto&& job ) {
 	int num = 500000;
 
 	{
-		std::cout << "test 3.1 sequential " + name << std::endl;
-		vecs2::Registry<vecs2::REGISTRYTYPE_SEQUENTIAL> system;
+		if(boolprint) std::cout << "test 3.1 sequential " + name << std::endl;
+		vecs::Registry<vecs::REGISTRYTYPE_SEQUENTIAL> system;
 		if(insert) test_insert(system, num);
 		duration = job(system, num);
-		std::cout << "Size: " << system.Size() << " us: " << duration << " us/entity: " << (double)duration/(double)num << std::endl;
+		if(boolprint) std::cout << "Size: " << system.Size() << " us: " << duration << " us/entity: " << (double)duration/(double)num << std::endl;
 		system.Clear();
 		if(insert) test_insert(system, num);
 		duration = job(system, num);
-		std::cout << "Size: " << system.Size() << " us: " << duration << " us/entity: " << (double)duration/(double)num << std::endl;
+		if(boolprint) std::cout << "Size: " << system.Size() << " us: " << duration << " us/entity: " << (double)duration/(double)num << std::endl;
 	}
 
 	{
-		std::cout << "test 3.2 sequential " + name << std::endl;
-		vecs2::Registry<vecs2::REGISTRYTYPE_PARALLEL> system;
+		if(boolprint) std::cout << "test 3.2 sequential " + name << std::endl;
+		vecs::Registry<vecs::REGISTRYTYPE_PARALLEL> system;
 		if(insert) test_insert(system, num);
 		duration = job(system, num);
-		std::cout << "Size: " << system.Size() << " us: " << duration << " us/entity: " << (double)duration/(double)num << std::endl;
+		if(boolprint) std::cout << "Size: " << system.Size() << " us: " << duration << " us/entity: " << (double)duration/(double)num << std::endl;
 		system.Clear();
 		if(insert) test_insert(system, num);
 		duration = job(system, num);
-		std::cout << "Size: " << system.Size() << " us: " << duration << " us/entity: " << (double)duration/(double)num << std::endl;
+		if(boolprint) std::cout << "Size: " << system.Size() << " us: " << duration << " us/entity: " << (double)duration/(double)num << std::endl;
 	}
 
 }
@@ -302,7 +303,7 @@ void test3( std::string name, bool insert, auto&& job ) {
 
 void test4( std::string name, bool insert, auto&& job ) {
 
-	vecs2::Registry<vecs2::REGISTRYTYPE_PARALLEL> system;
+	vecs::Registry<vecs::REGISTRYTYPE_PARALLEL> system;
 
 	int num = 500000;
 	auto work = [&](auto& system) {
@@ -311,7 +312,7 @@ void test4( std::string name, bool insert, auto&& job ) {
 
 	if(insert) test_insert(system, 4*num);
 
-	std::cout << "test 4.1 parallel " + name << std::endl;
+	if(boolprint) std::cout << "test 4.1 parallel " + name << std::endl;
 	auto t1 = std::chrono::high_resolution_clock::now();
 	{
 		std::jthread t1{ [&](){ work(system);} };
@@ -322,13 +323,13 @@ void test4( std::string name, bool insert, auto&& job ) {
 	{
 		auto t2 = std::chrono::high_resolution_clock::now();
 		auto duration = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
-		std::cout << "Size: " << system.Size() << " us: " << duration << " us/entity: " << (double)duration/(double)system.Size() << std::endl;
+		if(boolprint) std::cout << "Size: " << system.Size() << " us: " << duration << " us/entity: " << (double)duration/(double)system.Size() << std::endl;
 	}
 
 	system.Clear();
 	if(insert) test_insert(system, 4*num);
 
-	std::cout << "test 4.2 parallel " + name << std::endl;
+	if(boolprint) std::cout << "test 4.2 parallel " + name << std::endl;
 	t1 = std::chrono::high_resolution_clock::now();
 
 	{
@@ -340,7 +341,7 @@ void test4( std::string name, bool insert, auto&& job ) {
 	{
 		auto t2 = std::chrono::high_resolution_clock::now();
 		auto duration = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
-		std::cout << "Size: " << system.Size() << " us: " << duration << " us/entity: " << (double)duration/(double)system.Size() << std::endl;
+		if(boolprint) std::cout << "Size: " << system.Size() << " us: " << duration << " us/entity: " << (double)duration/(double)system.Size() << std::endl;
 	}
 }
 
@@ -355,10 +356,10 @@ auto SelectRandom(const S &s, size_t n) {
 
 void test5() {
 
-	std::cout << "test 5 parallel" << std::endl;
+	if(boolprint) std::cout << "test 5 parallel" << std::endl;
 
-	using system_t = vecs2::Registry<vecs2::REGISTRYTYPE_PARALLEL>;
-	using handles_t = std::set<vecs2::Handle>;
+	using system_t = vecs::Registry<vecs::REGISTRYTYPE_PARALLEL>;
+	using handles_t = std::set<vecs::Handle>;
 	system_t system;
 
 	std::random_device rd;
@@ -420,7 +421,7 @@ void test5() {
 
 	int num = 1000000;
 	auto work = [&](auto& system) {
-		std::set<vecs2::Handle> hs;
+		std::set<vecs::Handle> hs;
 
 		for( int i=0; i<num; ++i ) {
 			size_t idx = std::min( (size_t)(dis(gen)*jobs.size()), jobs.size()-1);
@@ -443,7 +444,7 @@ void test5() {
 
 	auto t2 = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
-	std::cout << "Size: " << system.Size() << " us: " << duration << " us/entity: " << (double)duration/(double)(8*num) << std::endl;
+	if(boolprint) std::cout << "Size: " << system.Size() << " us: " << duration << " us/entity: " << (double)duration/(double)(8*num) << std::endl;
 
 }
 
