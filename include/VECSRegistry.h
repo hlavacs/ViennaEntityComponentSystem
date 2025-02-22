@@ -91,9 +91,10 @@ namespace vecs {
 			/// @brief Prefix increment operator.
 			auto operator++() {
 				++m_entidx;
-				if( m_entidx >= m_archetypes[m_archidx].m_size ) {
+				while( m_entidx >= m_archetypes[m_archidx].m_size ) {
 					m_entidx = 0;
 					++m_archidx;
+					if( m_archidx >= m_archetypes.size() ) { break; }
 				}
 				return *this;
 			}
@@ -142,15 +143,15 @@ namespace vecs {
 			/// @return Iterator to the first entity.
 			auto begin() {
 				m_archetypes.clear();
-				for( auto& map : m_map ) {
+				for( auto& map : m_map ) { //go through all archetypes
 					auto arch = map.second.get();
-					if( arch->Size() == 0 ) { continue; }
-					bool hasTypes = (arch->Has(Type<Ts>()) && ...);
-					bool hasTagsYes = true;
-					bool hasTagsNo = true;
-					for( auto& tag : m_tagsYes ) { if( !arch->Has(tag) ) { hasTagsYes = false; break; } }
-					for( auto& tag : m_tagsNo ) { if( arch->Has(tag) ) { hasTagsNo = false; break; } }
-					if( hasTypes && hasTagsYes && hasTagsNo ) {
+					if( arch->Size() == 0 ) { continue; } //skip empty archetypes
+					bool hasTypes = (arch->Has(Type<Ts>()) && ...); //should have all types
+					bool hasAllTagsYes = true; //should have all tags
+					bool hasNoTagsNo = true; //should not have any of these tags
+					for( auto& tag : m_tagsYes ) { if( !arch->Has(tag) ) { hasAllTagsYes = false; break; } }
+					for( auto& tag : m_tagsNo ) { if( arch->Has(tag) ) { hasNoTagsNo = false; break; } }
+					if( hasTypes && hasAllTagsYes && hasNoTagsNo ) { //all conditions met
 						m_archetypes.push_back({arch, arch->Size()});
 					}
 				}
