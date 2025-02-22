@@ -14,6 +14,9 @@ namespace vecs {
     using mutex_t = std::shared_mutex; ///< Shared mutex type
     using namespace std::chrono_literals;
 
+	template<typename T>
+	concept VecsPOD = (!std::is_reference_v<T> && !std::is_pointer_v<T>);
+
     //----------------------------------------------------------------------------------------------
 	//Convenience 
 

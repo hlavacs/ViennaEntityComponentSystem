@@ -1,18 +1,12 @@
 #pragma once
 
 
-
-
 namespace vecs {
-
-
 
 	//----------------------------------------------------------------------------------------------
 	//Segmented Vector
 
-	template<typename T>
-		requires (!std::is_reference_v<T> && !std::is_pointer_v<T>)
-	class Vector;
+	template<VecsPOD T> class Vector;
 
 	class VectorBase {
 
@@ -42,8 +36,7 @@ namespace vecs {
 
 
 	/// @brief A vector that stores elements in segments to avoid reallocations. The size of a segment is 2^segmentBits.
-	template<typename T>
-		requires (!std::is_reference_v<T> && !std::is_pointer_v<T>)
+	template<VecsPOD T>
 	class Vector : public VectorBase {
 
 		using Segment_t = std::shared_ptr<std::vector<T>>;

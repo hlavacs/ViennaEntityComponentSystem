@@ -3,9 +3,6 @@
 
 namespace vecs {
 
-	template<typename... Ts>
-	concept VecsArchetype = (vtll::unique<vtll::tl<Ts...>>::value && (sizeof...(Ts) > 0) && (!std::is_same_v<Handle, std::decay_t<Ts>> && ...));
-
 	const int ARCHETYPE_SEQUENTIAL = 0;
 	const int ARCHETYPE_PARALLEL = 1;
 

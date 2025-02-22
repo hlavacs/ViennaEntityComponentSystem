@@ -2,9 +2,6 @@
 
 namespace vecs {
 	
-	template<typename U>
-	concept VecsPOD = (!std::is_reference_v<U> && !std::is_pointer_v<U>);
-	
 	//----------------------------------------------------------------------------------------------
 	//Slot Maps
 
