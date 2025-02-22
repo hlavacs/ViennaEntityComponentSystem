@@ -50,10 +50,9 @@ namespace vecs {
 			std::integral_constant<int, 1>, std::integral_constant<int, 16>>;
 	
 		using SlotMaps_t = std::vector<SlotMapAndMutex<typename Archetype<RTYPE>::ArchetypeAndIndex>>;
-		using HashMap_t = std::map<size_t, std::unique_ptr<Archetype<RTYPE>>>; //change to std::map
+		using HashMap_t = std::map<size_t, std::unique_ptr<Archetype<RTYPE>>>; 
 		using Size_t = std::conditional_t<RTYPE == REGISTRYTYPE_SEQUENTIAL, std::size_t, std::atomic<std::size_t>>;
 	
-
 	public:	
 		
 		//----------------------------------------------------------------------------------------------
@@ -368,19 +367,7 @@ namespace vecs {
 		/// @return A view of the entity components
 		template<typename... Ts>
 			requires (vtll::unique<vtll::tl<Ts...>>::value)
-		[[nodiscard]] auto GetView() -> View<Ts...> {
-			return {*this, m_archetypes, std::vector<size_t>{}, std::vector<size_t>{}};
-		}
-
-		template<typename... Ts>
-			requires (vtll::unique<vtll::tl<Ts...>>::value)
-		[[nodiscard]] auto GetView(std::vector<size_t>&& yes) -> View<Ts...> {
-			return {*this, m_archetypes, std::forward<std::vector<size_t>>(yes), std::vector<size_t>{}};
-		}
-
-		template<typename... Ts>
-			requires (vtll::unique<vtll::tl<Ts...>>::value)
-		[[nodiscard]] auto GetView(std::vector<size_t>&& yes, std::vector<size_t>&& no) -> View<Ts...> {
+		[[nodiscard]] auto GetView(std::vector<size_t>&& yes={}, std::vector<size_t>&& no={}) -> View<Ts...> {
 			return {*this, m_archetypes, std::forward<std::vector<size_t>>(yes), std::forward<std::vector<size_t>>(no),};
 		}
 
@@ -529,9 +516,9 @@ namespace vecs {
 		}
 
 		Size_t m_size{0}; //number of entities
-		SlotMaps_t m_slotMaps; //Slotmaps for entities. Internally synchronized!
-		HashMap_t m_archetypes; //Mapping vector of type set hash to archetype 1:1. 
-		mutex_t m_mutex; //mutex for reading and writing search cache. Not needed for HashMaps.
+		SlotMaps_t m_slotMaps; //Slotmap array for entities. Each slot map has its own mutex.
+		HashMap_t m_archetypes; //Mapping hash (from type hashes) to archetype 1:1. 
+		mutex_t m_mutex; //mutex for reading and writing m_archetypes.
 		inline static thread_local size_t m_slotMapIndex = NUMBER_SLOTMAPS::value - 1;
 	};
 
