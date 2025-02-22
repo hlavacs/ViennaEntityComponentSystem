@@ -11,7 +11,7 @@
 
 namespace vecs {
 
-    using mutex_t = std::shared_mutex; ///< Shared mutex type
+    using Mutex_t = std::shared_mutex; ///< Shared mutex type
     using namespace std::chrono_literals;
 
 	template<typename T>

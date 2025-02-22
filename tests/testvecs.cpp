@@ -144,23 +144,6 @@ void test_slotmap() {
 	std::print("\x1b[32m passed\n");
 }
 
-void test_hashmap() {
-	/*std::print("\x1b[37m testing hash map...");
-	{
-		vecs::HashMap<int> hm;
-		hm[1] = 1;
-		hm[2] = 2;
-		hm[3] = 3;
-
-		int h1 = hm[1];
-		int h2 = hm[2];
-		int h3 = hm[3];
-
-
-	}
-	std::print("\x1b[32m passed\n");*/
-}
-
 void test_archetype() {
 	std::print("\x1b[37m testing archetype...");
 
@@ -311,10 +294,10 @@ void test_registry() {
 
 
 int main() {
+	std::cout << "testing VECS...\n";
 	test_handle();
 	test_vector();
 	test_slotmap();
-	test_hashmap();
 	test_archetype();
 	test_mutex();
 	test_registry();

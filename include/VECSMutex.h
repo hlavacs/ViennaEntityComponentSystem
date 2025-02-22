@@ -18,7 +18,7 @@ namespace vecs {
 
 		/// @brief Constructor for a single mutex.
 		/// @param mutex Pointer to the mutex.
-		LockGuard(mutex_t* mutex) : m_mutex{mutex}, m_other{nullptr} { 
+		LockGuard(Mutex_t* mutex) : m_mutex{mutex}, m_other{nullptr} { 
 			if constexpr (LTYPE == LOCKGUARDTYPE_PARALLEL) { 
 				if(mutex) m_mutex->lock(); 
 			}
@@ -28,7 +28,7 @@ namespace vecs {
 		/// the entity components change. In this case, two mutexes must be locked.
 		/// @param mutex Pointer to the mutex.
 		/// @param other Pointer to the other mutex.
-		LockGuard(mutex_t* mutex, mutex_t* other) : m_mutex{mutex}, m_other{other} { 
+		LockGuard(Mutex_t* mutex, Mutex_t* other) : m_mutex{mutex}, m_other{other} { 
 			if constexpr (LTYPE == LOCKGUARDTYPE_PARALLEL) {
 				if(mutex && other) { 
 					std::min(m_mutex, m_other)->lock();	///lock the mutexes in the correct order
@@ -47,8 +47,8 @@ namespace vecs {
 			}
 		}
 
-		mutex_t* m_mutex{nullptr};
-		mutex_t* m_other{nullptr};
+		Mutex_t* m_mutex{nullptr};
+		Mutex_t* m_other{nullptr};
 	};
 
 	/// @brief A lock guard for a shared mutex in RAII manner. Several threads can lock the mutex in shared mode at the same time.
@@ -59,7 +59,7 @@ namespace vecs {
 	struct LockGuardShared {
 
 		/// @brief Constructor for a single mutex, locks the mutex.
-		LockGuardShared(mutex_t* mutex) : m_mutex{mutex} { 
+		LockGuardShared(Mutex_t* mutex) : m_mutex{mutex} { 
 			if constexpr (LTYPE == LOCKGUARDTYPE_PARALLEL) { m_mutex->lock_shared(); }
 		}
 
@@ -68,7 +68,7 @@ namespace vecs {
 			if constexpr (LTYPE == LOCKGUARDTYPE_PARALLEL) { m_mutex->unlock_shared(); }
 		}
 
-		mutex_t* m_mutex{nullptr}; ///< Pointer to the mutex.
+		Mutex_t* m_mutex{nullptr}; ///< Pointer to the mutex.
 	};
 
 	template<int LTYPE>
@@ -93,7 +93,7 @@ namespace vecs {
 			}
 		}
 
-		mutex_t* m_mutex{nullptr}; ///< Pointer to the mutex.
+		Mutex_t* m_mutex{nullptr}; ///< Pointer to the mutex.
 	};
 
 

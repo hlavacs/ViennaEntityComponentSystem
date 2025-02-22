@@ -189,7 +189,7 @@ namespace vecs {
 
 		/// @brief Get the mutex of the archetype.
 		/// @return Reference to the mutex.
-		[[nodiscard]] auto GetMutex() -> mutex_t& {
+		[[nodiscard]] auto GetMutex() -> Mutex_t& {
 			return m_mutex;
 		}
 
@@ -257,7 +257,7 @@ namespace vecs {
 
 		using Size_t = std::conditional_t<ATYPE == ARCHETYPE_SEQUENTIAL, std::size_t, std::atomic<std::size_t>>;
 		using Map_t = std::unordered_map<size_t, std::unique_ptr<VectorBase>>;
-		mutex_t 			m_mutex; //mutex for thread safety
+		Mutex_t 			m_mutex; //mutex for thread safety
 		Size_t 				m_changeCounter{0}; //changes invalidate references
 		std::set<size_t> 	m_types; //types of components
 		Map_t 				m_maps; //map from type index to component data

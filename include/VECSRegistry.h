@@ -41,7 +41,7 @@ namespace vecs {
 		template<vecs::VecsPOD T>
 		struct SlotMapAndMutex {
 			vecs::SlotMap<T> m_slotMap;
-			mutex_t m_mutex;
+			Mutex_t m_mutex;
 			SlotMapAndMutex( uint32_t storageIndex, uint32_t bits ) : m_slotMap{storageIndex, bits}, m_mutex{} {};
 			SlotMapAndMutex( const SlotMapAndMutex& other ) : m_slotMap{other.m_slotMap}, m_mutex{} {};
 		};
@@ -353,7 +353,8 @@ namespace vecs {
 			auto& archAndIndex = slot.m_value;
 			ReindexMovedEntity(archAndIndex.m_arch->Erase(archAndIndex.m_index), archAndIndex.m_index);
 			slot.m_version++; //invalidate the slot
-			--m_size;		}
+			--m_size;		
+		}
 
 		/// @brief Clear the registry by removing all entities.
 		void Clear() {
@@ -394,13 +395,13 @@ namespace vecs {
 
 		/// @brief Get the mutex of the archetype.
 		/// @return Reference to the mutex.
-		[[nodiscard]] inline auto GetSlotMapMutex(size_t index) -> mutex_t& {
+		[[nodiscard]] inline auto GetSlotMapMutex(size_t index) -> Mutex_t& {
 			return m_slotMaps[index].m_mutex;
 		}
 
 		/// @brief Get the mutex of the archetype.
 		/// @return Reference to the mutex.
-		[[nodiscard]] inline auto GetMutex() -> mutex_t& {
+		[[nodiscard]] inline auto GetMutex() -> Mutex_t& {
 			return m_mutex; 
 		}
 
@@ -518,7 +519,7 @@ namespace vecs {
 		Size_t m_size{0}; //number of entities
 		SlotMaps_t m_slotMaps; //Slotmap array for entities. Each slot map has its own mutex.
 		HashMap_t m_archetypes; //Mapping hash (from type hashes) to archetype 1:1. 
-		mutex_t m_mutex; //mutex for reading and writing m_archetypes.
+		Mutex_t m_mutex; //mutex for reading and writing m_archetypes.
 		inline static thread_local size_t m_slotMapIndex = NUMBER_SLOTMAPS::value - 1;
 	};
 
