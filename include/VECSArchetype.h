@@ -1,65 +1,7 @@
 #pragma once
 
-#include <VECSHandle.h>
 
 namespace vecs {
-
-	/*using Handle = vecs::Handle;
-	template<typename T>
-	using Vector = vecs::Vector<T>;
-	using VectorBase = vecs::VectorBase;
-	using mutex_t = vecs::mutex_t;
-
-	template<typename T>
-	inline auto Type() -> std::size_t {
-		return std::type_index(typeid(T)).hash_code();
-	}*/
-
-	//----------------------------------------------------------------------------------------------
-	//Convenience functions
-
-	template<typename>
-	struct is_std_vector : std::false_type {};
-
-	template<typename T, typename A>
-	struct is_std_vector<std::vector<T,A>> : std::true_type {};
-
-	template <typename> struct is_tuple : std::false_type {};
-	template <typename ...Ts> struct is_tuple<std::tuple<Ts...>> : std::true_type {};
-
-	template<typename... Ts>
-	struct Yes {};
-
-	template<typename... Ts>
-	struct No {};
-	
-	/// @brief Compute the hash of a list of hashes. If stored in a vector, make sure that hashes are sorted.
-	/// @tparam T Container type of the hashes.
-	/// @param hashes Reference to the container of the hashes.
-	/// @return Overall hash made from the hashes.
-	template <typename T>
-	inline size_t Hash( T& hashes ) {
-		std::size_t seed = 0;
-		if constexpr ( is_std_vector<std::decay_t<T>>::value ) {
-			std::ranges::sort(hashes);
-		}
-		for( auto& v : hashes ) {
-			seed ^= v + 0x9e3779b9 + (seed<<6) + (seed>>2);
-		}
-		return seed;
-	}
-
-	template <typename T>
-	inline size_t Hash( T&& hashes ) {
-		std::size_t seed = 0;
-		if constexpr ( is_std_vector<std::decay_t<T>>::value ) {
-			std::ranges::sort(hashes);
-		}
-		for( auto& v : hashes ) {
-			seed ^= v + 0x9e3779b9 + (seed<<6) + (seed>>2);
-		}
-		return seed;
-	}
 
 	template<typename... Ts>
 	concept VecsArchetype = (vtll::unique<vtll::tl<Ts...>>::value && (sizeof...(Ts) > 0) && (!std::is_same_v<Handle, std::decay_t<Ts>> && ...));

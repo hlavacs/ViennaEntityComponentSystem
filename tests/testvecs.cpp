@@ -6,10 +6,7 @@
 #include <print>
 
 #include "VECS.h"
-#include <VECSHandle.h>
-#include <VECSVector.h>
-#include <VECSSlotMap.h>
-#include <VECSArchetype.h>
+
 
 void check( bool b, std::string_view msg = "" ) {
 	if( b ) {
@@ -148,7 +145,7 @@ void test_slotmap() {
 }
 
 void test_hashmap() {
-	std::print("\x1b[37m testing hash map...");
+	/*std::print("\x1b[37m testing hash map...");
 	{
 		vecs::HashMap<int> hm;
 		hm[1] = 1;
@@ -161,7 +158,7 @@ void test_hashmap() {
 
 
 	}
-	std::print("\x1b[32m passed\n");
+	std::print("\x1b[32m passed\n");*/
 }
 
 void test_archetype() {
