@@ -477,8 +477,11 @@ namespace vecs {
 			auto newArchUnique = std::make_unique<Archetype<RTYPE>>();
 			auto newArch = newArchUnique.get();
 			if(arch) newArch->Clone(*arch, ignore); //clone old types/components and old tags
-			(newArch->template AddComponent<Ts>(), ...); //add new components
-			for( auto tag : tags ) { if(!ContainsType(ignore, tag)) { newArch->AddType(tag); } } //add new tags
+			auto fun = [&]<typename T>(){ if( !ContainsType(newArch->Types(), Type<T>()) ) { newArch->template AddComponent<T>(); } };
+			(fun.template operator()<Ts>(), ...);
+			for( auto tag : tags ) { 
+				if(!ContainsType(newArch->Types(), tag) && !ContainsType(ignore, tag)) { newArch->AddType(tag); } 
+			} //add new tags
 			m_archetypes[hs] = std::move(newArchUnique); //store the archetype
 			return newArch;
 		}
