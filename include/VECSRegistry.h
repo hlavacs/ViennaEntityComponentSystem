@@ -78,20 +78,18 @@ namespace vecs {
 			/// @param archidx First archetype index.
 			Iterator( Registry<RTYPE>& system, std::vector<ArchetypeAndSize>& arch, size_t archidx) 
 				: m_registry(system), m_archetypes{arch}, m_archidx{archidx}, m_entidx{0} {
-				if(archidx < m_archetypes.size()) {
-					Archetype<RTYPE>::m_iteratingArchetype = m_archetypes[m_archidx].m_arch;
-					Archetype<RTYPE>::m_iteratingIndex = m_entidx;
-				}
+				m_archidx>0 ? m_end = true : m_end = false;
 			}
 
 			/// @brief Copy constructor.
 			Iterator(const Iterator& other) 
 				: m_registry{other.m_registry}, m_archetypes{other.m_archetypes}, m_archidx{other.m_archidx}, m_entidx{other.m_entidx} {
+
 			}
 
 			/// @brief Destructor, unlocks the archetype.
 			~Iterator() {
-				if(m_archidx < m_archetypes.size()) {
+				if(m_end && m_archidx < m_archetypes.size()) {
 					m_registry.FillGaps(m_archetypes[m_archidx].m_arch);
 				}
 				Archetype<RTYPE>::m_iteratingArchetype = nullptr;
@@ -107,14 +105,19 @@ namespace vecs {
 					m_registry.FillGaps(m_archetypes[m_archidx].m_arch);
 					++m_archidx;
 					if( m_archidx >= m_archetypes.size() ) { break; }
-					Archetype<RTYPE>::m_iteratingArchetype = m_archetypes[m_archidx].m_arch;
-					Archetype<RTYPE>::m_iteratingIndex = m_entidx;
+					//Archetype<RTYPE>::m_iteratingArchetype = m_archetypes[m_archidx].m_arch;
+					//Archetype<RTYPE>::m_iteratingIndex = m_entidx;
 				}
 				return *this;
 			}
 
 			/// @brief Access the content the iterator points to.
 			auto operator*() {
+				if(m_archidx < m_archetypes.size()) {
+					Archetype<RTYPE>::m_iteratingArchetype = m_archetypes[m_archidx].m_arch;
+					Archetype<RTYPE>::m_iteratingIndex = m_entidx;
+				}
+
 				auto tup = std::tuple<Ts...>( Get<Ts>()... );
 				if constexpr (sizeof...(Ts) == 1) { return std::get<0>(tup); }
 				else return tup;
@@ -135,6 +138,7 @@ namespace vecs {
 			Registry<RTYPE>& m_registry; ///< Reference to the registry system.
 			Vector<Handle>*	m_mapHandle{nullptr}; ///< Pointer to the comp map holding the handle of the current archetype.
 			std::vector<ArchetypeAndSize>& m_archetypes; ///< List of archetypes.
+			size_t 	m_end{false};	///< True if this is the end iterator.
 			size_t 	m_archidx{0};	///< Index of the current archetype.
 			size_t 	m_entidx{0};	///< Index of the current entity.
 		}; //end of Iterator
@@ -434,10 +438,13 @@ namespace vecs {
 		// This is necessary when an entity is erased during iteration. The last entity is moved to the erased one
 		// after Iteration is finished. This is triggered by the iterator.
 		void FillGaps(Archetype<RTYPE>* arch) {
+			Archetype<RTYPE>::m_iteratingArchetype = nullptr;
+			size_t i=0;
 			for( auto& gap : arch->m_gaps ) {
-				if(gap<arch->Size()) ReindexMovedEntity(arch->Erase(gap), gap);
+				if(gap < arch->Size() + i++) ReindexMovedEntity(arch->Erase(gap), gap);
 			}
 			arch->m_gaps.clear();
+			Archetype<RTYPE>::m_iteratingArchetype = arch;
 		}
 
 	private:

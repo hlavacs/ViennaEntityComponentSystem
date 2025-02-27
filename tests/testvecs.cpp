@@ -194,9 +194,6 @@ void test_archetype() {
 		check( arch.Get<double>(1) == 4.0 );
 		check( arch.Get<std::string>(1) == "world" );
 
-		vecs::Archetype<0>::ArchetypeAndIndex slot1{&arch, 0};
-		vecs::Archetype<0>::ArchetypeAndIndex slot2{&arch, 1};
-
 		arch.Erase( 0 );
 		check( arch.Size() == 1 );
 		check( arch.Get<int>(0) == 2 );
@@ -205,8 +202,75 @@ void test_archetype() {
 
 		arch.Erase( 0 );
 		check( arch.Size() == 0 );
+	}
 
-		vecs::Archetype<0> arch2;
+	{
+		vecs::Archetype<0> arch;
+		arch.AddComponent<int>();
+		arch.AddComponent<float>();
+		arch.AddComponent<char>();
+		arch.AddComponent<double>();
+		arch.AddComponent<std::string>();
+
+		vecs::Archetype<0>::m_iteratingArchetype = &arch;
+		vecs::Archetype<0>::m_iteratingIndex = 5;
+
+		auto add = [&](int i){
+			arch.AddValue( vecs::Handle{1,(size_t)i} );
+			arch.AddValue( i );
+			arch.AddValue( 2.0f*i );
+			arch.AddValue( 'c' );
+			arch.AddValue( 3.0*i );
+			arch.AddValue( std::string("hello....") );
+		};
+
+		for( int i=0; i<10; ++i ) { 
+			add(i); 
+		}
+		check( arch.Size() == 10 );
+		std::cout << "\nArchetype size: " << arch.Size() << std::endl;
+		arch.Print();
+		arch.Erase( 6 );
+		check( arch.Size() == 9 );
+		std::cout << "\nArchetype size: " << arch.Size() << std::endl;
+		arch.Print();
+		arch.Erase( 6 );
+		check( arch.Size() == 8 );
+		std::cout << "\nArchetype size: " << arch.Size() << std::endl;
+		arch.Print();
+		arch.Erase( 6 );
+		check( arch.Size() == 7 );
+		std::cout << "\nArchetype size: " << arch.Size() << std::endl;
+		arch.Print();
+		arch.Erase( 6 );
+		check( arch.Size() == 6 );
+		std::cout << "\nArchetype size: " << arch.Size() << std::endl;
+		arch.Print();
+
+		vecs::Archetype<0>::m_iteratingIndex = 5;
+		arch.Erase( 1 );
+		check( arch.Size() == 5 );
+		std::cout << "\nArchetype size: " << arch.Size() << std::endl;
+		arch.Print();
+		arch.Erase( 2 );
+		check( arch.Size() == 4 );
+		std::cout << "\nArchetype size: " << arch.Size() << std::endl;
+		arch.Print();
+		arch.Erase( 0 );
+		check( arch.Size() == 3 );
+		std::cout << "\nArchetype size: " << arch.Size() << std::endl;
+		arch.Print();
+		vecs::Archetype<0>::m_gaps.clear();
+	}
+
+	{
+		vecs::Archetype<0> arch, arch2;
+		arch.AddComponent<int>();
+		arch.AddComponent<float>();
+		arch.AddComponent<char>();
+		arch.AddComponent<double>();
+		arch.AddComponent<std::string>();
+
 		arch2.AddComponent<int>();
 		arch2.AddComponent<float>();
 		arch2.AddComponent<char>();
