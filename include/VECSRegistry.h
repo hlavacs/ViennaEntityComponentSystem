@@ -77,30 +77,38 @@ namespace vecs {
 			/// @param arch List of archetypes. 
 			/// @param archidx First archetype index.
 			Iterator( Registry<RTYPE>& system, std::vector<ArchetypeAndSize>& arch, size_t archidx) 
-				: m_system(system), m_archetypes{arch}, m_archidx{archidx} {
+				: m_registry(system), m_archetypes{arch}, m_archidx{archidx}, m_entidx{0} {
+				if(archidx < m_archetypes.size()) {
+					Archetype<RTYPE>::m_iteratingArchetype = m_archetypes[m_archidx].m_arch;
+					Archetype<RTYPE>::m_iteratingIndex = m_entidx;
+				}
 			}
 
 			/// @brief Copy constructor.
-			Iterator(const Iterator& other) : m_system{other.m_system}, m_archetypes{other.m_archetypes}, 
-				m_archidx{other.m_archidx}, m_entidx{other.m_entidx} {
+			Iterator(const Iterator& other) 
+				: m_registry{other.m_registry}, m_archetypes{other.m_archetypes}, m_archidx{other.m_archidx}, m_entidx{other.m_entidx} {
 			}
 
 			/// @brief Destructor, unlocks the archetype.
 			~Iterator() {
 				if(m_archidx < m_archetypes.size()) {
-					m_system.FillGaps(m_archetypes[m_archidx].m_arch);
+					m_registry.FillGaps(m_archetypes[m_archidx].m_arch);
 				}
+				Archetype<RTYPE>::m_iteratingArchetype = nullptr;
 			}
 
 			/// @brief Prefix increment operator.
 			auto operator++() {
+				if( m_archidx >= m_archetypes.size() ) { return *this; }
 				++m_entidx;
-				auto arch = m_archetypes[m_archidx].m_arch;
-				while( m_entidx >= arch->Size() || m_entidx >= m_archetypes[m_archidx].m_size ) {
+				Archetype<RTYPE>::m_iteratingIndex = m_entidx;
+				while( m_entidx >= m_archetypes[m_archidx].m_arch->Size() || m_entidx >= m_archetypes[m_archidx].m_size ) {
 					m_entidx = 0;
-					m_system.FillGaps(arch);
+					m_registry.FillGaps(m_archetypes[m_archidx].m_arch);
 					++m_archidx;
 					if( m_archidx >= m_archetypes.size() ) { break; }
+					Archetype<RTYPE>::m_iteratingArchetype = m_archetypes[m_archidx].m_arch;
+					Archetype<RTYPE>::m_iteratingIndex = m_entidx;
 				}
 				return *this;
 			}
@@ -124,7 +132,7 @@ namespace vecs {
 				return (*m_archetypes[m_archidx].m_arch->template Map<T>())[m_entidx];
 			}
 
-			Registry<RTYPE>& m_system; ///< Reference to the registry system.
+			Registry<RTYPE>& m_registry; ///< Reference to the registry system.
 			Vector<Handle>*	m_mapHandle{nullptr}; ///< Pointer to the comp map holding the handle of the current archetype.
 			std::vector<ArchetypeAndSize>& m_archetypes; ///< List of archetypes.
 			size_t 	m_archidx{0};	///< Index of the current archetype.
@@ -542,17 +550,7 @@ namespace vecs {
 		SlotMaps_t m_slotMaps; //Slotmap array for entities. Each slot map has its own mutex.
 		HashMap_t m_archetypes; //Mapping hash (from type hashes) to archetype 1:1. 
 		Mutex_t m_mutex; //mutex for reading and writing m_archetypes.
-		inline static thread_local size_t m_slotMapIndex = NUMBER_SLOTMAPS::value - 1;
-
-		//Parallelization strategy (not yet implemented):
-		//- When iterating over an archetype, the archetype is locked for READING.
-		//- If an entity E should be erased (erase, add or erase component), then 
-		//  - the archetype is released for reading and locked for WRITING.
-		//  - If E is AFTER the current entity C, then the last entity L is moved over E, release write, lock read.
-		//  - If E is BEFORE or EQUAL the current entity C, filling the gap is DELAYED. Instead, the index if E
-		//	  is stored in a list of delayed entities. When the iteration is finished, the gaps are closed.
-		//    Also the archetype stays in write lock until the end of the iteration.
-		inline static thread_local Archetype<RTYPE>* m_iteratingArchetype{nullptr}; //for iterating over archetypes
+		inline static thread_local size_t m_slotMapIndex = NUMBER_SLOTMAPS::value - 1; //for new entities
 	};
 
 } //end of namespace vecs

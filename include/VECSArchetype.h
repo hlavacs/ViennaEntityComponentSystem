@@ -116,16 +116,6 @@ namespace vecs {
 			return { m_maps[Type<Handle>()]->size() - 1, other.Erase2(other_index) }; 
 		}
 
-		/// @brief Swap two entities in the archetype.
-		void Swap(ArchetypeAndIndex& slot1, ArchetypeAndIndex& slot2) {
-			assert( slot1.m_arch == slot2.m_arch );
-			for( auto& map : m_maps ) {
-				map.second->swap(slot1.m_index, slot2.m_index);
-			}
-			std::swap(slot1.m_index, slot2.m_index);
-			++m_changeCounter;
-		}
-
 		/// @brief Clone the archetype.
 		/// @param other The archetype to clone.
 		/// @param ignore Ignore these types.
@@ -266,6 +256,15 @@ namespace vecs {
 		Map_t 				m_maps; //map from type index to component data
 
 	public:
+		//Parallelization strategy (not yet implemented):
+		//- When iterating over an archetype, the archetype is locked for READING.
+		//- If an entity E should be erased (erase, add or erase component), then 
+		//  - the archetype is released for reading and locked for WRITING.
+		//  - If E is AFTER the current entity C, then the last entity L is moved over E, release write, lock read.
+		//  - If E is BEFORE or EQUAL the current entity C, filling the gap is DELAYED. Instead, the index if E
+		//	  is stored in a list of delayed entities. When the iteration is finished, the gaps are closed.
+		//    Also the archetype stays in write lock until the end of the iteration.
+		inline static thread_local Archetype<ATYPE>* m_iteratingArchetype{nullptr}; //for iterating over archetypes
 		inline static thread_local size_t m_iteratingIndex{std::numeric_limits<size_t>::max()}; //current iterator index
 		inline static thread_local std::vector<size_t> m_gaps{}; //gaps from previous erasures that must be filled
 	}; //end of Archetype

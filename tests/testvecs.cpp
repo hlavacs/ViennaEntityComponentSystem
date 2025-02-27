@@ -12,8 +12,8 @@ void check( bool b, std::string_view msg = "" ) {
 	if( b ) {
 		//std::cout << "\x1b[32m passed\n";
 	} else {
-		//std::cout << "\x1b[31m failed: " << msg << "\n";
-		assert(false);
+		std::cout << "\x1b[31m failed: " << msg << "\n";
+		exit(1);
 	}
 }
 
@@ -197,20 +197,11 @@ void test_archetype() {
 		vecs::Archetype<0>::ArchetypeAndIndex slot1{&arch, 0};
 		vecs::Archetype<0>::ArchetypeAndIndex slot2{&arch, 1};
 
-		arch.Swap( slot1, slot2 );
+		arch.Erase( 0 );
+		check( arch.Size() == 1 );
 		check( arch.Get<int>(0) == 2 );
 		check( arch.Get<float>(0) == 3.0f );
 		check( arch.Get<char>(0) == 'b' );
-
-		check( arch.Get<int>(1) == 1 );
-		check( arch.Get<float>(1) == 2.0f );
-		check( arch.Get<char>(1) == 'a' );
-
-		arch.Erase( 0 );
-		check( arch.Size() == 1 );
-		check( arch.Get<int>(0) == 1 );
-		check( arch.Get<float>(0) == 2.0f );
-		check( arch.Get<char>(0) == 'a' );
 
 		arch.Erase( 0 );
 		check( arch.Size() == 0 );
