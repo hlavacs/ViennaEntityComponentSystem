@@ -86,13 +86,19 @@ namespace vecs {
 			}
 
 			/// @brief Destructor, unlocks the archetype.
-			~Iterator() {}
+			~Iterator() {
+				if(m_archidx < m_archetypes.size()) {
+					m_system.FillGaps(m_archetypes[m_archidx].m_arch);
+				}
+			}
 
 			/// @brief Prefix increment operator.
 			auto operator++() {
 				++m_entidx;
-				while( m_entidx >= m_archetypes[m_archidx].m_size ) {
+				auto arch = m_archetypes[m_archidx].m_arch;
+				while( m_entidx >= arch->Size() || m_entidx >= m_archetypes[m_archidx].m_size ) {
 					m_entidx = 0;
+					m_system.FillGaps(arch);
 					++m_archidx;
 					if( m_archidx >= m_archetypes.size() ) { break; }
 				}
@@ -122,7 +128,7 @@ namespace vecs {
 			Vector<Handle>*	m_mapHandle{nullptr}; ///< Pointer to the comp map holding the handle of the current archetype.
 			std::vector<ArchetypeAndSize>& m_archetypes; ///< List of archetypes.
 			size_t 	m_archidx{0};	///< Index of the current archetype.
-			size_t 	m_entidx{0};		///< Index of the current entity.
+			size_t 	m_entidx{0};	///< Index of the current entity.
 		}; //end of Iterator
 
 
@@ -174,6 +180,8 @@ namespace vecs {
 
 
 		//----------------------------------------------------------------------------------------------
+
+		template<typename... Ts> friend class Iterator;
 
 		Registry() { 
 			m_slotMaps.reserve(NUMBER_SLOTMAPS::value); //resize the slot storage
@@ -414,6 +422,16 @@ namespace vecs {
 			return true;
 		}
 
+		/// @brief Fill gaps from previous erasures.
+		// This is necessary when an entity is erased during iteration. The last entity is moved to the erased one
+		// after Iteration is finished. This is triggered by the iterator.
+		void FillGaps(Archetype<RTYPE>* arch) {
+			for( auto& gap : arch->m_gaps ) {
+				if(gap<arch->Size()) ReindexMovedEntity(arch->Erase(gap), gap);
+			}
+			arch->m_gaps.clear();
+		}
+
 	private:
 
 		/// @brief Test if a type is in a container.
@@ -525,6 +543,16 @@ namespace vecs {
 		HashMap_t m_archetypes; //Mapping hash (from type hashes) to archetype 1:1. 
 		Mutex_t m_mutex; //mutex for reading and writing m_archetypes.
 		inline static thread_local size_t m_slotMapIndex = NUMBER_SLOTMAPS::value - 1;
+
+		//Strategy:
+		//- When iterating over an archetype, the archetype is locked for READING.
+		//- If an entity E should be erased (erase, add or erase component), then 
+		//  - the archetype is released for reading and locked for WRITING.
+		//  - If E is AFTER the current entity C, then the last entity L is moved over E, release write, lock read.
+		//  - If E is BEFORE or EQUAL the current entity C, filling the gap is DELAYED. Instead, the index if E
+		//	  is stored in a list of delayed entities. When the iteration is finished, the gaps are closed.
+		//    Alsoe the archetype stays in write lock until the end of the iteration.
+		inline static thread_local Archetype<RTYPE>* m_iteratingArchetype{nullptr}; //for iterating over archetypes
 	};
 
 } //end of namespace vecs

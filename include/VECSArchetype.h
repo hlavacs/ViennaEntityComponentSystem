@@ -1,6 +1,5 @@
 #pragma once
 
-
 namespace vecs {
 
 	const int ARCHETYPE_SEQUENTIAL = 0;
@@ -114,7 +113,7 @@ namespace vecs {
 				}
 			}
 			++m_changeCounter;
-			return { m_maps[Type<Handle>()]->size() - 1, other.Erase2(other_index) }; //return the index of the new entity
+			return { m_maps[Type<Handle>()]->size() - 1, other.Erase2(other_index) }; 
 		}
 
 		/// @brief Swap two entities in the archetype.
@@ -262,6 +261,9 @@ namespace vecs {
 		std::set<size_t> 	m_types; //types of components
 		Map_t 				m_maps; //map from type index to component data
 
+	public:
+		inline static thread_local size_t m_iteratingIndex{std::numeric_limits<size_t>::max()}; //current iterator index
+		inline static thread_local std::vector<size_t> m_gaps{}; //gaps from previous erasures that must be filled
 	}; //end of Archetype
 
 } //namespace vecs2

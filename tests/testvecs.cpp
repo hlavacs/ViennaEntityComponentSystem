@@ -287,9 +287,11 @@ void test_mutex() {
 void test_vecs();
 
 void test_registry() {
-	std::print("\x1b[37m testing registry...");
+	std::print("\x1b[37m testing registry..."); std::cout.flush();
+
 	test_vecs();
-	std::print("\x1b[32m passed\n");
+	std::print("\x1b[32m passed\n"); std::cout.flush();
+
 }
 
 
