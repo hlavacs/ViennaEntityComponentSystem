@@ -544,14 +544,14 @@ namespace vecs {
 		Mutex_t m_mutex; //mutex for reading and writing m_archetypes.
 		inline static thread_local size_t m_slotMapIndex = NUMBER_SLOTMAPS::value - 1;
 
-		//Strategy:
+		//Parallelization strategy (not yet implemented):
 		//- When iterating over an archetype, the archetype is locked for READING.
 		//- If an entity E should be erased (erase, add or erase component), then 
 		//  - the archetype is released for reading and locked for WRITING.
 		//  - If E is AFTER the current entity C, then the last entity L is moved over E, release write, lock read.
 		//  - If E is BEFORE or EQUAL the current entity C, filling the gap is DELAYED. Instead, the index if E
 		//	  is stored in a list of delayed entities. When the iteration is finished, the gaps are closed.
-		//    Alsoe the archetype stays in write lock until the end of the iteration.
+		//    Also the archetype stays in write lock until the end of the iteration.
 		inline static thread_local Archetype<RTYPE>* m_iteratingArchetype{nullptr}; //for iterating over archetypes
 	};
 
