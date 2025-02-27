@@ -142,7 +142,7 @@ namespace vecs {
 		/// @brief Get the number of entites in this archetype.
 		/// @return The number of entities.
 		size_t Size() {
-			return m_maps[Type<Handle>()]->size();
+			return m_maps[Type<Handle>()]->size() - m_gaps.size();
 		}
 
 		/// @brief Clear the archetype.
@@ -242,6 +242,10 @@ namespace vecs {
 		}
 
 	private:
+
+		size_t InternalSize() {
+			return m_maps[Type<Handle>()]->size();
+		}
 
 		/// @brief Erase an entity. To ensure thet consistency of the entity indices, the last entity is moved to the erased one.
 		/// This might result in a reindexing of the moved entity in the slot map. Thus we need a ref to the slot map
