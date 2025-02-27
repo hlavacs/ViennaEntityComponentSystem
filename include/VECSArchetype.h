@@ -244,6 +244,7 @@ namespace vecs {
 		auto Erase2(size_t index) -> Handle {
 			size_t last{index};
 			++m_changeCounter;
+			//if( m_iteratingArchetype == this && index <= m_iteratingIndex ) { m_gaps.push_back(index); return Handle{}; } //delayed erasure
 			for( auto& it : m_maps ) { last = it.second->erase(index); } //Erase from the component map
 			return index < last ? (*Map<Handle>())[index] : Handle{}; //return the handle of the moved entity
 		}
