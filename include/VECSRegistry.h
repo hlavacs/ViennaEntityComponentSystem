@@ -89,9 +89,7 @@ namespace vecs {
 
 			/// @brief Destructor, unlocks the archetype.
 			~Iterator() {
-				if(m_end && m_archidx < m_archetypes.size()) {
-					m_registry.FillGaps(m_archetypes[m_archidx].m_arch);
-				}
+				if(m_end && m_archidx < m_archetypes.size()) { m_registry.FillGaps(m_archetypes[m_archidx].m_arch);	}
 				Archetype<RTYPE>::m_iteratingArchetype = nullptr;
 			}
 
@@ -100,13 +98,11 @@ namespace vecs {
 				if( m_archidx >= m_archetypes.size() ) { return *this; }
 				++m_entidx;
 				Archetype<RTYPE>::m_iteratingIndex = m_entidx;
-				while( m_entidx >= m_archetypes[m_archidx].m_arch->Size() || m_entidx >= m_archetypes[m_archidx].m_size ) {
+				while( m_entidx >= m_archetypes[m_archidx].m_arch->Number() || m_entidx >= m_archetypes[m_archidx].m_size ) {
 					m_entidx = 0;
 					m_registry.FillGaps(m_archetypes[m_archidx].m_arch);
 					++m_archidx;
 					if( m_archidx >= m_archetypes.size() ) { break; }
-					//Archetype<RTYPE>::m_iteratingArchetype = m_archetypes[m_archidx].m_arch;
-					//Archetype<RTYPE>::m_iteratingIndex = m_entidx;
 				}
 				return *this;
 			}
@@ -438,10 +434,10 @@ namespace vecs {
 		// This is necessary when an entity is erased during iteration. The last entity is moved to the erased one
 		// after Iteration is finished. This is triggered by the iterator.
 		void FillGaps(Archetype<RTYPE>* arch) {
+			std::sort(arch->m_gaps.begin(), arch->m_gaps.end(), std::greater<size_t>());
 			Archetype<RTYPE>::m_iteratingArchetype = nullptr;
-			size_t i=0;
 			for( auto& gap : arch->m_gaps ) {
-				if(gap < arch->Size() + i++) ReindexMovedEntity(arch->Erase(gap), gap);
+				if(gap < arch->Number()) ReindexMovedEntity(arch->Erase(gap), gap);
 			}
 			arch->m_gaps.clear();
 			Archetype<RTYPE>::m_iteratingArchetype = arch;
