@@ -18,7 +18,7 @@ void check( bool b, std::string_view msg = "" ) {
 }
 
 void test_handle() {
-	std::print("\x1b[37m testing handle...");
+	std::cout << "\x1b[37m testing handle...";
 
 	{
 		vecs::Handle h0;
@@ -39,11 +39,11 @@ void test_handle() {
 		check( h2 != h3 );
 	}
 
-	std::print("\x1b[32m passed\n");
+	std::cout << "\x1b[32m passed\n";
 }
 
 void test_vector() {
-	std::print("\x1b[37m testing vector...");
+	std::cout << "\x1b[37m testing vector...";
 	{
 		vecs::Vector<int> vec;
 		std::vector<vecs::Vector<int>> v;
@@ -96,11 +96,11 @@ void test_vector() {
 		vecs::VectorBase* vb = &vec;
 		for( int i=0; i<10000; ++i ) { vb->push_back(); }
 	}
-	std::print("\x1b[32m passed\n");
+	std::cout << "\x1b[32m passed\n";
 }
 
 void test_slotmap() {
-	std::print("\x1b[37m testing slot map...");
+	std::cout << "\x1b[37m testing slot map...";
 	{
 		vecs::SlotMap<int> sm(0,6);
 		std::vector<vecs::SlotMap<int>> v;
@@ -141,11 +141,11 @@ void test_slotmap() {
 		for( int i=0; i<10000; ++i ) { check( sm[handles[i]].m_value == i ) ; }
 
 	}
-	std::print("\x1b[32m passed\n");
+	std::cout << "\x1b[32m passed\n";
 }
 
 void test_archetype() {
-	std::print("\x1b[37m testing archetype...");
+	std::cout << "\x1b[37m testing archetype...";
 
 	{
 		vecs::Archetype<0> arch;
@@ -331,7 +331,7 @@ void test_archetype() {
 		check( arch4.Has( vecs::Type<std::string>() ) == true );
 
 	}
-	std::print("\x1b[32m passed\n");
+	std::cout << "\x1b[32m passed\n";
 
 }
 
@@ -342,10 +342,10 @@ void test_mutex() {
 void test_vecs();
 
 void test_registry() {
-	std::print("\x1b[37m testing registry..."); std::cout.flush();
+	std::cout << "\x1b[37m testing registry...";
 
 	test_vecs();
-	std::print("\x1b[32m passed\n"); std::cout.flush();
+	std::cout << "\x1b[32m passed\n"; 
 
 }
 

@@ -4,14 +4,13 @@ set(TARGET testvecs)
 set(SOURCE testvecs.cpp testvecs_vecs.cpp)
 
 set(HEADERS
-  ${INCLUDE}/VECS.h
-  ${INCLUDE}/VECSArchetype.h
-  ${INCLUDE}/VECSHandle.h
-  ${INCLUDE}/VECSMutex.h
-  ${INCLUDE}/VECSSlotMap.h
-  ${INCLUDE}/VECSVector.h
+  ${PROJECT_SOURCE_DIR}/include/VECS.h
+  ${PROJECT_SOURCE_DIR}/include/VECSArchetype.h
+  ${PROJECT_SOURCE_DIR}/include/VECSHandle.h
+  ${PROJECT_SOURCE_DIR}/include/VECSMutex.h
+  ${PROJECT_SOURCE_DIR}/include/VECSSlotMap.h
+  ${PROJECT_SOURCE_DIR}/include/VECSVector.h
 )
 
 add_executable(${TARGET} ${SOURCE} ${HEADERS})
 
-include_directories (${INCLUDE})
