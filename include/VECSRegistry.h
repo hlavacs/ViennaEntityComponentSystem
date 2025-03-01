@@ -53,6 +53,7 @@ namespace vecs {
 		//----------------------------------------------------------------------------------------------
 
 		template<typename U>
+			requires (!std::is_reference_v<U>)
 		class Ref {
 
 			using T = std::decay_t<U>;
@@ -164,9 +165,9 @@ namespace vecs {
 
 			template<typename T>
 				requires std::is_reference_v<T>
-			auto Get() -> Ref<T> {
+			auto Get() -> to_ref_t<T> {
 				auto arch = m_archetypes[m_archidx].m_arch;
-				return Ref<T>(arch, (*arch->template Map<T>())[m_entidx]);
+				return to_ref_t<T>(arch, (*arch->template Map<T>())[m_entidx]);
 			}
 
 			Registry& m_registry; ///< Reference to the registry system.
