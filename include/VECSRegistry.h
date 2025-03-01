@@ -72,9 +72,9 @@ namespace vecs {
 
 		private:
 			auto CheckChangeCounter() -> T& {
-				auto cc = m_archetype->GetChangeCounter();
-				if(cc > m_changeCounter ) {
+				if(m_archetype->GetChangeCounter() > m_changeCounter ) {
 					std::cout << "Reference to type " << typeid(declval<T>()).name() << " invalidated because of adding or erasing a component or erasing an entity!" << std::endl;
+					assert(false);
 					exit(-1);
 				}
 				return  m_valueRef;
