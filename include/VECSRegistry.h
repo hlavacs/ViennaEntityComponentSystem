@@ -62,9 +62,9 @@ namespace vecs {
 			Ref(Archetype *arch, T& valueRef) : m_archetype{arch}, m_valuePtr{&valueRef}, m_changeCounter{arch->GetChangeCounter()} {}
 			Ref(const Ref& other) : m_archetype{other.m_archetype}, m_valuePtr{other.m_valuePtr}, m_changeCounter{other.m_changeCounter} {}
 
-			auto operator()() {return CheckChangeCounter(); }
+			auto& operator()() {return CheckChangeCounter(); }
 			void operator=(T&& value) { CheckChangeCounter() = std::forward<T>(value); }
-			operator T() { return CheckChangeCounter(); }
+			operator T&() { return CheckChangeCounter(); }
 
 		private:
 			auto CheckChangeCounter() -> T& {
