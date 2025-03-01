@@ -144,7 +144,7 @@ namespace vecs {
 					Archetype::m_iteratingIndex = m_entidx;
 				}
 
-				auto tup = std::tuple<Ts...>( Get<Ts>()... );
+				auto tup = std::make_tuple( Get<Ts>()... );
 				if constexpr (sizeof...(Ts) == 1) { return std::get<0>(tup); }
 				else return tup;
 			}
@@ -157,8 +157,16 @@ namespace vecs {
 		private:
 
 			template<typename T>
-			auto Get() -> T&{
+				requires (!std::is_reference_v<T>)
+			auto Get() -> T {
 				return (*m_archetypes[m_archidx].m_arch->template Map<T>())[m_entidx];
+			}
+
+			template<typename T>
+				requires std::is_reference_v<T>
+			auto Get() -> Ref<T> {
+				auto arch = m_archetypes[m_archidx].m_arch;
+				return Ref<T>(arch, (*arch->template Map<T>())[m_entidx]);
 			}
 
 			Registry& m_registry; ///< Reference to the registry system.
