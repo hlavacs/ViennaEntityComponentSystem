@@ -16,7 +16,7 @@ int test1() {
 	if(boolprint) std::cout << "test 1.2 system" << std::endl;
 
 	{
-	    vecs::Registry<vecs::REGISTRYTYPE_SEQUENTIAL> system;
+	    vecs::Registry system;
 
 		//Valid
 		{
@@ -227,7 +227,7 @@ int test1() {
 	}
 
 	{
-	    vecs::Registry<vecs::REGISTRYTYPE_SEQUENTIAL> system;
+	    vecs::Registry system;
 
 		std::vector<vecs::Handle> handles;
 		for( int i=0; i<10; ++i ) {
@@ -253,7 +253,7 @@ int test1() {
 }
 
 
-size_t test_insert_iterate( auto& system, int m ) {
+size_t test_insert_iterate( vecs::Registry& system, int m ) {
 
 	auto t1 = std::chrono::high_resolution_clock::now();
 
@@ -271,7 +271,7 @@ size_t test_insert_iterate( auto& system, int m ) {
 }
 
 
-size_t test_insert( auto& system, int m ) {
+size_t test_insert( vecs::Registry& system, int m ) {
 
 	auto t1 = std::chrono::high_resolution_clock::now();
 
@@ -284,7 +284,7 @@ size_t test_insert( auto& system, int m ) {
 }
 
 
-size_t test_iterate( auto& system, int m ) {
+size_t test_iterate( vecs::Registry& system, int m ) {
 
 	auto t1 = std::chrono::high_resolution_clock::now();
 
@@ -308,7 +308,7 @@ void test3( std::string name, bool insert, auto&& job ) {
 
 	{
 		if(boolprint) std::cout << "test 3.1 sequential " + name << std::endl;
-		vecs::Registry<vecs::REGISTRYTYPE_SEQUENTIAL> system;
+		vecs::Registry system;
 		if(insert) test_insert(system, num);
 		duration = job(system, num);
 		if(boolprint) std::cout << "Size: " << system.Size() << " us: " << duration << " us/entity: " << (double)duration/(double)num << std::endl;
@@ -320,7 +320,7 @@ void test3( std::string name, bool insert, auto&& job ) {
 
 	{
 		if(boolprint) std::cout << "test 3.2 sequential " + name << std::endl;
-		vecs::Registry<vecs::REGISTRYTYPE_PARALLEL> system;
+		vecs::Registry system;
 		if(insert) test_insert(system, num);
 		duration = job(system, num);
 		if(boolprint) std::cout << "Size: " << system.Size() << " us: " << duration << " us/entity: " << (double)duration/(double)num << std::endl;
@@ -335,7 +335,7 @@ void test3( std::string name, bool insert, auto&& job ) {
 
 void test4( std::string name, bool insert, auto&& job ) {
 
-	vecs::Registry<vecs::REGISTRYTYPE_PARALLEL> system;
+	vecs::Registry system;
 
 	int num = 500000;
 	auto work = [&](auto& system) {
@@ -390,7 +390,7 @@ void test5() {
 
 	if(boolprint) std::cout << "test 5 parallel" << std::endl;
 
-	using system_t = vecs::Registry<vecs::REGISTRYTYPE_PARALLEL>;
+	using system_t = vecs::Registry;
 	using handles_t = std::set<vecs::Handle>;
 	system_t system;
 

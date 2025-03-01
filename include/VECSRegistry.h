@@ -20,15 +20,8 @@ namespace vecs {
 	//----------------------------------------------------------------------------------------------
 	//Registry 
 
-	const int REGISTRYTYPE_SEQUENTIAL = 0;
-	const int REGISTRYTYPE_PARALLEL = 1;
-
-	template<int T>
-	concept RegistryType = (T == REGISTRYTYPE_SEQUENTIAL || T == REGISTRYTYPE_PARALLEL);
 
 	/// @brief A registry for entities and components.
-	template <int RTYPE>
-		requires RegistryType<RTYPE>
 	class Registry {
 
 		/// @brief Entry for the seach cache
@@ -39,19 +32,22 @@ namespace vecs {
 
 		template<vecs::VecsPOD T>
 		struct SlotMapAndMutex {
-			vecs::SlotMap<T> m_slotMap;
+			SlotMap<T> m_slotMap;
 			Mutex_t m_mutex;
 			SlotMapAndMutex( uint32_t storageIndex, uint32_t bits ) : m_slotMap{storageIndex, bits}, m_mutex{} {};
 			SlotMapAndMutex( const SlotMapAndMutex& other ) : m_slotMap{other.m_slotMap}, m_mutex{} {};
 		};
 
-		using NUMBER_SLOTMAPS = std::conditional_t< RTYPE == REGISTRYTYPE_SEQUENTIAL, 
-			std::integral_constant<int, 1>, std::integral_constant<int, 16>>;
-	
-		using SlotMaps_t = std::vector<SlotMapAndMutex<typename Archetype<RTYPE>::ArchetypeAndIndex>>;
-		using HashMap_t = std::map<size_t, std::unique_ptr<Archetype<RTYPE>>>; 
-		using Size_t = std::conditional_t<RTYPE == REGISTRYTYPE_SEQUENTIAL, std::size_t, std::atomic<std::size_t>>;
-	
+		#ifdef REGISTRYTYPE_SEQUENTIAL
+			using NUMBER_SLOTMAPS = std::integral_constant<int, 1>;
+		#else
+			using NUMBER_SLOTMAPS = std::integral_constant<int, 16>;
+		#endif
+
+		using Slot_t = typename SlotMap<typename Archetype::ArchetypeAndIndex>::Slot;
+		using SlotMaps_t = std::vector<SlotMapAndMutex<typename Archetype::ArchetypeAndIndex>>;
+		using HashMap_t = std::map<size_t, std::unique_ptr<Archetype>>;
+
 	public:	
 
 		//----------------------------------------------------------------------------------------------
@@ -63,7 +59,7 @@ namespace vecs {
 
 		public:
 			Ref() = default;
-			Ref(Archetype<RTYPE> *arch, T& valueRef) : m_archetype{arch}, m_valuePtr{&valueRef}, m_changeCounter{arch->GetChangeCounter()} {}
+			Ref(Archetype *arch, T& valueRef) : m_archetype{arch}, m_valuePtr{&valueRef}, m_changeCounter{arch->GetChangeCounter()} {}
 			Ref(const Ref& other) : m_archetype{other.m_archetype}, m_valuePtr{other.m_valuePtr}, m_changeCounter{other.m_changeCounter} {}
 
 			auto operator()() {return CheckChangeCounter(); }
@@ -80,7 +76,7 @@ namespace vecs {
 				return  *m_valuePtr;
 			}
 
-			Archetype<RTYPE>* m_archetype;
+			Archetype* m_archetype;
 			T* m_valuePtr{nullptr};
 			size_t m_changeCounter;
 		};
@@ -93,9 +89,9 @@ namespace vecs {
 
 		/// @brief A structure holding a pointer to an archetype and the current size of the archetype.
 		struct ArchetypeAndSize {
-			Archetype<RTYPE>* 	m_arch;	//pointer to the archetype
+			Archetype* 	m_arch;	//pointer to the archetype
 			size_t 				m_size;	//size of the archetype
-			ArchetypeAndSize(Archetype<RTYPE>* arch, size_t size) : m_arch{arch}, m_size{size} {}
+			ArchetypeAndSize(Archetype* arch, size_t size) : m_arch{arch}, m_size{size} {}
 		};
 
 
@@ -110,7 +106,7 @@ namespace vecs {
 			/// @brief Iterator constructor saving a list of archetypes and the current index.
 			/// @param arch List of archetypes. 
 			/// @param archidx First archetype index.
-			Iterator( Registry<RTYPE>& system, std::vector<ArchetypeAndSize>& arch, size_t archidx) 
+			Iterator( Registry& system, std::vector<ArchetypeAndSize>& arch, size_t archidx) 
 				: m_registry(system), m_archetypes{arch}, m_archidx{archidx}, m_entidx{0} {
 				m_archidx>0 ? m_end = true : m_end = false;
 			}
@@ -124,14 +120,14 @@ namespace vecs {
 			/// @brief Destructor, unlocks the archetype.
 			~Iterator() {
 				if(m_end && m_archidx < m_archetypes.size()) { m_registry.FillGaps(m_archetypes[m_archidx].m_arch);	}
-				Archetype<RTYPE>::m_iteratingArchetype = nullptr;
+				Archetype::m_iteratingArchetype = nullptr;
 			}
 
 			/// @brief Prefix increment operator.
 			auto operator++() {
 				if( m_archidx >= m_archetypes.size() ) { return *this; }
 				++m_entidx;
-				Archetype<RTYPE>::m_iteratingIndex = m_entidx;
+				Archetype::m_iteratingIndex = m_entidx;
 				while( m_entidx >= m_archetypes[m_archidx].m_arch->Number() || m_entidx >= m_archetypes[m_archidx].m_size ) {
 					m_entidx = 0;
 					m_registry.FillGaps(m_archetypes[m_archidx].m_arch);
@@ -144,8 +140,8 @@ namespace vecs {
 			/// @brief Access the content the iterator points to.
 			auto operator*() {
 				if(m_archidx < m_archetypes.size()) {
-					Archetype<RTYPE>::m_iteratingArchetype = m_archetypes[m_archidx].m_arch;
-					Archetype<RTYPE>::m_iteratingIndex = m_entidx;
+					Archetype::m_iteratingArchetype = m_archetypes[m_archidx].m_arch;
+					Archetype::m_iteratingIndex = m_entidx;
 				}
 
 				auto tup = std::tuple<Ts...>( Get<Ts>()... );
@@ -165,7 +161,7 @@ namespace vecs {
 				return (*m_archetypes[m_archidx].m_arch->template Map<T>())[m_entidx];
 			}
 
-			Registry<RTYPE>& m_registry; ///< Reference to the registry system.
+			Registry& m_registry; ///< Reference to the registry system.
 			Vector<Handle>*	m_mapHandle{nullptr}; ///< Pointer to the comp map holding the handle of the current archetype.
 			std::vector<ArchetypeAndSize>& m_archetypes; ///< List of archetypes.
 			size_t 	m_end{false};	///< True if this is the end iterator.
@@ -182,7 +178,7 @@ namespace vecs {
 		class View {
 
 		public:
-			View(Registry<RTYPE>& system, HashMap_t& map, auto&& tagsYes, auto&& tagsNo ) : 
+			View(Registry& system, HashMap_t& map, auto&& tagsYes, auto&& tagsNo ) : 
 				m_system{system}, m_map(map), m_tagsYes{tagsYes}, m_tagsNo{tagsNo} {
 			} ///< Constructor.
 
@@ -213,7 +209,7 @@ namespace vecs {
 
 		private:
 
-			Registry<RTYPE>& 				m_system;	///< Reference to the registry system.
+			Registry& 				m_system;	///< Reference to the registry system.
 			std::vector<size_t> 			m_tagsYes;	///< List of tags that must be present.
 			std::vector<size_t> 			m_tagsNo;	///< List of tags that must not be present.
 			HashMap_t& 						m_map;		///< List of archetypes.
@@ -228,7 +224,7 @@ namespace vecs {
 		Registry() { 
 			m_slotMaps.reserve(NUMBER_SLOTMAPS::value); //resize the slot storage
 			for( uint32_t i = 0; i < NUMBER_SLOTMAPS::value; ++i ) {
-				m_slotMaps.emplace_back( SlotMapAndMutex<typename Archetype<RTYPE>::ArchetypeAndIndex>{ i, 6  } ); 
+				m_slotMaps.emplace_back( SlotMapAndMutex<typename Archetype::ArchetypeAndIndex>{ i, 6  } ); 
 			}
 		};
 
@@ -457,14 +453,14 @@ namespace vecs {
 		/// @brief Fill gaps from previous erasures.
 		// This is necessary when an entity is erased during iteration. The last entity is moved to the erased one
 		// after Iteration is finished. This is triggered by the iterator.
-		void FillGaps(Archetype<RTYPE>* arch) {
+		void FillGaps(Archetype* arch) {
 			std::sort(arch->m_gaps.begin(), arch->m_gaps.end(), std::greater<size_t>());
-			Archetype<RTYPE>::m_iteratingArchetype = nullptr;
+			Archetype::m_iteratingArchetype = nullptr;
 			for( auto& gap : arch->m_gaps ) {
 				if(gap < arch->Number()) ReindexMovedEntity(arch->Erase(gap), gap);
 			}
 			arch->m_gaps.clear();
-			Archetype<RTYPE>::m_iteratingArchetype = arch;
+			Archetype::m_iteratingArchetype = arch;
 		}
 
 	private:
@@ -487,14 +483,14 @@ namespace vecs {
 		/// @brief Get the index of the entity in the archetype
 		/// @param handle The handle of the entity.
 		/// @return The index of the entity in the archetype.
-		auto& GetSlot( Handle handle ) {
+		auto GetSlot( Handle handle ) -> Slot_t& {
 			return m_slotMaps[handle.GetStorageIndex()].m_slotMap[handle];
 		}
 
 		/// @brief Get the index of the entity in the archetype
 		/// @param handle The handle of the entity.
 		/// @return The index of the entity and the archetype.
-		auto& GetArchetypeAndIndex( Handle handle ) {
+		auto GetArchetypeAndIndex( Handle handle ) -> Archetype::ArchetypeAndIndex& {
 			return GetSlot(handle).m_value;
 		}
 
@@ -510,7 +506,7 @@ namespace vecs {
 		/// @param tags Use also these tag hashes
 		/// @return A vector of type hashes
 		template<typename... Ts>
-		auto CreateTypeList(Archetype<RTYPE>* arch, const std::vector<size_t>&& tags, const std::vector<size_t>&& ignore) -> std::vector<size_t> {
+		auto CreateTypeList(Archetype* arch, const std::vector<size_t>&& tags, const std::vector<size_t>&& ignore) -> std::vector<size_t> {
 			std::vector<size_t> all{ tags.begin(), tags.end() };
 			(AddType(all, Type<Ts>()), ...);
 			if(arch) { for( auto type : arch->Types() ) { if(!ContainsType(ignore, type)) { AddType(all, type); } } }
@@ -523,11 +519,11 @@ namespace vecs {
 		/// @param tags Should have the tags of the entity.
 		/// @return A pointer to the archetype.
 		template<typename... Ts>
-		auto GetArchetype(Archetype<RTYPE>* arch, const std::vector<size_t>&& tags, const std::vector<size_t>&& ignore) -> Archetype<RTYPE>* {
+		auto GetArchetype(Archetype* arch, const std::vector<size_t>&& tags, const std::vector<size_t>&& ignore) -> Archetype* {
 			size_t hs = Hash(CreateTypeList<Ts...>(arch, std::forward<decltype(tags)>(tags), std::forward<decltype(ignore)>(ignore)));
 			if( m_archetypes.contains( hs ) ) { return m_archetypes[hs].get(); }
 
-			auto newArchUnique = std::make_unique<Archetype<RTYPE>>();
+			auto newArchUnique = std::make_unique<Archetype>();
 			auto newArch = newArchUnique.get();
 			if(arch) newArch->Clone(*arch, ignore); //clone old types/components and old tags
 			auto fun = [&]<typename T>(){ if( !ContainsType(newArch->Types(), Type<T>()) ) { newArch->template AddComponent<T>(); } };
@@ -553,7 +549,7 @@ namespace vecs {
 		/// @param newArch The new archetype.
 		/// @param oldArch The old archetype.
 		/// @param archAndIndex The archetype and index of the entity.
-		void Move(Archetype<RTYPE>* newArch, Archetype<RTYPE>* oldArch, vecs::Archetype<RTYPE>::ArchetypeAndIndex& archAndIndex) {
+		void Move(Archetype* newArch, Archetype* oldArch, vecs::Archetype::ArchetypeAndIndex& archAndIndex) {
 			auto [newIndex, movedHandle] = newArch->Move(*oldArch, archAndIndex.m_index);
 			ReindexMovedEntity(movedHandle, archAndIndex.m_index);
 			archAndIndex = { newArch, newIndex };
@@ -576,19 +572,19 @@ namespace vecs {
 
 		template<typename T>
 			requires (!std::is_reference_v<T>)
-		auto Get3(Archetype<RTYPE>* arch, size_t index) -> T {
+		auto Get3(Archetype* arch, size_t index) -> T {
 			return arch->template Get<T>(index);
 		}
 
 		/*template<typename T>
 			requires std::is_reference_v<T>
-		auto Get3(Archetype<RTYPE>* arch, size_t index) -> T& {
+		auto Get3(Archetype* arch, size_t index) -> T& {
 			return arch->template Get<T>(index);
 		}*/
 
 		template<typename T>
 		requires std::is_reference_v<T>
-		auto Get3(Archetype<RTYPE>* arch, size_t index) {
+		auto Get3(Archetype* arch, size_t index) {
 			return Ref<std::decay_t<T>>(arch, arch->template Get<std::decay_t<T>>(index));
 		}
 
@@ -612,6 +608,9 @@ namespace vecs {
 		Mutex_t m_mutex; //mutex for reading and writing m_archetypes.
 		inline static thread_local size_t m_slotMapIndex = NUMBER_SLOTMAPS::value - 1; //for new entities
 	};
+
+	template<typename T>
+	using Ref = Registry::Ref<T>;
 
 } //end of namespace vecs
 

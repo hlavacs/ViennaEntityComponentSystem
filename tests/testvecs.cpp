@@ -148,7 +148,7 @@ void test_archetype() {
 	std::cout << "\x1b[37m testing archetype...";
 
 	{
-		vecs::Archetype<0> arch;
+		vecs::Archetype arch;
 		arch.AddComponent<int>();
 		arch.AddComponent<float>();
 		arch.AddComponent<char>();
@@ -205,15 +205,15 @@ void test_archetype() {
 	}
 
 	{
-		vecs::Archetype<0> arch;
+		vecs::Archetype arch;
 		arch.AddComponent<int>();
 		arch.AddComponent<float>();
 		arch.AddComponent<char>();
 		arch.AddComponent<double>();
 		arch.AddComponent<std::string>();
 
-		vecs::Archetype<0>::m_iteratingArchetype = &arch;
-		vecs::Archetype<0>::m_iteratingIndex = 5;
+		vecs::Archetype::m_iteratingArchetype = &arch;
+		vecs::Archetype::m_iteratingIndex = 5;
 
 		auto add = [&](int i){
 			arch.AddValue( vecs::Handle{1,(size_t)i} );
@@ -247,7 +247,7 @@ void test_archetype() {
 		std::cout << "\nArchetype size: " << arch.Size() << std::endl;
 		arch.Print();
 
-		vecs::Archetype<0>::m_iteratingIndex = 5;
+		vecs::Archetype::m_iteratingIndex = 5;
 		arch.Erase( 1 );
 		check( arch.Size() == 5 );
 		std::cout << "\nArchetype size: " << arch.Size() << std::endl;
@@ -260,11 +260,11 @@ void test_archetype() {
 		check( arch.Size() == 3 );
 		std::cout << "\nArchetype size: " << arch.Size() << std::endl;
 		arch.Print();
-		vecs::Archetype<0>::m_gaps.clear();
+		vecs::Archetype::m_gaps.clear();
 	}
 
 	{
-		vecs::Archetype<0> arch, arch2;
+		vecs::Archetype arch, arch2;
 		arch.AddComponent<int>();
 		arch.AddComponent<float>();
 		arch.AddComponent<char>();
@@ -310,7 +310,7 @@ void test_archetype() {
 		check( arch.Get<char>(1) == 'b' );
 		check( arch.Get<double>(1) == 4.0 );
 
-		vecs::Archetype<0> arch3;
+		vecs::Archetype arch3;
 		arch3.Clone( arch, std::vector<size_t>{} );
 		check( arch3.Size() == 0 );
 		check( arch3.Has( vecs::Type<vecs::Handle>() ) == true );
@@ -320,7 +320,7 @@ void test_archetype() {
 		check( arch3.Has( vecs::Type<double>() ) == true );
 		check( arch3.Has( vecs::Type<std::string>() ) == true );
 
-		vecs::Archetype<0> arch4;
+		vecs::Archetype arch4;
 		arch4.Clone( arch, std::vector<size_t>{vecs::Type<int>(), vecs::Type<double>()} );
 		check( arch4.Size() == 0 );
 		check( arch4.Has( vecs::Type<vecs::Handle>() ) == true );

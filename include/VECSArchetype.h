@@ -2,9 +2,6 @@
 
 namespace vecs {
 
-	const int ARCHETYPE_SEQUENTIAL = 0;
-	const int ARCHETYPE_PARALLEL = 1;
-
 	//----------------------------------------------------------------------------------------------
 	//Archetype
 
@@ -13,14 +10,13 @@ namespace vecs {
 	/// The components are stored in the component maps. Note that the archetype class is not templated,
 	/// but some methods including a constructor are templated. Thus the class knows only type indices
 	/// of its components, not the types themselves.
-	template<int ATYPE = ARCHETYPE_SEQUENTIAL>
 	class Archetype {
 
 	public:
 
 		/// @brief A pair of an archetype and an index. This is stored in the slot map.
 		struct ArchetypeAndIndex {
-			Archetype<ATYPE>* m_arch;	//pointer to the archetype
+			Archetype* m_arch;	//pointer to the archetype
 			size_t m_index;			//index of the entity in the archetype
 		};	
 
@@ -256,7 +252,6 @@ namespace vecs {
 			return index < last ? (*Map<Handle>())[index] : Handle{}; //return the handle of the moved entity
 		}
 
-		using Size_t = std::conditional_t<ATYPE == ARCHETYPE_SEQUENTIAL, std::size_t, std::atomic<std::size_t>>;
 		using Map_t = std::unordered_map<size_t, std::unique_ptr<VectorBase>>;
 		Mutex_t 			m_mutex; //mutex for thread safety
 		Size_t 				m_changeCounter{0}; //changes invalidate references
@@ -272,7 +267,7 @@ namespace vecs {
 		//  - If E is BEFORE or EQUAL the current entity C, filling the gap is DELAYED. Instead, the index if E
 		//	  is stored in a list of delayed entities. When the iteration is finished, the gaps are closed.
 		//    Also the archetype stays in write lock until the end of the iteration.
-		inline static thread_local Archetype<ATYPE>* m_iteratingArchetype{nullptr}; //for iterating over archetypes
+		inline static thread_local Archetype* m_iteratingArchetype{nullptr}; //for iterating over archetypes
 		inline static thread_local size_t m_iteratingIndex{std::numeric_limits<size_t>::max()}; //current iterator index
 		inline static thread_local std::vector<size_t> m_gaps{}; //gaps from previous erasures that must be filled
 	}; //end of Archetype

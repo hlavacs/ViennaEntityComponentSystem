@@ -72,6 +72,16 @@ namespace vecs {
 	}
 }
 
+#if !defined(REGISTRYTYPE_SEQUENTIAL) || !defined(REGISTRYTYPE_PARALLEL)
+	#define REGISTRYTYPE_SEQUENTIAL
+#endif
+
+#ifdef REGISTRYTYPE_SEQUENTIAL
+	using Size_t = std::size_t;
+#else
+	using Size_t = std::atomic<std::size_t>;
+#endif
+
 #include <VTLL.h>
 #include <VSTY.h>
 #include "VECSHandle.h"

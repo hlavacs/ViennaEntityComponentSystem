@@ -13,6 +13,7 @@ namespace vecs {
 	template<VecsPOD T>
 	class SlotMap {
 
+	public:
 		/// @brief A slot in the slot map.
 		struct Slot {
 			int64_t m_nextFree; //index of the next free slot in the free list. 
