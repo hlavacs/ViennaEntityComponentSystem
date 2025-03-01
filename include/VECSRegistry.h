@@ -1,6 +1,5 @@
 #pragma once
 
-
 namespace vecs {
 
 	//----------------------------------------------------------------------------------------------
@@ -58,13 +57,14 @@ namespace vecs {
 		//----------------------------------------------------------------------------------------------
 
 		template<typename U>
-			requires (!std::is_reference_v<U>)
 		class Ref {
 
 			using T = std::decay_t<U>;
 
 		public:
-			Ref(Archetype<RTYPE> *arch, T& valueRef) : m_archetype{arch}, m_valueRef{valueRef}, m_changeCounter{arch->GetChangeCounter()} {}
+			Ref() = default;
+			Ref(Archetype<RTYPE> *arch, T& valueRef) : m_archetype{arch}, m_valuePtr{&valueRef}, m_changeCounter{arch->GetChangeCounter()} {}
+			Ref(const Ref& other) : m_archetype{other.m_archetype}, m_valuePtr{other.m_valuePtr}, m_changeCounter{other.m_changeCounter} {}
 
 			auto operator()() {return CheckChangeCounter(); }
 			void operator=(T&& value) { CheckChangeCounter() = std::forward<T>(value); }
@@ -73,17 +73,20 @@ namespace vecs {
 		private:
 			auto CheckChangeCounter() -> T& {
 				if(m_archetype->GetChangeCounter() > m_changeCounter ) {
-					std::cout << "Reference to type " << typeid(declval<T>()).name() << " invalidated because of adding or erasing a component or erasing an entity!" << std::endl;
+					std::cout << "Reference to type " << typeid(std::declval<T>()).name() << " invalidated because of adding or erasing a component or erasing an entity!" << std::endl;
 					assert(false);
 					exit(-1);
 				}
-				return  m_valueRef;
+				return  *m_valuePtr;
 			}
 
 			Archetype<RTYPE>* m_archetype;
-			T& m_valueRef;
+			T* m_valuePtr{nullptr};
 			size_t m_changeCounter;
 		};
+
+		template<typename T>
+		using to_ref_t = std::conditional<std::is_reference_v<T>, Ref<std::decay_t<T>>, T>::type;
 
 
 		//----------------------------------------------------------------------------------------------
@@ -295,7 +298,7 @@ namespace vecs {
 		/// @param handle The handle of the entity.
 		/// @return The component value or reference to it.
 		template<typename T>
-		auto Get(Handle handle) -> T {
+		auto Get(Handle handle) -> to_ref_t<T> {
 			return std::get<0>(Get2<T>(handle));
 		}
 
@@ -305,7 +308,7 @@ namespace vecs {
 		/// @return A tuple of the component values.
 		template<typename... Ts>
 			requires (sizeof...(Ts)>1 && vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<Ts...>, Handle&>::value)
-		[[nodiscard]] auto Get(Handle handle) -> std::tuple<Ts...> {
+		[[nodiscard]] auto Get(Handle handle) -> std::tuple<to_ref_t<Ts>...> {
 			return Get2<Ts...>(handle);
 		}
 
@@ -565,10 +568,10 @@ namespace vecs {
 		[[nodiscard]] auto Get2(Handle handle) {
 			auto& archAndIndex = GetArchetypeAndIndex(handle);
 			auto arch = archAndIndex.m_arch;
-			if( (arch->Has(Type<Ts>()) && ...) ) { return std::tuple<Ts...>{ Get3<Ts>(arch, archAndIndex.m_index)... }; } 
+			if( (arch->Has(Type<Ts>()) && ...) ) { return std::tuple<to_ref_t<Ts>...>{ Get3<Ts>(arch, archAndIndex.m_index)... }; } 
 			auto newArch = GetArchetype<Ts...>(arch, {}, {});
 			Move(newArch, arch, archAndIndex);
-			return std::tuple<Ts...>{ Get3<Ts>(newArch, archAndIndex.m_index)... }; 
+			return std::tuple<to_ref_t<Ts>...>{ Get3<Ts>(newArch, archAndIndex.m_index)... }; 
 		}
 
 		template<typename T>
@@ -577,10 +580,16 @@ namespace vecs {
 			return arch->template Get<T>(index);
 		}
 
-		template<typename T>
+		/*template<typename T>
 			requires std::is_reference_v<T>
 		auto Get3(Archetype<RTYPE>* arch, size_t index) -> T& {
 			return arch->template Get<T>(index);
+		}*/
+
+		template<typename T>
+		requires std::is_reference_v<T>
+		auto Get3(Archetype<RTYPE>* arch, size_t index) {
+			return Ref<std::decay_t<T>>(arch, arch->template Get<std::decay_t<T>>(index));
 		}
 
 		/// @brief Change the component values of an entity.

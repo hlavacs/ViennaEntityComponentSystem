@@ -55,15 +55,21 @@ int test1() {
 		    check( system.Exists(handle) );
 		    auto t2 = system.Types(handle);
 			std::set<size_t> types{vecs::Type<vecs::Handle>(), vecs::Type<int>(), vecs::Type<float>(), vecs::Type<double>()};
-			std::ranges::for_each( t2, [&](auto& t){ check( types.contains(t) ); } );	}
+			std::ranges::for_each( t2, [&](auto& t){ check( types.contains(t) ); } );	
+		}
 
 		//Get
 		{
 		    auto handle = system.Insert(5, 6.9f, 7.3);
-			decltype(auto) value = system.Get<float&>(handle);
-			float& f1 = value; 
+			auto value = system.Get<float&>(handle);
+			auto f1 = value; 
 			value = 10.0f; 
 			check( system.Get<float>(handle) == 10.0f );
+			auto c = system.Get<char&>(handle); //new component -> change counter goes up
+			//float val = value; //access old reference -> error
+			//value = 5.0f; //access old reference -> error
+			c = 'A';
+			check( system.Get<char>(handle) == 'A'); //new component -> change counter goes up
 
 		    auto [v2a, v2b] = system.Get<float, double>(handle);
 		    auto [v3a, v3b] = system.Get<float&, double&>(handle);

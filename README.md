@@ -108,17 +108,22 @@ system.Clear(); //clear the system
 assert( system.Size() == 0 );
 ```
 
-You can get the current value of type *T* of an entity by calling *Get<T>(handle)*. You can get a reference to a component by calling *Get<T&>(handle)*. 
-Be aware that using references is done at your own peril. This is due to the fact that components may change their place in memory due to the following operations:
+You can get the current value of type *T* of an entity by calling *Get<T>(handle)*. Here *T* is neither a pointer nor a reference.
+
+Obtaining pure C++ references is not possible in VECS. Instead, you can get a reference object *Ref<T>* to a component by calling *Get<T&>(handle)*. Reference objects can be used like normal references. However, they track certain operations in the entity's archetype, and become invalid once such an operation took place. Accessing them after this causes a program abotr. 
+This is due to the fact that components may change their place in memory due to the following operations:
 * Components are added to or erased from an entity.
 * Erasing an entity might cause another entity to be moved in order to fill the gap left by the erased entity.
-As long as you do not carry out such operations, you can use a reference.
+As long as you do not carry out such operations, you can use a reference object *Ref<T>*. After such an operation on an archetype, each reference to a component of this archetype becomes invalid. Make sure that references are not accessed after these operations.
 
 ```C
 vecs::Handle h2 = system.Insert(5, 6.9f, 7.3);; //create a new entity with int, float and double components
-auto value = system.Get<float&>(h2);    //get float&
-float f1 = value;
-value = 10.0f;
+auto value = system.Get<float&>(h2);    //get Ref<float>
+float f1 = value; //get value
+value = 10.0f; //set value
+auto c = system.Get<char&>(handle); //new component -> reference value is now invalid
+float val = value; //access old reference -> error!
+value = 5.0f; //access old reference -> error!
 ```
 
 If you specify more than one type, you can get a tuple holding the specified types or references. You can easily access all component values by using C++17 *structured binding*. Calling *Get<T>(handle)* on a type *T* that is not yet part of the entity will also create an empty new component for the entity.
