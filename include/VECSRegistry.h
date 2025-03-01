@@ -296,12 +296,7 @@ namespace vecs {
 		/// @return The component value or reference to it.
 		template<typename T>
 		auto Get(Handle handle) -> T {
-			auto& archAndIndex = GetArchetypeAndIndex(handle);
-			auto arch = archAndIndex.m_arch;
-			if( arch->Has(Type<T>()) ) { return arch->template Get<T>(archAndIndex.m_index); }
-			auto newArch = GetArchetype<T>(arch, {}, {});
-			Move(newArch, arch, archAndIndex);
-			return newArch->template Get<T>(archAndIndex.m_index);
+			return std::get<0>(Get2<T>(handle));
 		}
 
 		/// @brief Get component values of an entity.
@@ -311,12 +306,7 @@ namespace vecs {
 		template<typename... Ts>
 			requires (sizeof...(Ts)>1 && vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<Ts...>, Handle&>::value)
 		[[nodiscard]] auto Get(Handle handle) -> std::tuple<Ts...> {
-			auto& archAndIndex = GetArchetypeAndIndex(handle);
-			auto arch = archAndIndex.m_arch;
-			if( (arch->Has(Type<Ts>()) && ...) ) { return std::tuple<Ts...>{ arch->template Get<Ts>(archAndIndex.m_index)... }; }
-			auto newArch = GetArchetype<Ts...>(arch, {}, {});
-			Move(newArch, arch, archAndIndex);
-			return std::tuple<Ts...>{ newArch->template Get<Ts>(archAndIndex.m_index)... };
+			return Get2<Ts...>(handle);
 		}
 
 		/// @brief Put new component values to an entity.
@@ -564,6 +554,33 @@ namespace vecs {
 			auto [newIndex, movedHandle] = newArch->Move(*oldArch, archAndIndex.m_index);
 			ReindexMovedEntity(movedHandle, archAndIndex.m_index);
 			archAndIndex = { newArch, newIndex };
+		}
+
+		/// @brief Get component values of an entity.
+		/// @tparam Ts The types of the components.
+		/// @param handle The handle of the entity.
+		/// @return A tuple of the component values.
+		template<typename... Ts>
+			requires (vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<Ts...>, Handle&>::value)
+		[[nodiscard]] auto Get2(Handle handle) {
+			auto& archAndIndex = GetArchetypeAndIndex(handle);
+			auto arch = archAndIndex.m_arch;
+			if( (arch->Has(Type<Ts>()) && ...) ) { return std::tuple<Ts...>{ Get3<Ts>(arch, archAndIndex.m_index)... }; } 
+			auto newArch = GetArchetype<Ts...>(arch, {}, {});
+			Move(newArch, arch, archAndIndex);
+			return std::tuple<Ts...>{ Get3<Ts>(newArch, archAndIndex.m_index)... }; 
+		}
+
+		template<typename T>
+			requires (!std::is_reference_v<T>)
+		auto Get3(Archetype<RTYPE>* arch, size_t index) -> T {
+			return arch->template Get<T>(index);
+		}
+
+		template<typename T>
+			requires std::is_reference_v<T>
+		auto Get3(Archetype<RTYPE>* arch, size_t index) -> T& {
+			return arch->template Get<T>(index);
 		}
 
 		/// @brief Change the component values of an entity.
