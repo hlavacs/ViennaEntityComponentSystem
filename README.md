@@ -44,13 +44,11 @@ compiled for sequential mode.
 
 ## The VECS Include File
 
-VECS is a header only library, consisting of the header file *VECS.h*.  Include this file into your source code.
-VECS depends on another projects named the Vienna Type List Library (VTLL), see https://github.com/hlavacs/ViennaTypeListLibrary. This project is included as Git submodule. When cloning the project make sure to run 
-
-git submodule init\
-git submodule update
-
-in order to also clone VTLL. In tests\testlib.cpp you can find examples on how to use VECS.
+VECS is a header only library, consisting only of header files. Include *VECS.h* into your source code to use VECS.
+VECS depends on other header only projects:
+* Vienna Type List Library (VTLL), see https://github.com/hlavacs/ViennaTypeListLibrary.
+* Vienna Strong Type (VSTY), see https://github.com/hlavacs/ViennaStrongType. 
+Both are automatically downloaded through cmake configuration time.
 
 
 ## VECS Usage
@@ -126,7 +124,7 @@ float val = value; //access old reference -> error!
 value = 5.0f; //access old reference -> error!
 ```
 
-If you specify more than one type, you can get a tuple holding the specified types or references. You can easily access all component values by using C++17 *structured binding*. Calling *Get<T>(handle)* on a type *T* that is not yet part of the entity will also create an empty new component for the entity.
+If you specify more than one type, you can get a tuple holding the specified types or references (reference objects). You can easily access all component values by using C++17 *structured binding*. Calling *Get<T>(handle)* on a type *T* that is not yet part of the entity will also create an empty new component for the entity.
 
 ```C
 vecs::Handle h2 = system.Insert(5, 6.9f, 7.3);; //create a new entity with int, float and double components
@@ -180,6 +178,8 @@ struct T1 {
 system.Put(h2, s, T1{"BBB"}); //
 auto [ee, ff] = system.Get<std::string, T1>(h2); //
 ```
+
+## Iteration
 
 You can iterate over all components of a given type creating a *View*. The view covers all entities that hold all components of the specified types, and you can iterate over them using a standard C++ range based for loop. The following example creates views with one or three types and then iterates over all entities having these components. In the second loop, we get references and thus could also update the component values by iterating over them.
 
@@ -238,40 +238,6 @@ system.EraseTags(handle, 1ul);
 
 ```
 
-## Parallel Processing
-
-VECS can be compiled to run in parallel mode. This means that it can be accessed from several threads in parallel. VECS uses two types of mutexes to ensure no corruption of its data structures is done:
-* The registry uses a mutex to protect its global structures, i.e., the slot map and the map of archetypes.
-* Each archetype has its own mutex.
-
-Mutexes can be used in *shared mode* or in *exclusive mode*. Shared mode creates a read lock, i.e., many readers are allows to access the data in parallel, but no writer is allowed. A writer must lock in exclusive mode, and during this period, no othr reader or writer is allowed. Shared locks are fast and thus VECS prioritises them as much as possible for frequent operations, like iterating through entities. When using range based for loops, VECS read locks each archetype when the iterator enters the archetype, and unlocks it when leaving. This make iterating fast, but bears the potential for deadlocks when entities in the current archetype are accessed by others. E.g., if thread A runs a range based for loop and enters an archetype, it is immediately read locked. Thread B might want to add a new entity to the same archetype, and gets a write lock to the system, then waits for a write lock to the archetype. Thread A now wants to read lock the system, but the system is already locked by thread B. Thus both threads wait for each other.
-
-To mitigate this, VECS provides the possibility for scheduling a *delayed transaction*, i.e., a function that is carried out right after the iterator unlocks the current archetype. This is done in the following example:
-
-```C
-//create view and iterator, start with the first non-empty archetype that holds the data types, make read lock
-for( auto [handle, i, f] : system.template GetView<vecs::Handle, int&, float>() ) {
-    std::cout << "Handle: "<< handle << " int: " << i << " float: " << f << std::endl;
-	i = 100;
-	f = 100.0f;
-	system.DelayTransaction( [&](){  //carried out when archetype is changed or end is reached
-		std::cout << "Delayed Insert" << std::endl;
-		auto h = system.Insert(5, 5.5f);
-	} );
-	//auto h2 = system.Insert(5, 5.5f); // can cause deadlocks in parallel mode
-}
-```
-Of course this code also works in sequential mode, and it makes sense to use such operations in both modes to keep the code consistent.
-
-Note also that a new element is added each loop, which bears the potential of staying in the loop forever if the element is added to the same archetype the iterator is currently in. VECS mitigates this problem by limiting the loop count for each archetype to the number of entities in them when the view is created. 
-
-VECS mutexes protect agains data structure corruption, but they do not protect each component from data races. Parallel writes to the same components can occur and must be synchronized externally. In a video game this is traditionally done with a *directed acyclic graph (DAG)* that interconnects each system working on the ECS and other shared resources. In order to create this graph, each system must announce beforehand which resources it wants to read from and write to. With VECS two ways are possible.
-
-1. In the easy way, each system only declares the component types it wants to read/write to coming from the *iterator in the for loop*.
-	
-	* If the system does nothing else than iterating (no entity erased, no components added or erased), then those systems are not in a conflict with each other, i.e., they can read from the same components, but write to different components. This can easily be determined and systems run in parallel. In these cases, delaying transactions is not necessary, since the corresponding operations do not occur.
-	* If systems do carry out operations other than iterating, then deadlocks can occur and delaying transactions is necessary.
-
-2. In the sophisticated mode, systems would also declare which entity types they would erase, or add/erase components from. Since these are writing operations, it would severly restrict the number of systems that can run in parallel, but would not need any delayed transaction since one system would not write over or change/move entities that currently belong to another system. 
-
+## Parallel Usage
+Parallel usage at this point is not possible. Make sure to externally synchronize VECS.
 
