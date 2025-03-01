@@ -54,7 +54,38 @@ namespace vecs {
 		using Size_t = std::conditional_t<RTYPE == REGISTRYTYPE_SEQUENTIAL, std::size_t, std::atomic<std::size_t>>;
 	
 	public:	
-		
+
+		//----------------------------------------------------------------------------------------------
+
+		template<typename U>
+			requires (!std::is_reference_v<U>)
+		class Ref {
+
+			using T = std::decay_t<U>;
+
+		public:
+			Ref(Archetype<RTYPE> *arch, T& valueRef) : m_archetype{arch}, m_valueRef{valueRef}, m_changeCounter{arch->GetChangeCounter()} {}
+
+			auto operator()() {return CheckChangeCounter(); }
+			void operator=(T&& value) { CheckChangeCounter() = std::forward<T>(value); }
+			operator T() { return CheckChangeCounter(); }
+
+		private:
+			auto CheckChangeCounter() -> T& {
+				auto cc = m_archetype->GetChangeCounter();
+				if(cc > m_changeCounter ) {
+					std::cout << "Reference to type " << typeid(declval<T>()).name() << " invalidated because of adding or erasing a component or erasing an entity!" << std::endl;
+					exit(-1);
+				}
+				return  m_valueRef;
+			}
+
+			Archetype<RTYPE>* m_archetype;
+			T& m_valueRef;
+			size_t m_changeCounter;
+		};
+
+
 		//----------------------------------------------------------------------------------------------
 
 		/// @brief A structure holding a pointer to an archetype and the current size of the archetype.
