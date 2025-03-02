@@ -63,9 +63,11 @@ namespace vecs {
 			Ref(Archetype *arch, T& valueRef) : m_archetype{arch}, m_valuePtr{&valueRef}, m_changeCounter{arch->GetChangeCounter()} {}
 			Ref(const Ref& other) : m_archetype{other.m_archetype}, m_valuePtr{other.m_valuePtr}, m_changeCounter{other.m_changeCounter} {}
 
-			auto& operator()() {return CheckChangeCounter(); }
-			void operator=(T&& value) { CheckChangeCounter() = std::forward<T>(value); }
-			operator T&() { return CheckChangeCounter(); }
+			auto operator()() -> T& {return CheckChangeCounter(); }
+			auto operator=(T&& value) -> void { CheckChangeCounter() = std::forward<T>(value); }
+			     operator T&() { return CheckChangeCounter(); }
+			auto Value() -> T& { return CheckChangeCounter(); }
+			auto Get() -> T& { return CheckChangeCounter(); }
 
 		private:
 			auto CheckChangeCounter() -> T& {
@@ -80,6 +82,50 @@ namespace vecs {
 			Archetype* m_archetype;
 			T* m_valuePtr{nullptr};
 			size_t m_changeCounter;
+		};
+
+		//----------------------------------------------------------------------------------------------
+
+		template<typename U, auto P, typename D>
+			requires (!std::is_reference_v<vsty::strong_type_t<U, P, D>>)
+		class Ref<vsty::strong_type_t<U, P, D>> {
+
+			using T = vsty::strong_type_t<U, P, D>;
+
+		public:
+			Ref() = default;
+			Ref(Archetype *arch, T& valueRef) : m_archetype{arch}, m_valuePtr{&valueRef}, m_changeCounter{arch->GetChangeCounter()} {}
+			Ref(const Ref& other) : m_archetype{other.m_archetype}, m_valuePtr{other.m_valuePtr}, m_changeCounter{other.m_changeCounter} {}
+
+
+			auto operator()() -> U& {return CheckChangeCounter()(); }
+			auto operator=(T&& value) -> void { CheckChangeCounter()() = std::forward<T>(value); }
+			     operator T&() { return CheckChangeCounter(); }
+				 operator U&() { return CheckChangeCounter()(); }
+			auto Value() -> U& { return CheckChangeCounter()(); }
+			auto Get() -> T& { return CheckChangeCounter(); }
+
+			/*auto& operator()() {return CheckChangeCounter()(); }
+			void operator=(T&& value) { CheckChangeCounter() = std::forward<T>(value); }
+			operator T&() { return CheckChangeCounter(); }
+			operator U&() { return CheckChangeCounter()(); }
+			U& Value() { return CheckChangeCounter()(); }
+			T& Get() { return CheckChangeCounter(); }
+			T& Get() { return CheckChangeCounter(); }*/
+
+		private:
+			auto CheckChangeCounter() -> T& {
+				if(m_archetype->GetChangeCounter() > m_changeCounter ) {
+					std::cout << "Reference to type " << typeid(std::declval<T>()).name() << " invalidated because of adding or erasing a component or erasing an entity!" << std::endl;
+					assert(false);
+					exit(-1);
+				}
+				return  *m_valuePtr;
+			}
+
+			Archetype* m_archetype;
+			T* m_valuePtr{nullptr};
+			size_t m_changeCounter;			
 		};
 
 		template<typename T>

@@ -9,6 +9,12 @@
 bool boolprint = false;
 void check( bool b, std::string_view msg = "" );
 
+struct test_struct {
+	int i;
+	float f;
+};
+using strong_struct = vsty::strong_type_t<test_struct, vsty::counter<>>;
+using strong_int = vsty::strong_type_t<int, vsty::counter<>>;
 
 int test1() {
 
@@ -105,6 +111,31 @@ int test1() {
 		    check( system.Has<int>(handle) );
 		    check( system.Has<float>(handle) );
 		    check( system.Has<double>(handle) );
+		}
+
+		//reference to strong type
+		{
+			strong_int si{5};
+			strong_struct ss{{10, 6.9f}};
+			auto handle = system.Insert(si, ss);
+			check( system.Has<vecs::Handle>(handle) );
+			auto [rsi, rss] = system.Get<strong_int&, strong_struct&>(handle);
+			int i = rsi;
+			strong_struct ss2 = rss;
+			rss().i = 100;
+			check( system.Get<strong_struct>(handle)().i == 100 );
+			rss.Value().i = 101;
+			check( system.Get<strong_struct>(handle)().i == 101 );
+			rss().f = 101.0f;
+			check( system.Get<strong_struct>(handle)().f == 101.0f );
+			rss.Value().f = 102.0f;
+			check( system.Get<strong_struct>(handle)().f == 102.0f );
+			auto mewss = system.Get<strong_struct&>(handle);
+			mewss.Value().i = 103;
+			check( system.Get<strong_struct>(handle)().i == 103 );
+			mewss.Get() = {104, 204.0f};
+			check( system.Get<strong_struct>(handle)().i == 104 );
+			check( system.Get<strong_struct>(handle)().f == 204.0f );
 		}
 
 		//Erase components

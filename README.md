@@ -82,7 +82,7 @@ vecs::Handle hx1 = system.Insert(height_t{5}, weight_t{6}); //compiles
 
 Entities always contain their handle as a component. Thus it is not possible to additionally insert components of type *Handle*. If you need to insert handles, wrap them into a struct.
 
-Do not forget to use type names that describe the intent of the new type, not its type itself. So if you need another integer for storing the height of a person, name it *height_t* rather than *myint_t*. You can check whether an entity still exists by calling *Exists(handle)*. You can get a reference to a *std::set* holding *std::size_t* representing the component types that a given entity has by calling *Types()*. You can check whether an entity has a specific component type *T* by calling *Has<T>(handle)*. You can erase an entity and all its components by calling *Erase(handle)*. You can also erase individual components *T1, T2, ...* by calling *Erase<T1, T2, ...>(handle)*. Note that it is perfectly fine to remove all components from an entity. This does not remove the entity itself, and you can afterwards add new components to it. Call *Clear()* to remove all entities from the system.
+Do not forget to use type names that describe the intent of the new type, not its type itself. So if you need another integer for storing the height of a person, name it *height_t* rather than *myint_t*. You can check whether an entity still exists by calling *Exists(handle)*. You can get a reference to a *std::set* holding *std::size_t* representing the component types that a given entity has by calling *Types()*. You can check whether an entity has a specific component type *T* by calling *Has\<T>(handle)*. You can erase an entity and all its components by calling *Erase(handle)*. You can also erase individual components *T1, T2, ...* by calling *Erase<T1, T2, ...>(handle)*. Note that it is perfectly fine to remove all components from an entity. This does not remove the entity itself, and you can afterwards add new components to it. Call *Clear()* to remove all entities from the system.
 
 ```C
 vecs::Handle h1 = system.create(5); //create a new entity with one int component
@@ -106,13 +106,15 @@ system.Clear(); //clear the system
 assert( system.Size() == 0 );
 ```
 
-You can get the current value of type *T* of an entity by calling *Get<T>(handle)*. Here *T* is neither a pointer nor a reference.
+## References
 
-Obtaining pure C++ references is not possible in VECS. Instead, you can get a reference object *Ref<T>* to a component by calling *Get<T&>(handle)*. Reference objects can be used like normal references. However, they track certain operations in the entity's archetype, and become invalid once such an operation took place. Accessing them after this causes a program abotr. 
+You can get the current value of type *T* of an entity by calling *Get\<T>(handle)*. Here *T* is neither a pointer nor a reference.
+
+Obtaining pure C++ references is not possible in VECS. Instead, you can get a reference object *Ref\<T>* to a component by calling *Get<T&>(handle)*. Reference objects can be used like normal references. However, they track certain operations in the entity's archetype, and become invalid once such an operation took place. Accessing them after this causes a program abotr. 
 This is due to the fact that components may change their place in memory due to the following operations:
 * Components are added to or erased from an entity.
 * Erasing an entity might cause another entity to be moved in order to fill the gap left by the erased entity.
-As long as you do not carry out such operations, you can use a reference object *Ref<T>*. After such an operation on an archetype, each reference to a component of this archetype becomes invalid. Make sure that references are not accessed after these operations.
+As long as you do not carry out such operations, you can use a reference object *Ref\<T>*. After such an operation on an archetype, each reference to a component of this archetype becomes invalid. Make sure that references are not accessed after these operations.
 
 ```C
 vecs::Handle h2 = system.Insert(5, 6.9f, 7.3);; //create a new entity with int, float and double components
@@ -124,7 +126,7 @@ float val = value; //access old reference -> error!
 value = 5.0f; //access old reference -> error!
 ```
 
-If you specify more than one type, you can get a tuple holding the specified types or references (reference objects). You can easily access all component values by using C++17 *structured binding*. Calling *Get<T>(handle)* on a type *T* that is not yet part of the entity will also create an empty new component for the entity.
+If you specify more than one type, you can get a tuple holding the specified types or references (reference objects). You can easily access all component values by using C++17 *structured binding*. Calling *Get\<T>(handle)* on a type *T* that is not yet part of the entity will also create an empty new component for the entity.
 
 ```C
 vecs::Handle h2 = system.Insert(5, 6.9f, 7.3);; //create a new entity with int, float and double components
@@ -178,6 +180,44 @@ struct T1 {
 system.Put(h2, s, T1{"BBB"}); //
 auto [ee, ff] = system.Get<std::string, T1>(h2); //
 ```
+
+## Strong Types in Ref\<T> Objects
+If you use VSTY strong types, this means another onion layer of containment for the true value. Accessing it inside a *Ref\<T>* object follows some rules. The call *operator()* now returns the strong type value, not the strong type itself. This way, you only need one () instead of two. The *Value()* function does the same, while the *Get()* function returns the strong type, not the value of the strong type.
+
+```C
+    struct test_struct {
+    	int i;
+    	float f;
+    };
+    using strong_struct = vsty::strong_type_t<test_struct, vsty::counter<>>;
+    using strong_int = vsty::strong_type_t<int, vsty::counter<>>;
+
+    ...
+
+	strong_int si{5};
+	strong_struct ss{{10, 6.9f}};
+	auto handle = system.Insert(si, ss);
+	check( system.Has<vecs::Handle>(handle) );
+	auto [rsi, rss] = system.Get<strong_int&, strong_struct&>(handle);
+	int i = rsi;
+	strong_struct ss2 = rss;
+	rss().i = 100;
+	check( system.Get<strong_struct>(handle)().i == 100 );
+	rss.Value().i = 101;
+	check( system.Get<strong_struct>(handle)().i == 101 );
+	rss().f = 101.0f;
+	check( system.Get<strong_struct>(handle)().f == 101.0f );
+	rss.Value().f = 102.0f;
+	check( system.Get<strong_struct>(handle)().f == 102.0f );
+	auto mewss = system.Get<strong_struct&>(handle);
+	mewss.Value().i = 103;
+	check( system.Get<strong_struct>(handle)().i == 103 );
+	mewss.Get() = {104, 204.0f};
+	check( system.Get<strong_struct>(handle)().i == 104 );
+	check( system.Get<strong_struct>(handle)().f == 204.0f );
+```
+
+
 
 ## Iteration
 
