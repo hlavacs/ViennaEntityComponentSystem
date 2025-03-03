@@ -266,7 +266,7 @@ int test1() {
 			handles.push_back(h);
 		}
 		system.Print();
-		for(auto [h, i, f, d] : system.template GetView<vecs::Handle, int, float, double>() ) {
+		for(auto [h, i, f, d] : system.template GetView<vecs::Handle, int&, float, double>() ) {
 			if (i==1) {
 				system.Erase(handles[2]);
 			}

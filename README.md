@@ -110,11 +110,8 @@ assert( system.Size() == 0 );
 
 You can get the current value of type *T* of an entity by calling *Get\<T>(handle)*. Here *T* is neither a pointer nor a reference.
 
-Obtaining pure C++ references is not possible in VECS. Instead, you can get a reference object *Ref\<T>* to a component by calling *Get<T&>(handle)*. Reference objects can be used like normal references. However, they track certain operations in the entity's archetype, and become invalid once such an operation took place. Accessing them after this causes a program abotr. 
-This is due to the fact that components may change their place in memory due to the following operations:
-* Components are added to or erased from an entity.
-* Erasing an entity might cause another entity to be moved in order to fill the gap left by the erased entity.
-As long as you do not carry out such operations, you can use a reference object *Ref\<T>*. After such an operation on an archetype, each reference to a component of this archetype becomes invalid. Make sure that references are not accessed after these operations.
+Obtaining pure C++ references is not possible in VECS. Instead, you can get a reference object *Ref\<T>* to a component by calling *Get<T&>(handle)*. Reference objects can be used like normal references. They track the component's location are react accordingly. 
+However, if it accesses an erased entity or erased component, the program is aborted with an error.
 
 ```C
 vecs::Handle h2 = system.Insert(5, 6.9f, 7.3);; //create a new entity with int, float and double components
@@ -122,8 +119,6 @@ auto value = system.Get<float&>(h2);    //get Ref<float>
 float f1 = value; //get value
 value = 10.0f; //set value
 auto c = system.Get<char&>(handle); //new component -> reference value is now invalid
-float val = value; //access old reference -> error!
-value = 5.0f; //access old reference -> error!
 ```
 
 If you specify more than one type, you can get a tuple holding the specified types or references (reference objects). You can easily access all component values by using C++17 *structured binding*. Calling *Get\<T>(handle)* on a type *T* that is not yet part of the entity will also create an empty new component for the entity.
@@ -182,7 +177,7 @@ auto [ee, ff] = system.Get<std::string, T1>(h2); //
 ```
 
 ## Strong Types in Ref\<T> Objects
-If you use VSTY strong types, this means another onion layer of containment for the true value. Accessing it inside a *Ref\<T>* object follows some rules. The call *operator()* now returns the strong type value, not the strong type itself. This way, you only need one () instead of two. The *Value()* function does the same, while the *Get()* function returns the strong type, not the value of the strong type.
+If you use *VSTY* strong types, this means another onion layer of containment for the true value. Accessing it inside a *Ref\<T>* object follows some rules. The call *operator()* now returns the strong type *value*, not the strong type itself. This way, you only need one () instead of two. The *Value()* function does the same, while the *Get()* function returns the *strong type*, not the value of the strong type.
 
 ```C
     struct test_struct {
@@ -218,7 +213,6 @@ If you use VSTY strong types, this means another onion layer of containment for 
 ```
 
 
-
 ## Iteration
 
 You can iterate over all components of a given type creating a *View*. The view covers all entities that hold all components of the specified types, and you can iterate over them using a standard C++ range based for loop. The following example creates views with one or three types and then iterates over all entities having these components. In the second loop, we get references and thus could also update the component values by iterating over them.
@@ -246,7 +240,7 @@ for( auto [handle, i, f] : system.GetView<vecs::Handle&, int&, float&>() ) { //c
 }
 ```
 
-Inside the for loop you can do everything as long as VECS is running in *sequential mode*. Nevertheless, of course erasing entities might result in crahes if systems still try to access them. Systems can check if entities still exist using the *Exists(handle)* function. VECS does not use C++ *std::optional* intentionally since accessing erased entities should never occur which lies in the responsibility of the programmer.
+Inside the for loop you can do everything as long as VECS is running in *sequential mode*. Nevertheless, of course erasing entities might result in crashes if systems still try to access them. Systems can check if entities still exist using the *Exists(handle)* function. VECS does not use C++ *std::optional* intentionally since accessing erased entities should never occur which lies in the responsibility of the programmer.
 
 ## Tags
 

@@ -59,29 +59,34 @@ namespace vecs {
 			using T = std::decay_t<U>;
 
 		public:
-			Ref() = default;
-			Ref(Archetype *arch, T& valueRef) : m_archetype{arch}, m_valuePtr{&valueRef}, m_changeCounter{arch->GetChangeCounter()} {}
-			Ref(const Ref& other) : m_archetype{other.m_archetype}, m_valuePtr{other.m_valuePtr}, m_changeCounter{other.m_changeCounter} {}
+			Ref() = default;		
+			Ref(Handle handle, Slot_t& slot) : m_handle{handle}, m_slot{slot}, m_archetype{slot.m_value.m_arch} {}
+			Ref(const Ref& other) : m_handle{other.m_handle}, m_slot{other.m_slot}, m_archetype{other.m_archetype} {}
 
-			auto operator()() -> T& {return CheckChangeCounter(); }
-			auto operator=(T&& value) -> void { CheckChangeCounter() = std::forward<T>(value); }
-			     operator T&() { return CheckChangeCounter(); }
-			auto Value() -> T& { return CheckChangeCounter(); }
-			auto Get() -> T& { return CheckChangeCounter(); }
+			auto operator()() -> T& {return GetReference(); }
+			auto operator=(T&& value) -> void { GetReference() = std::forward<T>(value); }
+			     operator T&() { return GetReference(); }
+			auto Value() -> T& { return GetReference(); }
+			auto Get() -> T& { return GetReference(); }
 
 		private:
-			auto CheckChangeCounter() -> T& {
-				if(m_archetype->GetChangeCounter() > m_changeCounter ) {
-					std::cout << "Reference to type " << typeid(std::declval<T>()).name() << " invalidated because of adding or erasing a component or erasing an entity!" << std::endl;
-					assert(false);
-					exit(-1);
+			auto GetReference() -> T& {
+				auto arch = m_slot.m_value.m_arch;
+				auto index = m_slot.m_value.m_index;
+				if( arch != m_archetype ) {
+					if( !arch->Has(Type<T>()) ) {
+						std::cout << "Reference to type " << typeid(std::declval<T>()).name() << " invalidated because of adding or erasing a component or erasing an entity!" << std::endl;
+						assert(false);
+						exit(-1);
+					}
+					m_archetype = arch;
 				}
-				return  *m_valuePtr;
+				return (*arch->template Map<T>())[index];
 			}
 
-			Archetype* m_archetype;
-			T* m_valuePtr{nullptr};
-			size_t m_changeCounter;
+			Handle m_handle;
+			Slot_t& m_slot;
+			Archetype *m_archetype;
 		};
 
 		//----------------------------------------------------------------------------------------------
@@ -93,39 +98,36 @@ namespace vecs {
 			using T = vsty::strong_type_t<U, P, D>;
 
 		public:
-			Ref() = default;
-			Ref(Archetype *arch, T& valueRef) : m_archetype{arch}, m_valuePtr{&valueRef}, m_changeCounter{arch->GetChangeCounter()} {}
-			Ref(const Ref& other) : m_archetype{other.m_archetype}, m_valuePtr{other.m_valuePtr}, m_changeCounter{other.m_changeCounter} {}
+			Ref() = default;		
+			Ref(Handle handle, Slot_t& slot) : m_handle{handle}, m_slot{slot}, m_archetype{slot.m_value.m_arch} {}
+			Ref(const Ref& other) : m_handle{other.m_handle}, m_slot{other.m_slot}, m_archetype{other.m_archetype} {}
 
 
-			auto operator()() -> U& {return CheckChangeCounter()(); }
-			auto operator=(T&& value) -> void { CheckChangeCounter()() = std::forward<T>(value); }
-			     operator T&() { return CheckChangeCounter(); }
-				 operator U&() { return CheckChangeCounter()(); }
-			auto Value() -> U& { return CheckChangeCounter()(); }
-			auto Get() -> T& { return CheckChangeCounter(); }
-
-			/*auto& operator()() {return CheckChangeCounter()(); }
-			void operator=(T&& value) { CheckChangeCounter() = std::forward<T>(value); }
-			operator T&() { return CheckChangeCounter(); }
-			operator U&() { return CheckChangeCounter()(); }
-			U& Value() { return CheckChangeCounter()(); }
-			T& Get() { return CheckChangeCounter(); }
-			T& Get() { return CheckChangeCounter(); }*/
+			auto operator()() -> U& {return GetReference()(); }
+			auto operator=(T&& value) -> void { GetReference()() = std::forward<T>(value); }
+			     operator T&() { return GetReference(); }
+				 operator U&() { return GetReference()(); }
+			auto Value() -> U& { return GetReference()(); }
+			auto Get() -> T& { return GetReference(); }
 
 		private:
-			auto CheckChangeCounter() -> T& {
-				if(m_archetype->GetChangeCounter() > m_changeCounter ) {
+			auto GetReference() -> T& {
+				auto arch = m_slot.m_value.m_arch;
+				auto index = m_slot.m_value.m_index;
+				if( m_slot.m_version != m_handle.GetVersion() || ( arch != m_archetype && !arch->Has(Type<T>()) ) ) {
 					std::cout << "Reference to type " << typeid(std::declval<T>()).name() << " invalidated because of adding or erasing a component or erasing an entity!" << std::endl;
 					assert(false);
 					exit(-1);
 				}
-				return  *m_valuePtr;
+				if( arch != m_archetype ) {
+					m_archetype = arch;
+				}
+				return (*arch->template Map<T>())[index];
 			}
 
-			Archetype* m_archetype;
-			T* m_valuePtr{nullptr};
-			size_t m_changeCounter;			
+			Handle m_handle;
+			Slot_t& m_slot;
+			Archetype *m_archetype;		
 		};
 
 		template<typename T>
@@ -213,7 +215,8 @@ namespace vecs {
 				requires std::is_reference_v<T>
 			auto Get() -> to_ref_t<T> {
 				auto arch = m_archetypes[m_archidx].m_arch;
-				return to_ref_t<T>(arch, (*arch->template Map<T>())[m_entidx]);
+				Handle handle = (*arch->template Map<Handle>())[m_entidx];
+				return to_ref_t<T>( handle, m_registry.GetSlot(handle));
 			}
 
 			Registry& m_registry; ///< Reference to the registry system.
@@ -617,30 +620,25 @@ namespace vecs {
 		template<typename... Ts>
 			requires (vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<Ts...>, Handle&>::value)
 		[[nodiscard]] auto Get2(Handle handle) {
-			auto& archAndIndex = GetArchetypeAndIndex(handle);
+			auto& slot = GetSlot(handle);
+			auto& archAndIndex = slot.m_value; //  GetArchetypeAndIndex(handle);
 			auto arch = archAndIndex.m_arch;
-			if( (arch->Has(Type<Ts>()) && ...) ) { return std::tuple<to_ref_t<Ts>...>{ Get3<Ts>(arch, archAndIndex.m_index)... }; } 
+			if( (arch->Has(Type<Ts>()) && ...) ) { return std::tuple<to_ref_t<Ts>...>{ Get3<Ts>(handle, slot)... }; } 
 			auto newArch = GetArchetype<Ts...>(arch, {}, {});
 			Move(newArch, arch, archAndIndex);
-			return std::tuple<to_ref_t<Ts>...>{ Get3<Ts>(newArch, archAndIndex.m_index)... }; 
+			return std::tuple<to_ref_t<Ts>...>{ Get3<Ts>(handle, slot)... }; 
 		}
 
 		template<typename T>
 			requires (!std::is_reference_v<T>)
-		auto Get3(Archetype* arch, size_t index) -> T {
-			return arch->template Get<T>(index);
+		auto Get3(Handle handle, Slot_t& slot ) -> T { //Archetype* arch, size_t index) -> T {
+			return slot.m_value.m_arch->template Get<T>(slot.m_value.m_index);
 		}
-
-		/*template<typename T>
-			requires std::is_reference_v<T>
-		auto Get3(Archetype* arch, size_t index) -> T& {
-			return arch->template Get<T>(index);
-		}*/
 
 		template<typename T>
 		requires std::is_reference_v<T>
-		auto Get3(Archetype* arch, size_t index) {
-			return Ref<std::decay_t<T>>(arch, arch->template Get<std::decay_t<T>>(index));
+		auto Get3(Handle handle, Slot_t& slot ) { //Archetype* arch, size_t index) {
+			return Ref<std::decay_t<T>>(handle, slot) ; //arch->template Get<Handle>(index), arch->template Get<std::decay_t<T>>(index));
 		}
 
 		/// @brief Change the component values of an entity.
