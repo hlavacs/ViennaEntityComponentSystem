@@ -73,7 +73,7 @@ namespace vecs {
 			auto GetReference() -> T& {
 				auto arch = m_slot->m_value.m_arch;
 				auto index = m_slot->m_value.m_index;
-				if( m_slot->m_version != m_handle.GetVersion() || ( arch != m_archetype && !arch->Has(Type<T>()) )  ) {
+				if( !m_slot || m_slot->m_version != m_handle.GetVersion() || ( arch != m_archetype && !arch->Has(Type<T>()) )  ) {
 					if( !arch->Has(Type<T>()) ) {
 						std::cout << "Reference to type " << typeid(std::declval<T>()).name() << " invalidated because of adding or erasing a component or erasing an entity!" << std::endl;
 						assert(false);
@@ -114,7 +114,7 @@ namespace vecs {
 			auto GetReference() -> T& {
 				auto arch = m_slot->m_value.m_arch;
 				auto index = m_slot->m_value.m_index;
-				if( m_slot->m_version != m_handle.GetVersion() || ( arch != m_archetype && !arch->Has(Type<T>()) ) ) {
+				if( !m_slot || m_slot->m_version != m_handle.GetVersion() || ( arch != m_archetype && !arch->Has(Type<T>()) ) ) {
 					std::cout << "Reference to type " << typeid(std::declval<T>()).name() << " invalidated because of adding or erasing a component or erasing an entity!" << std::endl;
 					assert(false);
 					exit(-1);
