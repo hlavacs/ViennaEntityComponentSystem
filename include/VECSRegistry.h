@@ -63,6 +63,7 @@ namespace vecs {
 			Ref(Handle handle, Slot_t& slot) : m_handle{handle}, m_slot{&slot}, m_archetype{slot.m_value.m_arch} {}
 			Ref(const Ref& other) : m_handle{other.m_handle}, m_slot{other.m_slot}, m_archetype{other.m_archetype} {}
 
+			bool IsValid() { return m_slot != nullptr; }
 			auto operator()() -> T& {return GetReference(); }
 			auto operator=(T&& value) -> void { GetReference() = std::forward<T>(value); }
 			     operator T&() { return GetReference(); }
@@ -102,7 +103,7 @@ namespace vecs {
 			Ref(Handle handle, Slot_t& slot) : m_handle{handle}, m_slot{&slot}, m_archetype{slot.m_value.m_arch} {}
 			Ref(const Ref& other) : m_handle{other.m_handle}, m_slot{other.m_slot}, m_archetype{other.m_archetype} {}
 
-
+			bool IsValid() { return m_slot != nullptr; }
 			auto operator()() -> U& {return GetReference()(); }
 			auto operator=(T&& value) -> void { GetReference()() = std::forward<T>(value); }
 			     operator T&() { return GetReference(); }
