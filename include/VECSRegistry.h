@@ -59,8 +59,8 @@ namespace vecs {
 			using T = std::decay_t<U>;
 
 		public:
-			Ref() = default;		
-			Ref(Handle handle, Slot_t& slot) : m_handle{handle}, m_slot{slot}, m_archetype{slot.m_value.m_arch} {}
+			Ref() = default;
+			Ref(Handle handle, Slot_t& slot) : m_handle{handle}, m_slot{&slot}, m_archetype{slot.m_value.m_arch} {}
 			Ref(const Ref& other) : m_handle{other.m_handle}, m_slot{other.m_slot}, m_archetype{other.m_archetype} {}
 
 			auto operator()() -> T& {return GetReference(); }
@@ -71,9 +71,9 @@ namespace vecs {
 
 		private:
 			auto GetReference() -> T& {
-				auto arch = m_slot.m_value.m_arch;
-				auto index = m_slot.m_value.m_index;
-				if( arch != m_archetype ) {
+				auto arch = m_slot->m_value.m_arch;
+				auto index = m_slot->m_value.m_index;
+				if( m_slot->m_version != m_handle.GetVersion() || ( arch != m_archetype && !arch->Has(Type<T>()) )  ) {
 					if( !arch->Has(Type<T>()) ) {
 						std::cout << "Reference to type " << typeid(std::declval<T>()).name() << " invalidated because of adding or erasing a component or erasing an entity!" << std::endl;
 						assert(false);
@@ -84,9 +84,9 @@ namespace vecs {
 				return (*arch->template Map<T>())[index];
 			}
 
-			Handle m_handle;
-			Slot_t& m_slot;
-			Archetype *m_archetype;
+			Handle m_handle{};
+			Slot_t* m_slot{nullptr};
+			Archetype *m_archetype{nullptr};
 		};
 
 		//----------------------------------------------------------------------------------------------
@@ -99,7 +99,7 @@ namespace vecs {
 
 		public:
 			Ref() = default;		
-			Ref(Handle handle, Slot_t& slot) : m_handle{handle}, m_slot{slot}, m_archetype{slot.m_value.m_arch} {}
+			Ref(Handle handle, Slot_t& slot) : m_handle{handle}, m_slot{&slot}, m_archetype{slot.m_value.m_arch} {}
 			Ref(const Ref& other) : m_handle{other.m_handle}, m_slot{other.m_slot}, m_archetype{other.m_archetype} {}
 
 
@@ -112,9 +112,9 @@ namespace vecs {
 
 		private:
 			auto GetReference() -> T& {
-				auto arch = m_slot.m_value.m_arch;
-				auto index = m_slot.m_value.m_index;
-				if( m_slot.m_version != m_handle.GetVersion() || ( arch != m_archetype && !arch->Has(Type<T>()) ) ) {
+				auto arch = m_slot->m_value.m_arch;
+				auto index = m_slot->m_value.m_index;
+				if( m_slot->m_version != m_handle.GetVersion() || ( arch != m_archetype && !arch->Has(Type<T>()) ) ) {
 					std::cout << "Reference to type " << typeid(std::declval<T>()).name() << " invalidated because of adding or erasing a component or erasing an entity!" << std::endl;
 					assert(false);
 					exit(-1);
@@ -125,9 +125,9 @@ namespace vecs {
 				return (*arch->template Map<T>())[index];
 			}
 
-			Handle m_handle;
-			Slot_t& m_slot;
-			Archetype *m_archetype;		
+			Handle m_handle{};
+			Slot_t* m_slot{nullptr};
+			Archetype *m_archetype{nullptr};		
 		};
 
 		template<typename T>
