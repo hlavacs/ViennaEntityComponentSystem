@@ -64,6 +64,7 @@ namespace vecs {
 			Ref(const Ref& other) : m_handle{other.m_handle}, m_slot{other.m_slot}, m_archetype{other.m_archetype} {}
 
 			bool IsValid() { return m_slot != nullptr; }
+			bool Exists() { return m_slot->m_version == m_handle.GetVersion(); }
 			auto operator()() -> T& {return GetReference(); }
 			auto operator=(T&& value) -> void { GetReference() = std::forward<T>(value); }
 			     operator T&() { return GetReference(); }
@@ -104,6 +105,7 @@ namespace vecs {
 			Ref(const Ref& other) : m_handle{other.m_handle}, m_slot{other.m_slot}, m_archetype{other.m_archetype} {}
 
 			bool IsValid() { return m_slot != nullptr; }
+			bool Exists() { return m_slot->m_version == m_handle.GetVersion(); }
 			auto operator()() -> U& {return GetReference()(); }
 			auto operator=(T&& value) -> void { GetReference()() = std::forward<T>(value); }
 			     operator T&() { return GetReference(); }

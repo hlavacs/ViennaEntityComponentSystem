@@ -4,7 +4,7 @@ The Vienna Entity Component System (VECS) is a C++20 based ECS for game engines.
 Entity types consist of a number of *components*.
 Different entity types can be composed of different components.
 
-An ECS is a generic storage for such entities and their components. Entities can be composed and created, retrieved, updated, or erased from the storage. Additionally, a so-called *system* can have access to one or several components it is interested in, and work on them. For example, a physics system may be interested into components position, velocity, orientation, mass and moment of inertia. Another system animation is only interested into position, orientation, and animation data.
+An ECS is a generic storage for such entities and their components. Entities can be composed and created, retrieved, updated, or erased from the storage. In a game engine, typically a so-called *system* can have access to one or several components it is interested in, and work on them. For example, a *physics* system may be interested into components position, velocity, orientation, mass and moment of inertia. Another system *animation* is only interested into position, orientation, and animation data.
 Systems do not have to be specially defined, anything that specifies a number of components it is interested in and then loops over all entities that contain these components can be seen as a system.
 
 Important features of VECS are:
@@ -13,9 +13,9 @@ Important features of VECS are:
 * Easy to use
 * Supports multithreading and parallel accesses.
 
-VECS is a container for entities. Entities are composed of an arbitrary number of components of simple data types. 
+VECS is a container for entities. Entities are composed of an arbitrary number of components of simple plain old data types (PODs). PODs can be copied, moved, but cannot be pointers or references. They can also be copyable or movable classes like *std::string*.
 The standard operation in each game loop is to loop over a *subset* of such components concurrently. 
-Data layout is organized in such a way to make optimal use of chaches for exactly this main use case.
+Data layout is organized in such a way to make optimal use of caches for exactly this main use case.
 All entities containing the same component types are grouped into *archetypes*, i.e., separate data structures 
 storing these components, each component in continuous memory. Here, empty slots are never allowed,
 i.e., if an entity and all its components is erased, the components at the end of the data structure are moved into the now 
@@ -24,31 +24,35 @@ Thus when iterating over *N* components, accessing each component can make optim
 hiding slow data transfers from main memory by loading the data up front before being actually accessed.
 
 VECS internally uses the following data structures:
-* *Stack*: a container like a *std::vector*, but using segments to store data. Inside a segment, data is stored 
-continuously. Pointers to data are invalidated only if data is removed. 
-* *SlotMap*: a map that maps an integer index to an archetype and an index inside the archetype. 
-SlotMap is based on Stack and never shrinks. Each entry also contains a version number, which is increased 
+* *Vector*: a container like a *std::vector*, but using segments to store data. Inside a segment, data is stored contiguously. Pointers to data are invalidated only if data is moved or erased. 
+* *SlotMap*: a map that maps an integer index to an archetype and an index inside the archetype. *SlotMap* is based on *Vector* and **never shrinks**. Each entry also contains a *version* number, which is increased 
 each time an entity is erased from VECS.
-* *Handle*: Handles identify entities. For this, they contain an integer *index* into the SlotMap, 
-and a *version* number. Handles point to existing entities only if their version numbers match. A handle 
-points to an erased entity if its version number does not match the SlotMap version number.
-* *ComponentMap*: is based on Stack and stores one specific data type.
+* *Handle*: Handles identify entities. For this, they contain an integer *index* into the SlotMap, and a *version* number. Handles point to existing entities only if their version numbers match. A handle points to an erased entity if its version number does not match the SlotMap version number.
+* *ComponentMap*: is based on *Vector* and stores one specific data type.
 * *Archetype*: Contains all component maps of entities having the same set of component types.
-* *View*: allows to select a subset of component types and can create Iterators for looping.
-* *Iterator*: can be used to loop over a subset of component types.
+* *View*: allows to select a subset of component types and entities and can create Iterators for looping.
+* *Iterator*: can be used to loop over a subset of entities and component types.
+* *Ref\<T>* is like a C++ reference to a data component, but is based on the SlotMap entry and autmatically finds components, even if their entities have been moved to other archetypes.
 * *Registry*: the main class representing a container for entities. Programs can hold an arbitrary number of
 Registry instances any time, they do not interfere with each other.
-* *LockGuard* and *LockGuardShared*: used to protect data structures when compiled for parallel mode. Are empty when 
-compiled for sequential mode.
+* *LockGuard* and *LockGuardShared*: used to protect data structures when compiled for parallel mode. Are empty when compiled for sequential mode.
 
 
-## The VECS Include File
+## The VECS Include Files
 
-VECS is a header only library, consisting only of header files. Include *VECS.h* into your source code to use VECS.
-VECS depends on other header only projects:
+VECS is a header only library, consisting only of header files. Include *VECS.h* into your source code to use VECS. VECS depends on other header only projects:
 * Vienna Type List Library (VTLL), see https://github.com/hlavacs/ViennaTypeListLibrary.
-* Vienna Strong Type (VSTY), see https://github.com/hlavacs/ViennaStrongType. 
-Both are automatically downloaded through cmake configuration time.
+* Vienna Strong Type (VSTY), see https://github.com/hlavacs/ViennaStrongType.
+
+Both are automatically downloaded through *CMake* configuration:
+
+```
+cmake -S . -Bbuild -A x64
+cd build
+cmake --build . --config Release
+cmake --build . --config Debug
+cd ..
+```
 
 
 ## VECS Usage
@@ -56,14 +60,15 @@ Both are automatically downloaded through cmake configuration time.
 You can create an ECS with such a statement:
 
 ```C
- #include "VECS.h"
+#define REGISTRYTYPE_SEQUENTIAL //is the defualt, so you dont need it
+#include "VECS.h"
 
 int main() {
-    vecs::Registry<vecs::REGISTRYTYPE_SEQUENTIAL> system; //Either REGISTRYTYPE_SEQUENTIAL or REGISTRYTYPE_PARALLEL
+    vecs::Registry system; 
 }
 ```
 Now *system* is a container of entities and their components. 
-VECS can be compiled in two versions. In REGISTRYTYPE_SEQUENTIAL mode all operations are supposed to be done sequentially, there is no internal synchronization taking place. In REGISTRYTYPE_PARALLEL mode VECS uses mutexes to protect internal data structures from corruption, when access are done from multiple threads concurrently. 
+VECS can be compiled in two versions by defining a macro before including it. In REGISTRYTYPE_SEQUENTIAL mode (default if none is defined) all operations are supposed to be done sequentially, there is no internal synchronization taking place. In REGISTRYTYPE_PARALLEL mode VECS uses mutexes to protect internal data structures from corruption, when access are done from multiple threads concurrently (currently NOT implemented). 
 
 Entities can be created by calling *Insert()*:
 
@@ -74,15 +79,16 @@ vecs::Handle h1 = system.Insert(5, 3.0f, 4.0);
 Component values and their types are automatically determined by the function parameter list. In the example an entity is created that holds an integer, a float and a double as components, with the respective values. Note that you can use types only **once**, since access to components is type based. Thus, if you want to include components with the same type, wrap them into *structs* like so:
 
 ```C
-//vecs::Handle hx = system.Insert(5, 6); //compile error
+//vecs::Handle hx = system.Insert(5, 6); //compile error beacuse of two ints
 struct height_t { int i; }; 
-struct weight_t { int i; }; 
+using weight_t = vsty::strong_type_t<int, vsty::counter<>>; 
 vecs::Handle hx1 = system.Insert(height_t{5}, weight_t{6}); //compiles
 ```
+In the second case, the Vienny Strong Type is used, which is a convenience wrapper needing explicit construction and allowing implicit conversion, integer value partitioning, default values, testing for NULL values, etc. See the VSTY library for its usage. The counter makes sure that internally always a new type is created.
 
 Entities always contain their handle as a component. Thus it is not possible to additionally insert components of type *Handle*. If you need to insert handles, wrap them into a struct.
 
-Do not forget to use type names that describe the intent of the new type, not its type itself. So if you need another integer for storing the height of a person, name it *height_t* rather than *myint_t*. You can check whether an entity still exists by calling *Exists(handle)*. You can get a reference to a *std::set* holding *std::size_t* representing the component types that a given entity has by calling *Types()*. You can check whether an entity has a specific component type *T* by calling *Has\<T>(handle)*. You can erase an entity and all its components by calling *Erase(handle)*. You can also erase individual components *T1, T2, ...* by calling *Erase<T1, T2, ...>(handle)*. Note that it is perfectly fine to remove all components from an entity. This does not remove the entity itself, and you can afterwards add new components to it. Call *Clear()* to remove all entities from the system.
+Do not forget to use type names that describe the intent of the new type, not its type itself. So if you need another integer for storing the height of a person, name it *height_t* rather than *myint_t*. You can check whether an entity still exists by calling *Exists(handle)*. You can get a reference to a *std::set* holding *std::size_t* representing the component types that a given entity has by calling *Types()*. You can check whether an entity has a specific component type *T* by calling *Has\<T>(handle)*. You can erase an entity and all its components by calling *Erase(handle)*. You can also erase individual components *T1, T2, ...* by calling *Erase<T1, T2, ...>(handle)*. Note that it is perfectly fine to remove all components from an entity. This does not remove the entity itself, and you can afterwards add new components to it. Call *Clear()* to remove all entities from the registry.
 
 ```C
 vecs::Handle h1 = system.create(5); //create a new entity with one int component
@@ -118,7 +124,7 @@ vecs::Handle h2 = system.Insert(5, 6.9f, 7.3);; //create a new entity with int, 
 auto value = system.Get<float&>(h2);    //get Ref<float>
 float f1 = value; //get value
 value = 10.0f; //set value
-auto c = system.Get<char&>(handle); //new component -> reference value is now invalid
+auto c = system.Get<char&>(handle); //new component -> all components are moved but reference is still valid
 ```
 
 If you specify more than one type, you can get a tuple holding the specified types or references (reference objects). You can easily access all component values by using C++17 *structured binding*. Calling *Get\<T>(handle)* on a type *T* that is not yet part of the entity will also create an empty new component for the entity.
@@ -177,7 +183,8 @@ auto [ee, ff] = system.Get<std::string, T1>(h2); //
 ```
 
 ## Strong Types in Ref\<T> Objects
-If you use *VSTY* strong types, this means another onion layer of containment for the true value. Accessing it inside a *Ref\<T>* object follows some rules. The call *operator()* now returns the strong type *value*, not the strong type itself. This way, you only need one () instead of two. The *Value()* function does the same, while the *Get()* function returns the *strong type*, not the value of the strong type.
+If you use *VSTY* strong types, this means another onion layer of containment for the true value. Accessing it inside a *Ref\<T>* object follows some rules. The call *operator()* now returns the strong type *value*, not the strong type itself. This way, you only need one () instead of two. The *Value()* function does the same, while the *Get()* function returns the *strong type*, not the value of the strong type. If you want to read or write struct members, the compiler may force you to use teh call operator(), in order to make sure that you nmean the value of the Ref\<T> object.
+
 
 ```C
     struct test_struct {
@@ -194,11 +201,11 @@ If you use *VSTY* strong types, this means another onion layer of containment fo
 	auto handle = system.Insert(si, ss);
 	check( system.Has<vecs::Handle>(handle) );
 	auto [rsi, rss] = system.Get<strong_int&, strong_struct&>(handle);
-	int i = rsi;
+	int i = rsi; //implicit type conversion
 	strong_struct ss2 = rss;
-	rss().i = 100;
+	rss().i = 100; //use call operator()
 	check( system.Get<strong_struct>(handle)().i == 100 );
-	rss.Value().i = 101;
+	rss.Value().i = 101; //use Value() for strong type
 	check( system.Get<strong_struct>(handle)().i == 101 );
 	rss().f = 101.0f;
 	check( system.Get<strong_struct>(handle)().f == 101.0f );
@@ -207,7 +214,7 @@ If you use *VSTY* strong types, this means another onion layer of containment fo
 	auto mewss = system.Get<strong_struct&>(handle);
 	mewss.Value().i = 103;
 	check( system.Get<strong_struct>(handle)().i == 103 );
-	mewss.Get() = {104, 204.0f};
+	mewss.Get() = {104, 204.0f}; //access to strong type
 	check( system.Get<strong_struct>(handle)().i == 104 );
 	check( system.Get<strong_struct>(handle)().f == 204.0f );
 ```
@@ -240,7 +247,7 @@ for( auto [handle, i, f] : system.GetView<vecs::Handle&, int&, float&>() ) { //c
 }
 ```
 
-Inside the for loop you can do everything as long as VECS is running in *sequential mode*. Nevertheless, of course erasing entities might result in crashes if systems still try to access them. Systems can check if entities still exist using the *Exists(handle)* function. VECS does not use C++ *std::optional* intentionally since accessing erased entities should never occur which lies in the responsibility of the programmer.
+Inside the for loop you can do everything as long as VECS is running in *sequential mode*. Nevertheless, of course erasing entities might result in crashes if systems still try to access them. Systems can check if entities still exist using the *Exists(handle)* function, this also works for Ref\<T> objects. VECS does not use C++ *std::optional* intentionally since accessing erased entities should never occur which lies in the responsibility of the programmer.
 
 ## Tags
 

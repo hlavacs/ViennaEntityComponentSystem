@@ -1,6 +1,3 @@
-git submodule init
-git submodule update
-
 rem cmake -S . -Bbuild -G "Visual Studio 17 2022" -T ClangCL -A x64
 cmake -S . -Bbuild -A x64
 cd build
