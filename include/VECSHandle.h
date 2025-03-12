@@ -21,6 +21,8 @@ namespace vecs {
 			m_value.set_bits(storageIndex, INDEX_BITS + VERSION_BITS, STORAGE_BITS);
 		};
 
+		HandleT(size_t v) : m_value{type_t{v}} {};
+
 		size_t GetIndex() const { return m_value.get_bits(0, INDEX_BITS); }
 		size_t GetVersion() const { return m_value.get_bits(INDEX_BITS, VERSION_BITS); }
 		size_t GetStorageIndex() const { return m_value.get_bits(INDEX_BITS + VERSION_BITS); }
