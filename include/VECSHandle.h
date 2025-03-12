@@ -27,6 +27,7 @@ namespace vecs {
 		size_t GetVersion() const { return m_value.get_bits(INDEX_BITS, VERSION_BITS); }
 		size_t GetStorageIndex() const { return m_value.get_bits(INDEX_BITS + VERSION_BITS); }
 		size_t GetVersionedIndex() const { return (GetVersion() << VERSION_BITS) + GetIndex(); }
+		size_t GetValue() const { return m_value();  };
 		bool IsValid() const { return m_value != std::numeric_limits<size_t>::max(); }
 		HandleT& operator=(const HandleT& other) { m_value = other.m_value; return *this; }
 		bool operator==(const HandleT& other) const { return GetIndex() == other.GetIndex() && GetVersion() == other.GetVersion(); }
