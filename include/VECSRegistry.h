@@ -394,7 +394,7 @@ namespace vecs {
 		/// @param handle The handle of the entity.
 		/// @param ...tags The tags to add.
 		template<typename... Ts>
-			requires (std::is_same_v<std::decay_t<Ts>, size_t> && ...)
+			requires (std::is_integral_v<std::decay_t<Ts>> && ...)
 		void AddTags(Handle handle, Ts... tags) {
 			AddTags(handle, std::vector<size_t>{tags...});
 		}
@@ -415,7 +415,7 @@ namespace vecs {
 		/// @param handle The handle of the entity.
 		/// @param ...tags The tags to erase.
 		template<typename... Ts>
-			requires (std::is_same_v<std::decay_t<Ts>, size_t> && ...)
+			requires (std::is_integral_v<std::decay_t<Ts>> && ...)
 		void EraseTags(Handle handle, Ts... tags) {
 			EraseTags(handle, std::vector<size_t>{tags...});
 		}
