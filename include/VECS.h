@@ -51,7 +51,7 @@ namespace vecs {
 	inline size_t Hash( T& hashes ) {
 		std::size_t seed = 0;
 		if constexpr ( is_std_vector<std::decay_t<T>>::value ) {
-			std::ranges::sort(hashes);
+			std::sort(hashes.begin(), hashes.end());
 		}
 		for( auto& v : hashes ) {
 			seed ^= v + 0x9e3779b9 + (seed<<6) + (seed>>2);
@@ -63,7 +63,7 @@ namespace vecs {
 	inline size_t Hash( T&& hashes ) {
 		std::size_t seed = 0;
 		if constexpr ( is_std_vector<std::decay_t<T>>::value ) {
-			std::ranges::sort(hashes);
+			std::sort(hashes.begin(), hashes.end());
 		}
 		for( auto& v : hashes ) {
 			seed ^= v + 0x9e3779b9 + (seed<<6) + (seed>>2);
