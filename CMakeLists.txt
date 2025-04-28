@@ -46,3 +46,6 @@ include_directories (${viennatypelistlibrary_SOURCE_DIR}/include)
 include(CTest)
 
 add_subdirectory(tests)
+
+# Console
+add_subdirectory(Console)
