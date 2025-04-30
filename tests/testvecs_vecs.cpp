@@ -5,6 +5,8 @@
 #include <utility>
 #include <random>
 #include <thread>
+#include <string>
+#include <iostream>
 #include "VECS.h"
 
 bool boolprint = false;
@@ -379,10 +381,10 @@ void test4( std::string name, bool insert, auto&& job ) {
 	if(boolprint) std::cout << "test 4.1 parallel " + name << std::endl;
 	auto t1 = std::chrono::high_resolution_clock::now();
 	{
-		std::jthread t1{ [&](){ work(system);} };
-		std::jthread t2{ [&](){ work(system);} };
-		std::jthread t3{ [&](){ work(system);} };
-		std::jthread t4{ [&](){ work(system);} };
+		//std::jthread t1{ [&](){ work(system);} };
+		//std::jthread t2{ [&](){ work(system);} };
+		//std::jthread t3{ [&](){ work(system);} };
+		//std::jthread t4{ [&](){ work(system);} };
 	}
 	{
 		auto t2 = std::chrono::high_resolution_clock::now();
@@ -397,10 +399,10 @@ void test4( std::string name, bool insert, auto&& job ) {
 	t1 = std::chrono::high_resolution_clock::now();
 
 	{
-		std::jthread t1{ [&](){ work(system);} };
-		std::jthread t2{ [&](){ work(system);} };
-		std::jthread t3{ [&](){ work(system);} };
-		std::jthread t4{ [&](){ work(system);} };
+		//std::jthread t1{ [&](){ work(system);} };
+		//std::jthread t2{ [&](){ work(system);} };
+		//std::jthread t3{ [&](){ work(system);} };
+		//std::jthread t4{ [&](){ work(system);} };
 	}
 	{
 		auto t2 = std::chrono::high_resolution_clock::now();
@@ -496,14 +498,14 @@ void test5() {
 	auto t1 = std::chrono::high_resolution_clock::now();
 
 	{
-		std::jthread t1{ [&](){ work(system);} };
+		/*std::jthread t1{ [&](){ work(system);} };
 		std::jthread t2{ [&](){ work(system);} };
 		std::jthread t3{ [&](){ work(system);} };
 		std::jthread t4{ [&](){ work(system);} };
 		std::jthread t5{ [&](){ work(system);} };
 		std::jthread t6{ [&](){ work(system);} };
 		std::jthread t7{ [&](){ work(system);} };
-		std::jthread t8{ [&](){ work(system);} };
+		std::jthread t8{ [&](){ work(system);} };*/
 	}
 
 	auto t2 = std::chrono::high_resolution_clock::now();

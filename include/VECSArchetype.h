@@ -81,7 +81,7 @@ namespace vecs {
 		/// @param ...vs The component values.
 		template<typename... Ts>
 		void Put(size_t archIndex, Ts&& ...vs) {
-			assert( m_maps.contains(Type<Ts>()) && ... );
+			assert( (m_maps.contains(Type<Ts>()) && ...) );
 			auto fun = [&]<typename T>(T&& v){ (*Map<std::decay_t<T>>())[archIndex] = std::forward<T>(v); };
 			(fun.template operator()(std::forward<decltype(vs)>(vs)), ... );
 		}
