@@ -439,6 +439,7 @@ int main(int, char**)
 
     // Main loop
     bool done = false;
+    static bool IsConnected = false;
     while (!done)
     {
         // Poll and handle events (inputs, window resize, etc.)
@@ -482,12 +483,14 @@ int main(int, char**)
 
         static float f = 0.0f;
         static int counter = 0;
+       
 
 
 
         if (ImGui::BeginMainMenuBar()) {
             if (ImGui::BeginMenu("VECS")) {
                 if (ImGui::MenuItem("Vecs 1")) {
+                    IsConnected = true;
                 }
                 if (ImGui::MenuItem("Vecs 2")) {
                 }
@@ -519,24 +522,30 @@ int main(int, char**)
             ImGui::EndMainMenuBar();
         }
 
+        if (IsConnected) {
+            ImGui::Begin("Connection");
+            ImGui::Text("Connection not implemented yet!");
+            if (ImGui::Button("Close Connection")) { if (ImGui::IsItemClicked)IsConnected = false; }
+            ImGui::End();
+        }
 
 
   
 
         //// 2. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
         //{
-        //    static float f = 0.0f;
-        //    static int counter = 0;
+            //static float f = 0.0f;
+            //static int counter = 0;
 
-        //    ImGui::Begin("Connections");    // Create a window called "Connections" and append into it.
+            //ImGui::Begin("Connections");    // Create a window called "Connections" and append into it.
 
-        //    if (0) // TODO: enumerate connections, then list them here for selection of one
-        //        ;
-        //    else
-        //        ImGui::Text("No VECS applications running");
+            //if (0) // TODO: enumerate connections, then list them here for selection of one
+            //    ;
+            //else
+            //    ImGui::Text("No VECS applications running");
 
-        //    // ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-        //    ImGui::End();
+            //// ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+            //ImGui::End();
         //}
 
 
@@ -555,6 +564,8 @@ int main(int, char**)
         }
     }
 
+
+
     // Cleanup
     // [If using SDL_MAIN_USE_CALLBACKS: all code below would likely be your SDL_AppQuit() function]
     err = vkDeviceWaitIdle(g_Device);
@@ -571,3 +582,6 @@ int main(int, char**)
 
     return 0;
 }
+
+
+
