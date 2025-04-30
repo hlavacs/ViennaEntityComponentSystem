@@ -34,6 +34,8 @@ set(TARGET Console)
 
 set(SOURCE
     Console.cpp
+	Listener.cpp
+	ConsoleListener.cpp
 	${imgui_SOURCE_DIR}/imgui.cpp
 	${imgui_SOURCE_DIR}/imgui_draw.cpp
 	${imgui_SOURCE_DIR}/imgui_tables.cpp
@@ -44,6 +46,8 @@ set(SOURCE
 
 # VECS headers are maybe unnecessary in the console?
 set(HEADERS
+  Listener.h
+  ConsoleListener.h
   ${PROJECT_SOURCE_DIR}/include/VECS.h
   ${PROJECT_SOURCE_DIR}/include/VECSArchetype.h
   ${PROJECT_SOURCE_DIR}/include/VECSHandle.h
@@ -59,3 +63,4 @@ target_include_directories (${TARGET} PRIVATE ${sdl3_SOURCE_DIR}/include)
 
 target_link_libraries(${TARGET} Vulkan::Vulkan)
 target_link_libraries(${TARGET} SDL3::SDL3)
+target_link_libraries(${TARGET} ws2_32)

@@ -32,13 +32,16 @@
 #include <volk.h>
 #endif
 
+// Console Listener
+#include "ConsoleListener.h"
+
 //#define APP_USE_UNLIMITED_FRAME_RATE
 #ifdef _DEBUG
 #define APP_USE_VULKAN_DEBUG_REPORT
 #endif
 
 // Data
-static VkAllocationCallbacks*   g_Allocator = nullptr;
+static VkAllocationCallbacks* g_Allocator = nullptr;
 static VkInstance               g_Instance = VK_NULL_HANDLE;
 static VkPhysicalDevice         g_PhysicalDevice = VK_NULL_HANDLE;
 static VkDevice                 g_Device = VK_NULL_HANDLE;
@@ -256,7 +259,7 @@ static void CleanupVulkanWindow()
 
 static void FrameRender(ImGui_ImplVulkanH_Window* wd, ImDrawData* draw_data)
 {
-    VkSemaphore image_acquired_semaphore  = wd->FrameSemaphores[wd->SemaphoreIndex].ImageAcquiredSemaphore;
+    VkSemaphore image_acquired_semaphore = wd->FrameSemaphores[wd->SemaphoreIndex].ImageAcquiredSemaphore;
     VkSemaphore render_complete_semaphore = wd->FrameSemaphores[wd->SemaphoreIndex].RenderCompleteSemaphore;
     VkResult err = vkAcquireNextImageKHR(g_Device, wd->Swapchain, UINT64_MAX, image_acquired_semaphore, VK_NULL_HANDLE, &wd->FrameIndex);
     if (err == VK_ERROR_OUT_OF_DATE_KHR || err == VK_SUBOPTIMAL_KHR)
@@ -437,6 +440,17 @@ int main(int, char**)
     // Our state
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
+    // Setup Console Listener
+    ConsoleListener listening;
+#if 1
+    // for a first test, simply use port# 2000
+    std::string service = "2000";
+#else
+    std::string service;
+    // TODO: Fetch the service number or name from a confguration or the command line
+#endif
+    listening.Create(service);
+
     // Main loop
     bool done = false;
     static bool IsConnected = false;
@@ -483,7 +497,7 @@ int main(int, char**)
 
         static float f = 0.0f;
         static int counter = 0;
-       
+
 
 
 
@@ -503,11 +517,11 @@ int main(int, char**)
             if (ImGui::BeginMenu("View")) {
 
                 if (ImGui::BeginMenu("Snapshot")) {
-                        if (ImGui::MenuItem("View")) {
-                        }
-                        if (ImGui::MenuItem("Edit")) {
-                        }
-                        ImGui::EndMenu();
+                    if (ImGui::MenuItem("View")) {
+                    }
+                    if (ImGui::MenuItem("Edit")) {
+                    }
+                    ImGui::EndMenu();
                 }
                 if (ImGui::MenuItem("Live View")) {
                 }
@@ -530,7 +544,7 @@ int main(int, char**)
         }
 
 
-  
+
 
         //// 2. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
         //{
@@ -564,7 +578,8 @@ int main(int, char**)
         }
     }
 
-
+    // remove listener socket and connections
+    listening.Terminate();
 
     // Cleanup
     // [If using SDL_MAIN_USE_CALLBACKS: all code below would likely be your SDL_AppQuit() function]
