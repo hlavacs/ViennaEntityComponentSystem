@@ -18,9 +18,17 @@ namespace vecs {
         ~Manager() = default;  // Destructor
 
 
+		/// @brief Get a view of entities with specific components.
+		/// @tparam ...Ts The types of the components.
+		/// @return A view of the entity components
+		template<typename... Ts>
+			requires (vtll::unique<vtll::tl<Ts...>>::value)
+		[[nodiscard]] auto GetView(std::vector<size_t>&& yes={}, std::vector<size_t>&& no={}) -> Registry::View<Ts...> {
+			return m_system.GetView<Ts...>(std::forward<std::vector<size_t>>(yes), std::forward<std::vector<size_t>>(no));
+		}
+
 
         // TODO: check if component exists (relevant for paralell)
-        //  return only existing components OR ditch creation of empty component
         
         /// @brief Get a single component value of an entity.
 		/// @tparam T The type of the component.
@@ -52,7 +60,7 @@ namespace vecs {
 		template<typename... Ts>
 			requires ((sizeof...(Ts) > 0) && (vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
 		[[nodiscard]] auto createEntity( Ts&&... component ) -> Handle {
-            return m_system.Insert(component);
+            return m_system.Insert(std::forward<Ts>(component)...);
         }
 
 
@@ -73,7 +81,7 @@ namespace vecs {
         template<typename... Ts>
             requires ((vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<std::decay_t<Ts>...>, Handle>::value)
         void putComponent(Handle handle, Ts&&... vs) {
-            m_system.Put(handle, vs);
+            m_system.Put(handle, std::forward<Ts>(vs)...);
         }
 
 
@@ -84,7 +92,7 @@ namespace vecs {
 		template<typename... Ts>
         requires (std::is_integral_v<std::decay_t<Ts>> && ...)
         void addTags(Handle handle, Ts... tags) {
-            m_system.AddTags(handle, tags);
+            m_system.AddTags(handle, std::forward<Ts>(tags)...);
         }
 
 
@@ -95,7 +103,7 @@ namespace vecs {
         template<typename... Ts>
             requires (std::is_integral_v<std::decay_t<Ts>> && ...)
         void eraseTags(Handle handle, Ts... tags) {
-            m_system.EraseTags(handle, tags);
+            m_system.EraseTags(handle,std::forward<Ts>(tags)...);
         }
 
 
