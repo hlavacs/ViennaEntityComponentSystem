@@ -116,6 +116,10 @@ namespace vecs {
             m_system.Erase<Ts...>(handle);
         }
 
+        void EraseEntity(Handle handle) {
+            m_system.Erase(handle);
+        }
+
 
         /// @brief Clear the registry by removing all entities.
 		void clearRegistry() {

@@ -58,12 +58,12 @@ TEST_F(ManagerTest, AddTagsWorks) {
     int yesTagsCorrect = 0;
     int yesNoTagsCorrect = 0;
 
-    for ( auto handle : mng.template GetView<vecs::Handle>(std::vector<size_t>{1ul})) {
+    for ( auto handle : mng.template GetView<vecs::Handle>(std::vector<size_t>{1ul}) ) {
         //expect h3, h4, h5
         if (handle == h3 || handle == h4 || handle == h5) yesTagsCorrect += 1;
     }
 
-    for ( auto handle : mng.template GetView<vecs::Handle>(std::vector<size_t>{2ul}, std::vector<size_t>{3ul})) {
+    for ( auto handle : mng.template GetView<vecs::Handle>(std::vector<size_t>{2ul}, std::vector<size_t>{3ul}) ) {
         //expect h5
         if (handle == h5) yesNoTagsCorrect += 1;
     }
@@ -74,15 +74,54 @@ TEST_F(ManagerTest, AddTagsWorks) {
 
 
 TEST_F(ManagerTest, EraseTagsWorks) {
+    vecs::Handle h1 = mng.createEntity(4, 5.5, 6.6f);
 
+    mng.addTags(h1, 1ul, 2ul, 3ul);
+
+    bool tagErased = true;
+
+    mng.eraseTags(h1, 3ul);
+    for ( auto handle : mng.template GetView<vecs::Handle>(std::vector<size_t>{3ul}) ) {
+        if (handle == h1) tagErased = false;
+    }
+
+    ASSERT_TRUE(tagErased);
 }
 
 
-TEST_F(ManagerTest, EraseComponentWorks) {
+TEST_F(ManagerTest, EraseComponentAndEntityWorks) {
+    vecs::Handle h1 = mng.createEntity(5);
+    vecs::Handle h2 = mng.createEntity(4, 5.5f);
 
+    mng.EraseEntity(h1);
+    mng.eraseComponents<int>(h2);
+    bool noInt = true;
+
+    for ( auto [handle, i] : mng.GetView<vecs::Handle, int>() ) {
+        if (handle == h1 || handle == h2) noInt = false;
+    }
+
+    ASSERT_TRUE(noInt);
 }
 
 
 TEST_F(ManagerTest, ClearRegistryWorks) {
+    vecs::Handle h1 = mng.createEntity(5);
+    vecs::Handle h2 = mng.createEntity(4, 5.5f);
 
+    int size = 0;
+    for ( auto handle : mng.GetView<vecs::Handle>() ) {
+        size += 1;
+    }
+
+    ASSERT_EQ(size, 2);
+
+    mng.clearRegistry();
+
+    size = 0;
+    for ( auto handle : mng.GetView<vecs::Handle>() ) {
+        size += 1;
+    }
+
+    ASSERT_EQ(size, 0);
 }
