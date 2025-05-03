@@ -344,6 +344,60 @@ static void FramePresent(ImGui_ImplVulkanH_Window* wd)
     wd->SemaphoreIndex = (wd->SemaphoreIndex + 1) % wd->SemaphoreCount; // Now we can use the next set of semaphores
 }
 
+
+void static showNewSnapshotWindow(bool* p_open)
+{
+    ImGui::SetNextWindowSize(ImVec2(300, 50));
+    ImGui::SetNextWindowCollapsed(false);
+    ImGui::SetNextWindowPos(ImVec2(0, 20));
+    if (!ImGui::Begin("New Snapshot", p_open))
+    {
+        ImGui::End();
+    }
+    else
+    {
+        ImGui::Text("Implement Snapshots here!");
+        ImGui::End();
+    }
+}
+
+void static showConnectionWindow(bool* p_open)
+{
+    ImGui::SetNextWindowSize(ImVec2(300, 50));
+    ImGui::SetNextWindowCollapsed(false);
+    ImGui::SetNextWindowPos(ImVec2(0, 20));
+    if (!ImGui::Begin("Connection", p_open))
+    {
+        ImGui::End();
+    }
+    else
+    {
+        ImGui::Text("Connection not implemented yet!");
+        ImGui::End();
+    }
+}
+
+
+void static showLiveView(bool* p_open)
+{
+
+    ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(900, 730));
+    ImGui::SetNextWindowCollapsed(false);
+    //ImGui::SetNextWindowPos(ImVec2(0, 20));
+    if (!ImGui::Begin("Live View", p_open))
+    {
+        ImGui::End();
+    }
+    else
+    {
+        ImGui::Text("This is the Live View");
+        ImGui::End();
+    }
+
+}
+
 // Main code
 int main(int, char**)
 {
@@ -357,7 +411,7 @@ int main(int, char**)
 
     // Create window with Vulkan graphics context
     SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_HIDDEN);
-    SDL_Window* window = SDL_CreateWindow("VECS Console", 1280, 720, window_flags);
+    SDL_Window* window = SDL_CreateWindow("VECS Console", 1290, 730, window_flags);
     if (window == nullptr)
     {
         printf("Error: SDL_CreateWindow(): %s\n", SDL_GetError());
@@ -454,6 +508,8 @@ int main(int, char**)
     // Main loop
     bool done = false;
     static bool IsConnected = false;
+    static bool newSnapshotWindow = false; 
+    static bool liveView = false; 
     while (!done)
     {
         // Poll and handle events (inputs, window resize, etc.)
@@ -517,6 +573,9 @@ int main(int, char**)
             if (ImGui::BeginMenu("View")) {
 
                 if (ImGui::BeginMenu("Snapshot")) {
+                    if (ImGui::MenuItem("New")) {
+                        newSnapshotWindow = true; 
+                    }
                     if (ImGui::MenuItem("View")) {
                     }
                     if (ImGui::MenuItem("Edit")) {
@@ -524,6 +583,7 @@ int main(int, char**)
                     ImGui::EndMenu();
                 }
                 if (ImGui::MenuItem("Live View")) {
+                    liveView = true; 
                 }
                 ImGui::EndMenu();
             }
@@ -537,30 +597,17 @@ int main(int, char**)
         }
 
         if (IsConnected) {
-            ImGui::Begin("Connection");
-            ImGui::Text("Connection not implemented yet!");
-            if (ImGui::Button("Close Connection")) { if (ImGui::IsItemClicked)IsConnected = false; }
-            ImGui::End();
+            showConnectionWindow(&IsConnected);
         }
 
+        if (newSnapshotWindow) {
+            showNewSnapshotWindow(&newSnapshotWindow);
+        }
 
-
-
-        //// 2. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
-        //{
-            //static float f = 0.0f;
-            //static int counter = 0;
-
-            //ImGui::Begin("Connections");    // Create a window called "Connections" and append into it.
-
-            //if (0) // TODO: enumerate connections, then list them here for selection of one
-            //    ;
-            //else
-            //    ImGui::Text("No VECS applications running");
-
-            //// ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-            //ImGui::End();
-        //}
+        if (liveView)
+        {
+            showLiveView(&liveView);
+        }
 
 
         // Rendering
@@ -597,6 +644,8 @@ int main(int, char**)
 
     return 0;
 }
+
+
 
 
 
