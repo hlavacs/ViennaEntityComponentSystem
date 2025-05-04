@@ -10,8 +10,6 @@ namespace vecs {
 
     /// @brief A manager for handling registries and parallel access
     class Manager {
-        vecs::Registry m_system;
-
     public:
         Manager() {}
 
@@ -35,7 +33,7 @@ namespace vecs {
 		/// @param handle The handle of the entity.
 		/// @return The component value or reference to it.
         template<typename T>
-        auto getComponent(Handle handle) -> Registry::to_ref_t<T> {
+        auto GetComponent(Handle handle) -> Registry::to_ref_t<T> {
             return m_system.Get<T>(handle);
         }
 
@@ -45,10 +43,9 @@ namespace vecs {
 		/// @return A tuple of the component values.
         template<typename... Ts>
             requires (sizeof...(Ts)>1 && vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<Ts...>, Handle&>::value)
-        auto getComponent(Handle handle) -> std::tuple<Registry::to_ref_t<Ts>...> {
+        auto GetComponent(Handle handle) -> std::tuple<Registry::to_ref_t<Ts>...> {
             return m_system.Get<Ts...>(handle);
         }
-
 
 
 
@@ -59,7 +56,7 @@ namespace vecs {
 		/// @return Handle of new entity.
 		template<typename... Ts>
 			requires ((sizeof...(Ts) > 0) && (vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
-		[[nodiscard]] auto createEntity( Ts&&... component ) -> Handle {
+		[[nodiscard]] auto CreateEntity( Ts&&... component ) -> Handle {
             return m_system.Insert(std::forward<Ts>(component)...);
         }
 
@@ -70,7 +67,7 @@ namespace vecs {
 		/// @param v The new values in a tuple
 		template<typename... Ts>
         requires (vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<std::decay_t<Ts>...>, Handle>::value)
-        void putComponent(Handle handle, std::tuple<Ts...>& v) {
+        void PutComponent(Handle handle, std::tuple<Ts...>& v) {
             m_system.Put(handle, v);
         }
 
@@ -80,7 +77,7 @@ namespace vecs {
         /// @param vs The new values.
         template<typename... Ts>
             requires ((vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<std::decay_t<Ts>...>, Handle>::value)
-        void putComponent(Handle handle, Ts&&... vs) {
+        void PutComponent(Handle handle, Ts&&... vs) {
             m_system.Put(handle, std::forward<Ts>(vs)...);
         }
 
@@ -91,7 +88,7 @@ namespace vecs {
 		/// @param ...tags The tags to add.
 		template<typename... Ts>
         requires (std::is_integral_v<std::decay_t<Ts>> && ...)
-        void addTags(Handle handle, Ts... tags) {
+        void AddTags(Handle handle, Ts... tags) {
             m_system.AddTags(handle, std::forward<Ts>(tags)...);
         }
 
@@ -102,7 +99,7 @@ namespace vecs {
         /// @param ...tags The tags to erase.
         template<typename... Ts>
             requires (std::is_integral_v<std::decay_t<Ts>> && ...)
-        void eraseTags(Handle handle, Ts... tags) {
+        void EraseTags(Handle handle, Ts... tags) {
             m_system.EraseTags(handle,std::forward<Ts>(tags)...);
         }
 
@@ -112,7 +109,7 @@ namespace vecs {
 		/// @param handle The handle of the entity.		
 		template<typename... Ts>
             requires (vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
-        void eraseComponents(Handle handle) {
+        void EraseComponents(Handle handle) {
             m_system.Erase<Ts...>(handle);
         }
 
@@ -122,11 +119,14 @@ namespace vecs {
 
 
         /// @brief Clear the registry by removing all entities.
-		void clearRegistry() {
+		void ClearRegistry() {
 			m_system.Clear();
 		}
 
 
+    private:
+        vecs::Registry m_system;
+        
     };
 
 }

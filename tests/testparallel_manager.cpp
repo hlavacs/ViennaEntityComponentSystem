@@ -15,45 +15,45 @@ class ManagerTest : public testing::Test {
 
 
 TEST_F(ManagerTest, CreateAndChangeEntityWorks) {
-    vecs::Handle h1 = mng.createEntity(5, 7.6f, 3.2);
+    vecs::Handle h1 = mng.CreateEntity(5, 7.6f, 3.2);
 
-    ASSERT_EQ(mng.getComponent<int>(h1), 5);
-    ASSERT_EQ(mng.getComponent<float>(h1), 7.6f);
-    ASSERT_EQ(mng.getComponent<double>(h1), 3.2);
+    ASSERT_EQ(mng.GetComponent<int>(h1), 5);
+    ASSERT_EQ(mng.GetComponent<float>(h1), 7.6f);
+    ASSERT_EQ(mng.GetComponent<double>(h1), 3.2);
 
-    auto [c1, c2] = mng.getComponent<int&, double&>(h1);
+    auto [c1, c2] = mng.GetComponent<int&, double&>(h1);
     c1 = 7;
     c2 = 1.8;
 
-    ASSERT_EQ(mng.getComponent<int>(h1), 7);
-    ASSERT_EQ(mng.getComponent<double>(h1), 1.8);
+    ASSERT_EQ(mng.GetComponent<int>(h1), 7);
+    ASSERT_EQ(mng.GetComponent<double>(h1), 1.8);
 }
 
 
 TEST_F(ManagerTest, PutComponentWorks) {
-    vecs::Handle h2 = mng.createEntity(5);
+    vecs::Handle h2 = mng.CreateEntity(5);
 
-    mng.putComponent(h2, 6.4);
+    mng.PutComponent(h2, 6.4);
 
-    ASSERT_EQ(mng.getComponent<double>(h2), 6.4);
+    ASSERT_EQ(mng.GetComponent<double>(h2), 6.4);
 
 
     std::tuple<float, std::string> tup = {1.2f, "hi"};
-    mng.putComponent(h2, tup);
+    mng.PutComponent(h2, tup);
 
-    ASSERT_EQ(mng.getComponent<float>(h2), 1.2f);
-    ASSERT_EQ(mng.getComponent<std::string>(h2), "hi");
+    ASSERT_EQ(mng.GetComponent<float>(h2), 1.2f);
+    ASSERT_EQ(mng.GetComponent<std::string>(h2), "hi");
 }
 
 
 TEST_F(ManagerTest, AddTagsWorks) {
-    vecs::Handle h3 = mng.createEntity(4, 5.5, 6.6f);
-    vecs::Handle h4 = mng.createEntity(9, 8.8, 7.7f);
-    vecs::Handle h5 = mng.createEntity(7, 6.6, 5.5f);
+    vecs::Handle h3 = mng.CreateEntity(4, 5.5, 6.6f);
+    vecs::Handle h4 = mng.CreateEntity(9, 8.8, 7.7f);
+    vecs::Handle h5 = mng.CreateEntity(7, 6.6, 5.5f);
 
-    mng.addTags(h3, 1ul, 3ul);
-    mng.addTags(h4, 2ul, 3ul, 1ul);
-    mng.addTags(h5, 1ul, 2ul);
+    mng.AddTags(h3, 1ul, 3ul);
+    mng.AddTags(h4, 2ul, 3ul, 1ul);
+    mng.AddTags(h5, 1ul, 2ul);
 
     int yesTagsCorrect = 0;
     int yesNoTagsCorrect = 0;
@@ -74,13 +74,13 @@ TEST_F(ManagerTest, AddTagsWorks) {
 
 
 TEST_F(ManagerTest, EraseTagsWorks) {
-    vecs::Handle h1 = mng.createEntity(4, 5.5, 6.6f);
+    vecs::Handle h1 = mng.CreateEntity(4, 5.5, 6.6f);
 
-    mng.addTags(h1, 1ul, 2ul, 3ul);
+    mng.AddTags(h1, 1ul, 2ul, 3ul);
 
     bool tagErased = true;
 
-    mng.eraseTags(h1, 3ul);
+    mng.EraseTags(h1, 3ul);
     for ( auto handle : mng.template GetView<vecs::Handle>(std::vector<size_t>{3ul}) ) {
         if (handle == h1) tagErased = false;
     }
@@ -90,11 +90,11 @@ TEST_F(ManagerTest, EraseTagsWorks) {
 
 
 TEST_F(ManagerTest, EraseComponentAndEntityWorks) {
-    vecs::Handle h1 = mng.createEntity(5);
-    vecs::Handle h2 = mng.createEntity(4, 5.5f);
+    vecs::Handle h1 = mng.CreateEntity(5);
+    vecs::Handle h2 = mng.CreateEntity(4, 5.5f);
 
     mng.EraseEntity(h1);
-    mng.eraseComponents<int>(h2);
+    mng.EraseComponents<int>(h2);
     bool noInt = true;
 
     for ( auto [handle, i] : mng.GetView<vecs::Handle, int>() ) {
@@ -106,8 +106,8 @@ TEST_F(ManagerTest, EraseComponentAndEntityWorks) {
 
 
 TEST_F(ManagerTest, ClearRegistryWorks) {
-    vecs::Handle h1 = mng.createEntity(5);
-    vecs::Handle h2 = mng.createEntity(4, 5.5f);
+    vecs::Handle h1 = mng.CreateEntity(5);
+    vecs::Handle h2 = mng.CreateEntity(4, 5.5f);
 
     int size = 0;
     for ( auto handle : mng.GetView<vecs::Handle>() ) {
@@ -116,7 +116,7 @@ TEST_F(ManagerTest, ClearRegistryWorks) {
 
     ASSERT_EQ(size, 2);
 
-    mng.clearRegistry();
+    mng.ClearRegistry();
 
     size = 0;
     for ( auto handle : mng.GetView<vecs::Handle>() ) {
