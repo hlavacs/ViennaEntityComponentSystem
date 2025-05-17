@@ -19,7 +19,7 @@ namespace vecs {
         // ThreadPool SOURCE: https://www.geeksforgeeks.org/thread-pool-in-cpp/
         class ThreadPool {
         public:
-            ThreadPool(size_t num = 4/*std::thread::hardware_concurrency()*/) {
+            ThreadPool(size_t num = std::thread::hardware_concurrency()) {
                 for (size_t i {0}; i < num; ++i) {
                     m_threads.emplace_back([this] {
                         while (true) {
@@ -39,9 +39,7 @@ namespace vecs {
                                 // get next task from queue
                                 task = std::move(m_tasks.front());
                                 m_tasks.pop();
-                                
                             }
-
                             task();
                             
                             {

@@ -17,20 +17,16 @@ class ManagerTest : public testing::Test {
 TEST_F(ManagerTest, CreateAndChangeEntityWorks) {
     vecs::Handle h1 = mng.CreateEntity(5, 7.6f, 3.2);
 
-    mng.waitIdle();
     ASSERT_EQ(mng.GetComponent<int>(h1), 5);
     ASSERT_EQ(mng.GetComponent<float>(h1), 7.6f);
     ASSERT_EQ(mng.GetComponent<double>(h1), 3.2);
 
-    mng.waitIdle();
     auto [c1, c2] = mng.GetComponent<int&, double&>(h1);
     c1 = 7;
     c2 = 1.8;
 
-    mng.waitIdle();
     ASSERT_EQ(mng.GetComponent<int>(h1), 7);
     ASSERT_EQ(mng.GetComponent<double>(h1), 1.8);
-    mng.waitIdle();
 }
 
 
@@ -54,14 +50,13 @@ TEST_F(ManagerTest, AddTagsWorks) {
     vecs::Handle h4 = mng.CreateEntity(9, 8.8, 7.7f);
     vecs::Handle h5 = mng.CreateEntity(7, 6.6, 5.5f);
 
-    mng.waitIdle();
-
     mng.AddTags(h3, 1ul, 3ul);
     mng.waitIdle();
+
     mng.AddTags(h4, 2ul, 3ul, 1ul);
     mng.waitIdle();
-    mng.AddTags(h5, 1ul, 2ul);
 
+    mng.AddTags(h5, 1ul, 2ul);
     mng.waitIdle();
 
     int yesTagsCorrect = 0;
@@ -70,7 +65,6 @@ TEST_F(ManagerTest, AddTagsWorks) {
     auto yesTagsView = mng.template GetView<vecs::Handle>(std::vector<size_t>{1ul});
     auto yesNoTagsView = mng.template GetView<vecs::Handle>(std::vector<size_t>{2ul}, std::vector<size_t>{3ul});
 
-    mng.waitIdle();
     for ( auto handle : yesTagsView ) {
         //expect h3, h4, h5
         if (handle == h3 || handle == h4 || handle == h5) yesTagsCorrect += 1;
@@ -88,7 +82,7 @@ TEST_F(ManagerTest, AddTagsWorks) {
 
 TEST_F(ManagerTest, EraseTagsWorks) {
     vecs::Handle h6 = mng.CreateEntity(4, 5.5, 6.6f);
-    mng.waitIdle();
+
     mng.AddTags(h6, 4ul, 5ul, 6ul);
 
     bool tagErased = true;
@@ -108,7 +102,6 @@ TEST_F(ManagerTest, EraseTagsWorks) {
 TEST_F(ManagerTest, EraseComponentAndEntityWorks) {
     vecs::Handle h7 = mng.CreateEntity(5);
     vecs::Handle h8 = mng.CreateEntity(4, 5.5f);
-    mng.waitIdle();
 
     mng.EraseEntity(h7);
     mng.waitIdle();
@@ -129,7 +122,6 @@ TEST_F(ManagerTest, EraseComponentAndEntityWorks) {
 TEST_F(ManagerTest, ClearRegistryWorks) {
     vecs::Handle h9 = mng.CreateEntity(5);
     vecs::Handle h10 = mng.CreateEntity(4, 5.5f);
-    mng.waitIdle();
 
     int size = 0;
     auto resa = mng.GetView<vecs::Handle>();
@@ -139,11 +131,8 @@ TEST_F(ManagerTest, ClearRegistryWorks) {
     }
 
     ASSERT_EQ(size, 2);
-    mng.waitIdle();
 
     mng.ClearRegistry();
-    mng.waitIdle();
-    
     size = 0;
     auto resb = mng.GetView<vecs::Handle>();
 
