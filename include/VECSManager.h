@@ -39,9 +39,20 @@ namespace vecs {
                                 // get next task from queue
                                 task = std::move(m_tasks.front());
                                 m_tasks.pop();
+                                
                             }
 
                             task();
+                            
+                            {
+                                std::unique_lock<std::mutex> lock(m_queueMutex);
+                                --m_taskCount;
+                                if (isIdle()) {
+                                    m_idle = true;
+                                    m_idle.notify_all();
+                                }
+                            }
+                           
                         }
                     });
                 }
@@ -67,8 +78,19 @@ namespace vecs {
                 {
                     std::unique_lock<std::mutex> lock(m_queueMutex);
                     m_tasks.emplace(std::move(task));
+                    ++m_taskCount;
+                    m_idle = false;
                 }
                 m_cv.notify_one();
+            }
+
+
+            bool isIdle() {
+                return m_taskCount.load() == 0;
+            }
+
+            void waitForIdle() {
+                m_idle.wait(false);
             }
 
         private:
@@ -78,6 +100,8 @@ namespace vecs {
 
             bool m_stop = false;
             std::condition_variable m_cv;
+            std::atomic<bool> m_idle = true;
+            std::atomic<size_t> m_taskCount = 0;
         };
 
 
@@ -97,6 +121,9 @@ namespace vecs {
 
         ~Manager() = default;  // Destructor
 
+        void waitIdle() {
+            m_threadpool.waitForIdle();
+        }
 
 		/// @brief Get a view of entities with specific components.
 		/// @tparam ...Ts The types of the components.
