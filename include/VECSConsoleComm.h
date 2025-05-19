@@ -99,16 +99,6 @@ public:
                 buffer[received] = '\0'; 
                 return std::string(buffer);
             }
-            else if (received == 0) {
-                std::cout << "Server closed the connection." << std::endl;
-                running = false;
-                return "";
-            }
-            else {
-                std::cerr << "recv failed: " << WSAGetLastError() << std::endl;
-                running = false;
-                return "";
-            }
         }
 
         return "";
