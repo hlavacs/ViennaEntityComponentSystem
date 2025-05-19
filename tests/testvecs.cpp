@@ -350,14 +350,34 @@ void test_registry() {
 
 }
 
+void test_conn() {
+	std::cout << "\x1b[37m testing Connection!...\n";
+	//add usage here? 
+	vecs::VECSConsoleComm consoleComm;
+	std::cout << "\x1b[37m isConnected: " << consoleComm.isConnected() << "\n";
+	int testval = consoleComm.connectToServer();
+	std::cout << "\x1b[37m testval: " << testval <<"\n";
+
+	std::cout << "\x1b[37m isConnected: " << consoleComm.isConnected() << "\n";
+
+	consoleComm.sendMessage("Hello!   !");
+	auto recMessage = consoleComm.receiveMessage();
+	std::cout << "\x1b[37m Received: " << recMessage << "\n";
+	
+	consoleComm.disconnectFromServer();
+	std::cout << "\x1b[37m I hope it works? ...\n";
+}
 
 int main() {
 	std::cout << "testing VECS...\n";
+	test_conn();
+	
 	test_handle();
 	test_vector();
 	test_slotmap();
 	test_archetype();
 	test_mutex();
 	test_registry();
+	
 }
 

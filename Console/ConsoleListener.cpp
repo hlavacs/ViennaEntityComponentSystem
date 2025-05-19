@@ -31,4 +31,38 @@ typedef struct hostent HOSTENT;
 
 void ConsoleSocketThread::ClientActivity() {
 
+    int waitrc;
+
+    auto& s = getSocket();
+
+    // TEST - start by sending a welcome string to the other side
+    std::string welcome("VECS Console built " __DATE__ " " __TIME__ "\r\n");
+    s.sendData(welcome);
+
+    // wait for incoming data with a timeout of 500 ms
+    while ((waitrc = s.wait(500)) != SOCKET_ERROR) {
+        // check for timeout ...
+        if (waitrc == 0) {
+            // TODO : if there's an external influence governing this thread,
+            //        make it happen here
+        }
+        else if (waitrc > 0) {
+            // something HAPPENED!
+
+            // if no data there, the socket connection has presumably been closed from this or the other side
+            if (!s.dataThere())
+                break;
+
+            // FIRST TEST - simply read in as many data as available and echo them back
+            int nLen;
+            while ((nLen = s.bytesBuffered()) > 0) {
+                char sbuf[4096];
+                int maxRd = min(sizeof(sbuf), nLen);
+                int rlen = s.receiveData(sbuf, maxRd);
+                nLen -= rlen;
+                s.sendData(sbuf, rlen);
+            }
+
+        }
+    }
 }

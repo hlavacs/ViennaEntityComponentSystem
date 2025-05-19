@@ -1,10 +1,13 @@
 
 #ifdef WIN32
+#include <ws2tcpip.h>
 #else
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
+#include <sys/select.h>
+#include <netdb.h>
 typedef struct protoent PROTOENT;
 typedef struct servent SERVENT;
 typedef struct hostent HOSTENT;
@@ -30,14 +33,14 @@ typedef struct hostent HOSTENT;
 
 static bool sockStarted = false;
 static bool sockStart(void) {
-// This is only needed for Windows.
+    // This is only needed for Windows.
 #ifdef _WINSOCKAPI_ 
 
     WSADATA wsaData;
 
     if (sockStarted)
         return true;
-    if (WSAStartup(MAKEWORD(1, 1), &wsaData) != 0)
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
         return false;
 
     sockStarted = true;
@@ -73,9 +76,29 @@ inline int getSocketError(void)
 #endif
 }
 
+// setSockAddr : setup a sockaddr_in structure from the passed server/port
+
+void setSockAddr(struct sockaddr_in* pSA, std::string server, std::string service = "") {
+    pSA->sin_family = AF_INET;
+#ifdef _AIX
+    pSA->sin_len = sizeof(saiS);
+#endif
+    pSA->sin_addr.s_addr = server.size() ? Socket::getHostAddress(server) : INADDR_ANY;
+    pSA->sin_port = Socket::getServicePort(service);
+}
+
+
+// ===============================================================================
+// Socket class members
+
+// getError : retrieve the last (socket) error
+int Socket::getError() {
+    return getSocketError();
+}
+
 // getProtoNumber : returns Protocol Number
 
-static short getProtoNumber ( std::string proto = "" ) {
+int Socket::getProtoNumber(std::string proto) {
     PROTOENT FAR* lpPE;
 
     if (!sockStart() || proto.empty())
@@ -93,19 +116,20 @@ static short getProtoNumber ( std::string proto = "" ) {
     return lpPE->p_proto;
 }
 
-// createSocket : allocates a new socket
+// create : allocates a new socket
 
-static SOCKET createSocket(int sType = SOCK_STREAM, std::string proto = "") {
-    if (!sockStart())
+SOCKET Socket::create(int sType, std::string proto) {
+    if (!sockStart() || s != INVALID_SOCKET)
         return INVALID_SOCKET;
-    return socket(AF_INET, sType, getProtoNumber(proto));
+    s = socket(AF_INET, sType, getProtoNumber(proto));
+    return s;
 }
 
 // servicePort : determine port number to use instead of a passed in service name
 // This allows for funny specifications like "http" if you want to use port 80 or
 // whatever is defined in [%WINDIR%/system32/drivers]/etc/services
 
-int servicePort(std::string service, std::string proto = "tcp") {
+int Socket::getServicePort(std::string service, std::string proto) {
     if (service.empty() || (!sockStart()))
         return 0;
     if (service[0] == '#')  // accept number with leading # to allow clear numeric indication
@@ -131,12 +155,11 @@ int servicePort(std::string service, std::string proto = "tcp") {
     return lpS->s_port;
 }
 
-// hostAddr : returns the host address for a given host name
+// getHostAddress : returns the host address for a given host name
 
-unsigned long hostAddr ( std::string hostName = "" )
+unsigned long Socket::getHostAddress(std::string hostName)
 {
-    HOSTENT FAR* lpH;
-    LPDWORD lpAdr;
+    unsigned long* lpAdr;
     char szLocal[128];
 
     if (hostName.empty())
@@ -147,24 +170,41 @@ unsigned long hostAddr ( std::string hostName = "" )
 
     if (!sockStart())
         return INADDR_NONE;
-
-    lpH = gethostbyname(hostName.c_str());
-
+#if 1
+    HOSTENT* lpH = gethostbyname(hostName.c_str());
 #ifndef _WINSOCKAPI_
     /* under *N[I|U]X, close connection to /etc/hosts file */
     endhostent();
 #endif
-
     if (!lpH)
         return INADDR_NONE;
+    lpAdr = (unsigned long*)lpH->h_addr;
+#else
+    ADDRINFO hints{ .ai_family = AF_INET };
+    ADDRINFO* pai{ NULL };
+    if (getaddrinfo(hostName.c_str(), nullptr, &hints, &pai))
+        return INADDR_NONE;
+    // TODO: parse resulting structure for the best matching result
 
-    lpAdr = (LPDWORD)lpH->h_addr;
+    freeaddrinfo(pai);
+#endif
+
     return *lpAdr;
 }
 
-// isSocket : returns whether the passed socket IS a valid socket
+// isCreated : returns whether the socket IS a created socket
 
-static bool isSocket(SOCKET s) {
+bool Socket::isCreated() {
+    return (s != INVALID_SOCKET);
+}
+
+// isSocket : returns whether the socket IS a valid open socket
+
+bool Socket::isSocket() {
+
+    if (s == INVALID_SOCKET)
+        return false;
+
     struct sockaddr_in sain = { 0 };
 
 #ifdef _WINSOCKAPI_
@@ -176,90 +216,72 @@ static bool isSocket(SOCKET s) {
     return !getsockname(s, (struct sockaddr*)&sain, &len);
 }
 
-// setSockAddr : setup a sockaddr_in structure from the passed server/port
+// bind : binds socket to a server/port
 
-void setSockAddr ( struct sockaddr_in* pSA, std::string server, std::string service = "" ) {
-    pSA->sin_family = AF_INET;
-#ifdef _AIX
-    pSA->sin_len = sizeof(saiS);
-#endif
-    pSA->sin_addr.s_addr = server.size() ? hostAddr(server) : INADDR_ANY;
-    pSA->sin_port = servicePort(service);
-}
-
-// bindSocket : binds socket to a server/port
-
-static int bindSocket ( SOCKET s, std::string server = "", std::string service = "", int bReuse = 1) {
+int Socket::bind(std::string server, std::string service, int bReuse) {
     struct sockaddr_in saiS;
     // int bReuse = TRUE;
 
-    if (!sockStart())
+    if (!sockStart() || s == INVALID_SOCKET)
         return SOCKET_ERROR;
 
     if (service.size()) {
         // if binding to specific port, assure socket gets reused
-        setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (char*)&bReuse, sizeof(bReuse));
+        setOpt(SOL_SOCKET, SO_REUSEADDR, (char*)&bReuse, sizeof(bReuse));
     }
 
     setSockAddr(&saiS, server, service);
 
-    return bind(s, (const struct sockaddr*)&saiS, sizeof(saiS));
+    return ::bind(s, (const struct sockaddr*)&saiS, sizeof(saiS));
 }
 
-// connectSocket : connects socket to a server / port
+// connect : connects socket to a server / port
 
-int connectSocket ( SOCKET s, std::string server, std::string service ) {
+int Socket::connect(std::string server, std::string service) {
     struct sockaddr_in saiS;
     int rc;
 
-    if (!sockStart())
+    if (!sockStart() || s == INVALID_SOCKET)
         return SOCKET_ERROR;
 
     setSockAddr(&saiS, server, service);
-    rc = connect(s, (const struct sockaddr*)&saiS, sizeof(saiS));
+    rc = ::connect(s, (const struct sockaddr*)&saiS, sizeof(saiS));
     if (rc != 0)
-#ifdef _WINSOCKAPI_
-        rc = WSAGetLastError();
-#else
-        rc = errno;
-#endif
+        rc = getSocketError();
     return rc;
 }
 
-// disconnectSocket : closes a socket connection
+// disconnect : closes a socket connection
 
-int disconnectSocket ( SOCKET s ) {
-    int sType;
-    unsigned long ulNBIO = FALSE;
-    linger li { TRUE, 20 };
-#ifdef _WINSOCKAPI_
-    int sTypeLen = sizeof(sType);
-#else
-    socklen_t sTypeLen = sizeof(sType);
-#endif
-
-    if (!sockStart())
+int Socket::disconnect() {
+    if (!sockStart() || s == INVALID_SOCKET)
         return SOCKET_ERROR;
 
-#ifdef _WINSOCKAPI_
-    ioctlsocket(s, FIONBIO, &ulNBIO);
-#else
-    ioctl(s, FIONBIO, &ulNBIO);
-#endif
+    unsigned long ulNBIO{ 0 };
+    ioctl(FIONBIO, &ulNBIO);
 
-    setsockopt(s, SOL_SOCKET, SO_LINGER, (char*)&li, sizeof(li));
-    getsockopt(s, SOL_SOCKET, SO_TYPE, (char*)&sType, &sTypeLen);
+    linger li{ TRUE, 20 };
+    setOpt(SOL_SOCKET, SO_LINGER, (char*)&li, sizeof(li));
+
+#if 0 // think that's not necessary
+    int sType{ 0 };
+    size_t sTypeLen = sizeof(sType);
+    getOpt(SOL_SOCKET, SO_TYPE, (char*)&sType, &sTypeLen);
+#endif
 
     shutdown(s, 2);
     return 0;
 }
 
-// destroySocket : destroys an allocated socket
+// destroy : destroys an allocated socket
 
-int destroySocket ( SOCKET s ) {
+int Socket::destroy() {
     int rc;
 
-    disconnectSocket(s);
+    if (!sockStart() || s == INVALID_SOCKET)
+        return SOCKET_ERROR;
+
+    disconnect();
 
 #ifdef _WINSOCKAPI_
     rc = closesocket(s);
@@ -267,53 +289,73 @@ int destroySocket ( SOCKET s ) {
     rc = close(s);
 #endif
 
+    s = INVALID_SOCKET;
+
     return rc;
 }
 
-// getSocketPort : retrieves the port number for the passed socket
+// getPort : retrieves the port number for the socket
 
-int getSocketPort(SOCKET s) {
-    sockaddr_in sain { 0 };
+int Socket::getPort() {
+    if (!sockStart() || s == INVALID_SOCKET)
+        return SOCKET_ERROR;
 
+    sockaddr_in sain{ 0 };
 #ifdef _WINSOCKAPI_
     int len = sizeof(sain);
 #else
     socklen_t len = sizeof(sain);
 #endif
     if (getsockname(s, (struct sockaddr*)&sain, &len))
-        return -1;
+        return SOCKET_ERROR;
     return ntohs(sain.sin_port);
+}
+
+// getOpt : gets a socket option
+
+int Socket::getOpt(int level, int optname, char* optval, size_t* optlen) {
+    int rc;
+#ifdef _WINSOCKAPI_
+    int iopt = optlen ? (int)*optlen : 0;
+    rc = getsockopt(s, level, optname, optval, &iopt);
+    if (optlen)
+        *optlen = (size_t)iopt;
+#else
+    rc = getsockopt(s, level, optname, optval, (socklen_t*)optlen);
+#endif
+    return rc;
+}
+
+// setOpt : sets a socket option
+
+int Socket::setOpt(int level, int optname, const char* optval, int optlen) {
+    return ::setsockopt(s, level, optname, optval, optlen);
 }
 
 // setSendTimeout : sets the send timeout on a socket in msecs
 
-int setSendTimeout ( SOCKET s, int msecs = 0 ) {
-    return setsockopt(s, IPPROTO_TCP, SO_SNDTIMEO, (char*)&msecs, sizeof(msecs));
+int Socket::setSendTimeout(int msecs) {
+    return setOpt(IPPROTO_TCP, SO_SNDTIMEO, (char*)&msecs, sizeof(msecs));
 }
 
 // setReceiveTimeout : sets the receive timeout on a socket in msecs
 
-int setReceiveTimeout ( SOCKET s, int msecs = 0 ) {
-    return setsockopt(s, IPPROTO_TCP, SO_RCVTIMEO, (char*)&msecs, sizeof(msecs));
+int Socket::setReceiveTimeout(int msecs) {
+    return setOpt(IPPROTO_TCP, SO_RCVTIMEO, (char*)&msecs, sizeof(msecs));
 }
 
 // sendData : sends data to other side of the connection
 
-int sendData ( SOCKET s, const char * data, int datalen ) {
+int Socket::sendData(const char* data, int datalen) {
     int iBSent;
 
 #if 0 // don't think we need that
     int iSBufLen;
-#ifdef _WINSOCKAPI_
-    int iSBufLenLen = sizeof(iSBufLen);
-#else
-    socklen_t iSBufLenLen = sizeof(iSBufLen);
-#endif
-    getsockopt(s, SOL_SOCKET, SO_SNDBUF, (char*)&iSBufLen, &iSBufLenLen);
+    size_t iSBufLenLen = sizeof(iSBufLen);
+    getOpt(SOL_SOCKET, SO_SNDBUF, (char*)&iSBufLen, &iSBufLenLen);
 #endif
     int nTimeout = 0;
     int nError;
-
 
     do
     {
@@ -329,7 +371,8 @@ int sendData ( SOCKET s, const char * data, int datalen ) {
                 iBSent = 0;
             else
                 return nError;
-        } else if (iBSent == 0) {
+        }
+        else if (iBSent == 0) {
             nTimeout++;
             // if 10 seconds passed without send possibility, give up
             if (nTimeout > 100)
@@ -345,7 +388,7 @@ int sendData ( SOCKET s, const char * data, int datalen ) {
 
 // receiveData: receives data from other side of the connection
 
-int receiveData ( SOCKET s, char * lpData, int cbData, bool UntilFull = false)
+int Socket::receiveData(char* lpData, int cbData, bool UntilFull)
 {
     int iBRecv;
     int iBTotal = 0;
@@ -361,7 +404,8 @@ int receiveData ( SOCKET s, char * lpData, int cbData, bool UntilFull = false)
                 return iBTotal;
             else
                 iBRecv = 0;
-        } else if (!iBRecv) {  // no error, but no data?
+        }
+        else if (!iBRecv) {  // no error, but no data?
             // in all likelyhood, the connection has been closed from the other side.
             break; // no sense in waiting any more
         }
@@ -373,6 +417,64 @@ int receiveData ( SOCKET s, char * lpData, int cbData, bool UntilFull = false)
 
     return iBTotal;
 }
+
+// listen : make socket a listener
+
+int Socket::listen(int backlog) {
+    return ::listen(s, backlog);
+}
+
+// ioctl : perform an ioctl operation on the socket
+
+int Socket::ioctl(long cmd, unsigned long* argp) {
+#ifdef _WINSOCKAPI_
+    return ioctlsocket(s, cmd, argp);
+#else
+    return ::ioctl(s, cmd, argp);
+#endif
+}
+
+// accept : accepts a client connection and returns the resulting basic socket
+
+// TODO: make it return a Socket instead
+SOCKET Socket::accept(sockaddr* addr, int* addrlen) {
+    SOCKET sClient = ::accept(s, addr, addrlen);
+    return sClient;
+}
+
+// wait : waits for something to come in on socket
+
+int Socket::wait(int timeout) {
+    if (s == INVALID_SOCKET)
+        return SOCKET_ERROR;
+    // setup selector set (... of one ...)
+    fd_set fds;
+    FD_ZERO(&fds);
+    FD_SET(s, &fds);
+    // setup timeout (convert from incoming milliseconds to microseconds)
+    timeval to{ .tv_usec = timeout * 1000L };
+    // then wait for activity (or lack thereof)
+    return select(static_cast<int>(s + 1), &fds, NULL, NULL, (to.tv_sec || to.tv_usec) ? &to : NULL);
+    // TODO : use poll() instead on anything except Windows?
+}
+
+// bytesBuffered : return number of buffered bytes available for reading
+
+int Socket::bytesBuffered() {
+    unsigned long nLen{ 0 };
+    if (ioctl(FIONREAD, &nLen) == SOCKET_ERROR)
+        return -1;
+    return static_cast<int>(nLen);  // could potentially overflow, but the probability is negligible
+}
+
+// dataThere : returns whether data can be received from the socket
+
+bool Socket::dataThere() {
+    // try to peek - if select fired because of a socket error, get out
+    char dummy;
+    return recv(s, &dummy, 1, MSG_PEEK) > 0;
+}
+
 
 // ===============================================================================
 // SocketListener class members
@@ -387,22 +489,21 @@ bool SocketListener::Create(std::string service, int sockType) {
         return false;
     // This is a bit debatable - if a listener is already there,
     // what should create report back? "Yay" or "Nay"?
-    if (sockListener != INVALID_SOCKET)
+    if (sockListener.isCreated())
         return false;
 
     // create a listener socket
-    sockListener = createSocket(sockType);
-    if (sockListener == INVALID_SOCKET) return false;
+    sockListener.create(sockType);
+    if (!sockListener.isCreated()) return false;
     // assure socket gets reused
-    linger li { TRUE, 2 };
-    setsockopt(sockListener, SOL_SOCKET, SO_LINGER, (char*)&li, sizeof(li));
+    linger li{ TRUE, 2 };
+    sockListener.setOpt(SOL_SOCKET, SO_LINGER, (char*)&li, sizeof(li));
 
     // try to bind it to the specified port
-    int reuse { TRUE };
+    int reuse{ TRUE };
 
-    if (bindSocket(sockListener, "", service)) {
-        destroySocket(sockListener);
-        sockListener = INVALID_SOCKET;
+    if (sockListener.bind("", service)) {
+        sockListener.destroy();
         return false;
     }
 
@@ -411,9 +512,8 @@ bool SocketListener::Create(std::string service, int sockType) {
     {
     case SOCK_STREAM:
         // set socket to listening state
-        if (listen(sockListener, SOMAXCONN)) {
-            destroySocket(sockListener);
-            sockListener = INVALID_SOCKET;
+        if (sockListener.listen(SOMAXCONN)) {
+            sockListener.destroy();
             return false;
         }
         break;
@@ -428,11 +528,7 @@ bool SocketListener::Create(std::string service, int sockType) {
 
 #ifndef USING_SELECT
     unsigned long ulNBIO = TRUE;
-#ifdef _WINSOCKAPI_
-    int rc = ioctlsocket(sockListener, FIONBIO, &ulNBIO);
-#else
-    int rc = ioctl(sockListener, FIONBIO, &ulNBIO);
-#endif
+    int rc = sockListener.ioctl(FIONBIO, &ulNBIO);
 #endif
 
     // now create and run the listener thread
@@ -440,8 +536,7 @@ bool SocketListener::Create(std::string service, int sockType) {
         thdListener = std::thread(&SocketListener::thdFuncListener, this);
     }
     catch (...) {
-        destroySocket(sockListener);
-        sockListener = INVALID_SOCKET;
+        sockListener.destroy();
         return false;
     }
     // NOTE: this thread needs to be join()ed at some later time to synchronize it!
@@ -451,7 +546,8 @@ bool SocketListener::Create(std::string service, int sockType) {
 
 void SocketListener::Terminate() {
 
-    // this should be handled through a good <algorithm>, but for now, simply iterate through the list
+    // terminate all client connections
+    // this might be handled through a good <algorithm>, but for now, simply iterate through the list
     for (auto thd : streamClient) {
         thd->Terminate();
     }
@@ -459,7 +555,7 @@ void SocketListener::Terminate() {
     terminateListener = true;
     // catch up with listener thread
     if (thdListener.joinable())
-      thdListener.join();
+        thdListener.join();
 }
 
 // thdFuncListener : listener thread function
@@ -491,28 +587,28 @@ void SocketListener::thdFuncListener() {
 
 #ifdef USING_SELECT
         acceptfds = fds;
-        static timeval to { .tv_sec = 0, .tv_usec = 200000 };
+        static timeval to{ .tv_sec = 0, .tv_usec = 200000 };
         // wait for incoming connections with a 200 ms timeout
         // (allows external interruptions)
         int rc = select(maxfd + 1, &acceptfds, NULL, NULL, &to);
         if (rc == SOCKET_ERROR)
-          // here's a question lurking ...
-          // if the listener socket is dead, should all currently open connections be closed or not?
-          // if so, this might need to be triggered here.
-          break;
+            // here's a question lurking ...
+            // if the listener socket is dead, should all currently open connections be closed or not?
+            // if so, this might need to be triggered here.
+            break;
         else if (rc == 0)
-          // timeout happened ... loop
-          continue;
+            // timeout happened ... loop
+            continue;
 #endif
 
         if (typeListener == SOCK_STREAM) {
-            sockaddr_in saiClient {0};
+            sockaddr_in saiClient{ 0 };
 #ifdef _WINSOCKAPI_
             int lsaiClient = sizeof(saiClient);
 #else
             size_t lsaiClient = sizeof(saiClient);
 #endif
-            SOCKET sClient = accept(sockListener, (sockaddr*)&saiClient, &lsaiClient);
+            SOCKET sClient = sockListener.accept((sockaddr*)&saiClient, &lsaiClient);
             if (sClient == INVALID_SOCKET) {
 #if 0 // for now, ignore the reason. unaccepted is unaccepted.
 #ifdef _WINSOCKAPI_
@@ -526,13 +622,13 @@ void SocketListener::thdFuncListener() {
 #endif
                 continue;
             }
-            SocketThread* thdData { nullptr };
+            SocketThread* thdData{ nullptr };
             try {
                 // allocate new thread for this client
                 thdData = createSocketThread(sClient, this);
                 std::thread newThd(&SocketThread::Run, thdData);
                 thdData->SetThread(newThd);
-                
+
             }
             catch (...) {
                 if (thdData) delete thdData;
@@ -541,13 +637,9 @@ void SocketListener::thdFuncListener() {
         else if (typeListener == SOCK_DGRAM) {
             // assure datagram buffer is available
             if (!dgramBuf.size()) {
-                bool allocFailed { false };
-#ifdef _WINSOCKAPI_
-                int iRBufLenLen { sizeof(dgrambufLen) };
-#else
+                bool allocFailed{ false };
                 size_t iRBufLenLen{ sizeof(dgrambufLen) };
-#endif
-                getsockopt(sockListener, SOL_SOCKET, SO_RCVBUF, (char*)&dgrambufLen, &iRBufLenLen);
+                sockListener.getOpt(SOL_SOCKET, SO_RCVBUF, (char*)&dgrambufLen, &iRBufLenLen);
                 try {
                     dgramBuf.resize(dgrambufLen);
                 }
@@ -557,7 +649,7 @@ void SocketListener::thdFuncListener() {
             }
             if (!terminateListener) {
                 // fetch datagram from other side
-                int rcvd = receiveData(sockListener, dgramBuf.data(), dgrambufLen, FALSE);
+                int rcvd = sockListener.receiveData(dgramBuf.data(), dgrambufLen, FALSE);
                 if (rcvd) {
                     // datagram clients don't require a separate thread
                     if (rcvd < dgrambufLen)
@@ -572,11 +664,10 @@ void SocketListener::thdFuncListener() {
     }
 
     // remove the listener socket
-    destroySocket(sockListener);
-    sockListener = INVALID_SOCKET;
+    sockListener.destroy();
 
     // wait for all connections to go away
-    int timeouts { 0 };
+    int timeouts{ 0 };
     while (streamClient.size()) {
         removeEndedClients();
         if (++timeouts > 100)  // if waited too long, get out
@@ -588,11 +679,12 @@ void SocketListener::thdFuncListener() {
 
 // AddClient : add running client thread to list
 bool SocketListener::AddClient(SocketThread* thd) {
-    bool ok { false };
+    bool ok{ false };
     try {
         streamClient.push_back(thd);
         ok = true;
-    } catch(...) {
+    }
+    catch (...) {
     }
     return ok;
 }
@@ -616,7 +708,8 @@ void SocketListener::removeEndedClients() {
     // this should be handled through a good <algorithm>, bt for now, simply iterate through the list
     for (auto thd : streamClientGone) {
         // wait until thread is finished (and then clean up otherwise leaking thread data)
-        thd->GetThread().join();
+        if (thd->GetThread().joinable())
+            thd->GetThread().join();
 
         // remove thread from vector
         streamClient.erase(std::remove(streamClient.begin(), streamClient.end(), thd), streamClient.end());
@@ -641,10 +734,9 @@ void SocketThread::Run() {
 
     // Do whatever work has to be done ...
     ClientActivity();
- 
+
     // destroy the socket
-    destroySocket(sockClient);
-    sockClient = INVALID_SOCKET;
+    sockClient.destroy();
 
     // tell listener that this thread is gone now
     listener->RemoveClient(this);

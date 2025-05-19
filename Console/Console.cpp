@@ -363,10 +363,10 @@ void static showNewSnapshotWindow(bool* p_open)
 
 void static showConnectionWindow(bool* p_open)
 {
-    ImGui::SetNextWindowSize(ImVec2(300, 50));
+    ImGui::SetNextWindowSize(ImVec2(300, 120));
     ImGui::SetNextWindowCollapsed(false);
     ImGui::SetNextWindowPos(ImVec2(0, 20));
-    if (!ImGui::Begin("Connection", p_open))
+    if (!ImGui::Begin("Connections", p_open))
     {
         ImGui::End();
     }
@@ -507,7 +507,7 @@ int main(int, char**)
 
     // Main loop
     bool done = false;
-    static bool IsConnected = false;
+    static bool connectionWindow = false;
     static bool newSnapshotWindow = false; 
     static bool liveView = false; 
     while (!done)
@@ -558,15 +558,9 @@ int main(int, char**)
 
 
         if (ImGui::BeginMainMenuBar()) {
-            if (ImGui::BeginMenu("VECS")) {
-                if (ImGui::MenuItem("Vecs 1")) {
-                    IsConnected = true;
-                }
-                if (ImGui::MenuItem("Vecs 2")) {
-                }
-                if (ImGui::MenuItem("Vecs 3")) {
-                }
-                if (ImGui::MenuItem("Vecs 4")) {
+            if (ImGui::BeginMenu("Connections")) {
+                if (ImGui::MenuItem("Manage Connections")) {
+                    connectionWindow = true;
                 }
                 ImGui::EndMenu();
             }
@@ -596,8 +590,8 @@ int main(int, char**)
             ImGui::EndMainMenuBar();
         }
 
-        if (IsConnected) {
-            showConnectionWindow(&IsConnected);
+        if (connectionWindow) {
+            showConnectionWindow(&connectionWindow);
         }
 
         if (newSnapshotWindow) {
