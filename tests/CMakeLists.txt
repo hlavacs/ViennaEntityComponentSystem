@@ -1,7 +1,7 @@
 
 set(TARGET testparallel)
 
-set(SOURCE testparallel.cpp testparallel_manager.cpp)
+set(SOURCE testparallel_manager.cpp)
 
 set(HEADERS
   ${PROJECT_SOURCE_DIR}/include/VECS.h
