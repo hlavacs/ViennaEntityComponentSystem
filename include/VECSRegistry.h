@@ -491,13 +491,19 @@ namespace vecs {
 			}
 		}
 
-		/// @brief Get the mutex of the archetype.
+		/// @brief Get the mutex of the slotmap.
 		/// @return Reference to the mutex.
 		[[nodiscard]] inline auto GetSlotMapMutex(size_t index) -> Mutex_t& {
 			return m_slotMaps[index].m_mutex;
 		}
 
 		/// @brief Get the mutex of the archetype.
+		/// @return Reference to the mutex.
+		[[nodiscard]] inline auto GetArchetypeMutex(Handle handle) -> Mutex_t& {
+			return GetArchetypeAndIndex(handle).m_arch->GetMutex();
+		}
+
+		/// @brief Get the mutex of the registry.
 		/// @return Reference to the mutex.
 		[[nodiscard]] inline auto GetMutex() -> Mutex_t& {
 			return m_mutex; 
