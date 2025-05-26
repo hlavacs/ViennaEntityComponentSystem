@@ -10,8 +10,11 @@ extern "C" {
 #include <winsock2.h>
 #include <thread>
 #include <ws2tcpip.h>
+
 #pragma comment(lib, "Ws2_32.lib")
 }
+#include <nlohmann/json.hpp> 
+
 #else
 typedef int SOCKET;
 #define INVALID_SOCKET  (SOCKET)(~0)    // copied from winsock.h
@@ -23,7 +26,7 @@ namespace vecs {
 class VECSConsoleComm {
 
 private: 
-    std::thread commThread;
+    std::jthread commThread;
     std::mutex socketMutex;
     bool running = false;
 
@@ -57,7 +60,7 @@ public:
         int returnval = connect(ConnectSocket, (SOCKADDR*)&clientService, sizeof(clientService));
         if (returnval == 0) {
             running = true;
-            commThread = std::thread(&VECSConsoleComm::receiveMessage, this);
+            commThread = std::jthread(&VECSConsoleComm::handleConnection, this);
         }
         return returnval;
     }
@@ -77,8 +80,42 @@ public:
         return 0;
     }
 
+    void handleConnection() {
+        while (running) {
+            std::string msg = receiveMessage();
+
+            // If message is empty, it could mean a disconnect or error
+            if (msg.empty()) {
+                std::cout << "Disconnected from server or error occurred.\n";
+                running = false;
+                break;
+            }
+
+            // Handle the received message (you can expand this!)
+            processMessage(msg);
+        }
+
+        //TODO: close connection here? 
+    
+    }
+
+    void processMessage(std::string msg) {
+        
+        //Process JSon
+        nlohmann::json msgjson = nlohmann::json::parse(msg);
+       
+
+        if (msgjson["cmd"] == "Hello") {
+            // TESt TEST TEST
+            std::cout << "Hello from Console " << msgjson["version"] << "!\r\n";
+        }
+        // Live View 
+
+        // snapshot
+        // first: all Entity name strings 
+    }
+
     int sendMessage(std::string sendmessage){
-       std::lock_guard<std::mutex> lock(socketMutex);
        const char* csendmessage = sendmessage.c_str();
        return send(ConnectSocket, csendmessage, sendmessage.length(), 0);
     }
@@ -88,8 +125,6 @@ public:
         int received = 0;
 
         while (running) {
-            std::lock_guard<std::mutex> lock(socketMutex);
-
             if (ConnectSocket == INVALID_SOCKET)
                 return "";
 
@@ -100,7 +135,6 @@ public:
                 return std::string(buffer);
             }
         }
-
         return "";
     }
 

@@ -15,14 +15,8 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
   set(CMAKE_CXX_FLAGS_RELEASE /O2)
   add_compile_options(/await)
   add_compile_options(/EHsc)
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
   add_compile_options(-stdlib=libc++)
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-  add_compile_options(-stdlib=libc++)
-  if(UNIX)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++ -v")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -stdlib=libc++ -lc++abi")
-  endif()
 elseif(CMAKE_COMPILER_IS_GNUCXX)
 endif()
 
@@ -47,11 +41,21 @@ FetchContent_MakeAvailable(viennatypelistlibrary)
 include_directories (${viennatypelistlibrary_SOURCE_DIR}/include)
 
 
+FetchContent_Declare(json
+                     GIT_REPOSITORY https://github.com/nlohmann/json.git
+                     GIT_TAG develop)
+
+FetchContent_MakeAvailable(json)
+
+include_directories (${json_SOURCE_DIR}/single_include)
+
 # Testing
 
 include(CTest)
 
 add_subdirectory(tests)
 
+
 # Console
+
 add_subdirectory(Console)

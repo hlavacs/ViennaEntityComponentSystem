@@ -360,8 +360,18 @@ void test_conn() {
 
 	std::cout << "\x1b[37m isConnected: " << consoleComm.isConnected() << "\n";
 
-	consoleComm.sendMessage("Hello!   !");
 	auto recMessage = consoleComm.receiveMessage();
+	std::cout << "\x1b[37m Received: " << recMessage << "\n";
+	consoleComm.processMessage(recMessage);
+
+	consoleComm.sendMessage("Message 1");
+	 recMessage = consoleComm.receiveMessage();
+	std::cout << "\x1b[37m Received: " << recMessage << "\n";
+	consoleComm.sendMessage("Message 2");
+	 recMessage = consoleComm.receiveMessage();
+	std::cout << "\x1b[37m Received: " << recMessage << "\n";
+	consoleComm.sendMessage("Message 3");
+	 recMessage = consoleComm.receiveMessage();
 	std::cout << "\x1b[37m Received: " << recMessage << "\n";
 	
 	consoleComm.disconnectFromServer();

@@ -36,7 +36,7 @@ void ConsoleSocketThread::ClientActivity() {
     auto& s = getSocket();
 
     // TEST - start by sending a welcome string to the other side
-    std::string welcome("VECS Console built " __DATE__ " " __TIME__ "\r\n");
+    std::string welcome("{ \"cmd\":\"Hello\", \"version\":\"" __DATE__ " " __TIME__ "\" }");
     s.sendData(welcome);
 
     // wait for incoming data with a timeout of 500 ms
