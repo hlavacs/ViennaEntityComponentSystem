@@ -77,6 +77,8 @@ public:
     void Run();
     void Terminate() { terminateThread = true; }
 
+    int sendData(const char* data, int datalen) { return sockClient.sendData(data, datalen); }
+    int sendData(const std::string s) { return sockClient.sendData(s); }
 private:
     virtual void ClientActivity() {} // has to be overridden for any meaningful activity!
 
@@ -98,7 +100,10 @@ public:
     bool Create(std::string service, int sockType = SOCK_STREAM);
 
     bool AddClient(SocketThread* thd);
-    bool RemoveClient(SocketThread* thd);
+    virtual bool RemoveClient(SocketThread* thd);
+
+    size_t streamClientSize() { return streamClient.size(); }
+    SocketThread* streamClientAt(size_t i) { return streamClient[i]; }
 
     void Terminate();
 

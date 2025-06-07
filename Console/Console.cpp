@@ -345,9 +345,9 @@ static void FramePresent(ImGui_ImplVulkanH_Window* wd)
 }
 
 
-void static showNewSnapshotWindow(bool* p_open)
+void static showNewSnapshotWindow(ConsoleListener& listening, bool* p_open)
 {
-    ImGui::SetNextWindowSize(ImVec2(300, 50));
+    ImGui::SetNextWindowSize(ImVec2(300, 150));
     ImGui::SetNextWindowCollapsed(false);
     ImGui::SetNextWindowPos(ImVec2(0, 20));
     if (!ImGui::Begin("New Snapshot", p_open))
@@ -356,12 +356,29 @@ void static showNewSnapshotWindow(bool* p_open)
     }
     else
     {
-        ImGui::Text("Implement Snapshots here!");
+        if (ImGui::Button("Get new Snapshot"))
+        {
+            if(listening.cursel>=0)
+                 listening.getVecs(listening.cursel)->requestSnapshot();
+        }
+
+        for (size_t i = 0; i < listening.vecsCount(); i++) {
+            ConsoleSocketThread* thd = listening.getVecs(i);
+            if (thd) {
+                int entitycount = thd->getEntitycount();
+                if (entitycount > 0) {
+                    std::string spid = "VECS Entity Count " + std::to_string(entitycount);
+                    ImGui::Text(spid.c_str());
+                }
+            }
+        }
+        //ImGui::Text("Implement Snapshots here!");
+
         ImGui::End();
     }
 }
 
-void static showConnectionWindow(bool* p_open)
+void static showConnectionWindow(ConsoleListener& listening, bool* p_open)
 {
     ImGui::SetNextWindowSize(ImVec2(300, 120));
     ImGui::SetNextWindowCollapsed(false);
@@ -372,7 +389,49 @@ void static showConnectionWindow(bool* p_open)
     }
     else
     {
-        ImGui::Text("Connection not implemented yet!");
+        //ImGui::Text("Connection not implemented yet!");
+
+        // TEST TEST TEST TEST TEST
+        int cursel = -1;
+        for (size_t i = 0; i < listening.vecsCount(); i++) {
+            ConsoleSocketThread* thd = listening.getVecs(i);
+            if (thd) {
+                int pid = thd->getPid();
+                if (pid > 0) {
+                    std::string spid = "VECS PID " + std::to_string(pid);
+                    auto wasselected = thd->selected;
+                    ImGui::Selectable(spid.c_str(),&thd->selected);
+                    if (thd->selected != wasselected) {
+                        if (thd->selected)
+                            cursel = i;
+                        else
+                            listening.cursel = -1;
+                    }
+                }
+            }
+        }
+        if (cursel >= 0) {
+            listening.cursel = cursel;
+            for (size_t i = 0; i < listening.vecsCount(); i++) {
+                ConsoleSocketThread* thd = listening.getVecs(i);
+                if (thd) {
+                    thd->selected = (i == cursel);
+                }
+            }
+        }
+
+
+        //for (size_t i = 0; i < listening.vecsCount(); i++) {
+        //    ConsoleSocketThread* thd = listening.getVecs(i);
+        //    if (thd) {
+        //        int pid = thd->getPid();
+        //        if (pid > 0) {
+        //            std::string spid = "VECS PID " + std::to_string(pid);
+        //            ImGui::Text(spid.c_str());
+        //        }
+        //    }
+        //}
+
         ImGui::End();
     }
 }
@@ -508,8 +567,8 @@ int main(int, char**)
     // Main loop
     bool done = false;
     static bool connectionWindow = false;
-    static bool newSnapshotWindow = false; 
-    static bool liveView = false; 
+    static bool newSnapshotWindow = false;
+    static bool liveView = false;
     while (!done)
     {
         // Poll and handle events (inputs, window resize, etc.)
@@ -568,7 +627,7 @@ int main(int, char**)
 
                 if (ImGui::BeginMenu("Snapshot")) {
                     if (ImGui::MenuItem("New")) {
-                        newSnapshotWindow = true; 
+                        newSnapshotWindow = true;
                     }
                     if (ImGui::MenuItem("View")) {
                     }
@@ -577,7 +636,7 @@ int main(int, char**)
                     ImGui::EndMenu();
                 }
                 if (ImGui::MenuItem("Live View")) {
-                    liveView = true; 
+                    liveView = true;
                 }
                 ImGui::EndMenu();
             }
@@ -591,11 +650,11 @@ int main(int, char**)
         }
 
         if (connectionWindow) {
-            showConnectionWindow(&connectionWindow);
+            showConnectionWindow(listening, &connectionWindow);
         }
 
         if (newSnapshotWindow) {
-            showNewSnapshotWindow(&newSnapshotWindow);
+            showNewSnapshotWindow(listening, &newSnapshotWindow);
         }
 
         if (liveView)

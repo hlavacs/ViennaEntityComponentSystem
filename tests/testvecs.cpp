@@ -352,29 +352,35 @@ void test_registry() {
 
 void test_conn() {
 	std::cout << "\x1b[37m testing Connection!...\n";
-	//add usage here? 
-	vecs::VECSConsoleComm consoleComm;
-	std::cout << "\x1b[37m isConnected: " << consoleComm.isConnected() << "\n";
-	int testval = consoleComm.connectToServer();
-	std::cout << "\x1b[37m testval: " << testval <<"\n";
 
-	std::cout << "\x1b[37m isConnected: " << consoleComm.isConnected() << "\n";
-
-	auto recMessage = consoleComm.receiveMessage();
-	std::cout << "\x1b[37m Received: " << recMessage << "\n";
-	consoleComm.processMessage(recMessage);
-
-	consoleComm.sendMessage("Message 1");
-	 recMessage = consoleComm.receiveMessage();
-	std::cout << "\x1b[37m Received: " << recMessage << "\n";
-	consoleComm.sendMessage("Message 2");
-	 recMessage = consoleComm.receiveMessage();
-	std::cout << "\x1b[37m Received: " << recMessage << "\n";
-	consoleComm.sendMessage("Message 3");
-	 recMessage = consoleComm.receiveMessage();
-	std::cout << "\x1b[37m Received: " << recMessage << "\n";
+	//add usage here?
+	// 
+	// create a populated registry
+	vecs::Registry system;
+	vecs::Handle h1 = system.Insert(5, 3.0f, 4.0);
 	
-	consoleComm.disconnectFromServer();
+
+	struct height_t { int i; };
+	using weight_t = vsty::strong_type_t<int, vsty::counter<>>;
+	vecs::Handle hx1 = system.Insert(height_t{ 5 }, weight_t{ 6 });
+
+
+
+	std::cout << "\x1b[37m isConnected: " << system.isConnected() << "\n";
+	SOCKET testval = system.connectToServer();
+	std::cout << "\x1b[37m isConnected: " << system.isConnected() << "\n";
+
+	if (system.isConnected()) {
+
+		// do nothing for 30 seconds, let background task work
+#ifdef WIN32
+		Sleep(300 * 1000);
+#else
+		usleep(30 * 1000 * 1000);
+#endif
+
+		system.disconnectFromServer();
+	}
 	std::cout << "\x1b[37m I hope it works? ...\n";
 }
 

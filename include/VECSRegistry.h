@@ -24,7 +24,7 @@ namespace vecs {
 
 
 	/// @brief A registry for entities and components.
-	class Registry {
+	class Registry : public VECSConsoleInterface {
 
 		/// @brief Entry for the seach cache
 		struct TypeSetAndHash {
@@ -132,7 +132,7 @@ namespace vecs {
 
 			Handle m_handle{};
 			Slot_t* m_slot{nullptr};
-			Archetype *m_archetype{nullptr};		
+			Archetype *m_archetype{nullptr};
 		};
 
 		template<typename T>
@@ -665,6 +665,38 @@ namespace vecs {
 		HashMap_t m_archetypes; //Mapping hash (from type hashes) to archetype 1:1. 
 		Mutex_t m_mutex; //mutex for reading and writing m_archetypes.
 		inline static thread_local size_t m_slotMapIndex = NUMBER_SLOTMAPS::value - 1; //for new entities
+
+
+	// Console Communication
+	public:
+		SOCKET connectToServer(std::string host = "127.0.0.1", int port = 2000) {
+			comm.setRegistry(this);
+			return comm.connectToServer(host, port);
+		}
+		bool isConnected() {  return comm.isConnected(); }
+		int disconnectFromServer() { return comm.disconnectFromServer(); }
+
+		virtual std::string getSnapshot() override {
+			// presumably locking would be a good idea here, but for now, simply deliver
+			// primitive variant - create JSON on the fly
+			std::string json = "{\"cmd\":\"snapshot\",\"entities\":";
+			json += std::to_string(Size()) + ",";
+			json += "\"archetypes\":[";
+			size_t art {0};
+			for (auto& it : m_archetypes) {
+				if (art) json += ",";
+				json += "{\"hash\":\""+std::to_string(it.first)+
+				        // "," + it.second->toJSON() should come here when done
+				        "\"}";
+				art++;
+			}
+			json += "]";
+			json += "}";
+		    return json;
+		}
+	private:
+		VECSConsoleComm comm;
+
 	};
 
 	template<typename T>

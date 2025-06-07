@@ -52,8 +52,10 @@ set(HEADERS
   ${PROJECT_SOURCE_DIR}/include/VECSArchetype.h
   ${PROJECT_SOURCE_DIR}/include/VECSHandle.h
   ${PROJECT_SOURCE_DIR}/include/VECSMutex.h
+  ${PROJECT_SOURCE_DIR}/include/VECSRegistry.h
   ${PROJECT_SOURCE_DIR}/include/VECSSlotMap.h
   ${PROJECT_SOURCE_DIR}/include/VECSVector.h
+  ${PROJECT_SOURCE_DIR}/include/VECSConsoleComm.h
 )
 
 add_executable (${TARGET} ${SOURCE} ${HEADERS})
