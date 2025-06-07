@@ -5,6 +5,7 @@
 #include <thread>
 #include <future>
 #include <queue>
+#include <syncstream>
 
 namespace vecs {
 
@@ -134,33 +135,29 @@ namespace vecs {
             std::future<Registry::View<Ts...>> res_fut = res_prom.get_future();
 
             m_threadpool.enqueue( [&] {
-                    std::scoped_lock lock(this->m_system.GetMutex());
+                    std::shared_lock lock(this->m_system.GetMutex());
                     res_prom.set_value(this->m_system.GetView<Ts...>(std::forward<std::vector<size_t>>(yes), std::forward<std::vector<size_t>>(no)));
-            });
+                });
             
             Registry::View<Ts...> res = res_fut.get();
-
             return res;
 		}
 
-
-        // TODO: check if component exists (relevant for parallel)
         
         /// @brief Get a single component value of an entity.
 		/// @tparam T The type of the component.
 		/// @param handle The handle of the entity.
 		/// @return The component value or reference to it.
         template<typename T>
-        auto GetComponent(Handle handle) -> Registry::to_ref_t<T> {
+        auto Get(Handle handle) -> Registry::to_ref_t<T> {
 
             std::promise<Registry::to_ref_t<T>> res_prom;
             std::future<Registry::to_ref_t<T>> res_fut = res_prom.get_future();
 
             m_threadpool.enqueue( [&] {
-                    std::scoped_lock lock(this->m_system.GetMutex());
-                    res_prom.set_value(this->m_system.Get<T>(handle));
+                std::shared_lock lock(this->m_system.GetArchetypeMutex(handle));
+                res_prom.set_value(this->m_system.Get<T>(handle));
             });
-            
             Registry::to_ref_t<T> res = res_fut.get();
 
             return res;
@@ -173,16 +170,15 @@ namespace vecs {
 		/// @return A tuple of the component values.
         template<typename... Ts>
             requires (sizeof...(Ts)>1 && vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<Ts...>, Handle&>::value)
-        auto GetComponent(Handle handle) -> std::tuple<Registry::to_ref_t<Ts>...> {
+        auto Get(Handle handle) -> std::tuple<Registry::to_ref_t<Ts>...> {
             
             std::promise<std::tuple<Registry::to_ref_t<Ts>...>> res_prom;
             std::future<std::tuple<Registry::to_ref_t<Ts>...>> res_fut = res_prom.get_future();
 
             m_threadpool.enqueue( [&] {
-                    std::scoped_lock lock(this->m_system.GetMutex());
+                    std::shared_lock lock(this->m_system.GetArchetypeMutex(handle));
                     res_prom.set_value(this->m_system.Get<Ts...>(handle));
             });
-            
             std::tuple<Registry::to_ref_t<Ts>...> res = res_fut.get();
 
             return res;
@@ -198,11 +194,10 @@ namespace vecs {
 		/// @return Handle of new entity.
 		template<typename... Ts>
 			requires ((sizeof...(Ts) > 0) && (vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
-		[[nodiscard]] auto CreateEntity( Ts&&... component ) -> Handle {
+		[[nodiscard]] auto Insert( Ts&&... component ) -> Handle {
 
             std::promise<vecs::Handle> res_prom;
             std::future<vecs::Handle> res_fut = res_prom.get_future();
-
             m_threadpool.enqueue( [&] {
                     std::scoped_lock lock(this->m_system.GetMutex());
                     res_prom.set_value(this->m_system.Insert(std::forward<Ts>(component)...));
@@ -220,9 +215,12 @@ namespace vecs {
 		/// @param v The new values in a tuple
 		template<typename... Ts>
         requires (vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<std::decay_t<Ts>...>, Handle>::value)
-        void PutComponent(Handle handle, std::tuple<Ts...>& v) {
+        void Put(Handle handle, std::tuple<Ts...>& v) {
             m_threadpool.enqueue( [&] {
-                std::scoped_lock lock(this->m_system.GetMutex());
+                std::scoped_lock lock(this->m_system.GetArchetypeMutex(handle));
+                //TODO: add lock for potential new archetype
+                // if archetype with types of handle + v exists, lock it,
+                // else lock slotmap
                 this->m_system.Put(handle, v);
             });
         }
@@ -233,9 +231,10 @@ namespace vecs {
         /// @param vs The new values.
         template<typename... Ts>
             requires ((vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<std::decay_t<Ts>...>, Handle>::value)
-        void PutComponent(Handle handle, Ts&&... vs) {
+        void Put(Handle handle, Ts&&... vs) {
             m_threadpool.enqueue( [&] {
-                std::scoped_lock lock(this->m_system.GetMutex());
+                std::scoped_lock lock(this->m_system.GetArchetypeMutex(handle));
+                //TODO: same as above
                 this->m_system.Put(handle, std::forward<Ts>(vs)...);
             });
         }
@@ -274,14 +273,17 @@ namespace vecs {
 		/// @param handle The handle of the entity.		
 		template<typename... Ts>
             requires (vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
-        void EraseComponents(Handle handle) {
+        void Erase(Handle handle) {
             m_threadpool.enqueue( [&] {
                 std::scoped_lock lock(this->m_system.GetArchetypeMutex(handle));
                 this->m_system.Erase<Ts...>(handle);
             });
         }
 
-        void EraseEntity(Handle handle) {
+        
+        /// @brief Erase an entity from the registry.
+		/// @param handle The handle of the entity.
+        void Erase(Handle handle) {
             m_threadpool.enqueue( [&] {
                 std::scoped_lock lock(this->m_system.GetSlotMapMutex(handle.GetStorageIndex()));
                 this->m_system.Erase(handle);
@@ -290,7 +292,7 @@ namespace vecs {
 
 
         /// @brief Clear the registry by removing all entities.
-		void ClearRegistry() {
+		void Clear() {
             m_threadpool.enqueue( [&] {
                 std::scoped_lock lock(this->m_system.GetMutex());
                 this->m_system.Clear();
@@ -301,6 +303,13 @@ namespace vecs {
     private:
         vecs::Registry m_system;
         ThreadPool m_threadpool;
+
+        /// @brief Convenience print function for synchronous printing
+        /// @param id The current thread id.
+        /// @param std The string to print.
+        void PrintSync(std::thread::id id, std::string str) {
+            std::osyncstream(std::cout) << id << str << "\n";
+        }
     };
 
 }
