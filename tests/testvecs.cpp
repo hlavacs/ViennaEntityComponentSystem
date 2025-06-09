@@ -358,6 +358,7 @@ void test_conn() {
 	// create a populated registry
 	vecs::Registry system;
 	vecs::Handle h1 = system.Insert(5, 3.0f, 4.0);
+	vecs::Handle h2 = system.Insert(1, 23.0f, 3.0);
 	
 
 	struct height_t { int i; };

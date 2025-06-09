@@ -166,6 +166,8 @@ namespace vecs {
 			std::cout << std::endl << std::endl;
 		}
 
+
+
 		/// @brief Validate the archetype. Make sure all maps have the same size.
 		void Validate() {
 			for( auto& map : m_maps ) {
@@ -270,6 +272,70 @@ namespace vecs {
 		inline static thread_local Archetype* m_iteratingArchetype{nullptr}; //for iterating over archetypes
 		inline static thread_local size_t m_iteratingIndex{std::numeric_limits<size_t>::max()}; //current iterator index
 		inline static thread_local std::vector<size_t> m_gaps{}; //gaps from previous erasures that must be filled
+	
+	public: 
+		
+		std::string toJSON() {
+			std::string json = "\"Archetype\":{\"hash\":\""+std::to_string(Hash(m_types))+"\",\"types\":[";
+			//std::cout << "Archetype: " << Hash(m_types) << std::endl;
+			size_t count = 0;
+			for (auto ti : m_types) {
+				//std::cout << "Type: " << ti << " ";
+				if (count++) json += ",";
+				json += std::to_string(ti);
+			}
+			json += "],";
+
+			json += "\"maps\":[";
+			count = 0;
+			//std::cout << std::endl;
+			for (auto& map : m_maps) {
+				if (count++) json += ",";
+				json += map.second->toJSON();
+			}
+			json += "],";
+
+			//std::cout << "Entities: ";
+
+			json += "\"entities\":[";
+			count = 0;
+			auto map = Map<Handle>();
+			for (auto handle : *map) {
+				if (count++) json += ",";
+				json += handle.toJSON();
+				// std::cout << handle << " ";
+				json += "[";
+				count = 0;
+				for (auto type : m_types) {
+					if (count++)json += ",";
+					if (Has(type)) {
+						auto typemap = Map(type);
+						std::string sub;
+						if (type == Type<int>())
+							sub = std::to_string(Get<int>(handle.GetIndex()));
+						else if (type == Type<float>())
+							sub = std::to_string(Get<float>(handle.GetIndex()));
+						else if (type == Type<double>())
+							sub = std::to_string(Get<double>(handle.GetIndex()));
+						else if (type == Type<std::string>())
+							sub = "\"" + Get<std::string>(handle.GetIndex()) + "\"";
+						else
+							sub = "\"<unknown>\"";
+						
+						json += sub;
+					}
+
+				}
+				json += "]}";
+
+				
+			}
+			//std::cout << std::endl << std::endl;
+			json += "]}";
+			return json;
+
+		}
+	
 	}; //end of Archetype
 
 } //namespace vecs2

@@ -32,6 +32,7 @@ namespace vecs {
 		virtual auto clone() -> std::unique_ptr<VectorBase> = 0;
 		virtual void clear() = 0;
 		virtual void print() = 0;
+		virtual std::string toJSON() = 0;
 	}; //end of VectorBase
 
 
@@ -164,6 +165,24 @@ namespace vecs {
 			size_t m_segmentBits;	///< Number of bits for the segment size.
 			size_t m_segmentSize; ///< Size of a segment.
 			Vector_t m_segments{10};	///< Vector holding unique pointers to the segments.
+
+
+		public: 
+			std::string toJSON() override {
+				std::string json = std::string("{\"Name\":\"") + typeid(T).name() + "\",\"id\":\"" + std::to_string(Type<T>()) + "\"";
+
+	//			json += ",\"values\":[";
+	///*			for (size_t i = 0; i < size(); i++) {
+	//				if (i) json += ",";
+	//				json += "\"" + std::to_string(*this[i]) += "\"";
+	//			}*/
+	//			json += "]";
+
+				json += "}";
+				//std::cout << "Name: " << typeid(T).name() << " ID: " << Type<T>();
+				return json;
+			}
+
 	}; //end of Vector
 
 }

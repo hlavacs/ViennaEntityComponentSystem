@@ -685,9 +685,9 @@ namespace vecs {
 			size_t art {0};
 			for (auto& it : m_archetypes) {
 				if (art) json += ",";
-				json += "{\"hash\":\""+std::to_string(it.first)+
-				        // "," + it.second->toJSON() should come here when done
-				        "\"}";
+				json += "{\"hash\":\""+std::to_string(it.first)+"\""+
+				         "," + it.second->toJSON() + //should come here when done
+				        "}";
 				art++;
 			}
 			json += "]";
