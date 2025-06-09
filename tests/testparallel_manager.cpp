@@ -6,13 +6,14 @@
 
 #include "VECSManager.h"
 
-vecs::ThreadPool pool;
+std::shared_ptr<vecs::ThreadPool> pool = std::make_shared<vecs::ThreadPool>();
+std::shared_ptr<vecs::Registry> registry = std::make_shared<vecs::Registry>();
 
 class ManagerTest : public testing::Test {
     protected:
         ManagerTest(){}
 
-        vecs::Manager mng{&pool};
+        vecs::Manager mng{pool, registry};
 };
 
 

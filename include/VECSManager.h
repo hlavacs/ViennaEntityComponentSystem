@@ -17,8 +17,9 @@ namespace vecs {
     class Manager {
     public:
 
-        Manager(IThreadPool* threadpool) {
-            m_threadpool = threadpool;
+        Manager(std::shared_ptr<IThreadPool> threadpool, std::shared_ptr<vecs::Registry> registry) {
+            m_threadpool = std::move(threadpool);
+            m_system = std::move(registry);
         }
 
         ~Manager() = default;  // Destructor
@@ -38,8 +39,8 @@ namespace vecs {
             std::future<Registry::View<Ts...>> res_fut = res_prom.get_future();
 
             m_threadpool->enqueue( [&] {
-                    std::shared_lock lock(this->m_system.GetMutex());
-                    res_prom.set_value(this->m_system.GetView<Ts...>(std::forward<std::vector<size_t>>(yes), std::forward<std::vector<size_t>>(no)));
+                    std::shared_lock lock(m_system->GetMutex());
+                    res_prom.set_value(m_system->GetView<Ts...>(std::forward<std::vector<size_t>>(yes), std::forward<std::vector<size_t>>(no)));
                 });
             
             Registry::View<Ts...> res = res_fut.get();
@@ -58,8 +59,8 @@ namespace vecs {
             std::future<Registry::to_ref_t<T>> res_fut = res_prom.get_future();
 
             m_threadpool->enqueue( [&] {
-                std::shared_lock lock(this->m_system.GetArchetypeMutex(handle));
-                res_prom.set_value(this->m_system.Get<T>(handle));
+                std::shared_lock lock(m_system->GetArchetypeMutex(handle));
+                res_prom.set_value(m_system->Get<T>(handle));
             });
             Registry::to_ref_t<T> res = res_fut.get();
 
@@ -79,8 +80,8 @@ namespace vecs {
             std::future<std::tuple<Registry::to_ref_t<Ts>...>> res_fut = res_prom.get_future();
 
             m_threadpool->enqueue( [&] {
-                    std::shared_lock lock(this->m_system.GetArchetypeMutex(handle));
-                    res_prom.set_value(this->m_system.Get<Ts...>(handle));
+                    std::shared_lock lock(m_system->GetArchetypeMutex(handle));
+                    res_prom.set_value(m_system->Get<Ts...>(handle));
             });
             std::tuple<Registry::to_ref_t<Ts>...> res = res_fut.get();
 
@@ -102,8 +103,8 @@ namespace vecs {
             std::promise<vecs::Handle> res_prom;
             std::future<vecs::Handle> res_fut = res_prom.get_future();
             m_threadpool->enqueue( [&] {
-                    std::scoped_lock lock(this->m_system.GetMutex());
-                    res_prom.set_value(this->m_system.Insert(std::forward<Ts>(component)...));
+                    std::scoped_lock lock(m_system->GetMutex());
+                    res_prom.set_value(m_system->Insert(std::forward<Ts>(component)...));
             });
             
             vecs::Handle res = res_fut.get();
@@ -120,11 +121,11 @@ namespace vecs {
         requires (vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<std::decay_t<Ts>...>, Handle>::value)
         void Put(Handle handle, std::tuple<Ts...>& v) {
             m_threadpool->enqueue( [&] {
-                std::scoped_lock lock(this->m_system.GetArchetypeMutex(handle));
+                std::scoped_lock lock(m_system->GetArchetypeMutex(handle));
                 //TODO: add lock for potential new archetype
                 // if archetype with types of handle + v exists, lock it,
                 // else lock slotmap
-                this->m_system.Put(handle, v);
+                m_system->Put(handle, v);
             });
         }
 
@@ -136,9 +137,9 @@ namespace vecs {
             requires ((vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<std::decay_t<Ts>...>, Handle>::value)
         void Put(Handle handle, Ts&&... vs) {
             m_threadpool->enqueue( [&] {
-                std::scoped_lock lock(this->m_system.GetArchetypeMutex(handle));
+                std::scoped_lock lock(m_system->GetArchetypeMutex(handle));
                 //TODO: same as above
-                this->m_system.Put(handle, std::forward<Ts>(vs)...);
+                m_system->Put(handle, std::forward<Ts>(vs)...);
             });
         }
 
@@ -151,8 +152,8 @@ namespace vecs {
         requires (std::is_integral_v<std::decay_t<Ts>> && ...)
         void AddTags(Handle handle, Ts... tags) {
             m_threadpool->enqueue( [&] {
-                std::scoped_lock lock(this->m_system.GetArchetypeMutex(handle));
-                this->m_system.AddTags(handle, std::forward<Ts>(tags)...);
+                std::scoped_lock lock(m_system->GetArchetypeMutex(handle));
+                m_system->AddTags(handle, std::forward<Ts>(tags)...);
             }); 
         }
 
@@ -165,8 +166,8 @@ namespace vecs {
             requires (std::is_integral_v<std::decay_t<Ts>> && ...)
         void EraseTags(Handle handle, Ts... tags) {
             m_threadpool->enqueue( [&] {
-                std::scoped_lock lock(this->m_system.GetArchetypeMutex(handle));
-                this->m_system.EraseTags(handle,std::forward<Ts>(tags)...);
+                std::scoped_lock lock(m_system->GetArchetypeMutex(handle));
+                m_system->EraseTags(handle,std::forward<Ts>(tags)...);
             });
         }
 
@@ -178,8 +179,8 @@ namespace vecs {
             requires (vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
         void Erase(Handle handle) {
             m_threadpool->enqueue( [&] {
-                std::scoped_lock lock(this->m_system.GetArchetypeMutex(handle));
-                this->m_system.Erase<Ts...>(handle);
+                std::scoped_lock lock(m_system->GetArchetypeMutex(handle));
+                m_system->Erase<Ts...>(handle);
             });
         }
 
@@ -188,8 +189,8 @@ namespace vecs {
 		/// @param handle The handle of the entity.
         void Erase(Handle handle) {
             m_threadpool->enqueue( [&] {
-                std::scoped_lock lock(this->m_system.GetSlotMapMutex(handle.GetStorageIndex()));
-                this->m_system.Erase(handle);
+                std::scoped_lock lock(m_system->GetSlotMapMutex(handle.GetStorageIndex()));
+                m_system->Erase(handle);
             });
         }
 
@@ -197,15 +198,15 @@ namespace vecs {
         /// @brief Clear the registry by removing all entities.
 		void Clear() {
             m_threadpool->enqueue( [&] {
-                std::scoped_lock lock(this->m_system.GetMutex());
-                this->m_system.Clear();
+                std::scoped_lock lock(m_system->GetMutex());
+                m_system->Clear();
             });
 		}
 
 
     private:
-        vecs::Registry m_system;
-        IThreadPool* m_threadpool;
+        std::shared_ptr<vecs::Registry> m_system{nullptr};
+        std::shared_ptr<IThreadPool> m_threadpool;
 
         /// @brief Convenience print function for synchronous printing
         /// @param id The current thread id.
