@@ -6,11 +6,13 @@
 
 #include "VECSManager.h"
 
+vecs::ThreadPool pool;
+
 class ManagerTest : public testing::Test {
     protected:
         ManagerTest(){}
 
-        vecs::Manager mng;
+        vecs::Manager mng{&pool};
 };
 
 
