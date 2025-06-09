@@ -23,7 +23,7 @@ namespace vecs {
             std::mutex m_queueMutex;
 
             bool m_stop = false;
-            std::condition_variable m_cv;
+            std::condition_variable m_signal;
             std::atomic<bool> m_idle = true;
             std::atomic<size_t> m_taskCount = 0;
     };
@@ -54,7 +54,7 @@ namespace vecs {
                                 std::unique_lock<std::mutex> lock(m_queueMutex);
 
                                 // wait for task or until pool is stopped
-                                m_cv.wait(lock, [this] {
+                                m_signal.wait(lock, [this] {
                                     return !m_tasks.empty() || m_stop;
                                 });
 
@@ -90,7 +90,7 @@ namespace vecs {
                 }
 
                 // notify all threads
-                m_cv.notify_all();
+                m_signal.notify_all();
 
                 for (auto& thread: m_threads) {
                     thread.join();
@@ -105,7 +105,7 @@ namespace vecs {
                     ++m_taskCount;
                     m_idle = false;
                 }
-                m_cv.notify_one();
+                m_signal.notify_one();
             }
 
             bool isIdle() override {
