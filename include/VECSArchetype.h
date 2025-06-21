@@ -18,7 +18,7 @@ namespace vecs {
 		struct ArchetypeAndIndex {
 			Archetype* m_arch;	//pointer to the archetype
 			size_t m_index;			//index of the entity in the archetype
-		};	
+		};
 
 		/// @brief Constructor, creates the archetype.
 		Archetype() {
@@ -31,11 +31,11 @@ namespace vecs {
 		/// @param ...values The values of the components.
 		/// @return The index of the entity in the archetype.
 		template<typename... Ts>
-		size_t Insert(Handle handle, Ts&& ...values ) {
-			assert( m_maps.size() == sizeof...(Ts) + 1 );
-			assert( (m_maps.contains(Type<Ts>()) && ...) );
-			(AddValue( std::forward<Ts>(values) ), ...); //insert all components, get index of the handle
-			return AddValue( handle ); //insert the handle
+		size_t Insert(Handle handle, Ts&& ...values) {
+			assert(m_maps.size() == sizeof...(Ts) + 1);
+			assert((m_maps.contains(Type<Ts>()) && ...));
+			(AddValue(std::forward<Ts>(values)), ...); //insert all components, get index of the handle
+			return AddValue(handle); //insert the handle
 		}
 
 		/// @brief Get referece to the types of the components.
@@ -58,8 +58,8 @@ namespace vecs {
 		template<typename U>
 		[[nodiscard]] auto Get(size_t archIndex) -> U& {
 			using T = std::decay_t<U>;
-			assert( m_maps.contains(Type<T>()) );
-			assert( m_maps[Type<T>()]->size() > archIndex );
+			assert(m_maps.contains(Type<T>()));
+			assert(m_maps[Type<T>()]->size() > archIndex);
 			return (*Map<U>())[archIndex]; //Map<U>() decays the type
 		}
 
@@ -70,7 +70,7 @@ namespace vecs {
 		template<typename... Ts>
 			requires (sizeof...(Ts) > 1)
 		[[nodiscard]] auto Get(size_t archIndex) -> std::tuple<Ts&...> {
-			assert( (m_maps.contains(Type<Ts>()) && ...) );
+			assert((m_maps.contains(Type<Ts>()) && ...));
 			//assert( (m_maps[Type<Ts>()]->size() > archIndex && ...) );
 			return std::tuple<std::decay_t<Ts>&...>{ (*Map<std::decay_t<Ts>>())[archIndex]... };
 		}
@@ -81,9 +81,9 @@ namespace vecs {
 		/// @param ...vs The component values.
 		template<typename... Ts>
 		void Put(size_t archIndex, Ts&& ...vs) {
-			assert( (m_maps.contains(Type<Ts>()) && ...) );
-			auto fun = [&]<typename T>(T&& v){ (*Map<std::decay_t<T>>())[archIndex] = std::forward<T>(v); };
-			(fun.template operator()(std::forward<decltype(vs)>(vs)), ... );
+			assert((m_maps.contains(Type<Ts>()) && ...));
+			auto fun = [&]<typename T>(T && v) { (*Map<std::decay_t<T>>())[archIndex] = std::forward<T>(v); };
+			(fun.template operator()(std::forward<decltype(vs)>(vs)), ...);
 		}
 
 		/// @brief Erase an entity
@@ -98,28 +98,29 @@ namespace vecs {
 		/// @param other The other archetype.
 		/// @param other_index The index of the entity in the other archetype.
 		/// @return A pair of the index of the new entity in this archetype and the handle of the moved entity.
-		auto Move( Archetype& other, size_t other_index ) -> std::pair<size_t, Handle> {			
-			for( auto& ti : m_types ) { //go through all maps
-				if( m_maps.contains(ti) ) {
-					if( other.m_maps.contains(ti) ) {
+		auto Move(Archetype& other, size_t other_index) -> std::pair<size_t, Handle> {
+			for (auto& ti : m_types) { //go through all maps
+				if (m_maps.contains(ti)) {
+					if (other.m_maps.contains(ti)) {
 						m_maps[ti]->copy(other.Map(ti), other_index); //insert the new value
-					} else {
+					}
+					else {
 						m_maps[ti]->push_back(); //insert an empty value
 					}
 				}
 			}
 			++m_changeCounter;
-			return { m_maps[Type<Handle>()]->size() - 1, other.Erase2(other_index) }; 
+			return { m_maps[Type<Handle>()]->size() - 1, other.Erase2(other_index) };
 		}
 
 		/// @brief Clone the archetype.
 		/// @param other The archetype to clone.
 		/// @param ignore Ignore these types.
 		void Clone(Archetype& other, auto&& ignore) {
-			for( auto& ti : other.m_types ) { //go through all maps
-				if(std::find( ignore.begin(), ignore.end(), ti) != ignore.end()) { continue; }
+			for (auto& ti : other.m_types) { //go through all maps
+				if (std::find(ignore.begin(), ignore.end(), ti) != ignore.end()) { continue; }
 				m_types.insert(ti); //add the type to the list, could be a tag
-				if( other.m_maps.contains(ti) ) {
+				if (other.m_maps.contains(ti)) {
 					m_maps[ti] = other.Map(ti)->clone(); //make a component map like this one
 				}
 			}
@@ -140,7 +141,7 @@ namespace vecs {
 
 		/// @brief Clear the archetype.
 		void Clear() {
-			for( auto& map : m_maps ) {
+			for (auto& map : m_maps) {
 				map.second->clear();
 			}
 			++m_changeCounter;
@@ -149,18 +150,18 @@ namespace vecs {
 		/// @brief Print the archetype.
 		void Print() {
 			std::cout << "Archetype: " << Hash(m_types) << std::endl;
-			for( auto ti : m_types ) {
+			for (auto ti : m_types) {
 				std::cout << "Type: " << ti << " ";
 			}
 			std::cout << std::endl;
-			for( auto& map : m_maps ) {
+			for (auto& map : m_maps) {
 				std::cout << "Map: ";
 				map.second->print();
 				std::cout << std::endl;
 			}
 			std::cout << "Entities: ";
 			auto map = Map<Handle>();
-			for( auto handle : *map ) {
+			for (auto handle : *map) {
 				std::cout << handle << " ";
 			}
 			std::cout << std::endl << std::endl;
@@ -170,11 +171,11 @@ namespace vecs {
 
 		/// @brief Validate the archetype. Make sure all maps have the same size.
 		void Validate() {
-			for( auto& map : m_maps ) {
-				assert( map.second->size() == m_maps[Type<Handle>()]->size() );
+			for (auto& map : m_maps) {
+				assert(map.second->size() == m_maps[Type<Handle>()]->size());
 			}
 		}
-	
+
 		/// @brief Get the change counter of the archetype. It is increased when a change occurs
 		/// that might invalidate a Ref object, e.g. when an entity is moved to another archetype, or erased.
 		auto GetChangeCounter() -> size_t {
@@ -188,7 +189,7 @@ namespace vecs {
 		}
 
 		void AddType(size_t ti) {
-			assert( !m_types.contains(ti) );
+			assert(!m_types.contains(ti));
 			m_types.insert(ti);	//add the type to the list
 		};
 
@@ -198,7 +199,7 @@ namespace vecs {
 		void AddComponent() {
 			using T = std::decay_t<U>; //remove pointer or reference
 			size_t ti = Type<T>();
-			assert( !m_types.contains(ti) );
+			assert(!m_types.contains(ti));
 			m_types.insert(ti);	//add the type to the list
 			m_maps[ti] = std::make_unique<Vector<T>>(); //create the component map
 		};
@@ -207,12 +208,12 @@ namespace vecs {
 		/// @param v The component value.
 		/// @return The index of the component value.
 		template<typename U>
-		auto AddValue( U&& v ) -> size_t {
+		auto AddValue(U&& v) -> size_t {
 			using T = std::decay_t<U>;
 			return m_maps[Type<T>()]->push_back(std::forward<U>(v));	//insert the component value
 		};
 
-		auto AddEmptyValue( size_t ti ) -> size_t {
+		auto AddEmptyValue(size_t ti) -> size_t {
 			return m_maps[ti]->push_back();	//insert the component value
 		};
 
@@ -243,20 +244,20 @@ namespace vecs {
 		/// @param index The index of the entity in the archetype.
 		/// @return The handle of the moved last entity.
 		auto Erase2(size_t index) -> Handle {
-			size_t last{index};
+			size_t last{ index };
 			++m_changeCounter;
-			if( m_iteratingArchetype == this && index <= m_iteratingIndex ) {  //delayed erasure
-				m_gaps.push_back(index); 
+			if (m_iteratingArchetype == this && index <= m_iteratingIndex) {  //delayed erasure
+				m_gaps.push_back(index);
 				(*Map<Handle>())[index] = Handle{}; //invalidate the handle
-				return Handle{}; 
+				return Handle{};
 			}
-			for( auto& it : m_maps ) { last = it.second->erase(index); } //Erase from the component map
+			for (auto& it : m_maps) { last = it.second->erase(index); } //Erase from the component map
 			return index < last ? (*Map<Handle>())[index] : Handle{}; //return the handle of the moved entity
 		}
 
 		using Map_t = std::unordered_map<size_t, std::unique_ptr<VectorBase>>;
 		Mutex_t 			m_mutex; //mutex for thread safety
-		Size_t 				m_changeCounter{0}; //changes invalidate references
+		Size_t 				m_changeCounter{ 0 }; //changes invalidate references
 		std::set<size_t> 	m_types; //types of components
 		Map_t 				m_maps; //map from type index to component data
 
@@ -269,14 +270,14 @@ namespace vecs {
 		//  - If E is BEFORE or EQUAL the current entity C, filling the gap is DELAYED. Instead, the index if E
 		//	  is stored in a list of delayed entities. When the iteration is finished, the gaps are closed.
 		//    Also the archetype stays in write lock until the end of the iteration.
-		inline static thread_local Archetype* m_iteratingArchetype{nullptr}; //for iterating over archetypes
-		inline static thread_local size_t m_iteratingIndex{std::numeric_limits<size_t>::max()}; //current iterator index
+		inline static thread_local Archetype* m_iteratingArchetype{ nullptr }; //for iterating over archetypes
+		inline static thread_local size_t m_iteratingIndex{ std::numeric_limits<size_t>::max() }; //current iterator index
 		inline static thread_local std::vector<size_t> m_gaps{}; //gaps from previous erasures that must be filled
-	
-	public: 
-		
+
+	public:
+
 		std::string toJSON() {
-			std::string json = "\"Archetype\":{\"hash\":\""+std::to_string(Hash(m_types))+"\",\"types\":[";
+			std::string json = "\"archetype\":{\"hash\":" + std::to_string(Hash(m_types)) + ",\"types\":[";
 			//std::cout << "Archetype: " << Hash(m_types) << std::endl;
 			size_t count = 0;
 			for (auto ti : m_types) {
@@ -299,43 +300,71 @@ namespace vecs {
 
 			json += "\"entities\":[";
 			count = 0;
+			// get vector of all entity handles
 			auto map = Map<Handle>();
-			for (auto handle : *map) {
-				if (count++) json += ",";
+			size_t aindex = 0;					 // entity index in archetype
+			for (auto& handle : *map) {
+				auto eindex = handle.GetIndex(); // entity index in registry
+				if (aindex) json += ",";
+				// write out basic entity information
 				json += handle.toJSON();
-				// std::cout << handle << " ";
+				// retrieve the values of the entity components
 				json += "[";
 				count = 0;
-				for (auto type : m_types) {
-					if (count++)json += ",";
-					if (Has(type)) {
-						auto typemap = Map(type);
-						std::string sub;
-						if (type == Type<int>())
-							sub = std::to_string(Get<int>(handle.GetIndex()));
-						else if (type == Type<float>())
-							sub = std::to_string(Get<float>(handle.GetIndex()));
-						else if (type == Type<double>())
-							sub = std::to_string(Get<double>(handle.GetIndex()));
-						else if (type == Type<std::string>())
-							sub = "\"" + Get<std::string>(handle.GetIndex()) + "\"";
-						else
-							sub = "\"<unknown>\"";
-						
-						json += sub;
-					}
 
+				for (auto& map : m_maps) {
+					auto type = map.first;
+					if (count++)json += ",";
+					std::string sub;
+					auto typemap = Map(type);
+
+					// This is terrible code, but, to my knowledge, there's no better way to get
+					// the template types and hence the data
+					if (type == Type<char>())
+						sub = toJSONString(std::string(1, Get<char>(aindex)));
+					else if (type == Type<unsigned char>())
+						sub = toJSONString(std::string(1, Get<unsigned char>(aindex)));
+					else if (type == Type<int>())
+						sub = std::to_string(Get<int>(aindex));
+					else if (type == Type<unsigned int>())
+						sub = std::to_string(Get<unsigned int>(aindex));
+					else if (type == Type<long>())
+						sub = std::to_string(Get<long>(aindex));
+					else if (type == Type<unsigned long>())
+						sub = std::to_string(Get<unsigned long>(aindex));
+					else if (type == Type<long long>())
+						sub = std::to_string(Get<long long>(aindex));
+					else if (type == Type<unsigned long long>())
+						sub = std::to_string(Get<unsigned long long>(aindex));
+					else if (type == Type<float>())
+						sub = std::to_string(Get<float>(aindex));
+					else if (type == Type<double>())
+						sub = std::to_string(Get<double>(aindex));
+					else if (type == Type<std::string>())
+						sub = toJSONString(Get<std::string>(aindex));
+					else if (type == Type<Handle>()) {
+						// not really adding anything, but for completeness' sake ...
+						sub = std::to_string(Get<Handle>(aindex).GetValue());
+					}
+					/* doesn't seem to be possible ...
+					else if (type == Type<bool>())
+						sub = Get<bool>(aindex) ? "true" : "false";
+					*/
+					else
+						sub = "\"<unknown>\"";
+
+					json += sub;
 				}
 				json += "]}";
 
-				
+				aindex++;
 			}
 			//std::cout << std::endl << std::endl;
 			json += "]}";
 			return json;
 
 		}
-	
+
 	}; //end of Archetype
 
 } //namespace vecs2

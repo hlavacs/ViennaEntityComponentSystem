@@ -20,6 +20,7 @@
 #include <stdlib.h>         // abort
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
+#include <fstream>
 
 // This example doesn't compile with Emscripten yet! Awaiting SDL3 support.
 #ifdef __EMSCRIPTEN__
@@ -345,358 +346,573 @@ static void FramePresent(ImGui_ImplVulkanH_Window* wd)
 }
 
 
-void static showNewSnapshotWindow(ConsoleListener& listening, bool* p_open)
+void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
 {
-    ImGui::SetNextWindowSize(ImVec2(300, 150));
-    ImGui::SetNextWindowCollapsed(false);
-    ImGui::SetNextWindowPos(ImVec2(0, 20));
-    if (!ImGui::Begin("New Snapshot", p_open))
+    ImVec2 windowsize = ImVec2(1290, 730);
+    windowsize[0] -= 150;
+    windowsize[1] -= 20;
+    ImGui::SetNextWindowSize(windowsize, ImGuiCond_Once);
+    // ImGui::SetNextWindowCollapsed(false);
+    ImGui::SetNextWindowPos(ImVec2(150, 20), ImGuiCond_Once);
+
+    if (!ImGui::Begin("View Snapshot", p_open))
     {
         ImGui::End();
     }
     else
     {
-        if (ImGui::Button("Get new Snapshot"))
-        {
-            if(listening.cursel>=0)
-                 listening.getVecs(listening.cursel)->requestSnapshot();
-        }
+        if (listening.cursel >= 0) {
 
-        for (size_t i = 0; i < listening.vecsCount(); i++) {
-            ConsoleSocketThread* thd = listening.getVecs(i);
-            if (thd) {
-                int entitycount = thd->getEntitycount();
-                if (entitycount > 0) {
-                    std::string spid = "VECS Entity Count " + std::to_string(entitycount);
-                    ImGui::Text(spid.c_str());
-                }
+            // used in child window area calculation below - presumably there's a better way in Imgui
+            ImVec2 initCursorPos = ImGui::GetCursorPos();
+
+            if (ImGui::Button("Get new Snapshot"))
+            {
+                if (listening.cursel >= 0)
+                    listening.getVecs(listening.cursel)->requestSnapshot();
             }
+            Console::Registry& snap = listening.getVecs(listening.cursel)->getSnapshot();
+            
+            ImGui::SameLine();
+            if (ImGui::Button("Save snapshot to file"))
+            {
+                std::ofstream savefile; 
+                savefile.open("snapshot.json"); //maybe add timestamp
+                savefile << snap.getJsonsnap();
+                savefile.close();
+            }
+
+            ImVec2 windowSize = ImGui::GetWindowSize();
+            ImVec2 cursorPos = ImGui::GetCursorPos();
+            // calculate area for our 3 child windows - minimum is 600,400 
+            // the y size calculation is a bit meh ... need to find out more about child window padding, the effects of ImGui::NewLine etc.
+            float detailsY = 50.f;
+            ImVec2 childArea(std::max(600.f, windowSize.x - 2 * cursorPos.x), std::max(300.f - detailsY, windowSize.y - cursorPos.y - initCursorPos.y - 5.f));
+            // ImGui::BeginChild("Filter", ImVec2(160, 100));
+            ImGui::BeginChild("Filter", ImVec2(160, childArea.y - detailsY));
+
+            //--------------Archetype Filter--------------
+            ImGui::Text("Archetype");
+            std::vector<std::string> archetypeNames;
+            std::vector<std::string> entityNames;
+            entityNames.push_back("-");
+            archetypeNames.push_back("-");
+            for (auto& arch : snap.getArchetypes()) {
+                archetypeNames.push_back(arch.toString());
+                for (auto& ent : arch.getEntities())
+                    entityNames.push_back(ent.toString());
+            }
+            static std::string current_archetype = "-";
+
+            if (ImGui::BeginCombo("A", current_archetype.c_str())) {
+                for (auto& archetype : archetypeNames) {
+                    bool selected = (current_archetype == archetype);
+                    if (ImGui::Selectable(archetype.c_str(), selected))
+                        current_archetype = archetype;
+
+                    if (selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+
+                ImGui::EndCombo();
+            };
+            // --------------------------------------------
+
+
+
+            //-------------Entity Filter-------------------
+            ImGui::Text("Entity");
+            static std::string current_entity = "-";
+
+            if (ImGui::BeginCombo("E", current_entity.c_str())) {
+                for (auto& entity : entityNames) {
+                    bool selected = (current_entity == entity);
+                    if (ImGui::Selectable(entity.c_str(), selected))
+                        current_entity = entity;
+
+                    if (selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+
+                ImGui::EndCombo();
+            };
+
+            //---------------------------------------------
+
+
+
+
+            //------------Component Filter-----------------
+
+            //---------------------------------------------
+
+
+            ImGui::EndChild();
+
+            ImGui::SameLine();
+            ImGui::BeginChild("Snapshot", ImVec2(childArea.x - 160.f, childArea.y - detailsY));
+
+
+            // allow to single select a component
+            static Console::Component* selTableComponent{ nullptr };
+            static Console::Entity* selTableEntity{ nullptr };
+            bool componentSelected{ false };
+
+
+            if (ImGui::BeginTable("Snapshot", 5, ImGuiTableFlags_RowBg)) {
+
+                ImGui::TableSetupColumn("Archetype");
+                ImGui::TableSetupColumn("Index");
+                ImGui::TableSetupColumn("Typename");
+                ImGui::TableSetupColumn("Value");
+                ImGui::TableSetupColumn("Tag");
+                ImGui::TableHeadersRow();
+
+#if 0  // not yet!
+
+                // TODO: since there a re posisbly MANY table rows, investigate this part of the ImGui demo!
+
+#if 1
+            // Demonstrate using clipper for large vertical lists
+                ImGuiListClipper clipper;
+                clipper.Begin(items.Size);
+                while (clipper.Step())
+                {
+                    for (int row_n = clipper.DisplayStart; row_n < clipper.DisplayEnd; row_n++)
+#else
+            // Without clipper
+                    {
+                        for (int row_n = 0; row_n < items.Size; row_n++)
+#endif
+
+#endif
+
+                            bool selectedArchetype = (current_archetype != "-");
+                        bool selectedEntity = (current_entity != "-");
+
+                        for (auto& archetype : snap.getArchetypes()) {
+                            std::string aHash = archetype.toString();
+                            if (selectedArchetype && aHash != current_archetype)
+                                continue;
+                            int archtagcount = 0;
+                            std::string tagstr;
+                            for (auto& tag : archetype.getTags()) {
+                                if (archtagcount++) tagstr += ",";
+                                tagstr += snap.GetTagName(tag);
+                            }
+                            //ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0,ImGui::GetColorU32(ImVec4(0,188,0,50)));
+                            if (!archetype.getEntities().size()) {
+                                if (selectedEntity) continue;
+                                ImGui::TableNextRow();
+                                ImGui::TableSetColumnIndex(0);
+                                ImGui::TextUnformatted(aHash.c_str());
+                                ImGui::TableSetColumnIndex(1);
+                                ImGui::TextUnformatted("-");
+                                ImGui::TableSetColumnIndex(2);
+                                ImGui::TextUnformatted("-");
+                                ImGui::TableSetColumnIndex(3);
+                                ImGui::TextUnformatted("-");
+                                ImGui::TableSetColumnIndex(4);
+                                ImGui::TextUnformatted("-");
+                            }
+                            else {
+                                size_t entityIndex = 0;
+                                for (auto& entity : archetype.getEntities()) {
+                                    std::string eIndex = entity.toString();
+                                    if (selectedEntity && eIndex != current_entity) {
+                                        entityIndex++;
+                                        continue;
+                                    }
+                                    size_t componentIndex = 0;
+                                    for (auto& component : entity.getComponents()) {
+#if 0
+                                        std::string cvalue = snap.GetTypeName(component.getType()) + " " + component.toString();
+#else
+                                        std::string cvalue = component.toString();
+#endif
+                                        ImGui::TableNextRow();
+                                        ImGui::TableSetColumnIndex(0);
+
+#if 0 // no selection
+                                        ImGui::TextUnformatted(aHash.c_str());
+#else
+                                        // generate nice label for this table row; the "##" part is to guarantee unique labels while only displaying the hash
+                                        std::string componentLabel = aHash + "##" + std::to_string(entityIndex) + "." + std::to_string(componentIndex);
+                                        // make table row selectable
+                                        const ImGuiSelectableFlags selectable_flags = ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap;
+                                        const bool itemIsSelected = (&component == selTableComponent);
+                                        if (itemIsSelected) componentSelected = true;
+                                        if (ImGui::Selectable(componentLabel.c_str(), itemIsSelected, selectable_flags /*, ImVec2(0, 10)*/)) {
+                                            selTableComponent = &component;
+                                            selTableEntity = &entity;
+                                            componentSelected = true;
+                                        }
+#endif
+
+                                        ImGui::TableSetColumnIndex(1);
+                                        ImGui::TextUnformatted(eIndex.c_str());
+                                        ImGui::TableSetColumnIndex(2);
+                                        ImGui::TextUnformatted(snap.GetTypeName(component.getType()).c_str());
+                                        ImGui::TableSetColumnIndex(3);
+                                        ImGui::TextUnformatted(cvalue.c_str());
+                                        ImGui::TableSetColumnIndex(4);
+                                        ImGui::TextUnformatted(tagstr.c_str());
+
+                                        componentIndex++;
+                                    }
+                                    entityIndex++;
+                                }
+                            }
+
+                        }
+
+
+                        ImGui::EndTable();
+                    }
+                    ImGui::EndChild();
+
+                    // details area
+                    ImGui::NewLine();
+                    ImGui::BeginChild("Details", ImVec2(childArea.x, detailsY));
+                    if (componentSelected && selTableComponent) {
+                        std::string entityText = std::string("Entity Index: ") + selTableEntity->toString() +
+                            ", Version " + std::to_string(selTableEntity->GetVersion()) +
+                            ", Storage Index " + std::to_string(selTableEntity->GetStorageIndex());
+                        ImGui::TextUnformatted(entityText.c_str());
+                        std::string componentText = std::string("Component Type: ") + snap.GetTypeName(selTableComponent->getType());
+                        ImGui::TextUnformatted(componentText.c_str());
+                        ImGui::TextUnformatted(selTableComponent->toString().c_str());
+                    }
+                    ImGui::EndChild();
+
+                }
+            ImGui::End();
+            }
+
         }
-        //ImGui::Text("Implement Snapshots here!");
 
-        ImGui::End();
-    }
-}
 
-void static showConnectionWindow(ConsoleListener& listening, bool* p_open)
-{
-    ImGui::SetNextWindowSize(ImVec2(300, 120));
-    ImGui::SetNextWindowCollapsed(false);
-    ImGui::SetNextWindowPos(ImVec2(0, 20));
-    if (!ImGui::Begin("Connections", p_open))
+    void static showConnectionWindow(ConsoleListener & listening, bool* p_open)
     {
-        ImGui::End();
-    }
-    else
-    {
-        //ImGui::Text("Connection not implemented yet!");
-
-        // TEST TEST TEST TEST TEST
-        int cursel = -1;
-        for (size_t i = 0; i < listening.vecsCount(); i++) {
-            ConsoleSocketThread* thd = listening.getVecs(i);
-            if (thd) {
-                int pid = thd->getPid();
-                if (pid > 0) {
-                    std::string spid = "VECS PID " + std::to_string(pid);
-                    auto wasselected = thd->selected;
-                    ImGui::Selectable(spid.c_str(),&thd->selected);
-                    if (thd->selected != wasselected) {
-                        if (thd->selected)
-                            cursel = i;
-                        else
-                            listening.cursel = -1;
+        ImGui::SetNextWindowSize(ImVec2(150, 100), ImGuiCond_Once);
+        // ImGui::SetNextWindowCollapsed(false);
+        ImGui::SetNextWindowPos(ImVec2(0, 20), ImGuiCond_Once);
+        if (!ImGui::Begin("Connections", p_open))
+        {
+            ImGui::End();
+        }
+        else
+        {
+            int cursel = -1;
+            static bool fileselection= false;
+            ConsoleSocketThread* thd = listening.getVecs(0);
+            auto wasselected = thd->selected;
+            if (ImGui::Selectable("Load from File", &thd->selected)) {
+                if (!wasselected) {
+                    try {
+                        std::ifstream loadfile; 
+                        
+                        loadfile.open("snapshot.json");
+                        nlohmann::json inputjson = nlohmann::json::parse(loadfile);
+                        loadfile.close();
+                        //Console::Registry& snapshot, nlohmann::json const& json
+                        
+                        ConsoleSocketThread* thd = listening.getVecs(0);
+                        thd->parseSnapshot(inputjson);
+                        thd->selected = true; 
+                        cursel = 0;
+                    }
+                    catch (...) {
+                        //:)
                     }
                 }
             }
-        }
-        if (cursel >= 0) {
-            listening.cursel = cursel;
-            for (size_t i = 0; i < listening.vecsCount(); i++) {
+
+            for (size_t i = 1; i < listening.vecsCount(); i++) {
                 ConsoleSocketThread* thd = listening.getVecs(i);
                 if (thd) {
-                    thd->selected = (i == cursel);
+                    int pid = thd->getPid();
+                    if (pid > 0) {
+                        std::string spid = "VECS PID " + std::to_string(pid);
+                        auto wasselected = thd->selected;
+                        ImGui::Selectable(spid.c_str(), &thd->selected);
+                        if (thd->selected != wasselected) {
+                            if (thd->selected)
+                                cursel = static_cast<int>(i);
+                            else
+                                listening.cursel = -1;
+                        }
+                    }
                 }
             }
+            if (cursel >= 0) {
+                listening.cursel = cursel;
+                for (size_t i = 0; i < listening.vecsCount(); i++) {
+                    ConsoleSocketThread* thd = listening.getVecs(i);
+                    if (thd) {
+                        thd->selected = (i == cursel);
+                    }
+                }
+            }
+            ImGui::End();
+        }
+    }
+
+
+    void static showLiveView(bool* p_open)
+    {
+
+        // ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+        // ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        // ImGui::SetNextWindowSize(ImVec2(900, 730));
+        ImGui::SetNextWindowCollapsed(false);
+        //ImGui::SetNextWindowPos(ImVec2(0, 20));
+        if (!ImGui::Begin("Live View", p_open))
+        {
+            ImGui::End();
+        }
+        else
+        {
+            ImGui::Text("This is the Live View");
+            ImGui::End();
         }
 
-
-        //for (size_t i = 0; i < listening.vecsCount(); i++) {
-        //    ConsoleSocketThread* thd = listening.getVecs(i);
-        //    if (thd) {
-        //        int pid = thd->getPid();
-        //        if (pid > 0) {
-        //            std::string spid = "VECS PID " + std::to_string(pid);
-        //            ImGui::Text(spid.c_str());
-        //        }
-        //    }
-        //}
-
-        ImGui::End();
     }
-}
 
-
-void static showLiveView(bool* p_open)
-{
-
-    ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    ImGui::SetNextWindowSize(ImVec2(900, 730));
-    ImGui::SetNextWindowCollapsed(false);
-    //ImGui::SetNextWindowPos(ImVec2(0, 20));
-    if (!ImGui::Begin("Live View", p_open))
+    // Main code
+    int main(int, char**)
     {
-        ImGui::End();
-    }
-    else
-    {
-        ImGui::Text("This is the Live View");
-        ImGui::End();
-    }
+        // Setup SDL
+        // [If using SDL_MAIN_USE_CALLBACKS: all code below until the main loop starts would likely be your SDL_AppInit() function]
+        if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD))
+        {
+            printf("Error: SDL_Init(): %s\n", SDL_GetError());
+            return -1;
+        }
 
-}
+        // Create window with Vulkan graphics context
+        SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_HIDDEN);
+        SDL_Window* window = SDL_CreateWindow("VECS Console", 1290, 730, window_flags);
+        if (window == nullptr)
+        {
+            printf("Error: SDL_CreateWindow(): %s\n", SDL_GetError());
+            return -1;
+        }
 
-// Main code
-int main(int, char**)
-{
-    // Setup SDL
-    // [If using SDL_MAIN_USE_CALLBACKS: all code below until the main loop starts would likely be your SDL_AppInit() function]
-    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD))
-    {
-        printf("Error: SDL_Init(): %s\n", SDL_GetError());
-        return -1;
-    }
+        ImVector<const char*> extensions;
+        {
+            uint32_t sdl_extensions_count = 0;
+            const char* const* sdl_extensions = SDL_Vulkan_GetInstanceExtensions(&sdl_extensions_count);
+            for (uint32_t n = 0; n < sdl_extensions_count; n++)
+                extensions.push_back(sdl_extensions[n]);
+        }
+        SetupVulkan(extensions);
 
-    // Create window with Vulkan graphics context
-    SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_HIDDEN);
-    SDL_Window* window = SDL_CreateWindow("VECS Console", 1290, 730, window_flags);
-    if (window == nullptr)
-    {
-        printf("Error: SDL_CreateWindow(): %s\n", SDL_GetError());
-        return -1;
-    }
+        // Create Window Surface
+        VkSurfaceKHR surface;
+        VkResult err;
+        if (SDL_Vulkan_CreateSurface(window, g_Instance, g_Allocator, &surface) == 0)
+        {
+            printf("Failed to create Vulkan surface.\n");
+            return 1;
+        }
 
-    ImVector<const char*> extensions;
-    {
-        uint32_t sdl_extensions_count = 0;
-        const char* const* sdl_extensions = SDL_Vulkan_GetInstanceExtensions(&sdl_extensions_count);
-        for (uint32_t n = 0; n < sdl_extensions_count; n++)
-            extensions.push_back(sdl_extensions[n]);
-    }
-    SetupVulkan(extensions);
+        // Create Framebuffers
+        int w, h;
+        SDL_GetWindowSize(window, &w, &h);
+        ImGui_ImplVulkanH_Window* wd = &g_MainWindowData;
+        SetupVulkanWindow(wd, surface, w, h);
+        SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+        SDL_ShowWindow(window);
 
-    // Create Window Surface
-    VkSurfaceKHR surface;
-    VkResult err;
-    if (SDL_Vulkan_CreateSurface(window, g_Instance, g_Allocator, &surface) == 0)
-    {
-        printf("Failed to create Vulkan surface.\n");
-        return 1;
-    }
+        // Setup Dear ImGui context
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ImGuiIO& io = ImGui::GetIO(); (void)io;
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
-    // Create Framebuffers
-    int w, h;
-    SDL_GetWindowSize(window, &w, &h);
-    ImGui_ImplVulkanH_Window* wd = &g_MainWindowData;
-    SetupVulkanWindow(wd, surface, w, h);
-    SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
-    SDL_ShowWindow(window);
+        // Setup Dear ImGui style
+        ImGui::StyleColorsDark();
+        //ImGui::StyleColorsLight();
 
-    // Setup Dear ImGui context
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+        // Setup Platform/Renderer backends
+        ImGui_ImplSDL3_InitForVulkan(window);
+        ImGui_ImplVulkan_InitInfo init_info = {};
+        //init_info.ApiVersion = VK_API_VERSION_1_3;              // Pass in your value of VkApplicationInfo::apiVersion, otherwise will default to header version.
+        init_info.Instance = g_Instance;
+        init_info.PhysicalDevice = g_PhysicalDevice;
+        init_info.Device = g_Device;
+        init_info.QueueFamily = g_QueueFamily;
+        init_info.Queue = g_Queue;
+        init_info.PipelineCache = g_PipelineCache;
+        init_info.DescriptorPool = g_DescriptorPool;
+        init_info.RenderPass = wd->RenderPass;
+        init_info.Subpass = 0;
+        init_info.MinImageCount = g_MinImageCount;
+        init_info.ImageCount = wd->ImageCount;
+        init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+        init_info.Allocator = g_Allocator;
+        init_info.CheckVkResultFn = check_vk_result;
+        ImGui_ImplVulkan_Init(&init_info);
 
-    // Setup Dear ImGui style
-    ImGui::StyleColorsDark();
-    //ImGui::StyleColorsLight();
+        // Load Fonts
+        // - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
+        // - AddFontFromFileTTF() will return the ImFont* so you can store it if you need to select the font among multiple.
+        // - If the file cannot be loaded, the function will return a nullptr. Please handle those errors in your application (e.g. use an assertion, or display an error and quit).
+        // - The fonts will be rasterized at a given size (w/ oversampling) and stored into a texture when calling ImFontAtlas::Build()/GetTexDataAsXXXX(), which ImGui_ImplXXXX_NewFrame below will call.
+        // - Use '#define IMGUI_ENABLE_FREETYPE' in your imconfig file to use Freetype for higher quality font rendering.
+        // - Read 'docs/FONTS.md' for more instructions and details.
+        // - Remember that in C/C++ if you want to include a backslash \ in a string literal you need to write a double backslash \\ !
+        //io.Fonts->AddFontDefault();
+        //io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\segoeui.ttf", 18.0f);
+        //io.Fonts->AddFontFromFileTTF("../../misc/fonts/DroidSans.ttf", 16.0f);
+        //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Roboto-Medium.ttf", 16.0f);
+        //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Cousine-Regular.ttf", 15.0f);
+        //ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, nullptr, io.Fonts->GetGlyphRangesJapanese());
+        //IM_ASSERT(font != nullptr);
 
-    // Setup Platform/Renderer backends
-    ImGui_ImplSDL3_InitForVulkan(window);
-    ImGui_ImplVulkan_InitInfo init_info = {};
-    //init_info.ApiVersion = VK_API_VERSION_1_3;              // Pass in your value of VkApplicationInfo::apiVersion, otherwise will default to header version.
-    init_info.Instance = g_Instance;
-    init_info.PhysicalDevice = g_PhysicalDevice;
-    init_info.Device = g_Device;
-    init_info.QueueFamily = g_QueueFamily;
-    init_info.Queue = g_Queue;
-    init_info.PipelineCache = g_PipelineCache;
-    init_info.DescriptorPool = g_DescriptorPool;
-    init_info.RenderPass = wd->RenderPass;
-    init_info.Subpass = 0;
-    init_info.MinImageCount = g_MinImageCount;
-    init_info.ImageCount = wd->ImageCount;
-    init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-    init_info.Allocator = g_Allocator;
-    init_info.CheckVkResultFn = check_vk_result;
-    ImGui_ImplVulkan_Init(&init_info);
+        // Our state
+        ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-    // Load Fonts
-    // - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
-    // - AddFontFromFileTTF() will return the ImFont* so you can store it if you need to select the font among multiple.
-    // - If the file cannot be loaded, the function will return a nullptr. Please handle those errors in your application (e.g. use an assertion, or display an error and quit).
-    // - The fonts will be rasterized at a given size (w/ oversampling) and stored into a texture when calling ImFontAtlas::Build()/GetTexDataAsXXXX(), which ImGui_ImplXXXX_NewFrame below will call.
-    // - Use '#define IMGUI_ENABLE_FREETYPE' in your imconfig file to use Freetype for higher quality font rendering.
-    // - Read 'docs/FONTS.md' for more instructions and details.
-    // - Remember that in C/C++ if you want to include a backslash \ in a string literal you need to write a double backslash \\ !
-    //io.Fonts->AddFontDefault();
-    //io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\segoeui.ttf", 18.0f);
-    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/DroidSans.ttf", 16.0f);
-    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Roboto-Medium.ttf", 16.0f);
-    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Cousine-Regular.ttf", 15.0f);
-    //ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, nullptr, io.Fonts->GetGlyphRangesJapanese());
-    //IM_ASSERT(font != nullptr);
-
-    // Our state
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-
-    // Setup Console Listener
-    ConsoleListener listening;
+        // Setup Console Listener
+        ConsoleListener listening;
 #if 1
-    // for a first test, simply use port# 2000
-    std::string service = "2000";
+        // for a first test, simply use port# 2000
+        std::string service = "2000";
 #else
-    std::string service;
-    // TODO: Fetch the service number or name from a confguration or the command line
+        std::string service;
+        // TODO: Fetch the service number or name from a confguration or the command line
 #endif
-    listening.Create(service);
+        listening.Create(service);
 
-    // Main loop
-    bool done = false;
-    static bool connectionWindow = false;
-    static bool newSnapshotWindow = false;
-    static bool liveView = false;
-    while (!done)
-    {
-        // Poll and handle events (inputs, window resize, etc.)
-        // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
-        // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application, or clear/overwrite your copy of the mouse data.
-        // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application, or clear/overwrite your copy of the keyboard data.
-        // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
-        // [If using SDL_MAIN_USE_CALLBACKS: call ImGui_ImplSDL3_ProcessEvent() from your SDL_AppEvent() function]
-        SDL_Event event;
-        while (SDL_PollEvent(&event))
+        // Main loop
+        bool done = false;
+        static bool connectionWindow = true;
+        static bool viewSnapshotWindow = false;
+        static bool liveView = false;
+        while (!done)
         {
-            ImGui_ImplSDL3_ProcessEvent(&event);
-            if (event.type == SDL_EVENT_QUIT)
-                done = true;
-            if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && event.window.windowID == SDL_GetWindowID(window))
-                done = true;
-        }
-
-        // [If using SDL_MAIN_USE_CALLBACKS: all code below would likely be your SDL_AppIterate() function]
-        if (SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED)
-        {
-            SDL_Delay(10);
-            continue;
-        }
-
-        // Resize swap chain?
-        int fb_width, fb_height;
-        SDL_GetWindowSize(window, &fb_width, &fb_height);
-        if (fb_width > 0 && fb_height > 0 && (g_SwapChainRebuild || g_MainWindowData.Width != fb_width || g_MainWindowData.Height != fb_height))
-        {
-            ImGui_ImplVulkan_SetMinImageCount(g_MinImageCount);
-            ImGui_ImplVulkanH_CreateOrResizeWindow(g_Instance, g_PhysicalDevice, g_Device, &g_MainWindowData, g_QueueFamily, g_Allocator, fb_width, fb_height, g_MinImageCount);
-            g_MainWindowData.FrameIndex = 0;
-            g_SwapChainRebuild = false;
-        }
-
-        // Start the Dear ImGui frame
-        ImGui_ImplVulkan_NewFrame();
-        ImGui_ImplSDL3_NewFrame();
-        ImGui::NewFrame();
-
-        static float f = 0.0f;
-        static int counter = 0;
-
-
-
-
-        if (ImGui::BeginMainMenuBar()) {
-            if (ImGui::BeginMenu("Connections")) {
-                if (ImGui::MenuItem("Manage Connections")) {
-                    connectionWindow = true;
-                }
-                ImGui::EndMenu();
+            // Poll and handle events (inputs, window resize, etc.)
+            // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
+            // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application, or clear/overwrite your copy of the mouse data.
+            // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application, or clear/overwrite your copy of the keyboard data.
+            // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
+            // [If using SDL_MAIN_USE_CALLBACKS: call ImGui_ImplSDL3_ProcessEvent() from your SDL_AppEvent() function]
+            SDL_Event event;
+            while (SDL_PollEvent(&event))
+            {
+                ImGui_ImplSDL3_ProcessEvent(&event);
+                if (event.type == SDL_EVENT_QUIT)
+                    done = true;
+                if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && event.window.windowID == SDL_GetWindowID(window))
+                    done = true;
             }
-            if (ImGui::BeginMenu("View")) {
 
-                if (ImGui::BeginMenu("Snapshot")) {
-                    if (ImGui::MenuItem("New")) {
-                        newSnapshotWindow = true;
-                    }
-                    if (ImGui::MenuItem("View")) {
-                    }
-                    if (ImGui::MenuItem("Edit")) {
+            // [If using SDL_MAIN_USE_CALLBACKS: all code below would likely be your SDL_AppIterate() function]
+            if (SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED)
+            {
+                SDL_Delay(10);
+                continue;
+            }
+
+            // Resize swap chain?
+            int fb_width, fb_height;
+            SDL_GetWindowSize(window, &fb_width, &fb_height);
+            if (fb_width > 0 && fb_height > 0 && (g_SwapChainRebuild || g_MainWindowData.Width != fb_width || g_MainWindowData.Height != fb_height))
+            {
+                ImGui_ImplVulkan_SetMinImageCount(g_MinImageCount);
+                ImGui_ImplVulkanH_CreateOrResizeWindow(g_Instance, g_PhysicalDevice, g_Device, &g_MainWindowData, g_QueueFamily, g_Allocator, fb_width, fb_height, g_MinImageCount);
+                g_MainWindowData.FrameIndex = 0;
+                g_SwapChainRebuild = false;
+            }
+
+            // Start the Dear ImGui frame
+            ImGui_ImplVulkan_NewFrame();
+            ImGui_ImplSDL3_NewFrame();
+            ImGui::NewFrame();
+
+            static float f = 0.0f;
+            static int counter = 0;
+
+
+
+
+            if (ImGui::BeginMainMenuBar()) {
+                if (ImGui::BeginMenu("Connections")) {
+                    if (ImGui::MenuItem("Manage Connections")) {
+                        connectionWindow = true;
                     }
                     ImGui::EndMenu();
                 }
-                if (ImGui::MenuItem("Live View")) {
-                    liveView = true;
+                if (ImGui::BeginMenu("View")) {
+                    if (ImGui::MenuItem("Snapshot")) {
+
+                        viewSnapshotWindow = true;
+                    }
+
+                    if (ImGui::MenuItem("Live View")) {
+                        liveView = true;
+                    }
+                    ImGui::EndMenu();
                 }
-                ImGui::EndMenu();
-            }
-            if (ImGui::BeginMenu("Watchlist")) {
+                if (ImGui::BeginMenu("Watchlist")) {
 
-                if (ImGui::MenuItem("Edit/View")) {
+                    if (ImGui::MenuItem("Edit/View")) {
+                    }
+                    ImGui::EndMenu();
                 }
-                ImGui::EndMenu();
+                ImGui::EndMainMenuBar();
             }
-            ImGui::EndMainMenuBar();
-        }
 
-        if (connectionWindow) {
-            showConnectionWindow(listening, &connectionWindow);
-        }
+            if (connectionWindow) {
+                showConnectionWindow(listening, &connectionWindow);
+            }
 
-        if (newSnapshotWindow) {
-            showNewSnapshotWindow(listening, &newSnapshotWindow);
-        }
+            if (viewSnapshotWindow) {
+                showViewSnapshotWindow(listening, &viewSnapshotWindow);
+            }
 
-        if (liveView)
-        {
-            showLiveView(&liveView);
-        }
+            if (liveView)
+            {
+                showLiveView(&liveView);
+            }
 
 
-        // Rendering
-        ImGui::Render();
-        ImDrawData* draw_data = ImGui::GetDrawData();
-        const bool is_minimized = (draw_data->DisplaySize.x <= 0.0f || draw_data->DisplaySize.y <= 0.0f);
-        if (!is_minimized)
-        {
-            wd->ClearValue.color.float32[0] = clear_color.x * clear_color.w;
-            wd->ClearValue.color.float32[1] = clear_color.y * clear_color.w;
-            wd->ClearValue.color.float32[2] = clear_color.z * clear_color.w;
-            wd->ClearValue.color.float32[3] = clear_color.w;
-            FrameRender(wd, draw_data);
-            FramePresent(wd);
+            // Rendering
+            ImGui::Render();
+            ImDrawData* draw_data = ImGui::GetDrawData();
+            const bool is_minimized = (draw_data->DisplaySize.x <= 0.0f || draw_data->DisplaySize.y <= 0.0f);
+            if (!is_minimized)
+            {
+                wd->ClearValue.color.float32[0] = clear_color.x * clear_color.w;
+                wd->ClearValue.color.float32[1] = clear_color.y * clear_color.w;
+                wd->ClearValue.color.float32[2] = clear_color.z * clear_color.w;
+                wd->ClearValue.color.float32[3] = clear_color.w;
+                FrameRender(wd, draw_data);
+                FramePresent(wd);
+            }
         }
+
+        // remove listener socket and connections
+        listening.Terminate();
+
+        // Cleanup
+        // [If using SDL_MAIN_USE_CALLBACKS: all code below would likely be your SDL_AppQuit() function]
+        err = vkDeviceWaitIdle(g_Device);
+        check_vk_result(err);
+        ImGui_ImplVulkan_Shutdown();
+        ImGui_ImplSDL3_Shutdown();
+        ImGui::DestroyContext();
+
+        CleanupVulkanWindow();
+        CleanupVulkan();
+
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+
+        return 0;
     }
-
-    // remove listener socket and connections
-    listening.Terminate();
-
-    // Cleanup
-    // [If using SDL_MAIN_USE_CALLBACKS: all code below would likely be your SDL_AppQuit() function]
-    err = vkDeviceWaitIdle(g_Device);
-    check_vk_result(err);
-    ImGui_ImplVulkan_Shutdown();
-    ImGui_ImplSDL3_Shutdown();
-    ImGui::DestroyContext();
-
-    CleanupVulkanWindow();
-    CleanupVulkan();
-
-    SDL_DestroyWindow(window);
-    SDL_Quit();
-
-    return 0;
-}
 
 
 

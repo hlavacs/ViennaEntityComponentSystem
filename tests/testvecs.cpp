@@ -359,7 +359,12 @@ void test_conn() {
 	vecs::Registry system;
 	vecs::Handle h1 = system.Insert(5, 3.0f, 4.0);
 	vecs::Handle h2 = system.Insert(1, 23.0f, 3.0);
-	
+
+	system.AddTags(h1, 47ul);
+	system.AddTags(h2, 666ul);
+
+	vecs::Handle h3 = system.Insert(6, 7.0f, 8.0);
+	vecs::Handle h4 = system.Insert(2, 24.0f, 4.0);
 
 	struct height_t { int i; };
 	using weight_t = vsty::strong_type_t<int, vsty::counter<>>;
@@ -373,12 +378,17 @@ void test_conn() {
 
 	if (system.isConnected()) {
 
-		// do nothing for 30 seconds, let background task work
+		// do nothing for 300 seconds, let background task work
+		for (int secs = 0; secs < 300; secs++) {
 #ifdef WIN32
-		Sleep(300 * 1000);
+			Sleep(1000);
 #else
-		usleep(30 * 1000 * 1000);
+			usleep(1000 * 1000);
 #endif
+			// ... but get out if console has decided to leave the building
+			if (!system.isConnected())
+				break;
+		}
 
 		system.disconnectFromServer();
 	}

@@ -155,17 +155,20 @@ void ConsoleSocketThread::ClientActivity() {
     }
 }
 
+// Liberally sprinkling the source code with "nlohmann::" is a bit beside the point, so ...
+using namespace nlohmann;
+
 bool ConsoleSocketThread::ProcessJSON(std::string sjson) {
 
     //Process JSon
-    nlohmann::json msgjson;
+    json msgjson;
     try {
-        msgjson = nlohmann::json::parse(sjson);
+        msgjson = json::parse(sjson);
     }
 
-    catch (nlohmann::json::exception &e) {
-       auto x =  e.what();
-       std::cout << x << "\n";
+    catch (json::exception& e) {
+        auto x = e.what();
+        std::cout << x << "\n";
     }
     // could catch specific JSON error here, but for now, don't.
     catch (...) {
@@ -221,7 +224,7 @@ bool ConsoleSocketThread::ProcessJSON(std::string sjson) {
     return true;
 }
 
-bool ConsoleSocketThread::onHandshake(nlohmann::json const& json) {
+bool ConsoleSocketThread::onHandshake(json const& json) {
     // TODO: parse necessary values, return false if the connection does not match our criteria
     try {
         pid = json["pid"];
@@ -237,22 +240,86 @@ bool ConsoleSocketThread::requestSnapshot() {
     return sendData("{\"cmd\":\"snapshot\"}") > 0;
 }
 
-bool ConsoleSocketThread::onSnapshot(nlohmann::json const& json) {
+bool ConsoleSocketThread::parseSnapshot(nlohmann::json const& json) {
+    // clear potentially pre-existing snapshot
+    snapshot.clear();
+    snapshot.setJsonsnap(json.dump());
     // parse incoming snapshot, create internal structure for it that can be handled from GUI
     try {
-        entitycount = json["entities"];
+        //entitycount = json["entities"];
+        // get array of archetypes from JSON
+        // we need that first to determine what we got here ...
+        auto& archs = json["archetypes"];
+        for (auto& a : archs) {
+            auto& a2 = a["archetype"];   // TODO: is this sub-object really necessary?
+            auto& maps = a2["maps"];
+            for (auto& m : maps) {
+                snapshot.AddTypeName(m["id"], m["name"]);
+            }
+            // get set of types from JSON
+            // this also contains the tags assigned to this archetype
+            auto& types = a2["types"];
+            std::vector<size_t> tags;
+            for (auto& t : types) {
+                // this is a bit unsafe, as there are no constraints defined for tags.
+                if (!snapshot.HasTypeName(t)) {  // if it s not a type, it is a tag.
+                    snapshot.AddTag(t, std::to_string(t.get<size_t>()));      // TODO: once there are tag names, set them correctly
+                    tags.push_back(t);           // remember as one of the tags to add to the entities in this archetype
+                }
+            }
+
+            Console::Archetype ca(a2["hash"]);
+            for (auto& tag : tags) ca.addTag(tag);
+
+            // now that we got all necessary details, fetch the entities 
+            auto& entities = a2["entities"];
+            for (auto& e : entities) {
+                Console::Entity ce(e["index"], e["version"], e["stgindex"]);
+                auto& values = e["values"];
+                int i = 0;
+                for (auto& v : values) {
+                    std::string sv;  // in Console, we're content with strings for the moment
+                    // build string for expected primitive JSON types
+                    if (v.is_number_integer())
+                        sv = std::to_string(v.get<long long>());
+                    else if (v.is_number())
+                        sv = std::to_string(v.get<long double>());
+                    else
+                        sv = v;
+
+                    Console::Component cc;
+                    cc.addData(std::tuple<size_t, std::string>(maps[i]["id"], sv));
+                    ce.addComponent(cc);
+
+                    i++;
+                }
+                ca.addEntity(ce);
+            }
+
+            snapshot.addArchetype(ca);  // TODO: this is just a first draft - it COPIES the complete thing!
+        }
+    }
+    catch (json::exception& e) {
+        // for now, simply dump JSON errors
+        std::cout << e.what() << "\n";
+        return false;
     }
     catch (...) {
         return false;
     }
     return true;
+    
+}
+
+bool ConsoleSocketThread::onSnapshot(json const& json) {
+    return parseSnapshot(json);
 }
 
 bool ConsoleSocketThread::requestLiveView() {  // presumably expanded on in later versions
     return sendData("{\"cmd\":\"liveview\"}") > 0;
 }
 
-bool ConsoleSocketThread::onLiveView(nlohmann::json const& json) {
+bool ConsoleSocketThread::onLiveView(json const& json) {
     // parse incoming live view data, create internal structure for it that can be handled from GUI
     return true;
 }

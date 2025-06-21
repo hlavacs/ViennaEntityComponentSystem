@@ -2,6 +2,8 @@
 
 #include "Listener.h"
 
+#include "ConsoleRegistry.h"
+
 #include <nlohmann/json.hpp> 
 
 
@@ -14,11 +16,14 @@ public:
 
     bool isConnected() { return handShook; }  // that can surely be enhanced later on
     int getPid() { return pid; }
+    void setPid(int newPid) { pid = newPid; handShook = pid != 0; }
     int getEntitycount() { return entitycount; }
+    Console::Registry& getSnapshot() { return snapshot; }
 
     bool requestSnapshot();
     bool requestLiveView();  // presumably expanded on in later versions
     bool selected{ false };
+    bool parseSnapshot(nlohmann::json const& json);
 
 private:
     virtual void ClientActivity();
@@ -30,13 +35,17 @@ private:
     bool handShook{ false };
     int pid{ 0 };
     int entitycount{ 0 };
+    Console::Registry snapshot;  // we deal with exactly ONE snapshot at the moment
 };
 
 // ConsoleListener : derived Listener for the Console.
 
 class ConsoleListener : public TcpListener {
 public:
-    ConsoleListener(std::string service = "") : TcpListener(service) {}
+    ConsoleListener(std::string service = "") : TcpListener(service) { 
+        AddClient(createSocketThread(INVALID_SOCKET,this)); 
+        getVecs(0)->setPid(1);
+    }
 
     //TODO: if selected Thread is gone, toss selection
     int cursel{ -1 };

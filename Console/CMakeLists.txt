@@ -48,6 +48,10 @@ set(SOURCE
 set(HEADERS
   Listener.h
   ConsoleListener.h
+  ConsoleArchetype.h
+  ConsoleEntity.h
+  ConsoleComponent.h
+  ConsoleRegistry.h
   ${PROJECT_SOURCE_DIR}/include/VECS.h
   ${PROJECT_SOURCE_DIR}/include/VECSArchetype.h
   ${PROJECT_SOURCE_DIR}/include/VECSHandle.h

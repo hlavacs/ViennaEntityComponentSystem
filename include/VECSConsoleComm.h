@@ -190,7 +190,7 @@ namespace vecs {
                     std::string josnap = registry->getSnapshot();
                     sendMessage(josnap);
                     std::cout << "Sending snapshot: " << josnap << "\n";
-                    
+
                 }
 #else
                 sendMessage(registry->getSnapshot());
@@ -227,6 +227,21 @@ namespace vecs {
                 if (received > 0) {
                     buffer[received] = '\0';
                     return std::string(buffer);
+                }
+                else if (received == 0) {
+                    // in all likelyhood, the connection was dropped from the other side, so ...
+                    // close from our side, too
+                    disconnectFromServer();
+                }
+                else {
+                    // some network error or blocking would occur for non-blocking sockets
+                    // we don't do non-blocking socket opreations here, but why not capture it
+#ifdef _WINSOCKAPI_
+                    if (WSAGetLastError() != WSAEWOULDBLOCK)
+#else
+                    if (errno != EAGAIN && errno != EWOULDBLOCK)
+#endif
+                        disconnectFromServer();
                 }
             }
             return "";
