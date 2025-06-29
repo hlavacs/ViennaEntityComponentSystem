@@ -21,7 +21,7 @@ public:
     Console::Registry& getSnapshot() { return snapshot; }
 
     bool requestSnapshot();
-    bool requestLiveView();  // presumably expanded on in later versions
+    bool requestLiveView(bool active = true);  // presumably expanded on in later versions
     bool selected{ false };
     bool parseSnapshot(nlohmann::json const& json);
 
@@ -29,7 +29,7 @@ private:
     virtual void ClientActivity();
     bool ProcessJSON(std::string sjson);
     bool onHandshake(nlohmann::json const& json);
-    bool onSnapshot(nlohmann::json const& json);
+    bool onSnapshot(nlohmann::json const& json) { return parseSnapshot(json); }
     bool onLiveView(nlohmann::json const& json);
 private:
     bool handShook{ false };
@@ -42,8 +42,10 @@ private:
 
 class ConsoleListener : public TcpListener {
 public:
-    ConsoleListener(std::string service = "") : TcpListener(service) { 
-        AddClient(createSocketThread(INVALID_SOCKET,this)); 
+    ConsoleListener(std::string service = "") : TcpListener(service) {
+        // add an empty "thread" at the start for snapshot file
+        AddClient(createSocketThread(INVALID_SOCKET, this));
+        // force it to PID 1 (which will never come in from any socket)
         getVecs(0)->setPid(1);
     }
 
@@ -51,7 +53,7 @@ public:
     int cursel{ -1 };
     virtual bool RemoveClient(SocketThread* thd) {
         if (static_cast<ConsoleSocketThread*>(thd)->selected)
-            cursel = -1; // selektion zurücksetzen
+            cursel = -1; // reset selection
         return TcpListener::RemoveClient(thd);
     }
     // TODO: all operations that interact with the Console

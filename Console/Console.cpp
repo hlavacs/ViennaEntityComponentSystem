@@ -36,6 +36,9 @@
 // Console Listener
 #include "ConsoleListener.h"
 
+// use scaling (resize window based on main screen scale) - still very experimental!
+#define USE_SCALING 0
+
 //#define APP_USE_UNLIMITED_FRAME_RATE
 #ifdef _DEBUG
 #define APP_USE_VULKAN_DEBUG_REPORT
@@ -348,14 +351,41 @@ static void FramePresent(ImGui_ImplVulkanH_Window* wd)
 
 void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
 {
-    ImVec2 windowsize = ImVec2(1290, 730);
-    windowsize[0] -= 150;
-    windowsize[1] -= 20;
+#if USE_SCALING
+    float scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
+#else
+    const float scale = 1.f;
+#endif
+    /* Initial window layout:  1135x700 at offset 150,20 - potentially scaled to main screen scale
+                                            x (init 1135, min. 900)
+    +-------------------------------------------------------------------------------------------------+
+    | Button area                                                                                     |
+    +-------------------------+-----------------------------------------------------------------------+
+    |          160            |                           Rest (x-160, min.740)                       |
+    |                         |                                                                       |
+    |     Selections          |               Table                                                   |
+    |     Child Window        |               Child Window                                            |
+    |                         |                                                                       | y (init 700)
+    |     y-b.area-60, min.300|                                                   y-b.area-60, min.300|
+    |                         |                                                                       |
+    |                         |                                                                       |
+    |                         |                                                                       |
+    +-------------------------+-----------------------------------------------------------------------+
+    |  Details                                                                                        |
+    |  Child Window                                                                                 60|
+    +-------------------------------------------------------------------------------------------------+
+    */
+    ImVec2 windowsize = ImVec2(1135 * scale, 700 * scale);
     ImGui::SetNextWindowSize(windowsize, ImGuiCond_Once);
     // ImGui::SetNextWindowCollapsed(false);
-    ImGui::SetNextWindowPos(ImVec2(150, 20), ImGuiCond_Once);
+    ImVec2 wpos(150 * scale, 20 * scale);
+    if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+        wpos.x += ImGui::GetMainViewport()->Pos.x;
+        wpos.y += ImGui::GetMainViewport()->Pos.y;
+    }
+    ImGui::SetNextWindowPos(wpos, ImGuiCond_Once);
 
-    if (!ImGui::Begin("View Snapshot", p_open))
+    if (!ImGui::Begin("View Snapshot", p_open, ImGuiWindowFlags_HorizontalScrollbar))
     {
         ImGui::End();
     }
@@ -372,11 +402,11 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
                     listening.getVecs(listening.cursel)->requestSnapshot();
             }
             Console::Registry& snap = listening.getVecs(listening.cursel)->getSnapshot();
-            
+
             ImGui::SameLine();
             if (ImGui::Button("Save snapshot to file"))
             {
-                std::ofstream savefile; 
+                std::ofstream savefile;
                 savefile.open("snapshot.json"); //maybe add timestamp
                 savefile << snap.getJsonsnap();
                 savefile.close();
@@ -384,12 +414,18 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
 
             ImVec2 windowSize = ImGui::GetWindowSize();
             ImVec2 cursorPos = ImGui::GetCursorPos();
-            // calculate area for our 3 child windows - minimum is 600,400 
+            // calculate area for our 3 child windows - minimum is 600,300 (scaled)
             // the y size calculation is a bit meh ... need to find out more about child window padding, the effects of ImGui::NewLine etc.
-            float detailsY = 50.f;
-            ImVec2 childArea(std::max(600.f, windowSize.x - 2 * cursorPos.x), std::max(300.f - detailsY, windowSize.y - cursorPos.y - initCursorPos.y - 5.f));
-            // ImGui::BeginChild("Filter", ImVec2(160, 100));
-            ImGui::BeginChild("Filter", ImVec2(160, childArea.y - detailsY));
+            float detailsY = 50.f * scale;
+            ImVec2 childArea(std::max(900.f * scale, windowSize.x - 2 * cursorPos.x),
+                std::max(300.f * scale - detailsY, windowSize.y - cursorPos.y - initCursorPos.y - 5.f));
+            ImVec2 childFilterSz(160.f * scale, childArea.y - detailsY);
+            ImVec2 childSnapshotTableSz(childArea.x - (160.f * scale) - (10.f * scale /*for scrollbar*/), childArea.y - detailsY);
+            ImVec2 childDetailsSz(childArea.x, detailsY);
+
+            // Filter child window
+
+            ImGui::BeginChild("Filter", childFilterSz);
 
             //--------------Archetype Filter--------------
             ImGui::Text("Archetype");
@@ -450,8 +486,7 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
             ImGui::EndChild();
 
             ImGui::SameLine();
-            ImGui::BeginChild("Snapshot", ImVec2(childArea.x - 160.f, childArea.y - detailsY));
-
+            ImGui::BeginChild("Snapshot", childSnapshotTableSz);
 
             // allow to single select a component
             static Console::Component* selTableComponent{ nullptr };
@@ -573,7 +608,7 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
 
                     // details area
                     ImGui::NewLine();
-                    ImGui::BeginChild("Details", ImVec2(childArea.x, detailsY));
+                    ImGui::BeginChild("Details", childDetailsSz);
                     if (componentSelected && selTableComponent) {
                         std::string entityText = std::string("Entity Index: ") + selTableEntity->toString() +
                             ", Version " + std::to_string(selTableEntity->GetVersion()) +
@@ -594,9 +629,19 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
 
     void static showConnectionWindow(ConsoleListener & listening, bool* p_open)
     {
-        ImGui::SetNextWindowSize(ImVec2(150, 100), ImGuiCond_Once);
+#if USE_SCALING
+        float scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
+#else
+        const float scale = 1.f;
+#endif
+        ImGui::SetNextWindowSize(ImVec2(150 * scale, 100 * scale), ImGuiCond_Once);
         // ImGui::SetNextWindowCollapsed(false);
-        ImGui::SetNextWindowPos(ImVec2(0, 20), ImGuiCond_Once);
+        ImVec2 wpos(0 * scale, 20 * scale);
+        if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+            wpos.x += ImGui::GetMainViewport()->Pos.x;
+            wpos.y += ImGui::GetMainViewport()->Pos.y;
+        }
+        ImGui::SetNextWindowPos(wpos, ImGuiCond_Once);
         if (!ImGui::Begin("Connections", p_open))
         {
             ImGui::End();
@@ -604,27 +649,26 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
         else
         {
             int cursel = -1;
-            static bool fileselection= false;
+
+            // special case : read from file
             ConsoleSocketThread* thd = listening.getVecs(0);
             auto wasselected = thd->selected;
-            if (ImGui::Selectable("Load from File", &thd->selected)) {
-                if (!wasselected) {
+            ImGui::Selectable("Load from File", &thd->selected);
+            if (thd->selected != wasselected) {
+                if (thd->selected) {
                     try {
-                        std::ifstream loadfile; 
-                        
-                        loadfile.open("snapshot.json");
+                        std::ifstream loadfile("snapshot.json");
                         nlohmann::json inputjson = nlohmann::json::parse(loadfile);
                         loadfile.close();
-                        //Console::Registry& snapshot, nlohmann::json const& json
-                        
-                        ConsoleSocketThread* thd = listening.getVecs(0);
                         thd->parseSnapshot(inputjson);
-                        thd->selected = true; 
                         cursel = 0;
                     }
                     catch (...) {
-                        //:)
+                        thd->selected = false;
                     }
+                }
+                else if (wasselected) {
+                    listening.cursel = -1;
                 }
             }
 
@@ -659,20 +703,38 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
     }
 
 
-    void static showLiveView(bool* p_open)
+    void static showLiveView(ConsoleListener & listening, bool* p_open)
     {
 
         // ImVec2 center = ImGui::GetMainViewport()->GetCenter();
         // ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-        // ImGui::SetNextWindowSize(ImVec2(900, 730));
+#if USE_SCALING
+        float scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
+#else
+        const float scale = 1.f;
+#endif
+        // ImGui::SetNextWindowSize(ImVec2(900 * scale, 730 * scale));
         ImGui::SetNextWindowCollapsed(false);
-        //ImGui::SetNextWindowPos(ImVec2(0, 20));
+        //ImVec2 wpos(0 * scale, 20 * scale);
+        //if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+        //    wpos.x += ImGui::GetMainViewport()->Pos.x;
+        //    wpos.y += ImGui::GetMainViewport()->Pos.y;
+        //}
+        //ImGui::SetNextWindowPos(wpos, ImGuiCond_Once);
         if (!ImGui::Begin("Live View", p_open))
         {
             ImGui::End();
         }
         else
         {
+            if (ImGui::Button("Start LiveView"))
+            {
+                if (listening.cursel >= 0)
+                    listening.getVecs(listening.cursel)->requestLiveView();
+            }
+
+
+
             ImGui::Text("This is the Live View");
             ImGui::End();
         }
@@ -692,7 +754,12 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
 
         // Create window with Vulkan graphics context
         SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_HIDDEN);
-        SDL_Window* window = SDL_CreateWindow("VECS Console", 1290, 730, window_flags);
+#if USE_SCALING
+        float main_scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
+#else
+        const float main_scale = 1.f;
+#endif
+        SDL_Window* window = SDL_CreateWindow("VECS Console", (int)(1290 * main_scale), (int)(730 * main_scale), window_flags);
         if (window == nullptr)
         {
             printf("Error: SDL_CreateWindow(): %s\n", SDL_GetError());
@@ -732,9 +799,29 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
+        io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable docking
+        io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;       // Enable multi-viewports feature
+
         // Setup Dear ImGui style
         ImGui::StyleColorsDark();
         //ImGui::StyleColorsLight();
+
+        ImGuiStyle& style = ImGui::GetStyle();
+
+#if USE_SCALING
+        // Setup scaling
+        style.ScaleAllSizes(main_scale);        // Bake a fixed style scale. (until we have a solution for dynamic style scaling, changing this requires resetting Style + calling this again)
+        style.FontScaleDpi = main_scale;        // Set initial font scale. (using io.ConfigDpiScaleFonts=true makes this unnecessary. We leave both here for documentation purpose)
+        io.ConfigDpiScaleFonts = true;          // [Experimental] Automatically overwrite style.FontScaleDpi in Begin() when Monitor DPI changes. This will scale fonts but _NOT_ scale sizes/padding for now.
+        io.ConfigDpiScaleViewports = true;      // [Experimental] Scale Dear ImGui and Platform Windows when Monitor DPI changes.
+#endif
+
+        // When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
+        if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+        {
+            style.WindowRounding = 0.0f;
+            style.Colors[ImGuiCol_WindowBg].w = 1.0f;
+        }
 
         // Setup Platform/Renderer backends
         ImGui_ImplSDL3_InitForVulkan(window);
@@ -875,23 +962,31 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
 
             if (liveView)
             {
-                showLiveView(&liveView);
+                showLiveView(listening, &liveView);
             }
 
 
             // Rendering
             ImGui::Render();
-            ImDrawData* draw_data = ImGui::GetDrawData();
-            const bool is_minimized = (draw_data->DisplaySize.x <= 0.0f || draw_data->DisplaySize.y <= 0.0f);
-            if (!is_minimized)
+            ImDrawData* main_draw_data = ImGui::GetDrawData();
+            const bool main_is_minimized = (main_draw_data->DisplaySize.x <= 0.0f || main_draw_data->DisplaySize.y <= 0.0f);
+            wd->ClearValue.color.float32[0] = clear_color.x * clear_color.w;
+            wd->ClearValue.color.float32[1] = clear_color.y * clear_color.w;
+            wd->ClearValue.color.float32[2] = clear_color.z * clear_color.w;
+            wd->ClearValue.color.float32[3] = clear_color.w;
+            if (!main_is_minimized)
+                FrameRender(wd, main_draw_data);
+
+            if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
             {
-                wd->ClearValue.color.float32[0] = clear_color.x * clear_color.w;
-                wd->ClearValue.color.float32[1] = clear_color.y * clear_color.w;
-                wd->ClearValue.color.float32[2] = clear_color.z * clear_color.w;
-                wd->ClearValue.color.float32[3] = clear_color.w;
-                FrameRender(wd, draw_data);
-                FramePresent(wd);
+                // Update and Render additional Platform Windows
+                ImGui::UpdatePlatformWindows();
+                ImGui::RenderPlatformWindowsDefault();
+
+                // TODO for OpenGL: restore current GL context.
             }
+            if (!main_is_minimized)
+                FramePresent(wd);
         }
 
         // remove listener socket and connections

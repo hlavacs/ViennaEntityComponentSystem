@@ -673,8 +673,15 @@ namespace vecs {
 			comm.setRegistry(this);
 			return comm.connectToServer(host, port);
 		}
-		bool isConnected() {  return comm.isConnected(); }
+		bool isConnected() { return comm.isConnected(); }
 		int disconnectFromServer() { return comm.disconnectFromServer(); }
+
+		virtual std::string getLiveView() override {
+			std::string json = "{\"cmd\":\"liveview\",\"entities\":";
+			json += std::to_string(Size());
+			json += "}";
+			return json;
+		}
 
 		virtual std::string getSnapshot() override {
 			// presumably locking would be a good idea here, but for now, simply deliver
@@ -682,17 +689,33 @@ namespace vecs {
 			std::string json = "{\"cmd\":\"snapshot\",\"entities\":";
 			json += std::to_string(Size()) + ",";
 			json += "\"archetypes\":[";
-			size_t art {0};
+			size_t art{ 0 };
 			for (auto& it : m_archetypes) {
 				if (art) json += ",";
-				json += "{\"hash\":\""+std::to_string(it.first)+"\""+
-				         "," + it.second->toJSON() + //should come here when done
-				        "}";
+				json += "{\"hash\":\"" + std::to_string(it.first) + "\"" +
+					"," + it.second->toJSON() + //should come here when done
+					"}";
 				art++;
 			}
+			//json += "],"; TODO
+			//json += "\"slotmap\":[";
+			//size_t mapi = 0;
+			//for (auto& it : m_slotMaps) {
+			//	if (mapi++) json += ",";
+			//	json += "[";
+			//	for (size_t i = 0; i < it.m_slotMap.Size(); i++) {
+			//		if (i) json += ",";
+			//		json += "[";
+			//		//json += std::to_string(Hash(it.m_slotMap[i].m_value.m_arch)) + ",";  // TODO!
+			//		json += std::to_string(it.m_slotMap[i].m_value.m_index) + ",";
+			//		json += std::to_string(it.m_slotMap[i].m_version);
+			//		json += "]";
+			//	}
+			//	json += "]";
+			//}
 			json += "]";
 			json += "}";
-		    return json;
+			return json;
 		}
 	private:
 		VECSConsoleComm comm;

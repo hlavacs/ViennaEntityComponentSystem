@@ -370,7 +370,12 @@ void test_conn() {
 	using weight_t = vsty::strong_type_t<int, vsty::counter<>>;
 	vecs::Handle hx1 = system.Insert(height_t{ 5 }, weight_t{ 6 });
 
+	std::vector<vecs::Handle> handles;
+	for (int i = 10; i < 30; i++) {
+		handles.push_back(system.Insert(i, static_cast<float>(i*2)));
+	}
 
+	system.Erase(handles[4]); 
 
 	std::cout << "\x1b[37m isConnected: " << system.isConnected() << "\n";
 	SOCKET testval = system.connectToServer();
@@ -380,6 +385,14 @@ void test_conn() {
 
 		// do nothing for 300 seconds, let background task work
 		for (int secs = 0; secs < 300; secs++) {
+			if (secs & 1) {
+				system.Erase(handles[0]);
+				system.Erase(handles[1]);
+			}
+			else {
+				handles.push_back(system.Insert(secs+20, static_cast<float>(secs * 2)));
+				handles.push_back(system.Insert(secs + 15, static_cast<float>(secs * 3)));
+			}
 #ifdef WIN32
 			Sleep(1000);
 #else

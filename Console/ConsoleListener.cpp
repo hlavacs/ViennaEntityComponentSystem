@@ -246,7 +246,7 @@ bool ConsoleSocketThread::parseSnapshot(nlohmann::json const& json) {
     snapshot.setJsonsnap(json.dump());
     // parse incoming snapshot, create internal structure for it that can be handled from GUI
     try {
-        //entitycount = json["entities"];
+        entitycount = json["entities"];
         // get array of archetypes from JSON
         // we need that first to determine what we got here ...
         auto& archs = json["archetypes"];
@@ -308,19 +308,27 @@ bool ConsoleSocketThread::parseSnapshot(nlohmann::json const& json) {
         return false;
     }
     return true;
-    
+
 }
 
-bool ConsoleSocketThread::onSnapshot(json const& json) {
-    return parseSnapshot(json);
-}
-
-bool ConsoleSocketThread::requestLiveView() {  // presumably expanded on in later versions
-    return sendData("{\"cmd\":\"liveview\"}") > 0;
+bool ConsoleSocketThread::requestLiveView(bool active) {  // presumably expanded on in later versions
+    return sendData(std::string("{\"cmd\":\"liveview\",\"active\":") + (active ? "true" : "false") + "}") > 0;
 }
 
 bool ConsoleSocketThread::onLiveView(json const& json) {
     // parse incoming live view data, create internal structure for it that can be handled from GUI
+    try {
+        // TEST TEST TEST TEST TEST TEST TEST TEST
+        std::cout << json["entities"] << "\n";
+    }
+    catch (json::exception& e) {
+        // for now, simply dump JSON errors
+        std::cout << e.what() << "\n";
+        return false;
+    }
+    catch (...) {
+        return false;
+    }
     return true;
 }
 

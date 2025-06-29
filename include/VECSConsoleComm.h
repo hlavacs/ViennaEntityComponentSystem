@@ -43,6 +43,7 @@ namespace vecs {
     class VECSConsoleInterface {
     public:
         virtual std::string getSnapshot() = 0;
+        virtual std::string getLiveView() = 0;
     };
 
     class VECSConsoleComm {
@@ -51,6 +52,44 @@ namespace vecs {
         std::jthread commThread;
         std::mutex socketMutex;
         bool running = false;
+
+        // LiveView : encapsulation for all LiveView-related data
+        class LiveView {
+
+        public:
+            LiveView() {}  // don't need anything yet
+            ~LiveView() {}  // don't need anything yet
+
+            bool SetActive(bool onoff = true) { bool old = active; active = onoff; return old; }
+            bool IsActive() const { return active; }
+            bool Watch(Handle h) { return watched.insert(h).second; }
+            bool Unwatch(Handle h) { return watched.erase(h) > 0; }
+
+            // TODO: make these thread-safe. The listener thread might come in at any moment and fetch the changes.
+            void Insert(VECSConsoleInterface* registry, Handle& h) { handles++; changes = true; }
+            void Erase(VECSConsoleInterface* registry, Handle& h) { handles--; changes = true; }
+            void Clear(VECSConsoleInterface* registry) { handles = 0; changes = true; }
+            std::tuple<bool, std::string> getChangesJSON() {
+                if (!active)
+                    return std::tuple<bool, std::string>(false, "");
+                bool hadChanges = changes;
+                changes = false;
+                std::string json = "{\"cmd\":\"liveview\"";
+                if (hadChanges) {
+                    json += std::string(",\"entities\":") + std::to_string(handles);
+                }
+                json += "}";
+                changes = false;
+                return std::tuple<bool, std::string>(hadChanges, json);
+            }
+
+        private:
+            std::set<Handle> watched;
+            bool active{ false };
+            bool changes{ false };
+            size_t handles{ 0 };
+
+        } liveView;
 
         // design question ... do we want one comm object for each VECS registry, or one for all registries in the program?
         // for now, let's assume a simple 1:1 relation - each registry gets its own connection object
@@ -85,7 +124,7 @@ namespace vecs {
             //----------------------
             // Connect to server.
 
-            // VECSConsoleComm::connectToServer() so erweitern, dass es, wenn connect() eine Verbindung herstellen konnte (also 0 zur?ckgibt), einen eigenen Thread startet
+            // VECSConsoleComm::connectToServer() so erweitern, dass es, wenn connect() eine Verbindung herstellen konnte (also 0 zurueckgibt), einen eigenen Thread startet
             int returnval = connect(ConnectSocket, (SOCKADDR*)&clientService, sizeof(clientService));
             if (returnval == 0) {
                 running = true;
@@ -131,6 +170,13 @@ namespace vecs {
 
         }
 
+        // LiveView data interface
+        void Insert(Handle& h) { liveView.Insert(registry, h); }
+        void Erase(Handle& h) { liveView.Erase(registry, h); }
+        void Clear() { liveView.Clear(registry); }
+
+
+    private:
         void processMessage(std::string msg) {
 
             //Process JSon
@@ -197,7 +243,52 @@ namespace vecs {
 #endif
                 break;
             case cmdLiveView:
-                // Live View 
+                // Live View - can have following attributes:
+                // "active":true|false  - sets live view active or inactive
+                if (msgjson.contains("active")) {
+                    auto& act = msgjson["active"];
+                    if (act.is_boolean()) {
+                        liveView.SetActive(act);
+                        // TEST TEST TEST TEST TEST TEST TEST TEST TEST TEST
+                        std::string jsonlive = registry->getLiveView();
+                        sendMessage(jsonlive);
+                        std::cout << "Sending liveview: " << jsonlive << "\n";
+
+                    } // else ignore
+                }
+                // "watch":id or [id,id,...]  - adds a (set of) id(s) to the watched set
+                if (msgjson.contains("watch")) {
+                    auto& watch = msgjson["watch"];
+                    if (watch.is_array()) {
+                        for (auto& el : watch) {
+                            if (el.is_number_unsigned()) {
+                                size_t wh = el;
+                                liveView.Watch(static_cast<Handle>(wh));
+                            }
+                        }
+                    }
+                    else if (watch.is_number_unsigned()) {
+                        size_t wh = watch;
+                        liveView.Watch(static_cast<Handle>(wh));
+                    } // else ignore.
+                }
+                // "unwatch":id or [id,id,...]  - removes a (set of) id(s) from the watched set
+                if (msgjson.contains("unwatch")) {
+                    auto& unwatch = msgjson["unwatch"];
+                    if (unwatch.is_array()) {
+                        for (auto& el : unwatch) {
+                            if (el.is_number_unsigned()) {
+                                size_t wh = el;
+                                liveView.Unwatch(static_cast<Handle>(wh));
+                            }
+                        }
+                    }
+                    else if (unwatch.is_number_unsigned()) {
+                        size_t wh = unwatch;
+                        liveView.Unwatch(static_cast<Handle>(wh));
+                    } // else ignore.
+                }
+
                 break;
             default:
                 // keep compiler happy
@@ -209,7 +300,7 @@ namespace vecs {
 
         }
 
-        int sendMessage(std::string sendmessage) {
+        int sendMessage(std::string sendmessage) const {
             const char* csendmessage = sendmessage.c_str();
             return send(ConnectSocket, csendmessage, static_cast<int>(sendmessage.length()), 0);
         }
@@ -222,7 +313,32 @@ namespace vecs {
                 if (ConnectSocket == INVALID_SOCKET)
                     return "";
 
-                received = recv(ConnectSocket, buffer, sizeof(buffer) - 1, 0);
+                int selectrc;
+                timeval tmou{ .tv_usec = 200L * 1000L };  // that's 200 ms, i.e., 5 times per second
+                const timeval* ptmou = (tmou.tv_sec || tmou.tv_usec) ? &tmou : NULL;
+                fd_set fds;
+                do {
+                    // setup selector set (... of one ...)
+                    FD_ZERO(&fds);
+                    FD_SET(ConnectSocket, &fds);
+                    selectrc = select(static_cast<int>(ConnectSocket + 1), &fds, NULL, NULL, ptmou);
+                    // then wait for activity (or lack thereof)
+                    if (selectrc == 0) {
+                        // no data read from the other side within timeout period
+
+                        // TODO: in liveview, send assembled changes
+                        auto lv = liveView.getChangesJSON();
+                        if (std::get<0>(lv)) {
+                            // TEST TEST TEST TEST TEST TEST TEST TEST TEST
+                            std::cout << "Sending liveview changes: " << std::get<1>(lv) << "\n";
+                            sendMessage(std::get<1>(lv));
+                        }
+                    }
+                } while (selectrc == 0);
+                if (selectrc != INVALID_SOCKET)
+                    received = recv(ConnectSocket, buffer, sizeof(buffer) - 1, 0);
+                else
+                    received = -1;
 
                 if (received > 0) {
                     buffer[received] = '\0';

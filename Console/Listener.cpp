@@ -455,7 +455,7 @@ int Socket::wait(int timeout) {
     timeval to{ .tv_usec = timeout * 1000L };
     // then wait for activity (or lack thereof)
     return select(static_cast<int>(s + 1), &fds, NULL, NULL, (to.tv_sec || to.tv_usec) ? &to : NULL);
-    // TODO : use poll() instead on anything except Windows?
+    // TODO : use poll() instead on anything except Windows? Presumably not worth the hassle for ONE socket,
 }
 
 // bytesBuffered : return number of buffered bytes available for reading
