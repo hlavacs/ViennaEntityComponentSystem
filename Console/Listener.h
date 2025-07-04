@@ -16,6 +16,9 @@ typedef int SOCKET;
 // Socket : class to encapsulate the basic socket functionality
 
 class Socket {
+private:
+    SOCKET s{ INVALID_SOCKET };
+
 public:
     Socket(SOCKET s = INVALID_SOCKET) : s(s) {}
     ~Socket() { destroy(); }
@@ -57,8 +60,7 @@ public:
 
 private:
     void detach() { s = INVALID_SOCKET; }
-private:
-    SOCKET s{ INVALID_SOCKET };
+
 };
 
 // SocketThread : thread class for a TCP based connection
@@ -92,6 +94,17 @@ private:
 // SocketListener : base class for a socked based (TCP or UDP) listener
 
 class SocketListener {
+private:
+    Socket sockListener;
+    int portListener{ 0 };
+    std::string serviceListener{ "" };
+    int typeListener{ SOCK_STREAM };
+    std::thread thdListener;
+    volatile bool terminateListener{ false };
+    std::vector<char> dgramBuf;
+    std::vector<SocketThread*> streamClient;
+    std::vector<SocketThread*> streamClientGone;
+
 public:
     SocketListener(std::string service = "", int sockType = SOCK_STREAM) { if (service.size()) Create(service, sockType); }
     virtual ~SocketListener();
@@ -113,16 +126,7 @@ private:
     virtual void onDatagram(const char* data, int len) {}
     virtual SocketThread* createSocketThread(SOCKET s, SocketListener* l) { return new SocketThread(s, l); }
 
-private:
-    Socket sockListener;
-    int portListener{ 0 };
-    std::string serviceListener{ "" };
-    int typeListener{ SOCK_STREAM };
-    std::thread thdListener;
-    volatile bool terminateListener{ false };
-    std::vector<char> dgramBuf;
-    std::vector<SocketThread*> streamClient;
-    std::vector<SocketThread*> streamClientGone;
+
 };
 
 // UdpListener: base class for a socket-based UDP datagram listener

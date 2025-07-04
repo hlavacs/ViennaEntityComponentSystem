@@ -10,6 +10,18 @@
 // ConsoleSocketThread : socket client thread for the Console
 
 class ConsoleSocketThread : public SocketThread {
+private:
+    bool handShook{ false };
+    int pid{ 0 };
+    int entitycount{ 0 };
+    Console::Registry snapshot;  // we deal with exactly ONE snapshot at the moment
+
+    virtual void ClientActivity();
+    bool ProcessJSON(std::string sjson);
+    bool onHandshake(nlohmann::json const& json);
+    bool onSnapshot(nlohmann::json const& json) { return parseSnapshot(json); }
+    bool onLiveView(nlohmann::json const& json);
+
 public:
     ConsoleSocketThread(SOCKET s, SocketListener* l) : SocketThread(s, l) {}
     virtual ~ConsoleSocketThread() {}
@@ -20,22 +32,16 @@ public:
     int getEntitycount() { return entitycount; }
     Console::Registry& getSnapshot() { return snapshot; }
 
+    int lvEntityCount[200]{0};
+    int lvEntityMax = 0;
+
     bool requestSnapshot();
     bool requestLiveView(bool active = true);  // presumably expanded on in later versions
     bool selected{ false };
     bool parseSnapshot(nlohmann::json const& json);
 
-private:
-    virtual void ClientActivity();
-    bool ProcessJSON(std::string sjson);
-    bool onHandshake(nlohmann::json const& json);
-    bool onSnapshot(nlohmann::json const& json) { return parseSnapshot(json); }
-    bool onLiveView(nlohmann::json const& json);
-private:
-    bool handShook{ false };
-    int pid{ 0 };
-    int entitycount{ 0 };
-    Console::Registry snapshot;  // we deal with exactly ONE snapshot at the moment
+
+
 };
 
 // ConsoleListener : derived Listener for the Console.

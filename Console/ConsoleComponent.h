@@ -21,7 +21,6 @@ namespace Console {
 			return *this;
 		}
 
-	public:
 		void clear() {
 			/*data.clear();*/
 		}

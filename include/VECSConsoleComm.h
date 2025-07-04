@@ -84,12 +84,13 @@ namespace vecs {
             }
 
         private:
+            //set -> searching is quick 
             std::set<Handle> watched;
             bool active{ false };
             bool changes{ false };
             size_t handles{ 0 };
 
-        } liveView;
+        } liveView; //declare member variable
 
         // design question ... do we want one comm object for each VECS registry, or one for all registries in the program?
         // for now, let's assume a simple 1:1 relation - each registry gets its own connection object
@@ -171,9 +172,9 @@ namespace vecs {
         }
 
         // LiveView data interface
-        void Insert(Handle& h) { liveView.Insert(registry, h); }
-        void Erase(Handle& h) { liveView.Erase(registry, h); }
-        void Clear() { liveView.Clear(registry); }
+        void Insert(VECSConsoleInterface* registry, Handle& h) { liveView.Insert(registry, h); }
+        void Erase(VECSConsoleInterface* registry, Handle& h) { liveView.Erase(registry, h); }
+        void Clear(VECSConsoleInterface* registry) { liveView.Clear(registry); }
 
 
     private:

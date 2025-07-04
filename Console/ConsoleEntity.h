@@ -41,8 +41,6 @@ namespace Console {
 		void SetArchetype(Archetype* a = nullptr) { archetype = a; }
 		Archetype* GetArchetype() { return archetype; }
 
-	public:
-
 		void clear() {
 			index = version = stgindex = 0;;
 			components.clear();
@@ -71,8 +69,6 @@ namespace Console {
 		std::string toString() {
 			return std::to_string(index);
 		}
-
-
 
 	};
 

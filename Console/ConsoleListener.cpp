@@ -203,7 +203,7 @@ bool ConsoleSocketThread::ProcessJSON(std::string sjson) {
     case cmdHandshake:
         // VECS information coming in
         // This is where interaction with the main program has to happen.
-        // We got a new client! :-)
+        // We got a new client! :)
         onHandshake(msgjson);
 
         // for now, however ...
@@ -320,6 +320,11 @@ bool ConsoleSocketThread::onLiveView(json const& json) {
     try {
         // TEST TEST TEST TEST TEST TEST TEST TEST
         std::cout << json["entities"] << "\n";
+        for (int i = 1; i < _countof(lvEntityCount); i++) {
+            lvEntityCount[i - 1] = lvEntityCount[i];
+        }
+        lvEntityCount[_countof(lvEntityCount) - 1] = json["entities"];
+        if (lvEntityCount[_countof(lvEntityCount) - 1] > lvEntityMax) lvEntityMax = lvEntityCount[_countof(lvEntityCount) - 1];
     }
     catch (json::exception& e) {
         // for now, simply dump JSON errors

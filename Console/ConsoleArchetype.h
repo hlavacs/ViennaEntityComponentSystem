@@ -37,7 +37,6 @@ namespace Console {
 		void SetRegistry(Registry* r = nullptr) { registry = r; }
 		Registry* GetRegistry() { return registry; }
 
-	public:
 		void clear() {
 			entities.clear();
 			dataTypes.clear();

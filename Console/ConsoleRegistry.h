@@ -37,14 +37,11 @@ namespace Console {
             return *this;
         }
 
-    public:
         void clear() {
             types.clear();
             tags.clear();
             archetypes.clear();
         }
-
-    public:
 
         void setJsonsnap(std::string json) {
             jsonsnap = json; 
@@ -73,8 +70,6 @@ namespace Console {
             //TODO
             return 0;
         }
-
-
 
         // type name handling stuff
         bool AddTypeName(size_t t, std::string name) {
