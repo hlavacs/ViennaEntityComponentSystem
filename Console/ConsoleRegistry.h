@@ -16,8 +16,9 @@ namespace Console {
         // map of all types and their names 
         std::map<size_t, std::string> types;
         std::map<size_t, std::string> tags;
-        std::list<Archetype> archetypes;
-        std::string jsonsnap; 
+        std::map<size_t, Archetype> archetypes;
+        std::map<size_t, size_t> entities;
+        std::string jsonsnap;
 
 
     public:
@@ -26,14 +27,16 @@ namespace Console {
             types = org.types;
             tags = org.tags;
             archetypes = org.archetypes;
-            for (auto& a : archetypes) a.SetRegistry(this);
+            entities = org.entities;
+            for (auto& a : archetypes) a.second.SetRegistry(this);
         }
         Registry& operator=(Registry const& org) {
             clear();
             types = org.types;
             tags = org.tags;
             archetypes = org.archetypes;
-            for (auto& a : archetypes) a.SetRegistry(this);
+            entities = org.entities;
+            for (auto& a : archetypes) a.second.SetRegistry(this);
             return *this;
         }
 
@@ -41,23 +44,24 @@ namespace Console {
             types.clear();
             tags.clear();
             archetypes.clear();
+            entities.clear();
         }
 
         void setJsonsnap(std::string json) {
-            jsonsnap = json; 
+            jsonsnap = json;
         }
         std::string getJsonsnap() {
             return jsonsnap;
         }
 
         // archetype handling
-        std::list<Archetype>& getArchetypes() {
+        std::map<size_t, Archetype>& getArchetypes() {
             return archetypes;
         }
 
         int addArchetype(Archetype& a) {
-            archetypes.push_back(a);
-            archetypes.back().SetRegistry(this);
+            archetypes[a.getHash()] = a;
+            archetypes[a.getHash()].SetRegistry(this);
             return 0;
         }
 
@@ -66,9 +70,26 @@ namespace Console {
             return 0;
         }
 
-        int findArchetype(std::string) {
-            //TODO
-            return 0;
+        void addEntity(size_t entityid, size_t archetype) {
+            entities[entityid] = archetype;
+        }
+
+        Entity* findEntity(size_t id) {
+            auto hashit = entities.find(id);
+            if (hashit != entities.end()) {
+                auto arch = findArchetype(hashit->second);
+                if (arch != nullptr)
+                    return arch->findEntity(id);
+            }
+            return nullptr;
+        }
+
+        Archetype* findArchetype(size_t hash) {
+            auto i = archetypes.find(hash);
+            if (i != archetypes.end()) {
+                return &i->second;
+            }
+            else return nullptr;
         }
 
         // type name handling stuff

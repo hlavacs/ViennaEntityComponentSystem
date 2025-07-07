@@ -35,9 +35,6 @@
 #include <volk.h>
 #endif
 
-// Console Listener
-#include "ConsoleListener.h"
-
 // use scaling (resize window based on main screen scale) - still very experimental!
 #define USE_SCALING 0
 

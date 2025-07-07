@@ -21,6 +21,7 @@ std::string service = "2000";
 static bool connectionWindow = true;
 static bool viewSnapshotWindow = false;
 static bool liveView = false;
+static bool showWatchlist = false;
 
 void SetupListener() {
     listening.Create(service);
@@ -76,13 +77,12 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
 
             // used in child window area calculation below - presumably there's a better way in Imgui
             ImVec2 initCursorPos = ImGui::GetCursorPos();
-
+            auto vecs = listening.getVecs(listening.cursel);
             if (ImGui::Button("Get new Snapshot"))
             {
-                if (listening.cursel >= 0)
-                    listening.getVecs(listening.cursel)->requestSnapshot();
+              vecs->requestSnapshot();
             }
-            Console::Registry& snap = listening.getVecs(listening.cursel)->getSnapshot();
+            Console::Registry& snap = vecs->getSnapshot();
 
             ImGui::SameLine();
             if (ImGui::Button("Save snapshot to file"))
@@ -115,9 +115,9 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
             entityNames.push_back("-");
             archetypeNames.push_back("-");
             for (auto& arch : snap.getArchetypes()) {
-                archetypeNames.push_back(arch.toString());
-                for (auto& ent : arch.getEntities())
-                    entityNames.push_back(ent.toString());
+                archetypeNames.push_back(arch.second.toString());
+                for (auto& ent : arch.second.getEntities())
+                    entityNames.push_back(ent.second.toString());
             }
             static std::string current_archetype = "-";
 
@@ -207,17 +207,17 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
                         bool selectedEntity = (current_entity != "-");
 
                         for (auto& archetype : snap.getArchetypes()) {
-                            std::string aHash = archetype.toString();
+                            std::string aHash = archetype.second.toString();
                             if (selectedArchetype && aHash != current_archetype)
                                 continue;
                             int archtagcount = 0;
                             std::string tagstr;
-                            for (auto& tag : archetype.getTags()) {
+                            for (auto& tag : archetype.second.getTags()) {
                                 if (archtagcount++) tagstr += ",";
                                 tagstr += snap.GetTagName(tag);
                             }
                             //ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0,ImGui::GetColorU32(ImVec4(0,188,0,50)));
-                            if (!archetype.getEntities().size()) {
+                            if (!archetype.second.getEntities().size()) {
                                 if (selectedEntity) continue;
                                 ImGui::TableNextRow();
                                 ImGui::TableSetColumnIndex(0);
@@ -233,7 +233,9 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
                             }
                             else {
                                 size_t entityIndex = 0;
-                                for (auto& entity : archetype.getEntities()) {
+
+                                for (auto& x : archetype.second.getEntities()) {
+                                    auto& entity = x.second;
                                     std::string eIndex = entity.toString();
                                     if (selectedEntity && eIndex != current_entity) {
                                         entityIndex++;
@@ -262,6 +264,21 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
                                             selTableComponent = &component;
                                             selTableEntity = &entity;
                                             componentSelected = true;
+                                        }
+                                        if (ImGui::BeginPopupContextItem()) {
+                                            selTableComponent = &component;
+                                            selTableEntity = &entity;
+                                            componentSelected = true;
+                                            bool watched = listening.getVecs(listening.cursel)->isWatched(selTableEntity->GetIndex());
+                                            if (!watched && ImGui::Button("Add to watchlist")) {
+                                                vecs->addWatch(selTableEntity->GetIndex());
+                                                ImGui::CloseCurrentPopup();
+                                            }
+                                            if (watched && ImGui::Button("Remove from watchlist")) {
+                                                vecs->deleteWatch(selTableEntity->GetIndex());
+                                                ImGui::CloseCurrentPopup();
+                                            }
+                                            ImGui::EndPopup();
                                         }
 #endif
 
@@ -295,9 +312,20 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
                             ", Version " + std::to_string(selTableEntity->GetVersion()) +
                             ", Storage Index " + std::to_string(selTableEntity->GetStorageIndex());
                         ImGui::TextUnformatted(entityText.c_str());
+
+                        //ImGui::SameLine();
+                        //bool watched = listening.getVecs(listening.cursel)->isWatched(selTableEntity->GetIndex());
+                        //if (!watched && ImGui::Button("Add to watchlist")) {
+                        //    listening.getVecs(listening.cursel)->addWatch(selTableEntity->GetIndex());
+                        //}
+                        //if (watched && ImGui::Button("Remove from watchlist")) {
+                        //    listening.getVecs(listening.cursel)->deleteWatch(selTableEntity->GetIndex());
+                        //}
                         std::string componentText = std::string("Component Type: ") + snap.GetTypeName(selTableComponent->getType());
                         ImGui::TextUnformatted(componentText.c_str());
                         ImGui::TextUnformatted(selTableComponent->toString().c_str());
+
+
                     }
                     ImGui::EndChild();
 
@@ -391,7 +419,7 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
 #else
         const float scale = 1.f;
 #endif
-      
+
         ImVec2 windowsize = ImVec2(1135 * scale, 700 * scale);
         ImGui::SetNextWindowSize(windowsize, ImGuiCond_Once);
         ImVec2 wpos(150 * scale, 20 * scale);
@@ -420,7 +448,7 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
             if (listening.cursel >= 0) {
                 auto vecs = listening.getVecs(listening.cursel);
                 ImPlot::BeginPlot("TestPlot");
-                ImPlot::SetupAxisLimits(ImAxis_X1,0,_countof(vecs->lvEntityCount));
+                ImPlot::SetupAxisLimits(ImAxis_X1, 0, _countof(vecs->lvEntityCount));
                 ImPlot::SetupAxisLimits(ImAxis_Y1, 0, vecs->lvEntityMax);
                 //ImPlot::SetupAxesLimits(0,50,0,100);
                 ImPlot::PlotBars("Entities", vecs->lvEntityCount, _countof(vecs->lvEntityCount));
@@ -436,6 +464,116 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
         }
 
     }
+
+    void static showWatchlistWindow(ConsoleListener & listening, bool* p_open) {
+
+
+        if (!ImGui::Begin("Watchlist", p_open))
+        {
+            ImGui::End();
+        }
+        else
+        {
+            if (listening.cursel >= 0) {
+
+                // allow to single select a component
+                static Console::Component* selTableComponent{ nullptr };
+                static Console::Entity* selTableEntity{ nullptr };
+                bool componentSelected{ false };
+
+                auto vecs = listening.getVecs(listening.cursel);
+                if (ImGui::BeginTable("Watchlist", 5, ImGuiTableFlags_RowBg)) {
+
+                    ImGui::TableSetupColumn("Archetype");
+                    ImGui::TableSetupColumn("Index");
+                    ImGui::TableSetupColumn("Typename");
+                    ImGui::TableSetupColumn("Value");
+                    ImGui::TableSetupColumn("Tag");
+                    ImGui::TableHeadersRow();
+
+                    auto& snap = vecs->getSnapshot();
+                    auto& watchlist = vecs->getWatchlist();
+
+                    size_t entityIndex = 0;
+                    size_t entidel = (size_t)-1;
+                    for (auto& entityid : watchlist) {
+                        auto entity = snap.findEntity(entityid);
+                        if (!entity)
+                            continue;
+                        auto archetype = entity->GetArchetype();
+                        std::string aHash = archetype->toString();
+                        std::string eIndex = entity->toString();
+                        int archtagcount = 0;
+                        std::string tagstr;
+                        for (auto& tag : archetype->getTags()) {
+                            if (archtagcount++) tagstr += ",";
+                            tagstr += snap.GetTagName(tag);
+                        }
+                        size_t componentIndex = 0;
+                        for (auto& component : entity->getComponents()) {
+#if 0
+                            std::string cvalue = snap.GetTypeName(component.getType()) + " " + component.toString();
+#else
+                            std::string cvalue = component.toString();
+#endif
+                            ImGui::TableNextRow();
+                            ImGui::TableSetColumnIndex(0);
+
+#if 0 // no selection
+                            ImGui::TextUnformatted(aHash.c_str());
+#else
+                            // generate nice label for this table row; the "##" part is to guarantee unique labels while only displaying the hash
+                            std::string componentLabel = aHash + "##wl" + std::to_string(entityIndex) + "." + std::to_string(componentIndex);
+                            // make table row selectable
+                            const ImGuiSelectableFlags selectable_flags = ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap;
+                            const bool itemIsSelected = (&component == selTableComponent);
+                            if (itemIsSelected) componentSelected = true;
+                            if (ImGui::Selectable(componentLabel.c_str(), itemIsSelected, selectable_flags /*, ImVec2(0, 10)*/)) {
+                                selTableComponent = &component;
+                                selTableEntity = entity;
+                                componentSelected = true;
+                            }
+                            if (ImGui::BeginPopupContextItem()) {
+                                selTableComponent = &component;
+                                selTableEntity = entity;
+                                componentSelected = true;
+
+                                    if (ImGui::Button("Remove from watchlist")) {
+                                        //TODO 
+                                        entidel = entityid;
+                                        ImGui::CloseCurrentPopup();
+                                    }
+                                    ImGui::EndPopup();
+                            }
+#endif
+
+                            ImGui::TableSetColumnIndex(1);
+                            ImGui::TextUnformatted(eIndex.c_str());
+                            ImGui::TableSetColumnIndex(2);
+                            ImGui::TextUnformatted(snap.GetTypeName(component.getType()).c_str());
+                            ImGui::TableSetColumnIndex(3);
+                            ImGui::TextUnformatted(cvalue.c_str());
+                            ImGui::TableSetColumnIndex(4);
+                            ImGui::TextUnformatted(tagstr.c_str());
+
+                            componentIndex++;
+                        }
+                        entityIndex++;
+                    }
+                    if (entidel != (size_t)-1)
+                        vecs->deleteWatch(entidel);
+
+
+                }
+                ImGui::EndTable();
+            }
+            ImGui::End();
+        }
+
+    }
+
+
+
 
     void MainLoop() {
         if (ImGui::BeginMainMenuBar()) {
@@ -458,6 +596,7 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
             if (ImGui::BeginMenu("Watchlist")) {
 
                 if (ImGui::MenuItem("Edit/View")) {
+                    showWatchlist = true;
                 }
                 ImGui::EndMenu();
             }
@@ -476,7 +615,11 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
         {
             showLiveView(listening, &liveView);
         }
-    
+
+        if (showWatchlist) {
+            showWatchlistWindow(listening, &showWatchlist);
+        }
+
     }
 
 

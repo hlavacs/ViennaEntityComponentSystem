@@ -1,6 +1,7 @@
 #pragma once
 #include <iostream>
 #include <list>
+#include <map>
 
 #include "ConsoleEntity.h"
 
@@ -9,7 +10,7 @@ namespace Console {
 	class Registry;
 	class Archetype {
 	private:
-		std::list<Entity> entities;
+		std::map<size_t, Entity> entities;
 		std::list<std::string> dataTypes;
 		std::list<size_t> tags;
 		size_t hash;
@@ -19,7 +20,7 @@ namespace Console {
 		Archetype(size_t hash = 0) : hash(hash) {}
 		Archetype(Archetype const& org) {
 			entities = org.entities;
-			for (auto& e : entities) e.SetArchetype(this);
+			for (auto& e : entities) e.second.SetArchetype(this);
 			dataTypes = org.dataTypes;
 			tags = org.tags;
 			hash = org.hash;
@@ -27,14 +28,14 @@ namespace Console {
 		Archetype& operator=(Archetype const& org) {
 			clear();
 			entities = org.entities;
-			for (auto& e : entities) e.SetArchetype(this);
+			for (auto& e : entities) e.second.SetArchetype(this);
 			dataTypes = org.dataTypes;
 			tags = org.tags;
 			hash = org.hash;
 			return *this;
 		}
 
-		void SetRegistry(Registry* r = nullptr) { registry = r; }
+		void SetRegistry(Registry* r = nullptr);
 		Registry* GetRegistry() { return registry; }
 
 		void clear() {
@@ -44,24 +45,23 @@ namespace Console {
 			hash = 0;
 		}
 
-		std::list<Entity>& getEntities() {
+		std::map<size_t, Entity>& getEntities() {
 			return entities;
 		}
 
-		int addEntity(Entity& e) {
-			entities.push_back(e);
-			entities.back().SetArchetype(this);
-			return 0;
-		}
+		int addEntity(Entity& e);
 
 		int deleteEntity(std::string) {
 			//TODO
 			return 0;
 		}
 
-		int findEntity(std::string) {
-			//TODO
-			return 0;
+		Entity* findEntity(size_t id) {
+			auto i = entities.find(id);
+			if (i != entities.end()) {
+				return &i->second;
+			}
+			else return nullptr;
 		}
 
 

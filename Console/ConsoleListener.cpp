@@ -315,6 +315,16 @@ bool ConsoleSocketThread::requestLiveView(bool active) {  // presumably expanded
     return sendData(std::string("{\"cmd\":\"liveview\",\"active\":") + (active ? "true" : "false") + "}") > 0;
 }
 
+bool ConsoleSocketThread::sendWatchlist(std::set<size_t>& watchlist) {  
+    std::string watchlistString; 
+    int count = 0; 
+    for (auto& id : watchlist) {
+        if (count++) watchlistString += ","; 
+        watchlistString += std::to_string(id);
+    }
+    return sendData(std::string("{\"cmd\":\"liveview\",\"watchlist\":[") + watchlistString + "]}") > 0;
+}
+
 bool ConsoleSocketThread::onLiveView(json const& json) {
     // parse incoming live view data, create internal structure for it that can be handled from GUI
     try {

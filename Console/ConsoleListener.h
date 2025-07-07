@@ -5,6 +5,7 @@
 #include "ConsoleRegistry.h"
 
 #include <nlohmann/json.hpp> 
+#include <set>
 
 
 // ConsoleSocketThread : socket client thread for the Console
@@ -15,6 +16,7 @@ private:
     int pid{ 0 };
     int entitycount{ 0 };
     Console::Registry snapshot;  // we deal with exactly ONE snapshot at the moment
+    std::set<size_t> watchlist;
 
     virtual void ClientActivity();
     bool ProcessJSON(std::string sjson);
@@ -37,9 +39,15 @@ public:
 
     bool requestSnapshot();
     bool requestLiveView(bool active = true);  // presumably expanded on in later versions
+    bool sendWatchlist(std::set<size_t>& watchlist);
+
     bool selected{ false };
     bool parseSnapshot(nlohmann::json const& json);
 
+    void addWatch(size_t id) { watchlist.insert(id); sendWatchlist(watchlist); }
+    void deleteWatch(size_t id) { watchlist.erase(id); sendWatchlist(watchlist); }
+    bool isWatched(size_t id) { return watchlist.contains(id); }
+    std::set<size_t>& getWatchlist() { return watchlist; }
 
 
 };

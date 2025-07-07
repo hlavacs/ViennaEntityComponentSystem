@@ -64,6 +64,7 @@ namespace vecs {
             bool IsActive() const { return active; }
             bool Watch(Handle h) { return watched.insert(h).second; }
             bool Unwatch(Handle h) { return watched.erase(h) > 0; }
+            void ClearWatch() { watched.clear(); }
 
             // TODO: make these thread-safe. The listener thread might come in at any moment and fetch the changes.
             void Insert(VECSConsoleInterface* registry, Handle& h) { handles++; changes = true; }
@@ -258,8 +259,9 @@ namespace vecs {
                     } // else ignore
                 }
                 // "watch":id or [id,id,...]  - adds a (set of) id(s) to the watched set
-                if (msgjson.contains("watch")) {
-                    auto& watch = msgjson["watch"];
+                if (msgjson.contains("watchlist")) {
+                    liveView.ClearWatch();
+                    auto& watch = msgjson["watchlist"];
                     if (watch.is_array()) {
                         for (auto& el : watch) {
                             if (el.is_number_unsigned()) {
@@ -271,22 +273,6 @@ namespace vecs {
                     else if (watch.is_number_unsigned()) {
                         size_t wh = watch;
                         liveView.Watch(static_cast<Handle>(wh));
-                    } // else ignore.
-                }
-                // "unwatch":id or [id,id,...]  - removes a (set of) id(s) from the watched set
-                if (msgjson.contains("unwatch")) {
-                    auto& unwatch = msgjson["unwatch"];
-                    if (unwatch.is_array()) {
-                        for (auto& el : unwatch) {
-                            if (el.is_number_unsigned()) {
-                                size_t wh = el;
-                                liveView.Unwatch(static_cast<Handle>(wh));
-                            }
-                        }
-                    }
-                    else if (unwatch.is_number_unsigned()) {
-                        size_t wh = unwatch;
-                        liveView.Unwatch(static_cast<Handle>(wh));
                     } // else ignore.
                 }
 
