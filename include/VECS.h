@@ -8,6 +8,7 @@
 #include <functional>
 #include <typeindex>
 #include <cassert>
+#include <algorithm>
 
 namespace vecs {
 
