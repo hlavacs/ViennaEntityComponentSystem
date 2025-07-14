@@ -70,16 +70,16 @@ namespace Console {
             return 0;
         }
 
-        void addEntity(size_t entityid, size_t archetype) {
-            entities[entityid] = archetype;
+        void addEntity(size_t entityhandle, size_t archetype) {
+            entities[entityhandle] = archetype;
         }
 
-        Entity* findEntity(size_t id) {
-            auto hashit = entities.find(id);
+        Entity* findEntity(size_t handle) {
+            auto hashit = entities.find(handle);
             if (hashit != entities.end()) {
                 auto arch = findArchetype(hashit->second);
                 if (arch != nullptr)
-                    return arch->findEntity(id);
+                    return arch->findEntity(handle);
             }
             return nullptr;
         }
@@ -93,6 +93,7 @@ namespace Console {
         }
 
         // type name handling stuff
+        std::map<size_t, std::string>& GetTypes() { return types; }
         bool AddTypeName(size_t t, std::string name) {
             if (HasTypeName(t))                 // if already there ...
                 return name != GetTypeName(t);  // report whether same (if not: two names for the same type are BAD!)

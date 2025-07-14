@@ -311,8 +311,6 @@ namespace vecs {
 			slot.m_value.m_arch = GetArchetype<Ts...>(nullptr, {}, {});
 			slot.m_value.m_index = slot.m_value.m_arch->Insert( handle, std::forward<Ts>(component)... ); //insert the entity into the archetype
 			++m_size;
-			// for Console LiveView
-			comm.Insert(this, handle);
 			return handle;
 		}
 
@@ -456,8 +454,6 @@ namespace vecs {
 			ReindexMovedEntity(archAndIndex.m_arch->Erase(archAndIndex.m_index), archAndIndex.m_index);
 			slot.m_version++; //invalidate the slot
 			--m_size;		
-			// for Console LiveView
-			comm.Erase(this, handle);
 		}
 
 		/// @brief Clear the registry by removing all entities.
@@ -465,8 +461,6 @@ namespace vecs {
 			for( auto& arch : m_archetypes ) { arch.second->Clear(); }
 			for( auto& slotmap : m_slotMaps ) { slotmap.m_slotMap.Clear(); }
 			m_size = 0;
-			// for Console LiveView
-			comm.Clear(this);
 		}
 
 		/// @brief Get a view of entities with specific components.
@@ -679,7 +673,7 @@ namespace vecs {
 			comm.setRegistry(this);
 			return comm.connectToServer(host, port);
 		}
-		bool isConnected() {  return comm.isConnected(); }
+		bool isConnected() { return comm.isConnected(); }
 		int disconnectFromServer() { return comm.disconnectFromServer(); }
 
 		virtual std::string getLiveView() override {
@@ -687,6 +681,12 @@ namespace vecs {
 			json += std::to_string(Size());
 			json += "}";
 			return json;
+		}
+
+		virtual std::string toJSON(Handle h) override {
+			if (!h.IsValid() || !Exists(h)) { return "null"; }
+			auto& archAndIndex = GetArchetypeAndIndex(h);
+			return archAndIndex.m_arch->toJSON(archAndIndex.m_index);
 		}
 
 		virtual std::string getSnapshot() override {
@@ -698,30 +698,14 @@ namespace vecs {
 			size_t art {0};
 			for (auto& it : m_archetypes) {
 				if (art) json += ",";
-				json += "{\"hash\":\""+std::to_string(it.first)+"\""+
-				         "," + it.second->toJSON() + //should come here when done
-				        "}";
+				json += "{\"hash\":\"" + std::to_string(it.first) + "\"" +
+					"," + it.second->toJSON() + //should come here when done
+					"}";
 				art++;
 			}
-			//json += "],"; TODO
-			//json += "\"slotmap\":[";
-			//size_t mapi = 0;
-			//for (auto& it : m_slotMaps) {
-			//	if (mapi++) json += ",";
-			//	json += "[";
-			//	for (size_t i = 0; i < it.m_slotMap.Size(); i++) {
-			//		if (i) json += ",";
-			//		json += "[";
-			//		//json += std::to_string(Hash(it.m_slotMap[i].m_value.m_arch)) + ",";  // TODO!
-			//		json += std::to_string(it.m_slotMap[i].m_value.m_index) + ",";
-			//		json += std::to_string(it.m_slotMap[i].m_version);
-			//		json += "]";
-			//	}
-			//	json += "]";
-			//}
 			json += "]";
 			json += "}";
-		    return json;
+			return json;
 		}
 	private:
 		VECSConsoleComm comm;

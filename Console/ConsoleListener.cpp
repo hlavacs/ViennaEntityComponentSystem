@@ -274,7 +274,7 @@ bool ConsoleSocketThread::parseSnapshot(nlohmann::json const& json) {
             // now that we got all necessary details, fetch the entities 
             auto& entities = a2["entities"];
             for (auto& e : entities) {
-                Console::Entity ce(e["index"], e["version"], e["stgindex"]);
+                Console::Entity ce(e["index"], e["version"], e["stgindex"], e["value"]);
                 auto& values = e["values"];
                 int i = 0;
                 for (auto& v : values) {
@@ -312,14 +312,15 @@ bool ConsoleSocketThread::parseSnapshot(nlohmann::json const& json) {
 }
 
 bool ConsoleSocketThread::requestLiveView(bool active) {  // presumably expanded on in later versions
+    isLive = active; 
     return sendData(std::string("{\"cmd\":\"liveview\",\"active\":") + (active ? "true" : "false") + "}") > 0;
 }
 
-bool ConsoleSocketThread::sendWatchlist(std::set<size_t>& watchlist) {  
-    std::string watchlistString; 
-    int count = 0; 
+bool ConsoleSocketThread::sendWatchlist(std::set<size_t>& watchlist) {
+    std::string watchlistString;
+    int count = 0;
     for (auto& id : watchlist) {
-        if (count++) watchlistString += ","; 
+        if (count++) watchlistString += ",";
         watchlistString += std::to_string(id);
     }
     return sendData(std::string("{\"cmd\":\"liveview\",\"watchlist\":[") + watchlistString + "]}") > 0;
@@ -328,13 +329,26 @@ bool ConsoleSocketThread::sendWatchlist(std::set<size_t>& watchlist) {
 bool ConsoleSocketThread::onLiveView(json const& json) {
     // parse incoming live view data, create internal structure for it that can be handled from GUI
     try {
-        // TEST TEST TEST TEST TEST TEST TEST TEST
-        std::cout << json["entities"] << "\n";
-        for (int i = 1; i < _countof(lvEntityCount); i++) {
-            lvEntityCount[i - 1] = lvEntityCount[i];
+        if (json.contains("entities")) {
+            // TEST TEST TEST TEST TEST TEST TEST TEST
+            size_t entities = json["entities"];
+            std::cout << "LiveView entities: " << entities << "\n";
+            int newMax = (int)entities;
+            for (int i = 1; i < _countof(lvEntityCount); i++) {
+                if (lvEntityCount[i] > newMax)
+                    newMax = lvEntityCount[i];
+                lvEntityCount[i - 1] = lvEntityCount[i];
+            }
+            lvEntityCount[_countof(lvEntityCount) - 1] = (int)entities;
+
+            // scale max up and down - up at once, down only if difference is too big
+            if (newMax > lvEntityMax)
+                lvEntityMax = newMax;
+            else if (!newMax)
+                lvEntityMax = 1;
+            else if (newMax < lvEntityMax)
+                lvEntityMax = newMax + ((lvEntityMax - newMax) / 2);
         }
-        lvEntityCount[_countof(lvEntityCount) - 1] = json["entities"];
-        if (lvEntityCount[_countof(lvEntityCount) - 1] > lvEntityMax) lvEntityMax = lvEntityCount[_countof(lvEntityCount) - 1];
     }
     catch (json::exception& e) {
         // for now, simply dump JSON errors

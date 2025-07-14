@@ -42,8 +42,12 @@ namespace vecs {
 
     class VECSConsoleInterface {
     public:
+        // Snapshot functionality
         virtual std::string getSnapshot() = 0;
+        // LiveView functionality
         virtual std::string getLiveView() = 0;
+        virtual size_t Size() = 0;
+        virtual std::string toJSON(Handle h) = 0;
     };
 
     class VECSConsoleComm {
@@ -60,35 +64,63 @@ namespace vecs {
             LiveView() {}  // don't need anything yet
             ~LiveView() {}  // don't need anything yet
 
+            void setRegistry(VECSConsoleInterface* reg = nullptr) { registry = reg; }
+
             bool SetActive(bool onoff = true) { bool old = active; active = onoff; return old; }
             bool IsActive() const { return active; }
-            bool Watch(Handle h) { return watched.insert(h).second; }
-            bool Unwatch(Handle h) { return watched.erase(h) > 0; }
-            void ClearWatch() { watched.clear(); }
+            bool Watch(std::set<Handle>& newSet) {
+                // determine handles to remove
+                std::set<Handle> toRemove;
+                for (auto& el : watched)
+                    if (!newSet.contains(el.first))
+                        toRemove.insert(el.first);
+                // add new handles
+                for (auto& el : newSet)
+                    if (!watched.contains(el))
+                        watched[el] = "";
+                // remove unwatched handles
+                for (auto& el : toRemove)
+                    watched.erase(el);
+                return true; // needed?
+            }
 
             // TODO: make these thread-safe. The listener thread might come in at any moment and fetch the changes.
-            void Insert(VECSConsoleInterface* registry, Handle& h) { handles++; changes = true; }
-            void Erase(VECSConsoleInterface* registry, Handle& h) { handles--; changes = true; }
-            void Clear(VECSConsoleInterface* registry) { handles = 0; changes = true; }
             std::tuple<bool, std::string> getChangesJSON() {
-                if (!active)
+                if (!active || !registry)
                     return std::tuple<bool, std::string>(false, "");
-                bool hadChanges = changes;
-                changes = false;
+                size_t oldHandles = handles; handles = registry->Size();
+                bool changes = oldHandles != handles;
                 std::string json = "{\"cmd\":\"liveview\"";
-                if (hadChanges) {
+                if (changes) {
                     json += std::string(",\"entities\":") + std::to_string(handles);
                 }
+                size_t changedWatch = 0;
+                for (auto& entity : watched) {
+                    std::string entityJSON = registry->toJSON(entity.first);
+                    if (entityJSON != entity.second) {
+                        if (!changedWatch++)
+                            json += ",\"watched\":[{";
+                        else
+                            json += ",{";
+                        entity.second = entityJSON;
+                        changes = true;
+                        json += std::string("\"entity\":") +
+                            std::to_string(entity.first.GetIndex()) +
+                            ",\"data\":" +
+                            entityJSON +
+                            "}";
+                    }
+                }
+                if (changedWatch)
+                    json += "]";
                 json += "}";
-                changes = false;
-                return std::tuple<bool, std::string>(hadChanges, json);
+                return std::tuple<bool, std::string>(changes, json);
             }
 
         private:
-            //set -> searching is quick 
-            std::set<Handle> watched;
+            VECSConsoleInterface* registry{ nullptr };
+            std::map<Handle, std::string> watched;
             bool active{ false };
-            bool changes{ false };
             size_t handles{ 0 };
 
         } liveView; //declare member variable
@@ -104,7 +136,7 @@ namespace vecs {
         }
 
         // simple variant: handle exactly one registry
-        void setRegistry(VECSConsoleInterface* reg = nullptr) { registry = reg; }
+        void setRegistry(VECSConsoleInterface* reg = nullptr) { registry = reg; liveView.setRegistry(reg); }
 
         SOCKET connectToServer(std::string host = "127.0.0.1", int port = 2000) {
             if (!startup())
@@ -171,11 +203,6 @@ namespace vecs {
             //TODO: close connection here? 
 
         }
-
-        // LiveView data interface
-        void Insert(VECSConsoleInterface* registry, Handle& h) { liveView.Insert(registry, h); }
-        void Erase(VECSConsoleInterface* registry, Handle& h) { liveView.Erase(registry, h); }
-        void Clear(VECSConsoleInterface* registry) { liveView.Clear(registry); }
 
 
     private:
@@ -260,20 +287,21 @@ namespace vecs {
                 }
                 // "watch":id or [id,id,...]  - adds a (set of) id(s) to the watched set
                 if (msgjson.contains("watchlist")) {
-                    liveView.ClearWatch();
                     auto& watch = msgjson["watchlist"];
+                    std::set<Handle> newWatchlist;
                     if (watch.is_array()) {
                         for (auto& el : watch) {
                             if (el.is_number_unsigned()) {
                                 size_t wh = el;
-                                liveView.Watch(static_cast<Handle>(wh));
+                                newWatchlist.insert(static_cast<Handle>(wh));
                             }
                         }
                     }
                     else if (watch.is_number_unsigned()) {
                         size_t wh = watch;
-                        liveView.Watch(static_cast<Handle>(wh));
+                        newWatchlist.insert(static_cast<Handle>(wh));
                     } // else ignore.
+                    liveView.Watch(newWatchlist);
                 }
 
                 break;
@@ -317,7 +345,7 @@ namespace vecs {
                         auto lv = liveView.getChangesJSON();
                         if (std::get<0>(lv)) {
                             // TEST TEST TEST TEST TEST TEST TEST TEST TEST
-                            std::cout << "Sending liveview changes: " << std::get<1>(lv) << "\n";
+                            std::cout << "Liveview changes: " << std::get<1>(lv) << "\n";
                             sendMessage(std::get<1>(lv));
                         }
                     }

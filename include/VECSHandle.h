@@ -40,7 +40,7 @@ namespace vecs {
 	public:
 		std::string toJSON() {
 			std::string json = "{\"index\":" + std::to_string(GetIndex()) + ",\"version\":" + std::to_string(GetVersion()) +
-				",\"stgindex\":" + std::to_string(GetStorageIndex()) + ",\"values\":";	
+				",\"stgindex\":" + std::to_string(GetStorageIndex()) + ",\"value\":" + std::to_string(GetValue()) + ",\"values\":";
 			return json;
 		}
 	};

@@ -1,3 +1,3 @@
-void SetupListener();
+bool SetupListener();
 void TerminateListener();
 void MainLoop();

@@ -371,11 +371,13 @@ void test_conn() {
 	vecs::Handle hx1 = system.Insert(height_t{ 5 }, weight_t{ 6 });
 
 	std::vector<vecs::Handle> handles;
+	// create 20 handles
 	for (int i = 10; i < 30; i++) {
-		handles.push_back(system.Insert(i, static_cast<float>(i*2)));
+		handles.push_back(system.Insert(i, static_cast<float>(i * 2)));
 	}
-
-	system.Erase(handles[4]); 
+	// erase one of them, leaving 19
+	system.Erase(handles[4]);
+	handles.erase(handles.begin() + 4);
 
 	std::cout << "\x1b[37m isConnected: " << system.isConnected() << "\n";
 	SOCKET testval = system.connectToServer();
@@ -383,16 +385,28 @@ void test_conn() {
 
 	if (system.isConnected()) {
 
-		// do nothing for 300 seconds, let background task work
-		for (int secs = 0; secs < 300; secs++) {
+		// do nothing for 600 seconds, let background task work
+		for (int secs = 0; secs < 600; secs++) {
+			// test for dynamic scaling of entity graph in Console LiveView
+			if (secs == 80) {
+				for (auto hit = std::prev(handles.end()); hit > handles.begin() + 18; hit--)
+					system.Erase(*hit);
+				handles.erase(handles.begin() + 19, handles.end());
+			}
+			else if (secs < 80) {
+				handles.push_back(system.Insert(secs + 1000, static_cast<float>(secs * 7)));
+				handles.push_back(system.Insert(secs + 1000, static_cast<float>(secs * 7)));
+			}
+			// alternating "add 2 at end, remove 2 at front"
 			if (secs & 1) {
-				system.Erase(handles[0]);
-				system.Erase(handles[1]);
+				system.Erase(handles[0]); handles.erase(handles.begin());
+				system.Erase(handles[1]); handles.erase(handles.begin() + 1);
 			}
 			else {
-				handles.push_back(system.Insert(secs+20, static_cast<float>(secs * 2)));
+				handles.push_back(system.Insert(secs + 20, static_cast<float>(secs * 2)));
 				handles.push_back(system.Insert(secs + 15, static_cast<float>(secs * 3)));
 			}
+
 #ifdef WIN32
 			Sleep(1000);
 #else

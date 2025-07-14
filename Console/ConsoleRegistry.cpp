@@ -8,14 +8,14 @@ namespace Console {
 		registry = r;
 		if (registry)
 			for (auto& e : entities)
-				registry->addEntity(e.second.GetIndex(), hash);
+				registry->addEntity(e.second.GetValue(), hash);
 	}
 	int Archetype::addEntity(Entity& e) {
-		entities[e.GetIndex()] = e;
-		entities[e.GetIndex()].SetArchetype(this);
- 
+		entities[e.GetValue()] = e;
+		entities[e.GetValue()].SetArchetype(this);
+
 		if (registry) {
-			registry->addEntity(e.GetIndex(), hash);
+			registry->addEntity(e.GetValue(), hash);
 		}
 
 		return 0;

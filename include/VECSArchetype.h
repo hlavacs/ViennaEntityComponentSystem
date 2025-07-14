@@ -276,6 +276,57 @@ namespace vecs {
 
 	public:
 
+		std::string toJSON(size_t aindex) {
+			// retrieve the values of the entity components
+			std::string json = "[";
+			size_t count = 0;
+
+			for (auto& map : m_maps) {
+				auto type = map.first;
+				if (count++)json += ",";
+				std::string sub;
+				auto typemap = Map(type);
+
+				// This is terrible code, but, to my knowledge, there's no better way to get
+				// the template types and hence the data
+				if (type == Type<char>())
+					sub = toJSONString(std::string(1, Get<char>(aindex)));
+				else if (type == Type<unsigned char>())
+					sub = toJSONString(std::string(1, Get<unsigned char>(aindex)));
+				else if (type == Type<int>())
+					sub = std::to_string(Get<int>(aindex));
+				else if (type == Type<unsigned int>())
+					sub = std::to_string(Get<unsigned int>(aindex));
+				else if (type == Type<long>())
+					sub = std::to_string(Get<long>(aindex));
+				else if (type == Type<unsigned long>())
+					sub = std::to_string(Get<unsigned long>(aindex));
+				else if (type == Type<long long>())
+					sub = std::to_string(Get<long long>(aindex));
+				else if (type == Type<unsigned long long>())
+					sub = std::to_string(Get<unsigned long long>(aindex));
+				else if (type == Type<float>())
+					sub = std::to_string(Get<float>(aindex));
+				else if (type == Type<double>())
+					sub = std::to_string(Get<double>(aindex));
+				else if (type == Type<std::string>())
+					sub = toJSONString(Get<std::string>(aindex));
+				else if (type == Type<Handle>()) {
+					// not really adding anything, but for completeness' sake ...
+					sub = std::to_string(Get<Handle>(aindex).GetValue());
+				}
+				/* doesn't seem to be possible ...
+				else if (type == Type<bool>())
+					sub = Get<bool>(aindex) ? "true" : "false";
+				*/
+				else
+					sub = "\"<unknown>\"";
+
+				json += sub;
+			}
+			return json + "]";
+
+		}
 		std::string toJSON() {
 			std::string json = "\"archetype\":{\"hash\":" + std::to_string(Hash(m_types)) + ",\"types\":[";
 			//std::cout << "Archetype: " << Hash(m_types) << std::endl;
@@ -304,58 +355,12 @@ namespace vecs {
 			auto map = Map<Handle>();
 			size_t aindex = 0;					 // entity index in archetype
 			for (auto& handle : *map) {
-				auto eindex = handle.GetIndex(); // entity index in registry
 				if (aindex) json += ",";
+				auto eindex = handle.GetIndex(); // entity index in registry
 				// write out basic entity information
 				json += handle.toJSON();
 				// retrieve the values of the entity components
-				json += "[";
-				count = 0;
-
-				for (auto& map : m_maps) {
-					auto type = map.first;
-					if (count++)json += ",";
-					std::string sub;
-					auto typemap = Map(type);
-
-					// This is terrible code, but, to my knowledge, there's no better way to get
-					// the template types and hence the data
-					if (type == Type<char>())
-						sub = toJSONString(std::string(1, Get<char>(aindex)));
-					else if (type == Type<unsigned char>())
-						sub = toJSONString(std::string(1, Get<unsigned char>(aindex)));
-					else if (type == Type<int>())
-						sub = std::to_string(Get<int>(aindex));
-					else if (type == Type<unsigned int>())
-						sub = std::to_string(Get<unsigned int>(aindex));
-					else if (type == Type<long>())
-						sub = std::to_string(Get<long>(aindex));
-					else if (type == Type<unsigned long>())
-						sub = std::to_string(Get<unsigned long>(aindex));
-					else if (type == Type<long long>())
-						sub = std::to_string(Get<long long>(aindex));
-					else if (type == Type<unsigned long long>())
-						sub = std::to_string(Get<unsigned long long>(aindex));
-					else if (type == Type<float>())
-						sub = std::to_string(Get<float>(aindex));
-					else if (type == Type<double>())
-						sub = std::to_string(Get<double>(aindex));
-					else if (type == Type<std::string>())
-						sub = toJSONString(Get<std::string>(aindex));
-					else if (type == Type<Handle>()) {
-						// not really adding anything, but for completeness' sake ...
-						sub = std::to_string(Get<Handle>(aindex).GetValue());
-					}
-					/* doesn't seem to be possible ...
-					else if (type == Type<bool>())
-						sub = Get<bool>(aindex) ? "true" : "false";
-					*/
-					else
-						sub = "\"<unknown>\"";
-
-					json += sub;
-				}
-				json += "]}";
+				json += toJSON(aindex) + "}";
 
 				aindex++;
 			}

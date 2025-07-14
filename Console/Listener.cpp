@@ -225,14 +225,17 @@ int Socket::bind(std::string server, std::string service, int bReuse) {
     if (!sockStart() || s == INVALID_SOCKET)
         return SOCKET_ERROR;
 
-    if (service.size()) {
-        // if binding to specific port, assure socket gets reused
-        setOpt(SOL_SOCKET, SO_REUSEADDR, (char*)&bReuse, sizeof(bReuse));
-    }
-
     setSockAddr(&saiS, server, service);
 
-    return ::bind(s, (const struct sockaddr*)&saiS, sizeof(saiS));
+    int rc = ::bind(s, (const struct sockaddr*)&saiS, sizeof(saiS));
+    if (!rc) {
+        if (service.size()) {
+            // if binding to specific port, assure socket gets reused
+            setOpt(SOL_SOCKET, SO_REUSEADDR, (char*)&bReuse, sizeof(bReuse));
+        }
+    }
+    return rc;
+
 }
 
 // connect : connects socket to a server / port

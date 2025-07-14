@@ -17,6 +17,7 @@ private:
     int entitycount{ 0 };
     Console::Registry snapshot;  // we deal with exactly ONE snapshot at the moment
     std::set<size_t> watchlist;
+    bool isLive{ false }; 
 
     virtual void ClientActivity();
     bool ProcessJSON(std::string sjson);
@@ -34,19 +35,20 @@ public:
     int getEntitycount() { return entitycount; }
     Console::Registry& getSnapshot() { return snapshot; }
 
-    int lvEntityCount[200]{0};
-    int lvEntityMax = 0;
+    int lvEntityCount[200]{ 0 };
+    int lvEntityMax = 1;
 
     bool requestSnapshot();
     bool requestLiveView(bool active = true);  // presumably expanded on in later versions
     bool sendWatchlist(std::set<size_t>& watchlist);
+    bool getIsLive() { return isLive; } // nanananana
 
     bool selected{ false };
     bool parseSnapshot(nlohmann::json const& json);
 
-    void addWatch(size_t id) { watchlist.insert(id); sendWatchlist(watchlist); }
-    void deleteWatch(size_t id) { watchlist.erase(id); sendWatchlist(watchlist); }
-    bool isWatched(size_t id) { return watchlist.contains(id); }
+    void addWatch(size_t handle) { watchlist.insert(handle); sendWatchlist(watchlist); }
+    void deleteWatch(size_t handle) { watchlist.erase(handle); sendWatchlist(watchlist); }
+    bool isWatched(size_t handle) { return watchlist.contains(handle); }
     std::set<size_t>& getWatchlist() { return watchlist; }
 
 

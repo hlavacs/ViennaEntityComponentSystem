@@ -13,16 +13,18 @@ namespace Console {
 		size_t index;
 		size_t version;
 		size_t stgindex;
+		size_t value;
 
 		std::list<Component> components;
 		Archetype* archetype{ nullptr };
 
 	public:
-		Entity(size_t index = 0, size_t version = 0, size_t stgindex = 0) : index(index), version(version), stgindex(stgindex) {}
+		Entity(size_t index = 0, size_t version = 0, size_t stgindex = 0, size_t value = 0) : index(index), version(version), stgindex(stgindex), value(value) {}
 		Entity(Entity const& org) {
 			index = org.index;
 			version = org.version;
 			stgindex = org.stgindex;
+			value = org.value;
 			components = org.components;
 		}
 		Entity& operator=(Entity const& org) {
@@ -30,6 +32,7 @@ namespace Console {
 			index = org.index;
 			version = org.version;
 			stgindex = org.stgindex;
+			value = org.value;
 			components = org.components;
 			return *this;
 		}
@@ -37,12 +40,13 @@ namespace Console {
 		size_t GetIndex() { return index; }
 		size_t GetVersion() { return version; }
 		size_t GetStorageIndex() { return stgindex; }
+		size_t GetValue() { return value; }
 
 		void SetArchetype(Archetype* a = nullptr) { archetype = a; }
 		Archetype* GetArchetype() { return archetype; }
 
 		void clear() {
-			index = version = stgindex = 0;;
+			index = version = stgindex = value = 0;
 			components.clear();
 		}
 
