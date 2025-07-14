@@ -14,6 +14,10 @@ namespace Console {
 		size_t version;
 		size_t stgindex;
 		size_t value;
+		size_t flags{ 0 };
+
+		enum{modified = 1,
+			deleted = 2};
 
 		std::list<Component> components;
 		Archetype* archetype{ nullptr };
@@ -59,14 +63,21 @@ namespace Console {
 			return 0;
 		}
 
-		int deleteComponent(std::string) {
-			//TODO
-			return 0;
+		void setModified() {
+			flags |= modified; //set modified bit in flags
 		}
 
-		int findComponent(std::string) {
-			//TODO
-			return 0;
+		bool isModified() {
+			return flags & modified; // return wether modified bit is set in flags
+		}
+
+
+		void setDeleted() {
+			flags |= deleted; //set deleted bit in flags
+		}
+
+		bool isDeleted() {
+			return flags & deleted; // return wether deleted bit is set in flags
 		}
 
 

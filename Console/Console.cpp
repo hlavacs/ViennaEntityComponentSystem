@@ -492,12 +492,32 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
 
         ImGui::SetNextWindowCollapsed(false);
 
-        if (!ImGui::Begin("Live View", p_open))
+        if (!ImGui::Begin("Live View", p_open, ImGuiWindowFlags_HorizontalScrollbar))
         {
             ImGui::End();
         }
         else
         {
+            ImVec2 windowSize = ImGui::GetWindowSize();
+            ImVec2 cursorPos = ImGui::GetCursorPos();
+            // calculate area for our 3 child windows - minimum is 600,300 (scaled)
+            // the y size calculation is a bit meh ... need to find out more about child window padding, the effects of ImGui::NewLine etc.
+            
+            ImVec2 childArea(std::max(900.f * scale, windowSize.x - 2 * cursorPos.x- 7.f),
+                std::max(300.f * scale, windowSize.y - cursorPos.y - 12.f));
+            
+            float lowerY = childArea.y * 0.5f;
+            
+            ImVec2 childLiveViewGraphSz(childArea.x - (10.f * scale /*for scrollbar*/), childArea.y - lowerY);
+            ImVec2 childStatsSz(childArea.x / 3.f, lowerY);
+            ImVec2 childWatchlistSz(childArea.x*(2.f/3.f), lowerY);
+
+            // Filter child window
+
+            ImGui::BeginChild("LiveView", childLiveViewGraphSz);
+
+
+
             if (listening.cursel >= 0){
             auto vecs = listening.getVecs(listening.cursel);
             bool isLive = vecs->getIsLive();
@@ -510,18 +530,107 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
                 vecs->requestLiveView(false);
             }
                 
-                ImPlot::BeginPlot("TestPlot");
+                ImPlot::BeginPlot("TestPlot", ImVec2(-1,-1));
                 ImPlot::SetupAxisLimits(ImAxis_X1, 0, _countof(vecs->lvEntityCount));
                 ImPlot::SetupAxisLimits(ImAxis_Y1, 0, vecs->lvEntityMax, ImPlotCond_Always);
                 //ImPlot::SetupAxesLimits(0,50,0,100);
                 ImPlot::PlotBars("Entities", vecs->lvEntityCount, _countof(vecs->lvEntityCount));
-                ImGui::Text("This is the Live View");
+               
 
 
                 ImPlot::EndPlot();
 
             }
+            ImGui::EndChild();
 
+            ImGui::BeginChild("Statistics", childStatsSz);
+
+            ImGui::Text("Number Entities: "); 
+            ImGui::Text("Average Component: ");
+            ImGui::Text("Merry Christmas: HOHOHO");
+
+            ImGui::EndChild(); 
+            ImGui::SameLine(); 
+            
+            ImGui::BeginChild("Watchlist", childWatchlistSz);
+            if (listening.cursel >= 0) {
+                auto vecs = listening.getVecs(listening.cursel);
+
+                // allow to single select a component
+                static Console::Component* selTableComponent{ nullptr };
+                static Console::Entity* selTableEntity{ nullptr };
+                bool componentSelected{ false };
+
+                
+                if (ImGui::BeginTable("Watchlist", 5, ImGuiTableFlags_RowBg)) {
+
+                    ImGui::TableSetupColumn("Archetype");
+                    ImGui::TableSetupColumn("Index");
+                    ImGui::TableSetupColumn("Typename");
+                    ImGui::TableSetupColumn("Value");
+                    ImGui::TableSetupColumn("Tag");
+                    ImGui::TableHeadersRow();
+
+                    auto& snap = vecs->getSnapshot();
+                    auto& watchlist = vecs->getWatchlist();
+
+                    size_t entityIndex = 0;
+                    size_t entidel = (size_t)-1;
+                    for (auto& entityhandle : watchlist) {
+                        auto &entity = entityhandle.second;
+                        
+                        auto archetype = entity.GetArchetype();
+                        std::string aHash = archetype->toString();
+                        std::string eIndex = entity.toString();
+                        int archtagcount = 0;
+                        std::string tagstr;
+                        for (auto& tag : archetype->getTags()) {
+                            if (archtagcount++) tagstr += ",";
+                            tagstr += snap.GetTagName(tag);
+                        }
+                        ImVec4 color = entity.isModified() ? ImVec4(255, 255, 0, 255) :
+                            entity.isDeleted() ? ImVec4(255, 0, 0, 255) :
+                            ImVec4(255, 255, 255, 255);
+                        size_t componentIndex = 0;
+                        for (auto& component : entity.getComponents()) {
+#if 0
+                            std::string cvalue = snap.GetTypeName(component.getType()) + " " + component.toString();
+#else
+                            std::string cvalue = component.toString();
+#endif
+                            ImGui::TableNextRow();
+
+                            ImGui::TableSetColumnIndex(0);
+                            ImGui::TextColored(color, aHash.c_str());
+                            ImGui::TableSetColumnIndex(1);
+                            ImGui::TextColored(color,eIndex.c_str());
+                            ImGui::TableSetColumnIndex(2);
+                            ImGui::TextColored(color, snap.GetTypeName(component.getType()).c_str());
+                            ImGui::TableSetColumnIndex(3);
+                            ImGui::TextColored(color, cvalue.c_str());
+                            ImGui::TableSetColumnIndex(4);
+                            ImGui::TextColored(color, tagstr.c_str());
+
+                            componentIndex++;
+                        }
+                        entityIndex++;
+                    }
+                    if (entidel != (size_t)-1)
+                        vecs->deleteWatch(entidel);
+
+
+                }
+                ImGui::EndTable();
+
+
+            }
+            
+            
+            ImGui::Text("Number Entities: ");
+            ImGui::Text("Average Component: ");
+            ImGui::Text("Merry Christmas: HOHOHO");
+
+            ImGui::EndChild();
 
             ImGui::End();
         }
@@ -529,7 +638,24 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
     }
 
     void static showWatchlistWindow(ConsoleListener & listening, bool* p_open) {
+#if USE_SCALING
+        float scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
+#else
+        const float scale = 1.f;
+#endif
 
+        ImVec2 windowsize = ImVec2(1135 * scale, 700 * scale);
+        ImGui::SetNextWindowSize(windowsize, ImGuiCond_Once);
+        ImVec2 wpos(150 * scale, 20 * scale);
+        if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+            wpos.x += ImGui::GetMainViewport()->Pos.x;
+            wpos.y += ImGui::GetMainViewport()->Pos.y;
+        }
+        ImGui::SetNextWindowPos(wpos, ImGuiCond_Once);
+
+
+
+        ImGui::SetNextWindowCollapsed(false);
 
         if (!ImGui::Begin("Watchlist", p_open))
         {
@@ -560,7 +686,7 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
                     size_t entityIndex = 0;
                     size_t entidel = (size_t)-1;
                     for (auto& entityhandle : watchlist) {
-                        auto entity = snap.findEntity(entityhandle);
+                        auto entity = snap.findEntity(entityhandle.first);
                         if (!entity)
                             continue;
                         auto archetype = entity->GetArchetype();
@@ -603,7 +729,7 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
 
                                 if (ImGui::Button("Remove from watchlist")) {
                                     //TODO 
-                                    entidel = entityhandle;
+                                    entidel = entityhandle.first;
                                     ImGui::CloseCurrentPopup();
                                 }
                                 ImGui::EndPopup();

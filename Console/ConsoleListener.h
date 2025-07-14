@@ -16,7 +16,7 @@ private:
     int pid{ 0 };
     int entitycount{ 0 };
     Console::Registry snapshot;  // we deal with exactly ONE snapshot at the moment
-    std::set<size_t> watchlist;
+    std::map<size_t, Console::Entity> watchlist;
     bool isLive{ false }; 
 
     virtual void ClientActivity();
@@ -40,16 +40,16 @@ public:
 
     bool requestSnapshot();
     bool requestLiveView(bool active = true);  // presumably expanded on in later versions
-    bool sendWatchlist(std::set<size_t>& watchlist);
+    bool sendWatchlist(std::map<size_t, Console::Entity>& watchlist);
     bool getIsLive() { return isLive; } // nanananana
 
     bool selected{ false };
     bool parseSnapshot(nlohmann::json const& json);
 
-    void addWatch(size_t handle) { watchlist.insert(handle); sendWatchlist(watchlist); }
+    void addWatch(size_t handle) { auto h = snapshot.findEntity(handle); watchlist[handle] = *h; watchlist[handle].SetArchetype(h->GetArchetype()); sendWatchlist(watchlist); }
     void deleteWatch(size_t handle) { watchlist.erase(handle); sendWatchlist(watchlist); }
     bool isWatched(size_t handle) { return watchlist.contains(handle); }
-    std::set<size_t>& getWatchlist() { return watchlist; }
+    std::map<size_t, Console::Entity>& getWatchlist() { return watchlist; }
 
 
 };

@@ -1,7 +1,5 @@
 #pragma once
 
-#include "VECSConsoleComm.h"
-
 namespace vecs {
 
 	//----------------------------------------------------------------------------------------------
@@ -24,7 +22,7 @@ namespace vecs {
 
 
 	/// @brief A registry for entities and components.
-	class Registry : public VECSConsoleInterface {
+	class Registry{
 
 		/// @brief Entry for the seach cache
 		struct TypeSetAndHash {
@@ -669,27 +667,21 @@ namespace vecs {
 
 	// Console Communication
 	public:
-		SOCKET connectToServer(std::string host = "127.0.0.1", int port = 2000) {
-			comm.setRegistry(this);
-			return comm.connectToServer(host, port);
-		}
-		bool isConnected() { return comm.isConnected(); }
-		int disconnectFromServer() { return comm.disconnectFromServer(); }
 
-		virtual std::string getLiveView() override {
+		std::string getLiveView() {
 			std::string json = "{\"cmd\":\"liveview\",\"entities\":";
 			json += std::to_string(Size());
 			json += "}";
 			return json;
 		}
 
-		virtual std::string toJSON(Handle h) override {
+		std::string toJSON(Handle h) {
 			if (!h.IsValid() || !Exists(h)) { return "null"; }
 			auto& archAndIndex = GetArchetypeAndIndex(h);
 			return archAndIndex.m_arch->toJSON(archAndIndex.m_index);
 		}
 
-		virtual std::string getSnapshot() override {
+		std::string getSnapshot() {
 			// presumably locking would be a good idea here, but for now, simply deliver
 			// primitive variant - create JSON on the fly
 			std::string json = "{\"cmd\":\"snapshot\",\"entities\":";
@@ -707,9 +699,6 @@ namespace vecs {
 			json += "}";
 			return json;
 		}
-	private:
-		VECSConsoleComm comm;
-
 	};
 
 	template<typename T>

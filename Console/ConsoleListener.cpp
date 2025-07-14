@@ -316,12 +316,12 @@ bool ConsoleSocketThread::requestLiveView(bool active) {  // presumably expanded
     return sendData(std::string("{\"cmd\":\"liveview\",\"active\":") + (active ? "true" : "false") + "}") > 0;
 }
 
-bool ConsoleSocketThread::sendWatchlist(std::set<size_t>& watchlist) {
+bool ConsoleSocketThread::sendWatchlist(std::map<size_t, Console::Entity>& watchlist) {
     std::string watchlistString;
     int count = 0;
     for (auto& id : watchlist) {
         if (count++) watchlistString += ",";
-        watchlistString += std::to_string(id);
+        watchlistString += std::to_string(id.first);
     }
     return sendData(std::string("{\"cmd\":\"liveview\",\"watchlist\":[") + watchlistString + "]}") > 0;
 }
@@ -348,6 +348,19 @@ bool ConsoleSocketThread::onLiveView(json const& json) {
                 lvEntityMax = 1;
             else if (newMax < lvEntityMax)
                 lvEntityMax = newMax + ((lvEntityMax - newMax) / 2);
+        }
+        if (json.contains("watched")) {
+            for (auto& entityObject : json["watched"]) {
+                if (!entityObject.contains("entity") || !entityObject.contains("data"))
+                    continue; 
+                auto& entity = watchlist[entityObject["entity"]]; 
+                if (entityObject["data"].is_null()) {
+                    entity.setDeleted();
+                }
+                else {
+                    entity.setModified();
+                }
+            }
         }
     }
     catch (json::exception& e) {

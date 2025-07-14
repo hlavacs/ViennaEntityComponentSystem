@@ -379,11 +379,14 @@ void test_conn() {
 	system.Erase(handles[4]);
 	handles.erase(handles.begin() + 4);
 
-	std::cout << "\x1b[37m isConnected: " << system.isConnected() << "\n";
-	SOCKET testval = system.connectToServer();
-	std::cout << "\x1b[37m isConnected: " << system.isConnected() << "\n";
+	vecs::VECSConsoleComm comm; 
 
-	if (system.isConnected()) {
+	std::cout << "\x1b[37m isConnected: " << comm.isConnected() << "\n";
+	
+	SOCKET testval = comm.connectToServer(&system);
+	std::cout << "\x1b[37m isConnected: " << comm.isConnected() << "\n";
+
+	if (comm.isConnected()) {
 
 		// do nothing for 600 seconds, let background task work
 		for (int secs = 0; secs < 600; secs++) {
@@ -413,11 +416,11 @@ void test_conn() {
 			usleep(1000 * 1000);
 #endif
 			// ... but get out if console has decided to leave the building
-			if (!system.isConnected())
+			if (!comm.isConnected())
 				break;
 		}
 
-		system.disconnectFromServer();
+		comm.disconnectFromServer();
 	}
 	std::cout << "\x1b[37m I hope it works? ...\n";
 }

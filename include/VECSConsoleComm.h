@@ -40,16 +40,6 @@ namespace vecs {
     // To do so, declare VECSConsoleCommInterface (i.e., include VECSConsoleComm.h in VECSRegistry.h)
     // before declaring the registry class and derive Registry from VECSConsoleInterface.
 
-    class VECSConsoleInterface {
-    public:
-        // Snapshot functionality
-        virtual std::string getSnapshot() = 0;
-        // LiveView functionality
-        virtual std::string getLiveView() = 0;
-        virtual size_t Size() = 0;
-        virtual std::string toJSON(Handle h) = 0;
-    };
-
     class VECSConsoleComm {
 
     private:
@@ -64,7 +54,7 @@ namespace vecs {
             LiveView() {}  // don't need anything yet
             ~LiveView() {}  // don't need anything yet
 
-            void setRegistry(VECSConsoleInterface* reg = nullptr) { registry = reg; }
+            void setRegistry(Registry* reg = nullptr) { registry = reg; }
 
             bool SetActive(bool onoff = true) { bool old = active; active = onoff; return old; }
             bool IsActive() const { return active; }
@@ -118,7 +108,7 @@ namespace vecs {
             }
 
         private:
-            VECSConsoleInterface* registry{ nullptr };
+            Registry* registry{ nullptr };
             std::map<Handle, std::string> watched;
             bool active{ false };
             size_t handles{ 0 };
@@ -127,7 +117,7 @@ namespace vecs {
 
         // design question ... do we want one comm object for each VECS registry, or one for all registries in the program?
         // for now, let's assume a simple 1:1 relation - each registry gets its own connection object
-        VECSConsoleInterface* registry{ nullptr };
+        Registry* registry{ nullptr };
 
     public:
         ~VECSConsoleComm() {
@@ -136,11 +126,13 @@ namespace vecs {
         }
 
         // simple variant: handle exactly one registry
-        void setRegistry(VECSConsoleInterface* reg = nullptr) { registry = reg; liveView.setRegistry(reg); }
+        void setRegistry(Registry* reg = nullptr) { registry = reg; liveView.setRegistry(reg); }
 
-        SOCKET connectToServer(std::string host = "127.0.0.1", int port = 2000) {
+        SOCKET connectToServer(Registry* reg, std::string host = "127.0.0.1", int port = 2000) {
             if (!startup())
                 return INVALID_SOCKET;
+
+            setRegistry(reg); 
 
             if (ConnectSocket != INVALID_SOCKET)
                 return ConnectSocket;

@@ -203,5 +203,5 @@ using Size_t = std::atomic<std::size_t>;
 #include "VECSSlotMap.h"
 #include "VECSArchetype.h"
 #include "VECSRegistry.h"
-
+#include "VECSConsoleComm.h"
 
