@@ -53,10 +53,6 @@ namespace Console {
 
 		int addEntity(Entity& e);
 
-		int deleteEntity(std::string) {
-			//TODO
-			return 0;
-		}
 
 		Entity* findEntity(size_t id) {
 			auto i = entities.find(id);
@@ -65,7 +61,6 @@ namespace Console {
 			}
 			else return nullptr;
 		}
-
 
 		std::list<std::size_t>& getTags() {
 			return tags;
@@ -76,18 +71,6 @@ namespace Console {
 			return 0;
 		}
 
-		int deleteTag(size_t tagid) {
-			//TODO
-			return 0;
-		}
-
-		int findTag(size_t taggid) {
-			//TODO
-			return 0;
-		}
-
-
-
 		size_t getHash() {
 			return hash;
 		}
@@ -95,7 +78,6 @@ namespace Console {
 		std::string toString() {
 			return std::to_string(hash);
 		}
-
 
 	};
 

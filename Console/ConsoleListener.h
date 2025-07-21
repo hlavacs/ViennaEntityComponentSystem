@@ -11,6 +11,9 @@
 namespace Console {
 
     class WatchEntity : public Entity {
+    private:
+        Archetype arch;
+
     public:
         WatchEntity() {}
         WatchEntity(Entity const& org) : Entity(org) {
@@ -23,9 +26,6 @@ namespace Console {
             SetArchetype(&arch);
             return *this;
         }
-
-    private:
-        Archetype arch;
     };
 
 

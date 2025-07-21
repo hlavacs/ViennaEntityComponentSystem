@@ -549,10 +549,12 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
 
             if (listening.cursel >= 0) {
                 auto vecs = listening.getVecs(listening.cursel);
-                ImGui::Text("Number Entities: %d", vecs->lvEntityCount[_countof(vecs->lvEntityCount) - 1]);
-                ImGui::Text("Average Component: %.2f", vecs->getAvgComp());
+                ImGui::Text("Number of Entities: %d", vecs->lvEntityCount[_countof(vecs->lvEntityCount) - 1]);
+                ImGui::Text("Average Number of Components: %.2f", vecs->getAvgComp());
+                //TODO: Estimated memory usage
+                ImGui::Text("Estimated Memory usage: ");
             }
-            ImGui::Text("Merry Christmas: HOHOHO");
+            
 
             ImGui::EndChild();
             ImGui::SameLine();
@@ -754,8 +756,6 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
         }
 
     }
-
-
 
 
     void MainLoop() {

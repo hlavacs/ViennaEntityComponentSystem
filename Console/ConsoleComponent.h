@@ -16,13 +16,8 @@ namespace Console {
 			data = org.data;
 		}
 		Component& operator=(Component const& org) {
-			clear();
 			data = org.data;
 			return *this;
-		}
-
-		void clear() {
-			/*data.clear();*/
 		}
 
 		int addData(std::tuple<size_t, std::string> x) {

@@ -28,18 +28,6 @@ typedef int SOCKET;
 
 namespace vecs {
 
-    // the age-old chicken-and-egg problem in its header-only variant ...
-    // we need to declare two classes : registry and console communication classes.
-    // Each one should know the other, and each one should be able  to use the other's methods.
-    // How can we declare that?
-    // Here's one way:
-    // If the VECS program should use console communication, define an interface class and derive
-    // the VECS registry class from that. The console class can then use the interface methods without
-    // having to have full knowledge of the registry.
-    // The registry, however, can see the full method set of the console communication class.
-    // To do so, declare VECSConsoleCommInterface (i.e., include VECSConsoleComm.h in VECSRegistry.h)
-    // before declaring the registry class and derive Registry from VECSConsoleInterface.
-
     class VECSConsoleComm {
 
     private:

@@ -65,11 +65,6 @@ namespace Console {
             return 0;
         }
 
-        int deleteArchetype(std::string) {
-            //TODO
-            return 0;
-        }
-
         void addEntity(size_t entityhandle, size_t archetype) {
             entities[entityhandle] = archetype;
         }
@@ -124,7 +119,6 @@ namespace Console {
             assert(it != tags.end());
             return it->second;
         }
-
 
     }; // Snapshot
 }
