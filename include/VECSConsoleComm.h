@@ -50,6 +50,13 @@ namespace vecs {
         // LiveView : encapsulation for all LiveView-related data
         class LiveView {
 
+        private: 
+            Registry* registry{ nullptr };
+            std::map<Handle, std::string> watched;
+            bool active{ false };
+            size_t handles{ 0 };
+            float avgComp{ 0.f };
+
         public:
             LiveView() {}  // don't need anything yet
             ~LiveView() {}  // don't need anything yet
@@ -84,19 +91,34 @@ namespace vecs {
                 if (changes) {
                     json += std::string(",\"entities\":") + std::to_string(handles);
                 }
+                
+                float oldAvgComp = avgComp; 
+                avgComp = registry->getAvgComp();
+                bool compChanges = oldAvgComp != avgComp;
+                if (compChanges) {
+                    json += std::string(",\"avgComp\":") + std::to_string(avgComp);
+                    changes = true; 
+                }
+
                 size_t changedWatch = 0;
                 for (auto& entity : watched) {
                     std::string entityJSON = registry->toJSON(entity.first);
                     if (entityJSON != entity.second) {
+#if 0  // do this as long as Console doesn't check the values
+                        bool toSend = (entity.second.size() || entityJSON == "null");
+                        entity.second = entityJSON;
+                        if (!toSend) continue;
+#else
+                        entity.second = entityJSON;
+#endif
                         if (!changedWatch++)
                             json += ",\"watched\":[{";
                         else
                             json += ",{";
-                        entity.second = entityJSON;
                         changes = true;
                         json += std::string("\"entity\":") +
                             std::to_string(entity.first.GetIndex()) +
-                            ",\"data\":" +
+                            ",\"values\":" +
                             entityJSON +
                             "}";
                     }
@@ -106,12 +128,6 @@ namespace vecs {
                 json += "}";
                 return std::tuple<bool, std::string>(changes, json);
             }
-
-        private:
-            Registry* registry{ nullptr };
-            std::map<Handle, std::string> watched;
-            bool active{ false };
-            size_t handles{ 0 };
 
         } liveView; //declare member variable
 
@@ -132,7 +148,7 @@ namespace vecs {
             if (!startup())
                 return INVALID_SOCKET;
 
-            setRegistry(reg); 
+            setRegistry(reg);
 
             if (ConnectSocket != INVALID_SOCKET)
                 return ConnectSocket;

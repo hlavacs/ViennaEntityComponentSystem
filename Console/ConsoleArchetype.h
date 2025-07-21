@@ -19,16 +19,18 @@ namespace Console {
 	public:
 		Archetype(size_t hash = 0) : hash(hash) {}
 		Archetype(Archetype const& org) {
+			copyArchetype(org);
 			entities = org.entities;
 			for (auto& e : entities) e.second.SetArchetype(this);
-			dataTypes = org.dataTypes;
-			tags = org.tags;
-			hash = org.hash;
 		}
 		Archetype& operator=(Archetype const& org) {
-			clear();
+			copyArchetype(org);
 			entities = org.entities;
 			for (auto& e : entities) e.second.SetArchetype(this);
+			return *this;
+		}
+		Archetype& copyArchetype(Archetype const& org) {
+			clear();
 			dataTypes = org.dataTypes;
 			tags = org.tags;
 			hash = org.hash;

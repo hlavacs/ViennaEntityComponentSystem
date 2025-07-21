@@ -242,8 +242,9 @@ bool ConsoleSocketThread::requestSnapshot() {
 
 bool ConsoleSocketThread::parseSnapshot(nlohmann::json const& json) {
     // clear potentially pre-existing snapshot
-    snapshot.clear();
-    snapshot.setJsonsnap(json.dump());
+    int newSnapIdx = snapidx ^ 1;  // switch to other snap
+    snapshot[newSnapIdx].clear();
+    snapshot[newSnapIdx].setJsonsnap(json.dump());
     // parse incoming snapshot, create internal structure for it that can be handled from GUI
     try {
         entitycount = json["entities"];
@@ -254,7 +255,7 @@ bool ConsoleSocketThread::parseSnapshot(nlohmann::json const& json) {
             auto& a2 = a["archetype"];   // TODO: is this sub-object really necessary?
             auto& maps = a2["maps"];
             for (auto& m : maps) {
-                snapshot.AddTypeName(m["id"], m["name"]);
+                snapshot[newSnapIdx].AddTypeName(m["id"], m["name"]);
             }
             // get set of types from JSON
             // this also contains the tags assigned to this archetype
@@ -262,8 +263,8 @@ bool ConsoleSocketThread::parseSnapshot(nlohmann::json const& json) {
             std::vector<size_t> tags;
             for (auto& t : types) {
                 // this is a bit unsafe, as there are no constraints defined for tags.
-                if (!snapshot.HasTypeName(t)) {  // if it s not a type, it is a tag.
-                    snapshot.AddTag(t, std::to_string(t.get<size_t>()));      // TODO: once there are tag names, set them correctly
+                if (!snapshot[newSnapIdx].HasTypeName(t)) {  // if it s not a type, it is a tag.
+                    snapshot[newSnapIdx].AddTag(t, std::to_string(t.get<size_t>()));      // TODO: once there are tag names, set them correctly
                     tags.push_back(t);           // remember as one of the tags to add to the entities in this archetype
                 }
             }
@@ -296,7 +297,9 @@ bool ConsoleSocketThread::parseSnapshot(nlohmann::json const& json) {
                 ca.addEntity(ce);
             }
 
-            snapshot.addArchetype(ca);  // TODO: this is just a first draft - it COPIES the complete thing!
+            snapshot[newSnapIdx].addArchetype(ca);  // TODO: this is just a first draft - it COPIES the complete thing!
+
+            snapidx = newSnapIdx;  // the ONLY moment for a race condition ...
         }
     }
     catch (json::exception& e) {
@@ -312,11 +315,11 @@ bool ConsoleSocketThread::parseSnapshot(nlohmann::json const& json) {
 }
 
 bool ConsoleSocketThread::requestLiveView(bool active) {  // presumably expanded on in later versions
-    isLive = active; 
+    isLive = active;
     return sendData(std::string("{\"cmd\":\"liveview\",\"active\":") + (active ? "true" : "false") + "}") > 0;
 }
 
-bool ConsoleSocketThread::sendWatchlist(std::map<size_t, Console::Entity>& watchlist) {
+bool ConsoleSocketThread::sendWatchlist(std::map<size_t, Console::WatchEntity>& watchlist) {
     std::string watchlistString;
     int count = 0;
     for (auto& id : watchlist) {
@@ -349,16 +352,44 @@ bool ConsoleSocketThread::onLiveView(json const& json) {
             else if (newMax < lvEntityMax)
                 lvEntityMax = newMax + ((lvEntityMax - newMax) / 2);
         }
+        if (json.contains("avgComp")) {
+             avgComp = json["avgComp"]; 
+        }
         if (json.contains("watched")) {
             for (auto& entityObject : json["watched"]) {
-                if (!entityObject.contains("entity") || !entityObject.contains("data"))
-                    continue; 
-                auto& entity = watchlist[entityObject["entity"]]; 
-                if (entityObject["data"].is_null()) {
+                if (!entityObject.contains("entity") || !entityObject.contains("values"))
+                    continue;
+                auto& entity = watchlist[entityObject["entity"]];
+                if (entityObject["values"].is_null()) {
                     entity.setDeleted();
                 }
                 else {
-                    entity.setModified();
+                    auto& values = entityObject["values"];
+                    int i = 0;
+                    bool changes = false;
+                    auto coit = entity.getComponents().begin();
+                    // walk through all components and look for changes
+                    for (auto& v : values) {
+                        std::string sv;  // in Console, we're content with strings for the moment
+                        // build string for expected primitive JSON types
+                        if (v.is_number_integer())
+                            sv = std::to_string(v.get<long long>());
+                        else if (v.is_number())
+                            sv = std::to_string(v.get<long double>());
+                        else
+                            sv = v;
+                        if (sv != coit->toString()) {
+                            // for now, assume that any type change automatically means a new archetype and thus
+                            // a deletion from the old archetype, so don't examine archetype type changes
+                            coit->setString(sv);
+                            changes = true;
+                        }
+                        i++;
+                        coit++;
+                    }
+
+                    if (changes)
+                        entity.setModified();
                 }
             }
         }

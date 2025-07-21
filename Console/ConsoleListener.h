@@ -8,6 +8,29 @@
 #include <set>
 
 
+namespace Console {
+
+    class WatchEntity : public Entity {
+    public:
+        WatchEntity() {}
+        WatchEntity(Entity const& org) : Entity(org) {
+            if (org.GetArchetype()) arch.copyArchetype(*org.GetArchetype());
+            SetArchetype(&arch);
+        }
+        WatchEntity& operator=(Entity const& org) {
+            Entity::operator=(org);
+            if (org.GetArchetype()) arch.copyArchetype(*org.GetArchetype());
+            SetArchetype(&arch);
+            return *this;
+        }
+
+    private:
+        Archetype arch;
+    };
+
+
+}
+
 // ConsoleSocketThread : socket client thread for the Console
 
 class ConsoleSocketThread : public SocketThread {
@@ -15,9 +38,11 @@ private:
     bool handShook{ false };
     int pid{ 0 };
     int entitycount{ 0 };
-    Console::Registry snapshot;  // we deal with exactly ONE snapshot at the moment
-    std::map<size_t, Console::Entity> watchlist;
-    bool isLive{ false }; 
+    Console::Registry snapshot[2];  // we deal with exactly ONE snapshot at the moment, but alternating between 2 makes life much more conflict-free :-)
+    int snapidx{ 0 };
+    std::map<size_t, Console::WatchEntity> watchlist;
+    bool isLive{ false };
+    float avgComp{ 0.f };
 
     virtual void ClientActivity();
     bool ProcessJSON(std::string sjson);
@@ -33,23 +58,25 @@ public:
     int getPid() { return pid; }
     void setPid(int newPid) { pid = newPid; handShook = pid != 0; }
     int getEntitycount() { return entitycount; }
-    Console::Registry& getSnapshot() { return snapshot; }
+    Console::Registry& getSnapshot() { return snapshot[snapidx]; }
 
     int lvEntityCount[200]{ 0 };
     int lvEntityMax = 1;
 
+    float getAvgComp() { return avgComp; }
+
     bool requestSnapshot();
     bool requestLiveView(bool active = true);  // presumably expanded on in later versions
-    bool sendWatchlist(std::map<size_t, Console::Entity>& watchlist);
+    bool sendWatchlist(std::map<size_t, Console::WatchEntity>& watchlist);
     bool getIsLive() { return isLive; } // nanananana
 
     bool selected{ false };
     bool parseSnapshot(nlohmann::json const& json);
 
-    void addWatch(size_t handle) { auto h = snapshot.findEntity(handle); watchlist[handle] = *h; watchlist[handle].SetArchetype(h->GetArchetype()); sendWatchlist(watchlist); }
+    void addWatch(size_t handle) { watchlist[handle] = *snapshot[snapidx].findEntity(handle); sendWatchlist(watchlist); }
     void deleteWatch(size_t handle) { watchlist.erase(handle); sendWatchlist(watchlist); }
     bool isWatched(size_t handle) { return watchlist.contains(handle); }
-    std::map<size_t, Console::Entity>& getWatchlist() { return watchlist; }
+    std::map<size_t, Console::WatchEntity>& getWatchlist() { return watchlist; }
 
 
 };

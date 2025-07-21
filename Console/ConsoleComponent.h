@@ -39,6 +39,9 @@ namespace Console {
 		std::string toString() {
 			return std::get<1>(data);
 		}
+		void setString(std::string s) {
+			std::get<1>(data) = s;
+		}
 	};
 
 } // namespace Console

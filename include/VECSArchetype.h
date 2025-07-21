@@ -327,6 +327,10 @@ namespace vecs {
 			return json + "]";
 
 		}
+		size_t getComponents() {
+			return Size() * m_maps.size();
+		}
+
 		std::string toJSON() {
 			std::string json = "\"archetype\":{\"hash\":" + std::to_string(Hash(m_types)) + ",\"types\":[";
 			//std::cout << "Archetype: " << Hash(m_types) << std::endl;

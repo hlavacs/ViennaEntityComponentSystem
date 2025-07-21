@@ -258,7 +258,7 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
 
 #endif
 
-                        bool selectedArchetype = (current_archetype != "-");
+                            bool selectedArchetype = (current_archetype != "-");
                         bool selectedEntity = (current_entity != "-");
                         bool selectedComptype = (current_comptype != "-");
                         bool selectedTag = (current_tag != "-");
@@ -502,15 +502,15 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
             ImVec2 cursorPos = ImGui::GetCursorPos();
             // calculate area for our 3 child windows - minimum is 600,300 (scaled)
             // the y size calculation is a bit meh ... need to find out more about child window padding, the effects of ImGui::NewLine etc.
-            
-            ImVec2 childArea(std::max(900.f * scale, windowSize.x - 2 * cursorPos.x- 7.f),
+
+            ImVec2 childArea(std::max(900.f * scale, windowSize.x - 2 * cursorPos.x - 7.f),
                 std::max(300.f * scale, windowSize.y - cursorPos.y - 12.f));
-            
+
             float lowerY = childArea.y * 0.5f;
-            
+
             ImVec2 childLiveViewGraphSz(childArea.x - (10.f * scale /*for scrollbar*/), childArea.y - lowerY);
             ImVec2 childStatsSz(childArea.x / 3.f, lowerY);
-            ImVec2 childWatchlistSz(childArea.x*(2.f/3.f), lowerY);
+            ImVec2 childWatchlistSz(childArea.x * (2.f / 3.f), lowerY);
 
             // Filter child window
 
@@ -518,40 +518,45 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
 
 
 
-            if (listening.cursel >= 0){
-            auto vecs = listening.getVecs(listening.cursel);
-            bool isLive = vecs->getIsLive();
-            if (!isLive && ImGui::Button("Start LiveView"))
-            {
-                vecs->requestLiveView();
-            }
-            if (isLive && ImGui::Button("Stop LiveView"))
-            {
-                vecs->requestLiveView(false);
-            }
-                
-                ImPlot::BeginPlot("TestPlot", ImVec2(-1,-1));
-                ImPlot::SetupAxisLimits(ImAxis_X1, 0, _countof(vecs->lvEntityCount));
-                ImPlot::SetupAxisLimits(ImAxis_Y1, 0, vecs->lvEntityMax, ImPlotCond_Always);
-                //ImPlot::SetupAxesLimits(0,50,0,100);
-                ImPlot::PlotBars("Entities", vecs->lvEntityCount, _countof(vecs->lvEntityCount));
-               
+            if (listening.cursel >= 0) {
+                auto vecs = listening.getVecs(listening.cursel);
+                bool isLive = vecs->getIsLive();
+                if (!isLive && ImGui::Button("Start LiveView"))
+                {
+                    vecs->requestLiveView();
+                }
+                if (isLive && ImGui::Button("Stop LiveView"))
+                {
+                    vecs->requestLiveView(false);
+                }
+
+                if (ImPlot::BeginPlot("TestPlot", ImVec2(-1, -1))) {
+
+                    ImPlot::SetupAxisLimits(ImAxis_X1, 0, _countof(vecs->lvEntityCount));
+                    ImPlot::SetupAxisLimits(ImAxis_Y1, 0, vecs->lvEntityMax, ImPlotCond_Always);
+                    //ImPlot::SetupAxesLimits(0,50,0,100);
+                    ImPlot::PlotBars("Entities", vecs->lvEntityCount, _countof(vecs->lvEntityCount));
 
 
-                ImPlot::EndPlot();
+
+                    ImPlot::EndPlot();
+                }
 
             }
             ImGui::EndChild();
 
             ImGui::BeginChild("Statistics", childStatsSz);
 
-            ImGui::Text("Number Entities: "); 
-            ImGui::Text("Average Component: ");
+            if (listening.cursel >= 0) {
+                auto vecs = listening.getVecs(listening.cursel);
+                ImGui::Text("Number Entities: %d", vecs->lvEntityCount[_countof(vecs->lvEntityCount) - 1]);
+                ImGui::Text("Average Component: %.2f", vecs->getAvgComp());
+            }
             ImGui::Text("Merry Christmas: HOHOHO");
 
-            ImGui::EndChild(); 
-            ImGui::SameLine(); 
-            
+            ImGui::EndChild();
+            ImGui::SameLine();
+
             ImGui::BeginChild("Watchlist", childWatchlistSz);
             if (listening.cursel >= 0) {
                 auto vecs = listening.getVecs(listening.cursel);
@@ -561,7 +566,7 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
                 static Console::Entity* selTableEntity{ nullptr };
                 bool componentSelected{ false };
 
-                
+
                 if (ImGui::BeginTable("Watchlist", 5, ImGuiTableFlags_RowBg)) {
 
                     ImGui::TableSetupColumn("Archetype");
@@ -575,10 +580,9 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
                     auto& watchlist = vecs->getWatchlist();
 
                     size_t entityIndex = 0;
-                    size_t entidel = (size_t)-1;
                     for (auto& entityhandle : watchlist) {
-                        auto &entity = entityhandle.second;
-                        
+                        auto& entity = entityhandle.second;
+
                         auto archetype = entity.GetArchetype();
                         std::string aHash = archetype->toString();
                         std::string eIndex = entity.toString();
@@ -603,7 +607,7 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
                             ImGui::TableSetColumnIndex(0);
                             ImGui::TextColored(color, aHash.c_str());
                             ImGui::TableSetColumnIndex(1);
-                            ImGui::TextColored(color,eIndex.c_str());
+                            ImGui::TextColored(color, eIndex.c_str());
                             ImGui::TableSetColumnIndex(2);
                             ImGui::TextColored(color, snap.GetTypeName(component.getType()).c_str());
                             ImGui::TableSetColumnIndex(3);
@@ -615,20 +619,11 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
                         }
                         entityIndex++;
                     }
-                    if (entidel != (size_t)-1)
-                        vecs->deleteWatch(entidel);
 
-
+                    ImGui::EndTable();
                 }
-                ImGui::EndTable();
-
 
             }
-            
-            
-            ImGui::Text("Number Entities: ");
-            ImGui::Text("Average Component: ");
-            ImGui::Text("Merry Christmas: HOHOHO");
 
             ImGui::EndChild();
 
@@ -752,9 +747,8 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
                     if (entidel != (size_t)-1)
                         vecs->deleteWatch(entidel);
 
-
+                    ImGui::EndTable();
                 }
-                ImGui::EndTable();
             }
             ImGui::End();
         }

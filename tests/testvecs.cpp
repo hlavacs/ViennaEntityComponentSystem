@@ -353,7 +353,6 @@ void test_registry() {
 void test_conn() {
 	std::cout << "\x1b[37m testing Connection!...\n";
 
-	//add usage here?
 	// 
 	// create a populated registry
 	vecs::Registry system;
@@ -379,10 +378,10 @@ void test_conn() {
 	system.Erase(handles[4]);
 	handles.erase(handles.begin() + 4);
 
-	vecs::VECSConsoleComm comm; 
+	vecs::VECSConsoleComm comm;
 
 	std::cout << "\x1b[37m isConnected: " << comm.isConnected() << "\n";
-	
+
 	SOCKET testval = comm.connectToServer(&system);
 	std::cout << "\x1b[37m isConnected: " << comm.isConnected() << "\n";
 
@@ -398,12 +397,16 @@ void test_conn() {
 			}
 			else if (secs < 80) {
 				handles.push_back(system.Insert(secs + 1000, static_cast<float>(secs * 7)));
-				handles.push_back(system.Insert(secs + 1000, static_cast<float>(secs * 7)));
+				handles.push_back(system.Insert(secs + 1000, static_cast<float>(secs * 7), static_cast<double>(secs*5)));
+
 			}
-			// alternating "add 2 at end, remove 2 at front"
+			// change contents of 0 every second
+			std::cout << "Setting " << std::to_string(handles[0].GetValue()) << " int to " << secs + 1000 << "\n";
+			system.Put(handles[0], secs + 10000);
+			// alternating "add 2 at end, remove 2 at front + 1"
 			if (secs & 1) {
-				system.Erase(handles[0]); handles.erase(handles.begin());
 				system.Erase(handles[1]); handles.erase(handles.begin() + 1);
+				system.Erase(handles[2]); handles.erase(handles.begin() + 2);
 			}
 			else {
 				handles.push_back(system.Insert(secs + 20, static_cast<float>(secs * 2)));

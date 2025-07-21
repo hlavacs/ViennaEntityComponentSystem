@@ -16,8 +16,10 @@ namespace Console {
 		size_t value;
 		size_t flags{ 0 };
 
-		enum{modified = 1,
-			deleted = 2};
+		enum {
+			modified = 1,
+			deleted = 2
+		};
 
 		std::list<Component> components;
 		Archetype* archetype{ nullptr };
@@ -47,7 +49,7 @@ namespace Console {
 		size_t GetValue() { return value; }
 
 		void SetArchetype(Archetype* a = nullptr) { archetype = a; }
-		Archetype* GetArchetype() { return archetype; }
+		Archetype* GetArchetype() const { return archetype; }
 
 		void clear() {
 			index = version = stgindex = value = 0;

@@ -675,6 +675,14 @@ namespace vecs {
 			return json;
 		}
 
+		float getAvgComp() {
+			float avgComp = 0.f;
+			for (auto& arch : m_archetypes) {
+				avgComp+=arch.second->getComponents();
+			}
+			return (Size()) ? (avgComp / Size()) : Size();
+		}
+
 		std::string toJSON(Handle h) {
 			if (!h.IsValid() || !Exists(h)) { return "null"; }
 			auto& archAndIndex = GetArchetypeAndIndex(h);
