@@ -7,6 +7,7 @@
 #include <stdio.h>          // printf, fprintf
 #include <stdlib.h>         // abort
 #include <fstream>
+#include <filesystem>
 
 
 // Console Listener
@@ -22,6 +23,8 @@ static bool connectionWindow = true;
 static bool viewSnapshotWindow = false;
 static bool liveView = false;
 static bool showWatchlist = false;
+static bool showSnapshotFileList = false;
+std::string selectedSnapshotFile; 
 
 bool SetupListener() {
     return listening.Create(service);
@@ -394,6 +397,40 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
 
         }
 
+    void static showSnapshotFileListWindow(bool* p_open) {
+        if (!ImGui::Begin("SnapshotFileListWindow", p_open))
+        {
+            ImGui::End();
+        }
+        else
+        {
+
+            ImGui::Text("Choose a Snapshot: ");
+
+            std::filesystem::path curDir{ "." };
+            for (auto const& dir_entry : std::filesystem::directory_iterator{ curDir }) {
+                auto entry = dir_entry.path().string();
+                if (entry.size() < 5)continue; 
+                if(entry.substr(entry.size()-5)==".json")
+                    if (ImGui::Selectable(entry.c_str())) {
+                        selectedSnapshotFile = entry;
+                    }
+            }
+
+            //TODO: if not selected, display cancel button
+            if (ImGui::Button(selectedSnapshotFile.size() ? "Select File: " : "Cancel")) {
+                showSnapshotFileList = false;
+            }
+            ImGui::SameLine();
+            ImGui::Text(selectedSnapshotFile.c_str());
+
+
+
+
+            ImGui::End();
+        }
+        
+    }
 
     void static showConnectionWindow(ConsoleListener & listening, bool* p_open)
     {
@@ -422,6 +459,18 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
             ConsoleSocketThread* thd = listening.getVecs(0);
             auto wasselected = thd->selected;
             ImGui::Selectable("Load from File", &thd->selected);
+            //If loadFromfile is selected set showSnapshotFileList to true
+            if (thd->selected != wasselected) {
+                if (thd->selected) {
+                    showSnapshotFileList = true;
+                }
+            }
+            //if Load from file was selected: open selecction window: 
+
+            if (showSnapshotFileList) {
+                showSnapshotFileListWindow(&showSnapshotFileList);
+            }
+
             if (thd->selected != wasselected) {
                 if (thd->selected) {
                     try {
