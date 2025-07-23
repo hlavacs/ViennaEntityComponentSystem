@@ -552,7 +552,19 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
                 ImGui::Text("Number of Entities: %d", vecs->lvEntityCount[_countof(vecs->lvEntityCount) - 1]);
                 ImGui::Text("Average Number of Components: %.2f", vecs->getAvgComp());
                 //TODO: Estimated memory usage
-                ImGui::Text("Estimated Memory usage: ");
+                char s[128];
+                size_t estSize = vecs->getEstSize();
+                // primitive human-readable value ...
+                if (estSize >= 1000000000L) // over a gigabyte?
+                    sprintf(s, "%.2lf GB", static_cast<double>(estSize) / 1000000000.0);
+                else if (estSize >= 1000000L) // over a megabyte?
+                    sprintf(s, "%.2lf MB", static_cast<double>(estSize) / 1000000.0);
+                else if (estSize >= 1000L) // over a killabyte?
+                    sprintf(s, "%.2lf KB", static_cast<double>(estSize) / 1000.0);
+                else  // below a killahbyte
+                    sprintf(s, "%ld B", estSize);
+
+                ImGui::Text("Estimated Memory usage: %s", s);
             }
             
 

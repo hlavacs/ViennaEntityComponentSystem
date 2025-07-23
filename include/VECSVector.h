@@ -32,8 +32,11 @@ namespace vecs {
 		virtual auto clone() -> std::unique_ptr<VectorBase> = 0;
 		virtual void clear() = 0;
 		virtual void print() = 0;
-		virtual std::string toJSON() = 0;
+
+		virtual auto toJSON() -> std::string = 0;
+		virtual auto toJSON(size_t index) -> std::string = 0;
 		virtual size_t getType() = 0;
+		virtual size_t elemSize() = 0;
 	}; //end of VectorBase
 
 
@@ -169,40 +172,16 @@ namespace vecs {
 
 
 	public:
-		std::string toJSON() override {
+
+		auto toJSON(size_t index) -> std::string override { return ::vecs::toJSON(operator[](index)); }
+
+		auto toJSON() -> std::string override {
 			std::string json = std::string("{\"name\":\"") + typeid(T).name() + "\",\"id\":" + std::to_string(Type<T>());
-
-#if 0
-			/* you can incorporate this to get the values, as far as primitives are concerned.
-			 * It doesn't, however, make much sense to do that - you simply get the entities' values,
-			 * and these are sent separately anyway. */
-			json += ",\"values\":[";
-			auto type = Type<T>();
-			size_t count{ 0 };
-			// This is suboptimal. But I don't see a better way yet. Still needs research.
-			if constexpr (std::is_same_v<T, char> || std::is_same_v<T, unsigned char>) {
-				for (auto& x : *this) { if (count++) json += ","; json += toJSONString(std::string(1, x)); }
-			}
-			else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, unsigned int> ||
-				std::is_same_v<T, long> || std::is_same_v<T, unsigned long> ||
-				std::is_same_v<T, long long> || std::is_same_v<T, unsigned long long> ||
-				std::is_same_v<T, float> || std::is_same_v<T, double>) {
-				for (auto& x : *this) { if (count++) json += ","; json += std::to_string(x); }
-			}
-			else if constexpr (std::is_same_v<T, std::string>) {
-				for (auto& x : *this) { if (count++) json += ","; json += toJSONString(x); }
-			}
-			else if constexpr (std::is_same_v<T, Handle>) {
-				for (auto& x : *this) { if (count++) json += ","; json += std::to_string(x.GetValue()); }
-			}
-			json += "]";
-#endif
-
 			json += "}";
-			//std::cout << "Name: " << typeid(T).name() << " ID: " << Type<T>();
 			return json;
 		}
 		virtual size_t getType() { return Type<T>(); }
+		size_t elemSize() override { return sizeof(T); }
 
 	}; //end of Vector
 

@@ -43,6 +43,7 @@ private:
     std::map<size_t, Console::WatchEntity> watchlist;
     bool isLive{ false };
     float avgComp{ 0.f };
+    size_t estSize{ 0 }; 
 
     virtual void ClientActivity();
     bool ProcessJSON(std::string sjson);
@@ -64,6 +65,7 @@ public:
     int lvEntityMax = 1;
 
     float getAvgComp() { return avgComp; }
+    size_t getEstSize() { return estSize; }
 
     bool requestSnapshot();
     bool requestLiveView(bool active = true);  // presumably expanded on in later versions

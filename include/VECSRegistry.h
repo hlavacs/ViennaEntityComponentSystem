@@ -683,6 +683,14 @@ namespace vecs {
 			return (Size()) ? (avgComp / Size()) : Size();
 		}
 
+		size_t getEstSize() {
+			size_t estSize = 0; 
+			for (auto& arch : m_archetypes) {
+				estSize += arch.second->getEstSize();
+			}
+			return estSize; 
+		}
+
 		std::string toJSON(Handle h) {
 			if (!h.IsValid() || !Exists(h)) { return "null"; }
 			auto& archAndIndex = GetArchetypeAndIndex(h);

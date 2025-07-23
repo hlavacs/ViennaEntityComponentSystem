@@ -355,6 +355,10 @@ bool ConsoleSocketThread::onLiveView(json const& json) {
         if (json.contains("avgComp")) {
              avgComp = json["avgComp"]; 
         }
+        if (json.contains("estSize")) {
+            estSize = json["estSize"];
+        }
+        
         if (json.contains("watched")) {
             for (auto& entityObject : json["watched"]) {
                 if (!entityObject.contains("entity") || !entityObject.contains("values"))

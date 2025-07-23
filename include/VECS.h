@@ -71,81 +71,6 @@ namespace vecs {
 		return seed;
 	}
 
-#if 0
-	// Highly experimental code ...
-
-		/// @brief convert a value into a transmittable JSON string
-	template<typename T>
-	inline std::string toJSON(T src) {
-#if 1
-		// C++17 style
-		if constexpr (std::is_same_v<T, std::string>) {
-#else
-		// C++11 style
-		if (std::is_same(T, std::string > ::value)) {
-#endif
-			std::string d("\"");
-			// mini-massager to get a string into JSON format
-			for (auto c : src) {
-				switch (c) {
-				case '\b':
-					d += "\\b";
-					break;
-				case '\f':
-					d += "\\f";
-					break;
-				case '\n':
-					d += "\\n";
-					break;
-				case '\r':
-					d += "\\r";
-					break;
-				case '\t':
-					d += "\\t";
-					break;
-				case '\\':
-				case '\"':
-					d += '\\';
-					d += c;
-					break;
-				default:
-					// this might require conversion of all other control characters (below 0x20) to \u00xx,
-					// but let's ignore that for now, shall we?
-					d += c;
-					break;
-				}
-			}
-			return d + "\"";
-		}
-#if 1
-		// C++17 style
-		else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, unsigned int> ||
-			std::is_same_v<T, long> || std::is_same_v<T, unsigned long> ||
-			std::is_same_v<T, long long> || std::is_same_v<T, unsigned long long> ||
-			std::is_same_v<T, float> || std::is_same_v<T, double>) {
-#else
-		// C++11 style
-		else if (std::is_same<T, int>::value || std::is_same<T, unsigned int>::value ||
-			std::is_same<T, long>::value || std::is_same<T, unsigned long>::value ||
-			std::is_same<T, long long>::value || std::is_same<T, unsigned long long>::value ||
-			std::is_same<T, float>::value || std::is_same<T, double>::value) {
-#endif
-			return std::to_string(src);
-		}
-#if 1
-		// C++17 style
-		else if constexpr (std::is_same_v<T, char> || std::is_same_v<T, unsigned char>) {
-#else
-		// C++11 style
-		else if (std::is_same<T, char>::value || std::is_same<T, unsigned char>::value) {
-#endif
-			return toJSON<std::string>(std::string(1, src));
-		}
-		else
-			return "";
-
-		}
-#endif
 
 	/// @brief convert a string into a transmittable JSON string
 	inline std::string toJSONString(std::string s) {
@@ -183,7 +108,51 @@ namespace vecs {
 		return d + "\"";
 	}
 
+	template<typename T>
+	concept HasToString = requires(T a) {
+		{ a.to_string() } -> std::convertible_to<std::string>;
+	};
+	template<typename T>
+	concept Streamable = requires(std::ostream & os, T a) {
+		{ os << a } -> std::same_as<std::ostream&>;
+	};
+
+	/// @brief convert a value into a transmittable JSON string
+	template<typename T>
+	std::string toJSON(const T& value) {
+		// This is less terrible code, but, to my knowledge, there's no better way to get
+		// the template types and hence the data
+		// handle primitive types
+		if constexpr (std::is_same_v<T, char> || std::is_same_v<T, unsigned char>)
+			return toJSONString(std::string(1, value));
+		else if constexpr (std::is_same_v<T, int> ||
+			std::is_same_v<T, unsigned int> ||
+			std::is_same_v<T, long> ||
+			std::is_same_v<T, unsigned long> ||
+			std::is_same_v<T, long long> ||
+			std::is_same_v<T, unsigned long long> ||
+			std::is_same_v<T, float> ||
+			std::is_same_v<T, double> ||
+			std::is_same_v<T, long double>)
+			return std::to_string(value);
+		// handle strings themselves
+		else if constexpr (std::is_same_v<T, std::string>)
+			return toJSONString(value);
+		// handle objects with a to_string member
+		else if constexpr (HasToString<T>)
+			return toJSONString(value.to_string());
+		// handle objects that can be serialized to a stream
+		else if constexpr (Streamable<T>) {
+			std::ostringstream oss;
+			oss << value;
+			return toJSONString(oss.str());
 		}
+		// anything else, sadly, cannot be JSONified
+		return toJSONString("<unknown>");
+	}
+
+
+}
 
 #if !defined(REGISTRYTYPE_SEQUENTIAL) || !defined(REGISTRYTYPE_PARALLEL)
 #define REGISTRYTYPE_SEQUENTIAL

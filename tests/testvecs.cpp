@@ -350,6 +350,7 @@ void test_registry() {
 
 }
 
+
 void test_conn() {
 	std::cout << "\x1b[37m testing Connection!...\n";
 
@@ -365,14 +366,22 @@ void test_conn() {
 	vecs::Handle h3 = system.Insert(6, 7.0f, 8.0);
 	vecs::Handle h4 = system.Insert(2, 24.0f, 4.0);
 
-	struct height_t { int i; };
+	struct height_t { int i; std::string to_string() const { return std::to_string(i); } };
 	using weight_t = vsty::strong_type_t<int, vsty::counter<>>;
 	vecs::Handle hx1 = system.Insert(height_t{ 5 }, weight_t{ 6 });
+
+	static const char* letsjam[] = {
+		 "Mein kleiner gruener Kaktus",
+		 "faehrt morgen ins Buero -",
+		 "Hollari",
+		 "hollara",
+		 "hollaro!",
+	};
 
 	std::vector<vecs::Handle> handles;
 	// create 20 handles
 	for (int i = 10; i < 30; i++) {
-		handles.push_back(system.Insert(i, static_cast<float>(i * 2)));
+		handles.push_back(system.Insert(i, static_cast<float>(i * 2), std::string(letsjam[i % _countof(letsjam)])));
 	}
 	// erase one of them, leaving 19
 	system.Erase(handles[4]);
@@ -397,12 +406,13 @@ void test_conn() {
 			}
 			else if (secs < 80) {
 				handles.push_back(system.Insert(secs + 1000, static_cast<float>(secs * 7)));
-				handles.push_back(system.Insert(secs + 1000, static_cast<float>(secs * 7), static_cast<double>(secs*5)));
+				handles.push_back(system.Insert(secs + 1000, static_cast<float>(secs * 7), static_cast<double>(secs * 5)));
 
 			}
 			// change contents of 0 every second
 			std::cout << "Setting " << std::to_string(handles[0].GetValue()) << " int to " << secs + 1000 << "\n";
 			system.Put(handles[0], secs + 10000);
+			system.Put(handles[0], std::string(letsjam[secs % _countof(letsjam)]));
 			// alternating "add 2 at end, remove 2 at front + 1"
 			if (secs & 1) {
 				system.Erase(handles[1]); handles.erase(handles.begin() + 1);

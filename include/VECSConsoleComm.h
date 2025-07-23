@@ -44,6 +44,7 @@ namespace vecs {
             bool active{ false };
             size_t handles{ 0 };
             float avgComp{ 0.f };
+            size_t estSize{ 0 };
 
         public:
             LiveView() {}  // don't need anything yet
@@ -87,6 +88,15 @@ namespace vecs {
                     json += std::string(",\"avgComp\":") + std::to_string(avgComp);
                     changes = true; 
                 }
+
+                size_t oldEstSize = estSize; 
+                estSize = registry->getEstSize();
+                compChanges = oldEstSize != estSize;
+                if (compChanges) {
+                    json += std::string(",\"estSize\":") + std::to_string(estSize);
+                    changes = true;
+                }
+                
 
                 size_t changedWatch = 0;
                 for (auto& entity : watched) {
