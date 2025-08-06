@@ -404,7 +404,7 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
         }
         else
         {
-
+            
             ImGui::Text("Choose a Snapshot: ");
 
             std::filesystem::path curDir{ "." };
@@ -462,6 +462,7 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
             //If loadFromfile is selected set showSnapshotFileList to true
             if (thd->selected != wasselected) {
                 if (thd->selected) {
+                    selectedSnapshotFile.clear();
                     showSnapshotFileList = true;
                 }
             }
@@ -469,12 +470,15 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
 
             if (showSnapshotFileList) {
                 showSnapshotFileListWindow(&showSnapshotFileList);
+                if (!showSnapshotFileList) {
+                    thd->selected = (selectedSnapshotFile.size() != 0);
+                }
             }
 
             if (thd->selected != wasselected) {
                 if (thd->selected) {
                     try {
-                        std::ifstream loadfile("snapshot.json");
+                        std::ifstream loadfile(selectedSnapshotFile);
                         nlohmann::json inputjson = nlohmann::json::parse(loadfile);
                         loadfile.close();
                         thd->parseSnapshot(inputjson);
