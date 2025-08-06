@@ -91,7 +91,13 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
             if (ImGui::Button("Save snapshot to file"))
             {
                 std::ofstream savefile;
-                savefile.open("snapshot.json"); //maybe add timestamp
+                std::time_t currTime = std::time(nullptr);
+                auto timestamp =  std::localtime(&currTime);
+                auto savetime = std::put_time(timestamp, "%Y%m%d%H%M%S");
+                std::ostringstream oss;
+                oss << savetime;
+                std::string saveName = std::string("snapshot") + oss.str()+ ".json";
+                savefile.open(saveName); 
                 savefile << snap.getJsonsnap();
                 savefile.close();
             }
