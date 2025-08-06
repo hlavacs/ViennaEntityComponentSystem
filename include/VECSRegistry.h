@@ -698,19 +698,18 @@ namespace vecs {
 		}
 
 		std::string getSnapshot() {
-			// presumably locking would be a good idea here, but for now, simply deliver
-			// primitive variant - create JSON on the fly
 			std::string json = "{\"cmd\":\"snapshot\",\"entities\":";
 			json += std::to_string(Size()) + ",";
 			json += "\"archetypes\":[";
 			size_t art {0};
+			m_mutex.lock();
 			for (auto& it : m_archetypes) {
 				if (art) json += ",";
 				json += "{\"hash\":\"" + std::to_string(it.first) + "\"" +
-					"," + it.second->toJSON() + //should come here when done
-					"}";
+					"," + it.second->toJSON() + "}";
 				art++;
 			}
+			m_mutex.unlock();
 			json += "]";
 			json += "}";
 			return json;

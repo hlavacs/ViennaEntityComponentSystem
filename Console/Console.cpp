@@ -9,7 +9,6 @@
 #include <fstream>
 #include <filesystem>
 
-
 // Console Listener
 #include "ConsoleListener.h"
 
@@ -29,10 +28,10 @@ std::string selectedSnapshotFile;
 bool SetupListener() {
     return listening.Create(service);
 }
+
 void TerminateListener() {
     listening.Terminate();
 }
-
 
 void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
 {
@@ -403,7 +402,7 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
 
         }
 
-    void static showSnapshotFileListWindow(bool* p_open) {
+void static showSnapshotFileListWindow(bool* p_open) {
         if (!ImGui::Begin("SnapshotFileListWindow", p_open))
         {
             ImGui::End();
@@ -438,7 +437,7 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
         
     }
 
-    void static showConnectionWindow(ConsoleListener & listening, bool* p_open)
+void static showConnectionWindow(ConsoleListener & listening, bool* p_open)
     {
 #if USE_SCALING
         float scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
@@ -529,8 +528,7 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
         }
     }
 
-
-    void static showLiveView(ConsoleListener & listening, bool* p_open)
+void static showLiveView(ConsoleListener & listening, bool* p_open)
     {
 #if USE_SCALING
         float scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
@@ -705,7 +703,7 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
 
     }
 
-    void static showWatchlistWindow(ConsoleListener & listening, bool* p_open) {
+void static showWatchlistWindow(ConsoleListener & listening, bool* p_open) {
 #if USE_SCALING
         float scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
 #else
@@ -828,8 +826,7 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
 
     }
 
-
-    void MainLoop() {
+void MainLoop() {
         if (ImGui::BeginMainMenuBar()) {
             if (ImGui::BeginMenu("Connections")) {
                 if (ImGui::MenuItem("Manage Connections")) {
@@ -875,10 +872,3 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
         }
 
     }
-
-
-
-
-
-
-

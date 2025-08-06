@@ -172,7 +172,6 @@ namespace vecs {
 
 
 	public:
-
 		auto toJSON(size_t index) -> std::string override { return ::vecs::toJSON(operator[](index)); }
 
 		auto toJSON() -> std::string override {

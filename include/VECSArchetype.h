@@ -303,10 +303,8 @@ namespace vecs {
 
 		std::string toJSON() {
 			std::string json = "\"archetype\":{\"hash\":" + std::to_string(Hash(m_types)) + ",\"types\":[";
-			//std::cout << "Archetype: " << Hash(m_types) << std::endl;
 			size_t count = 0;
 			for (auto ti : m_types) {
-				//std::cout << "Type: " << ti << " ";
 				if (count++) json += ",";
 				json += std::to_string(ti);
 			}
@@ -314,15 +312,11 @@ namespace vecs {
 
 			json += "\"maps\":[";
 			count = 0;
-			//std::cout << std::endl;
 			for (auto& map : m_maps) {
 				if (count++) json += ",";
 				json += map.second->toJSON();
 			}
 			json += "],";
-
-			//std::cout << "Entities: ";
-
 			json += "\"entities\":[";
 			count = 0;
 			// get vector of all entity handles
@@ -338,7 +332,6 @@ namespace vecs {
 
 				aindex++;
 			}
-			//std::cout << std::endl << std::endl;
 			json += "]}";
 			return json;
 

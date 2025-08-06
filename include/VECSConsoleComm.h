@@ -47,8 +47,8 @@ namespace vecs {
             size_t estSize{ 0 };
 
         public:
-            LiveView() {}  // don't need anything yet
-            ~LiveView() {}  // don't need anything yet
+            LiveView() {}  
+            ~LiveView() {} 
 
             void setRegistry(Registry* reg = nullptr) { registry = reg; }
 
@@ -74,6 +74,9 @@ namespace vecs {
             std::tuple<bool, std::string> getChangesJSON() {
                 if (!active || !registry)
                     return std::tuple<bool, std::string>(false, "");
+
+                registry->GetMutex().lock();
+
                 size_t oldHandles = handles; handles = registry->Size();
                 bool changes = oldHandles != handles;
                 std::string json = "{\"cmd\":\"liveview\"";
@@ -102,13 +105,9 @@ namespace vecs {
                 for (auto& entity : watched) {
                     std::string entityJSON = registry->toJSON(entity.first);
                     if (entityJSON != entity.second) {
-#if 0  // do this as long as Console doesn't check the values
-                        bool toSend = (entity.second.size() || entityJSON == "null");
+
                         entity.second = entityJSON;
-                        if (!toSend) continue;
-#else
-                        entity.second = entityJSON;
-#endif
+
                         if (!changedWatch++)
                             json += ",\"watched\":[{";
                         else
@@ -124,6 +123,7 @@ namespace vecs {
                 if (changedWatch)
                     json += "]";
                 json += "}";
+                registry->GetMutex().unlock();
                 return std::tuple<bool, std::string>(changes, json);
             }
 
@@ -164,7 +164,6 @@ namespace vecs {
             //----------------------
             // Connect to server.
 
-            // VECSConsoleComm::connectToServer() so erweitern, dass es, wenn connect() eine Verbindung herstellen konnte (also 0 zurueckgibt), einen eigenen Thread startet
             int returnval = connect(ConnectSocket, (SOCKADDR*)&clientService, sizeof(clientService));
             if (returnval == 0) {
                 running = true;
@@ -205,9 +204,6 @@ namespace vecs {
                 // Handle the received message (you can expand this!)
                 processMessage(msg);
             }
-
-            //TODO: close connection here? 
-
         }
 
 
@@ -219,7 +215,7 @@ namespace vecs {
             try {
                 msgjson = nlohmann::json::parse(msg);
             }
-            // could catch specific JSON error here, but for now, don't.
+            // Console sent wrong JSON, ignore
             catch (...) {
                 return;
             }
@@ -243,20 +239,15 @@ namespace vecs {
                 if (cmdit != cmds.end())
                     cmd = cmdit->second;
             }
-            // could catch specific JSON error here, but for now, don't.
+            // Console sent wrong or unknown command, ignore
             catch (...) {
                 // ignore, following switch simply won't do anything
             }
 
             switch (cmd) {
             case cmdHandshake:
-                // Here, the following could / should be done:
-                // .) check whether compatible Console version - close connection if not (keep error description somewhere, maybe?)
-                // ... but for now, simply move on.
-
-                // TEST TEST TEST
+                //print for testing
                 std::cout << "Hello from Console pid " << msgjson["pid"] << " built " << msgjson["compiled"] << "!\n";
-
                 // prepare a nice "Hello yourself!" to tell Console about us
                 sendMessage("{\"cmd\":\"handshake\", \"pid\":" + std::to_string(getpid()) + " }");
                 break;
@@ -265,15 +256,14 @@ namespace vecs {
                 if (!registry) {       // if no registry there,
                     sendMessage("{}"); // send empty object (maybe some kind of error object would be better?)
                 }
-                // first variant: simply get full snapshot in JSON form from the registry
-#if 1 // TEST TEST TEST TEST TEST TEST
+#if 1 // Debugging:
                 {
                     std::string josnap = registry->getSnapshot();
                     sendMessage(josnap);
                     std::cout << "Sending snapshot: " << josnap << "\n";
 
                 }
-#else
+#else // release
                 sendMessage(registry->getSnapshot());
 #endif
                 break;
@@ -284,9 +274,10 @@ namespace vecs {
                     auto& act = msgjson["active"];
                     if (act.is_boolean()) {
                         liveView.SetActive(act);
-                        // TEST TEST TEST TEST TEST TEST TEST TEST TEST TEST
+                        
                         std::string jsonlive = registry->getLiveView();
                         sendMessage(jsonlive);
+                        //Debugging: 
                         std::cout << "Sending liveview: " << jsonlive << "\n";
 
                     } // else ignore
@@ -314,7 +305,7 @@ namespace vecs {
             default:
                 // keep compiler happy
 
-                // TEST TEST TEST TEST
+                // Debugging:
                 std::cout << "Incoming command \"" << msgjson["cmd"] << "\" ignored\n";
                 break;
             }
@@ -346,11 +337,9 @@ namespace vecs {
                     // then wait for activity (or lack thereof)
                     if (selectrc == 0) {
                         // no data read from the other side within timeout period
-
-                        // TODO: in liveview, send assembled changes
                         auto lv = liveView.getChangesJSON();
                         if (std::get<0>(lv)) {
-                            // TEST TEST TEST TEST TEST TEST TEST TEST TEST
+                            // Debugging:
                             std::cout << "Liveview changes: " << std::get<1>(lv) << "\n";
                             sendMessage(std::get<1>(lv));
                         }

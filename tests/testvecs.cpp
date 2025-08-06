@@ -370,6 +370,7 @@ void test_conn() {
 	using weight_t = vsty::strong_type_t<int, vsty::counter<>>;
 	vecs::Handle hx1 = system.Insert(height_t{ 5 }, weight_t{ 6 });
 
+	//Test to see changes in the liveview
 	static const char* letsjam[] = {
 		 "Mein kleiner gruener Kaktus",
 		 "faehrt morgen ins Buero -",
