@@ -661,18 +661,16 @@ void static showLiveView(ConsoleListener & listening, bool* p_open)
                         std::string tagstr;
                         for (auto& tag : archetype->getTags()) {
                             if (archtagcount++) tagstr += ",";
-                            tagstr += snap.GetTagName(tag);
+                            tagstr += /*snap.GetTagName(tag)*/std::to_string(tag);
                         }
                         ImVec4 color = entity.isModified() ? ImVec4(255, 255, 0, 255) :
                             entity.isDeleted() ? ImVec4(255, 0, 0, 255) :
                             ImVec4(255, 255, 255, 255);
                         size_t componentIndex = 0;
                         for (auto& component : entity.getComponents()) {
-#if 0
-                            std::string cvalue = snap.GetTypeName(component.getType()) + " " + component.toString();
-#else
+
                             std::string cvalue = component.toString();
-#endif
+
                             ImGui::TableNextRow();
 
                             ImGui::TableSetColumnIndex(0);
@@ -680,7 +678,7 @@ void static showLiveView(ConsoleListener & listening, bool* p_open)
                             ImGui::TableSetColumnIndex(1);
                             ImGui::TextColored(color, eIndex.c_str());
                             ImGui::TableSetColumnIndex(2);
-                            ImGui::TextColored(color, snap.GetTypeName(component.getType()).c_str());
+                            ImGui::TextColored(color, entity.GetTypeName(component.getType()).c_str());
                             ImGui::TableSetColumnIndex(3);
                             ImGui::TextColored(color, cvalue.c_str());
                             ImGui::TableSetColumnIndex(4);

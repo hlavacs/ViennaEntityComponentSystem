@@ -13,19 +13,45 @@ namespace Console {
     class WatchEntity : public Entity {
     private:
         Archetype arch;
+        std::map<size_t, std::string> typeNames;
 
     public:
         WatchEntity() {}
         WatchEntity(Entity const& org) : Entity(org) {
-            if (org.GetArchetype()) arch.copyArchetype(*org.GetArchetype());
+            if (org.GetArchetype()) {
+                arch.copyArchetype(*org.GetArchetype());
+                auto registry = org.GetArchetype()->GetRegistry();
+                if (registry) {
+                    for (auto& component : getComponents()) {
+                        typeNames[component.getType()] = registry->GetTypeName(component.getType()).c_str();
+                    }
+                }
+            }
             SetArchetype(&arch);
         }
+
         WatchEntity& operator=(Entity const& org) {
             Entity::operator=(org);
-            if (org.GetArchetype()) arch.copyArchetype(*org.GetArchetype());
+            if (org.GetArchetype()) {
+                arch.copyArchetype(*org.GetArchetype());
+                auto registry = org.GetArchetype()->GetRegistry();
+                if (registry) {
+                    for (auto& component : getComponents()) {
+                        typeNames[component.getType()] = registry->GetTypeName(component.getType()).c_str();
+                    }
+                }
+            }
             SetArchetype(&arch);
             return *this;
         }
+
+        std::string GetTypeName(size_t t) {
+            auto it = typeNames.find(t);
+            assert(it != typeNames.end());
+            return it->second;
+        }
+
+
     };
 
 
