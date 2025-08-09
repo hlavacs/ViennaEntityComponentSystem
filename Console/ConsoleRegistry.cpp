@@ -2,8 +2,6 @@
 
 namespace Console {
 
-	// Console::Archetype members
-
 	void Archetype::SetRegistry(Registry* r) {
 		registry = r;
 		if (registry)

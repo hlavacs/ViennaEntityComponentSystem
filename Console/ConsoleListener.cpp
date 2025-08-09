@@ -51,8 +51,8 @@ void ConsoleSocketThread::ClientActivity() {
     while ((waitrc = s.wait(500)) != SOCKET_ERROR) {
         // check for timeout ...
         if (waitrc == 0) {
-            // TODO : if there's an external influence governing this thread,
-            //        make it happen here
+            // if there's an external influence governing this thread,
+            // make it happen here
         }
         else if (waitrc > 0) {
             // something HAPPENED!
@@ -67,10 +67,7 @@ void ConsoleSocketThread::ClientActivity() {
                 int maxRd = min(sizeof(sbuf), nLen);
                 int rlen = s.receiveData(sbuf, maxRd);
                 nLen -= rlen;
-#if 0
-                // FIRST TEST - simply read in as many data as available and echo them back
-                s.sendData(sbuf, rlen);
-#else
+
                 // process incoming buffers, which are supposed to be in JSON format
                 // refer to https://www.json.org/json-en.html for complete JSON specification
 
@@ -147,10 +144,7 @@ void ConsoleSocketThread::ClientActivity() {
                         json.clear();
                     }
                 }
-
-#endif
             }
-
         }
     }
 }
@@ -205,16 +199,11 @@ bool ConsoleSocketThread::ProcessJSON(std::string sjson) {
         // This is where interaction with the main program has to happen.
         // We got a new client! :)
         onHandshake(msgjson);
-
-        // for now, however ...
-        // TEST TEST TEST TEST TEST - simply request a snapshot
-        //requestSnapshot();
         break;
     case cmdSnapshot:
         onSnapshot(msgjson);
         break;
     case cmdLiveView:
-        // this is SURELY going to change ... a LOT
         onLiveView(msgjson);
         break;
     default:
@@ -225,7 +214,6 @@ bool ConsoleSocketThread::ProcessJSON(std::string sjson) {
 }
 
 bool ConsoleSocketThread::onHandshake(json const& json) {
-    // TODO: parse necessary values, return false if the connection does not match our criteria
     try {
         pid = json["pid"];
     }
@@ -252,7 +240,7 @@ bool ConsoleSocketThread::parseSnapshot(nlohmann::json const& json) {
         // we need that first to determine what we got here ...
         auto& archs = json["archetypes"];
         for (auto& a : archs) {
-            auto& a2 = a["archetype"];   // TODO: is this sub-object really necessary?
+            auto& a2 = a["archetype"]; 
             auto& maps = a2["maps"];
             for (auto& m : maps) {
                 snapshot[newSnapIdx].AddTypeName(m["id"], m["name"]);
@@ -264,8 +252,8 @@ bool ConsoleSocketThread::parseSnapshot(nlohmann::json const& json) {
             for (auto& t : types) {
                 // this is a bit unsafe, as there are no constraints defined for tags.
                 if (!snapshot[newSnapIdx].HasTypeName(t)) {  // if it s not a type, it is a tag.
-                    snapshot[newSnapIdx].AddTag(t, std::to_string(t.get<size_t>()));      // TODO: once there are tag names, set them correctly
-                    tags.push_back(t);           // remember as one of the tags to add to the entities in this archetype
+                    snapshot[newSnapIdx].AddTag(t, std::to_string(t.get<size_t>()));
+                    tags.push_back(t); // remember as one of the tags to add to the entities in this archetype
                 }
             }
 
@@ -296,10 +284,8 @@ bool ConsoleSocketThread::parseSnapshot(nlohmann::json const& json) {
                 }
                 ca.addEntity(ce);
             }
-
-            snapshot[newSnapIdx].addArchetype(ca);  // TODO: this is just a first draft - it COPIES the complete thing!
-
-            snapidx = newSnapIdx;  // the ONLY moment for a race condition ...
+            snapshot[newSnapIdx].addArchetype(ca); 
+            snapidx = newSnapIdx;  
         }
     }
     catch (json::exception& e) {
@@ -314,7 +300,7 @@ bool ConsoleSocketThread::parseSnapshot(nlohmann::json const& json) {
 
 }
 
-bool ConsoleSocketThread::requestLiveView(bool active) {  // presumably expanded on in later versions
+bool ConsoleSocketThread::requestLiveView(bool active) { 
     isLive = active;
     return sendData(std::string("{\"cmd\":\"liveview\",\"active\":") + (active ? "true" : "false") + "}") > 0;
 }
@@ -333,8 +319,8 @@ bool ConsoleSocketThread::onLiveView(json const& json) {
     // parse incoming live view data, create internal structure for it that can be handled from GUI
     try {
         if (json.contains("entities")) {
-            // TEST TEST TEST TEST TEST TEST TEST TEST
             size_t entities = json["entities"];
+           
             std::cout << "LiveView entities: " << entities << "\n";
             int newMax = (int)entities;
             for (int i = 1; i < _countof(lvEntityCount); i++) {
