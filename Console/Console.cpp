@@ -150,8 +150,6 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
             };
             // --------------------------------------------
 
-
-
             //-------------Entity Filter-------------------
             ImGui::Text("Entity");
             static std::string current_entity = "-";
@@ -170,8 +168,6 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
             };
 
             //---------------------------------------------
-
-
 
 
             //------------Component Filter-----------------
@@ -203,8 +199,6 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
 
             //---------------------------------------------
 
-
-
             //---------------Tag Filter--------------------
 
 
@@ -226,9 +220,7 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
 
             //---------------------------------------------
 
-
             ImGui::EndChild();
-
             ImGui::SameLine();
             ImGui::BeginChild("Snapshot", childSnapshotTableSz);
 
@@ -236,7 +228,6 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
             static Console::Component* selTableComponent{ nullptr };
             static Console::Entity* selTableEntity{ nullptr };
             bool componentSelected{ false };
-
 
             if (ImGui::BeginTable("Snapshot", 5, ImGuiTableFlags_RowBg)) {
 
@@ -247,160 +238,130 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
                 ImGui::TableSetupColumn("Tag");
                 ImGui::TableHeadersRow();
 
-#if 0  // not yet!
+                bool selectedArchetype = (current_archetype != "-");
+                bool selectedEntity = (current_entity != "-");
+                bool selectedComptype = (current_comptype != "-");
+                bool selectedTag = (current_tag != "-");
 
-                // TODO: since there a re posisbly MANY table rows, investigate this part of the ImGui demo!
+                for (auto& archetype : snap.getArchetypes()) {
+                    std::string aHash = archetype.second.toString();
+                    if (selectedArchetype && aHash != current_archetype)
+                        continue;
+                    int archtagcount = 0;
+                    std::string tagstr;
+                    bool abortTag = (selectedTag && !archetype.second.getTags().size());
+                    for (auto& tag : archetype.second.getTags()) {
+                        if (archtagcount++) tagstr += ",";
+                        std::string tagName = snap.GetTagName(tag);
+                        if (selectedTag && tagName != current_tag)
+                            abortTag = true;
+                        tagstr += tagName;
+                    }
+                    if (abortTag) continue;
+                    //ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0,ImGui::GetColorU32(ImVec4(0,188,0,50)));
+                    if (!archetype.second.getEntities().size()) {
+                        if (selectedEntity) continue;
+                        ImGui::TableNextRow();
+                        ImGui::TableSetColumnIndex(0);
+                        ImGui::TextUnformatted(aHash.c_str());
+                        ImGui::TableSetColumnIndex(1);
+                        ImGui::TextUnformatted("-");
+                        ImGui::TableSetColumnIndex(2);
+                        ImGui::TextUnformatted("-");
+                        ImGui::TableSetColumnIndex(3);
+                        ImGui::TextUnformatted("-");
+                        ImGui::TableSetColumnIndex(4);
+                        ImGui::TextUnformatted("-");
+                    }
+                    else {
+                        size_t entityIndex = 0;
 
-#if 1
-            // Demonstrate using clipper for large vertical lists
-                ImGuiListClipper clipper;
-                clipper.Begin(items.Size);
-                while (clipper.Step())
-                {
-                    for (int row_n = clipper.DisplayStart; row_n < clipper.DisplayEnd; row_n++)
-#else
-            // Without clipper
-                    {
-                        for (int row_n = 0; row_n < items.Size; row_n++)
-#endif
-
-#endif
-
-                            bool selectedArchetype = (current_archetype != "-");
-                        bool selectedEntity = (current_entity != "-");
-                        bool selectedComptype = (current_comptype != "-");
-                        bool selectedTag = (current_tag != "-");
-
-                        for (auto& archetype : snap.getArchetypes()) {
-                            std::string aHash = archetype.second.toString();
-                            if (selectedArchetype && aHash != current_archetype)
+                        for (auto& x : archetype.second.getEntities()) {
+                            auto& entity = x.second;
+                            std::string eIndex = entity.toString();
+                            if (selectedEntity && eIndex != current_entity) {
+                                entityIndex++;
                                 continue;
-                            int archtagcount = 0;
-                            std::string tagstr;
-                            bool abortTag = (selectedTag && !archetype.second.getTags().size());
-                            for (auto& tag : archetype.second.getTags()) {
-                                if (archtagcount++) tagstr += ",";
-                                std::string tagName = snap.GetTagName(tag);
-                                if (selectedTag && tagName != current_tag)
-                                    abortTag = true;
-                                tagstr += tagName;
                             }
-                            if (abortTag) continue;
-                            //ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0,ImGui::GetColorU32(ImVec4(0,188,0,50)));
-                            if (!archetype.second.getEntities().size()) {
-                                if (selectedEntity) continue;
+                            size_t componentIndex = 0;
+                            for (auto& component : entity.getComponents()) {
+                                std::string actCompType = snap.GetTypeName(component.getType());
+                                if (selectedComptype && actCompType != current_comptype) {
+                                    componentIndex++;
+                                    continue;
+                                }
+                                std::string cvalue = component.toString();
                                 ImGui::TableNextRow();
                                 ImGui::TableSetColumnIndex(0);
-                                ImGui::TextUnformatted(aHash.c_str());
-                                ImGui::TableSetColumnIndex(1);
-                                ImGui::TextUnformatted("-");
-                                ImGui::TableSetColumnIndex(2);
-                                ImGui::TextUnformatted("-");
-                                ImGui::TableSetColumnIndex(3);
-                                ImGui::TextUnformatted("-");
-                                ImGui::TableSetColumnIndex(4);
-                                ImGui::TextUnformatted("-");
-                            }
-                            else {
-                                size_t entityIndex = 0;
 
-                                for (auto& x : archetype.second.getEntities()) {
-                                    auto& entity = x.second;
-                                    std::string eIndex = entity.toString();
-                                    if (selectedEntity && eIndex != current_entity) {
-                                        entityIndex++;
-                                        continue;
-                                    }
-                                    size_t componentIndex = 0;
-                                    for (auto& component : entity.getComponents()) {
-                                        std::string actCompType = snap.GetTypeName(component.getType());
-                                        if (selectedComptype && actCompType != current_comptype) {
-                                            componentIndex++;
-                                            continue;
-                                        }
-#if 0
-                                        std::string cvalue = snap.GetTypeName(component.getType()) + " " + component.toString();
-#else
-                                        std::string cvalue = component.toString();
-#endif
-                                        ImGui::TableNextRow();
-                                        ImGui::TableSetColumnIndex(0);
-
-#if 0 // no selection
-                                        ImGui::TextUnformatted(aHash.c_str());
-#else
-                                        // generate nice label for this table row; the "##" part is to guarantee unique labels while only displaying the hash
-                                        std::string componentLabel = aHash + "##" + std::to_string(entityIndex) + "." + std::to_string(componentIndex);
-                                        // make table row selectable
-                                        const ImGuiSelectableFlags selectable_flags = ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap;
-                                        const bool itemIsSelected = (&component == selTableComponent);
-                                        if (itemIsSelected) componentSelected = true;
-                                        if (ImGui::Selectable(componentLabel.c_str(), itemIsSelected, selectable_flags /*, ImVec2(0, 10)*/)) {
-                                            selTableComponent = &component;
-                                            selTableEntity = &entity;
-                                            componentSelected = true;
-                                        }
-                                        if (ImGui::BeginPopupContextItem()) {
-                                            selTableComponent = &component;
-                                            selTableEntity = &entity;
-                                            componentSelected = true;
-                                            bool watched = listening.getVecs(listening.cursel)->isWatched(selTableEntity->GetValue());
-                                            if (!watched && ImGui::Button("Add to watchlist")) {
-                                                vecs->addWatch(selTableEntity->GetValue());
-                                                ImGui::CloseCurrentPopup();
-                                            }
-                                            if (watched && ImGui::Button("Remove from watchlist")) {
-                                                vecs->deleteWatch(selTableEntity->GetValue());
-                                                ImGui::CloseCurrentPopup();
-                                            }
-                                            ImGui::EndPopup();
-                                        }
-#endif
-
-                                        ImGui::TableSetColumnIndex(1);
-                                        ImGui::TextUnformatted(eIndex.c_str());
-                                        ImGui::TableSetColumnIndex(2);
-                                        ImGui::TextUnformatted(actCompType.c_str());
-                                        ImGui::TableSetColumnIndex(3);
-                                        ImGui::TextUnformatted(cvalue.c_str());
-                                        ImGui::TableSetColumnIndex(4);
-                                        ImGui::TextUnformatted(tagstr.c_str());
-
-                                        componentIndex++;
-                                    }
-                                    entityIndex++;
+                                // generate nice label for this table row; the "##" part is to guarantee unique labels while only displaying the hash
+                                std::string componentLabel = aHash + "##" + std::to_string(entityIndex) + "." + std::to_string(componentIndex);
+                                // make table row selectable
+                                const ImGuiSelectableFlags selectable_flags = ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap;
+                                const bool itemIsSelected = (&component == selTableComponent);
+                                if (itemIsSelected) componentSelected = true;
+                                if (ImGui::Selectable(componentLabel.c_str(), itemIsSelected, selectable_flags /*, ImVec2(0, 10)*/)) {
+                                    selTableComponent = &component;
+                                    selTableEntity = &entity;
+                                    componentSelected = true;
                                 }
+                                if (ImGui::BeginPopupContextItem()) {
+                                    selTableComponent = &component;
+                                    selTableEntity = &entity;
+                                    componentSelected = true;
+                                    bool watched = listening.getVecs(listening.cursel)->isWatched(selTableEntity->GetValue());
+                                    if (!watched && ImGui::Button("Add to watchlist")) {
+                                        vecs->addWatch(selTableEntity->GetValue());
+                                        ImGui::CloseCurrentPopup();
+                                    }
+                                    if (watched && ImGui::Button("Remove from watchlist")) {
+                                        vecs->deleteWatch(selTableEntity->GetValue());
+                                        ImGui::CloseCurrentPopup();
+                                    }
+                                    ImGui::EndPopup();
+                                }
+
+                                ImGui::TableSetColumnIndex(1);
+                                ImGui::TextUnformatted(eIndex.c_str());
+                                ImGui::TableSetColumnIndex(2);
+                                ImGui::TextUnformatted(actCompType.c_str());
+                                ImGui::TableSetColumnIndex(3);
+                                ImGui::TextUnformatted(cvalue.c_str());
+                                ImGui::TableSetColumnIndex(4);
+                                ImGui::TextUnformatted(tagstr.c_str());
+
+                                componentIndex++;
                             }
-
+                           entityIndex++;
                         }
-
-
-                        ImGui::EndTable();
                     }
-                    ImGui::EndChild();
-
-                    // details area
-                    ImGui::NewLine();
-                    ImGui::BeginChild("Details", childDetailsSz);
-                    if (componentSelected && selTableComponent) {
-                        std::string entityText = std::string("Entity Index: ") + selTableEntity->toString() +
-                            ", Version " + std::to_string(selTableEntity->GetVersion()) +
-                            ", Storage Index " + std::to_string(selTableEntity->GetStorageIndex());
-                        ImGui::TextUnformatted(entityText.c_str());
-
-                        std::string componentText = std::string("Component Type: ") + snap.GetTypeName(selTableComponent->getType());
-                        ImGui::TextUnformatted(componentText.c_str());
-                        ImGui::TextUnformatted(selTableComponent->toString().c_str());
-
-
-                    }
-                    ImGui::EndChild();
 
                 }
-            ImGui::End();
-            }
 
+              ImGui::EndTable();
+            }
+            ImGui::EndChild();
+
+            // details area
+            ImGui::NewLine();
+            ImGui::BeginChild("Details", childDetailsSz);
+            if (componentSelected && selTableComponent) {
+                std::string entityText = std::string("Entity Index: ") + selTableEntity->toString() +
+                    ", Version " + std::to_string(selTableEntity->GetVersion()) +
+                    ", Storage Index " + std::to_string(selTableEntity->GetStorageIndex());
+                ImGui::TextUnformatted(entityText.c_str());
+
+                std::string componentText = std::string("Component Type: ") + snap.GetTypeName(selTableComponent->getType());
+                ImGui::TextUnformatted(componentText.c_str());
+                ImGui::TextUnformatted(selTableComponent->toString().c_str());
+
+
+            }
+         ImGui::EndChild();
         }
+     ImGui::End();
+    }
+}
 
 void static showSnapshotFileListWindow(bool* p_open) {
         if (!ImGui::Begin("SnapshotFileListWindow", p_open))
@@ -409,9 +370,7 @@ void static showSnapshotFileListWindow(bool* p_open) {
         }
         else
         {
-            
             ImGui::Text("Choose a Snapshot: ");
-
             std::filesystem::path curDir{ "." };
             for (auto const& dir_entry : std::filesystem::directory_iterator{ curDir }) {
                 auto entry = dir_entry.path().string();
@@ -428,13 +387,8 @@ void static showSnapshotFileListWindow(bool* p_open) {
             }
             ImGui::SameLine();
             ImGui::Text(selectedSnapshotFile.c_str());
-
-
-
-
             ImGui::End();
         }
-        
     }
 
 void static showConnectionWindow(ConsoleListener & listening, bool* p_open)
@@ -445,7 +399,6 @@ void static showConnectionWindow(ConsoleListener & listening, bool* p_open)
         const float scale = 1.f;
 #endif
         ImGui::SetNextWindowSize(ImVec2(150 * scale, 100 * scale), ImGuiCond_Once);
-        // ImGui::SetNextWindowCollapsed(false);
         ImVec2 wpos(0 * scale, 20 * scale);
         if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
             wpos.x += ImGui::GetMainViewport()->Pos.x;
@@ -458,73 +411,72 @@ void static showConnectionWindow(ConsoleListener & listening, bool* p_open)
         }
         else
         {
-            int cursel = -1;
+          int cursel = -1;
+          // special case : read from file
+          ConsoleSocketThread* thd = listening.getVecs(0);
+          auto wasselected = thd->selected;
+          ImGui::Selectable("Load from File", &thd->selected);
+          //If loadFromfile is selected set showSnapshotFileList to true
+          if (thd->selected != wasselected) {
+              if (thd->selected) {
+                  selectedSnapshotFile.clear();
+                  showSnapshotFileList = true;
+              }
+          }
+          //if Load from file was selected: open selecction window: 
 
-            // special case : read from file
-            ConsoleSocketThread* thd = listening.getVecs(0);
-            auto wasselected = thd->selected;
-            ImGui::Selectable("Load from File", &thd->selected);
-            //If loadFromfile is selected set showSnapshotFileList to true
-            if (thd->selected != wasselected) {
-                if (thd->selected) {
-                    selectedSnapshotFile.clear();
-                    showSnapshotFileList = true;
-                }
-            }
-            //if Load from file was selected: open selecction window: 
+          if (showSnapshotFileList) {
+              showSnapshotFileListWindow(&showSnapshotFileList);
+              if (!showSnapshotFileList) {
+                  thd->selected = (selectedSnapshotFile.size() != 0);
+              }
+          }
 
-            if (showSnapshotFileList) {
-                showSnapshotFileListWindow(&showSnapshotFileList);
-                if (!showSnapshotFileList) {
-                    thd->selected = (selectedSnapshotFile.size() != 0);
-                }
-            }
+          if (thd->selected != wasselected) {
+              if (thd->selected) {
+                  try {
+                      std::ifstream loadfile(selectedSnapshotFile);
+                      nlohmann::json inputjson = nlohmann::json::parse(loadfile);
+                      loadfile.close();
+                      thd->parseSnapshot(inputjson);
+                      cursel = 0;
+                  }
+                  catch (...) {
+                      thd->selected = false;
+                  }
+              }
+              else if (wasselected) {
+                  listening.cursel = -1;
+              }
+          }
 
-            if (thd->selected != wasselected) {
-                if (thd->selected) {
-                    try {
-                        std::ifstream loadfile(selectedSnapshotFile);
-                        nlohmann::json inputjson = nlohmann::json::parse(loadfile);
-                        loadfile.close();
-                        thd->parseSnapshot(inputjson);
-                        cursel = 0;
-                    }
-                    catch (...) {
-                        thd->selected = false;
-                    }
-                }
-                else if (wasselected) {
-                    listening.cursel = -1;
-                }
-            }
-
-            for (size_t i = 1; i < listening.vecsCount(); i++) {
-                ConsoleSocketThread* thd = listening.getVecs(i);
-                if (thd) {
-                    int pid = thd->getPid();
-                    if (pid > 0) {
-                        std::string spid = "VECS PID " + std::to_string(pid);
-                        auto wasselected = thd->selected;
-                        ImGui::Selectable(spid.c_str(), &thd->selected);
-                        if (thd->selected != wasselected) {
-                            if (thd->selected)
-                                cursel = static_cast<int>(i);
-                            else
-                                listening.cursel = -1;
-                        }
-                    }
-                }
-            }
-            if (cursel >= 0) {
-                listening.cursel = cursel;
-                for (size_t i = 0; i < listening.vecsCount(); i++) {
-                    ConsoleSocketThread* thd = listening.getVecs(i);
-                    if (thd) {
-                        thd->selected = (i == cursel);
-                    }
-                }
-            }
-            ImGui::End();
+          for (size_t i = 1; i < listening.vecsCount(); i++) {
+              ConsoleSocketThread* thd = listening.getVecs(i);
+              if (thd) {
+                  int pid = thd->getPid();
+                  if (pid > 0) {
+                      std::string spid = "VECS PID " + std::to_string(pid);
+                      auto wasselected = thd->selected;
+                      ImGui::Selectable(spid.c_str(), &thd->selected);
+                      if (thd->selected != wasselected) {
+                          if (thd->selected)
+                              cursel = static_cast<int>(i);
+                          else
+                              listening.cursel = -1;
+                      }
+                  }
+              }
+          }
+          if (cursel >= 0) {
+              listening.cursel = cursel;
+              for (size_t i = 0; i < listening.vecsCount(); i++) {
+                  ConsoleSocketThread* thd = listening.getVecs(i);
+                  if (thd) {
+                      thd->selected = (i == cursel);
+                  }
+              }
+          }
+          ImGui::End();
         }
     }
 
@@ -544,8 +496,6 @@ void static showLiveView(ConsoleListener & listening, bool* p_open)
             wpos.y += ImGui::GetMainViewport()->Pos.y;
         }
         ImGui::SetNextWindowPos(wpos, ImGuiCond_Once);
-
-
 
         ImGui::SetNextWindowCollapsed(false);
 
@@ -573,8 +523,6 @@ void static showLiveView(ConsoleListener & listening, bool* p_open)
 
             ImGui::BeginChild("LiveView", childLiveViewGraphSz);
 
-
-
             if (listening.cursel >= 0) {
                 auto vecs = listening.getVecs(listening.cursel);
                 bool isLive = vecs->getIsLive();
@@ -593,9 +541,6 @@ void static showLiveView(ConsoleListener & listening, bool* p_open)
                     ImPlot::SetupAxisLimits(ImAxis_Y1, 0, vecs->lvEntityMax, ImPlotCond_Always);
                     //ImPlot::SetupAxesLimits(0,50,0,100);
                     ImPlot::PlotBars("Entities", vecs->lvEntityCount, _countof(vecs->lvEntityCount));
-
-
-
                     ImPlot::EndPlot();
                 }
 
@@ -608,7 +553,6 @@ void static showLiveView(ConsoleListener & listening, bool* p_open)
                 auto vecs = listening.getVecs(listening.cursel);
                 ImGui::Text("Number of Entities: %d", vecs->lvEntityCount[_countof(vecs->lvEntityCount) - 1]);
                 ImGui::Text("Average Number of Components: %.2f", vecs->getAvgComp());
-                //TODO: Estimated memory usage
                 char s[128];
                 size_t estSize = vecs->getEstSize();
                 // primitive human-readable value ...
@@ -619,12 +563,9 @@ void static showLiveView(ConsoleListener & listening, bool* p_open)
                 else if (estSize >= 1000L) // over a killabyte?
                     sprintf(s, "%.2lf KB", static_cast<double>(estSize) / 1000.0);
                 else  // below a killahbyte
-                    sprintf(s, "%ld B", estSize);
-
+                    sprintf(s, "%ld B", (int)estSize);
                 ImGui::Text("Estimated Memory usage: %s", s);
-            }
-            
-
+            } 
             ImGui::EndChild();
             ImGui::SameLine();
 
@@ -637,7 +578,6 @@ void static showLiveView(ConsoleListener & listening, bool* p_open)
                 static Console::Entity* selTableEntity{ nullptr };
                 bool componentSelected{ false };
 
-
                 if (ImGui::BeginTable("Watchlist", 5, ImGuiTableFlags_RowBg)) {
 
                     ImGui::TableSetupColumn("Archetype");
@@ -647,7 +587,6 @@ void static showLiveView(ConsoleListener & listening, bool* p_open)
                     ImGui::TableSetupColumn("Tag");
                     ImGui::TableHeadersRow();
 
-                    auto& snap = vecs->getSnapshot();
                     auto& watchlist = vecs->getWatchlist();
 
                     size_t entityIndex = 0;
@@ -661,7 +600,7 @@ void static showLiveView(ConsoleListener & listening, bool* p_open)
                         std::string tagstr;
                         for (auto& tag : archetype->getTags()) {
                             if (archtagcount++) tagstr += ",";
-                            tagstr += /*snap.GetTagName(tag)*/std::to_string(tag);
+                            tagstr += std::to_string(tag);
                         }
                         ImVec4 color = entity.isModified() ? ImVec4(255, 255, 0, 255) :
                             entity.isDeleted() ? ImVec4(255, 0, 0, 255) :
@@ -693,12 +632,9 @@ void static showLiveView(ConsoleListener & listening, bool* p_open)
                 }
 
             }
-
             ImGui::EndChild();
-
             ImGui::End();
         }
-
     }
 
 void static showWatchlistWindow(ConsoleListener & listening, bool* p_open) {
@@ -716,8 +652,6 @@ void static showWatchlistWindow(ConsoleListener & listening, bool* p_open) {
             wpos.y += ImGui::GetMainViewport()->Pos.y;
         }
         ImGui::SetNextWindowPos(wpos, ImGuiCond_Once);
-
-
 
         ImGui::SetNextWindowCollapsed(false);
 
@@ -744,37 +678,29 @@ void static showWatchlistWindow(ConsoleListener & listening, bool* p_open) {
                     ImGui::TableSetupColumn("Tag");
                     ImGui::TableHeadersRow();
 
-                    auto& snap = vecs->getSnapshot();
                     auto& watchlist = vecs->getWatchlist();
 
                     size_t entityIndex = 0;
                     size_t entidel = (size_t)-1;
                     for (auto& entityhandle : watchlist) {
-                        auto entity = snap.findEntity(entityhandle.first);
-                        if (!entity)
-                            continue;
-                        auto archetype = entity->GetArchetype();
+                        auto& entity = entityhandle.second;
+                        auto archetype = entity.GetArchetype();
                         std::string aHash = archetype->toString();
-                        std::string eIndex = entity->toString();
+                        std::string eIndex = entity.toString();
                         int archtagcount = 0;
                         std::string tagstr;
                         for (auto& tag : archetype->getTags()) {
                             if (archtagcount++) tagstr += ",";
-                            tagstr += snap.GetTagName(tag);
+                            tagstr += /*snap.GetTagName(tag)*/std::to_string(tag);
                         }
                         size_t componentIndex = 0;
-                        for (auto& component : entity->getComponents()) {
-#if 0
-                            std::string cvalue = snap.GetTypeName(component.getType()) + " " + component.toString();
-#else
+                        for (auto& component : entity.getComponents()) {
+
                             std::string cvalue = component.toString();
-#endif
+
                             ImGui::TableNextRow();
                             ImGui::TableSetColumnIndex(0);
 
-#if 0 // no selection
-                            ImGui::TextUnformatted(aHash.c_str());
-#else
                             // generate nice label for this table row; the "##" part is to guarantee unique labels while only displaying the hash
                             std::string componentLabel = aHash + "##wl" + std::to_string(entityIndex) + "." + std::to_string(componentIndex);
                             // make table row selectable
@@ -783,12 +709,12 @@ void static showWatchlistWindow(ConsoleListener & listening, bool* p_open) {
                             if (itemIsSelected) componentSelected = true;
                             if (ImGui::Selectable(componentLabel.c_str(), itemIsSelected, selectable_flags /*, ImVec2(0, 10)*/)) {
                                 selTableComponent = &component;
-                                selTableEntity = entity;
+                                selTableEntity = &entity;
                                 componentSelected = true;
                             }
                             if (ImGui::BeginPopupContextItem()) {
                                 selTableComponent = &component;
-                                selTableEntity = entity;
+                                selTableEntity = &entity;
                                 componentSelected = true;
 
                                 if (ImGui::Button("Remove from watchlist")) {
@@ -798,12 +724,10 @@ void static showWatchlistWindow(ConsoleListener & listening, bool* p_open) {
                                 }
                                 ImGui::EndPopup();
                             }
-#endif
-
                             ImGui::TableSetColumnIndex(1);
                             ImGui::TextUnformatted(eIndex.c_str());
                             ImGui::TableSetColumnIndex(2);
-                            ImGui::TextUnformatted(snap.GetTypeName(component.getType()).c_str());
+                            ImGui::TextUnformatted(entity.GetTypeName(component.getType()).c_str());
                             ImGui::TableSetColumnIndex(3);
                             ImGui::TextUnformatted(cvalue.c_str());
                             ImGui::TableSetColumnIndex(4);
