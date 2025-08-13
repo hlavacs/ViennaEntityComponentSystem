@@ -155,6 +155,7 @@ namespace vecs {
                 std::scoped_lock lock(m_system->GetArchetypeMutex(handle));
                 m_system->AddTags(handle, std::forward<Ts>(tags)...);
             }); 
+            waitIdle();
         }
 
 
@@ -169,6 +170,7 @@ namespace vecs {
                 std::scoped_lock lock(m_system->GetArchetypeMutex(handle));
                 m_system->EraseTags(handle,std::forward<Ts>(tags)...);
             });
+            waitIdle();
         }
 
 
@@ -182,6 +184,7 @@ namespace vecs {
                 std::scoped_lock lock(m_system->GetArchetypeMutex(handle));
                 m_system->Erase<Ts...>(handle);
             });
+            waitIdle();
         }
 
 
@@ -192,6 +195,7 @@ namespace vecs {
                 std::scoped_lock lock(m_system->GetSlotMapMutex(handle.GetStorageIndex()));
                 m_system->Erase(handle);
             });
+            waitIdle();
         }
 
 

@@ -54,13 +54,8 @@ TEST_F(ManagerTest, AddTagsWorks) {
     vecs::Handle h5 = mng.Insert(7, 6.6, 5.5f);
 
     mng.AddTags(h3, 1ul, 3ul);
-    mng.waitIdle();
-
     mng.AddTags(h4, 2ul, 3ul, 1ul);
-    mng.waitIdle();
-
     mng.AddTags(h5, 1ul, 2ul);
-    mng.waitIdle();
 
     int yesTagsCorrect = 0;
     int yesNoTagsCorrect = 0;
@@ -89,9 +84,7 @@ TEST_F(ManagerTest, EraseTagsWorks) {
     mng.AddTags(h6, 4ul, 5ul, 6ul);
 
     bool tagErased = true;
-    mng.waitIdle();
     mng.EraseTags(h6, 6ul);
-    mng.waitIdle();
 
     auto res = mng.template GetView<vecs::Handle>(std::vector<size_t>{6ul});
     for ( auto handle : res)  {
@@ -107,9 +100,7 @@ TEST_F(ManagerTest, EraseComponentAndEntityWorks) {
     vecs::Handle h8 = mng.Insert(4, 5.5f);
 
     mng.Erase(h7);
-    mng.waitIdle();
     mng.Erase<int>(h8);
-    mng.waitIdle();
 
     bool noInt = true;
     auto res = mng.template GetView<vecs::Handle, int>();
