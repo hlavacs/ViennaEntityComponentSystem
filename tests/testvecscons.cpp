@@ -150,6 +150,26 @@ void test_conn() {
 
 		// do nothing for 600 seconds, let background task work
 		for (int secs = 0; secs < 600; secs++) {
+
+			while (_kbhit()) {
+				switch (_getch()) {
+				case 'a':
+					for (int i = 0; i < 100000; i++) {
+						handles.push_back(system.Insert(i + 100000, static_cast<float>(i * 7)));
+					}
+					break;
+				case 'd': 
+					if (handles.size() > 100000) {
+						for (int i = 0; i < 100000; i++) {
+							system.Erase(handles[1]); handles.erase(handles.begin() + 1);
+						}
+					}
+					break; 
+				default: 
+					break;
+				}
+			}
+
 			// test for dynamic scaling of entity graph in Console LiveView
 			if (secs < 80) {
 				handles.push_back(system.Insert(secs + 1000, static_cast<float>(secs * 7)));

@@ -36,6 +36,12 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
 {
     float scale = GetContentScale();
 
+    //for over a hundred thousand entities, this way of displaying the data and filtering it is too slow.
+    //rework is needed
+    //e.g only load data of the first 100 displayed entites and only load more when scrolling down
+    //maybe initialize filters when snapshot is coming in or methods for the filters 
+
+
     /* Initial window layout:  1135x700 at offset 150,20 - potentially scaled to main screen scale
                                             x (init 1135, min. 900)
     +-------------------------------------------------------------------------------------------------+
