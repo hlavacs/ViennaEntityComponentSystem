@@ -99,8 +99,6 @@ namespace vecs {
 				d += c;
 				break;
 			default:
-				// this might require conversion of all other control characters (below 0x20) to \u00xx,
-				// but let's ignore that for now, shall we?
 				d += c;
 				break;
 			}
@@ -120,8 +118,7 @@ namespace vecs {
 	/// @brief convert a value into a transmittable JSON string
 	template<typename T>
 	std::string toJSON(const T& value) {
-		// This is less terrible code, but, to my knowledge, there's no better way to get
-		// the template types and hence the data
+		// to my knowledge, there's no better way to get the template types and hence the data
 		// handle primitive types
 		if constexpr (std::is_same_v<T, char> || std::is_same_v<T, unsigned char>)
 			return toJSONString(std::string(1, value));

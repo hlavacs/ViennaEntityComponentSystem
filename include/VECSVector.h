@@ -171,6 +171,7 @@ namespace vecs {
 		Vector_t m_segments{ 10 };	///< Vector holding unique pointers to the segments.
 
 
+	//Methods for Console communication
 	public:
 		auto toJSON(size_t index) -> std::string override { return ::vecs::toJSON(operator[](index)); }
 

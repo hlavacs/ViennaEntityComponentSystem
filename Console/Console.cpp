@@ -73,7 +73,7 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
     {
         if (listening.cursel >= 0) {
 
-            // used in child window area calculation below - presumably there's a better way in Imgui
+            // used in child window area calculation below
             ImVec2 initCursorPos = ImGui::GetCursorPos();
             auto vecs = listening.getVecs(listening.cursel);
             if (ImGui::Button("Get new Snapshot"))
@@ -100,12 +100,11 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
             ImVec2 windowSize = ImGui::GetWindowSize();
             ImVec2 cursorPos = ImGui::GetCursorPos();
             // calculate area for our 3 child windows - minimum is 600,300 (scaled)
-            // the y size calculation is a bit meh ... need to find out more about child window padding, the effects of ImGui::NewLine etc.
             float detailsY = 50.f * scale;
             ImVec2 childArea(std::max(900.f * scale, windowSize.x - 2 * cursorPos.x),
                 std::max(300.f * scale - detailsY, windowSize.y - cursorPos.y - initCursorPos.y - 5.f));
             ImVec2 childFilterSz(160.f * scale, childArea.y - detailsY);
-            ImVec2 childSnapshotTableSz(childArea.x - (160.f * scale) - (10.f * scale /*for scrollbar*/), childArea.y - detailsY);
+            ImVec2 childSnapshotTableSz(childArea.x - (160.f * scale) - (10.f * scale), childArea.y - detailsY);
             ImVec2 childDetailsSz(childArea.x, detailsY);
 
             // Filter child window
@@ -254,7 +253,6 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
                         tagstr += tagName;
                     }
                     if (abortTag) continue;
-                    //ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0,ImGui::GetColorU32(ImVec4(0,188,0,50)));
                     if (!archetype.second.getEntities().size()) {
                         if (selectedEntity) continue;
                         ImGui::TableNextRow();
@@ -296,7 +294,7 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
                                 const ImGuiSelectableFlags selectable_flags = ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap;
                                 const bool itemIsSelected = (&component == selTableComponent);
                                 if (itemIsSelected) componentSelected = true;
-                                if (ImGui::Selectable(componentLabel.c_str(), itemIsSelected, selectable_flags /*, ImVec2(0, 10)*/)) {
+                                if (ImGui::Selectable(componentLabel.c_str(), itemIsSelected, selectable_flags)) {
                                     selTableComponent = &component;
                                     selTableEntity = &entity;
                                     componentSelected = true;
@@ -376,8 +374,6 @@ void static showSnapshotFileListWindow(bool* p_open) {
                     selectedSnapshotFile = entry;
                 }
         }
-
-        //TODO: if not selected, display cancel button
         if (ImGui::Button(selectedSnapshotFile.size() ? "Select File: " : "Cancel")) {
             showSnapshotFileList = false;
         }
@@ -495,15 +491,12 @@ void static showLiveView(ConsoleListener& listening, bool* p_open)
     {
         ImVec2 windowSize = ImGui::GetWindowSize();
         ImVec2 cursorPos = ImGui::GetCursorPos();
-        // calculate area for our 3 child windows - minimum is 600,300 (scaled)
-        // the y size calculation is a bit meh ... need to find out more about child window padding, the effects of ImGui::NewLine etc.
-
         ImVec2 childArea(std::max(900.f * scale, windowSize.x - 2 * cursorPos.x - 7.f),
             std::max(300.f * scale, windowSize.y - cursorPos.y - 12.f));
 
         float lowerY = childArea.y * 0.5f;
 
-        ImVec2 childLiveViewGraphSz(childArea.x - (10.f * scale /*for scrollbar*/), childArea.y - lowerY);
+        ImVec2 childLiveViewGraphSz(childArea.x - (10.f * scale), childArea.y - lowerY);
         ImVec2 childStatsSz(childArea.x / 3.f, lowerY);
         ImVec2 childWatchlistSz(childArea.x * (2.f / 3.f), lowerY);
 
@@ -527,7 +520,6 @@ void static showLiveView(ConsoleListener& listening, bool* p_open)
 
                 ImPlot::SetupAxisLimits(ImAxis_X1, 0, _countof(vecs->lvEntityCount));
                 ImPlot::SetupAxisLimits(ImAxis_Y1, 0, vecs->lvEntityMax, ImPlotCond_Always);
-                //ImPlot::SetupAxesLimits(0,50,0,100);
                 ImPlot::PlotBars("Entities", vecs->lvEntityCount, _countof(vecs->lvEntityCount));
                 ImPlot::EndPlot();
             }
@@ -543,14 +535,14 @@ void static showLiveView(ConsoleListener& listening, bool* p_open)
             ImGui::Text("Average Number of Components: %.2f", vecs->getAvgComp());
             char s[128];
             size_t estSize = vecs->getEstSize();
-            // primitive human-readable value ...
-            if (estSize >= 1000000000L) // over a gigabyte?
+            // primitive human-readable value
+            if (estSize >= 1000000000L) // over a gigabyte
                 sprintf(s, "%.2lf GB", static_cast<double>(estSize) / 1000000000.0);
-            else if (estSize >= 1000000L) // over a megabyte?
+            else if (estSize >= 1000000L) // over a megabyte
                 sprintf(s, "%.2lf MB", static_cast<double>(estSize) / 1000000.0);
-            else if (estSize >= 1000L) // over a killabyte?
+            else if (estSize >= 1000L) // over a kilobyte
                 sprintf(s, "%.2lf KB", static_cast<double>(estSize) / 1000.0);
-            else  // below a killahbyte
+            else  // below a kilobyte
                 sprintf(s, "%ld B", (int)estSize);
             ImGui::Text("Estimated Memory usage: %s", s);
         }
@@ -691,7 +683,7 @@ void static showWatchlistWindow(ConsoleListener& listening, bool* p_open) {
                         const ImGuiSelectableFlags selectable_flags = ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap;
                         const bool itemIsSelected = (&component == selTableComponent);
                         if (itemIsSelected) componentSelected = true;
-                        if (ImGui::Selectable(componentLabel.c_str(), itemIsSelected, selectable_flags /*, ImVec2(0, 10)*/)) {
+                        if (ImGui::Selectable(componentLabel.c_str(), itemIsSelected, selectable_flags)) {
                             selTableComponent = &component;
                             selTableEntity = &entity;
                             componentSelected = true;
@@ -702,7 +694,6 @@ void static showWatchlistWindow(ConsoleListener& listening, bool* p_open) {
                             componentSelected = true;
 
                             if (ImGui::Button("Remove from watchlist")) {
-                                //TODO 
                                 entidel = entityhandle.first;
                                 ImGui::CloseCurrentPopup();
                             }

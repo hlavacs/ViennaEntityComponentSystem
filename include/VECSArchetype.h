@@ -274,8 +274,8 @@ namespace vecs {
 		inline static thread_local size_t m_iteratingIndex{ std::numeric_limits<size_t>::max() }; //current iterator index
 		inline static thread_local std::vector<size_t> m_gaps{}; //gaps from previous erasures that must be filled
 
-	public:
-
+//methods for Console communication
+public:
 		std::string toJSON(size_t aindex) {
 			// retrieve the values of the entity components
 			std::string json = "[";

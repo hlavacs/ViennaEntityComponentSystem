@@ -5,7 +5,7 @@
 #include <vector>
 
 namespace Console {
-
+	//Representation of Components for the Console
 	class Component {
 	private:
 		std::tuple<size_t, std::string> data;

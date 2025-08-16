@@ -37,6 +37,7 @@ namespace vecs {
 	private:
 		type_t m_value; ///< Strong type for the handle.
 
+	//Method for Console communication
 	public:
 		std::string toJSON() {
 			std::string json = "{\"index\":" + std::to_string(GetIndex()) + ",\"version\":" + std::to_string(GetVersion()) +

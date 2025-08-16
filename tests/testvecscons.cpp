@@ -94,7 +94,7 @@ void test_conn() {
 		 "Hollari",
 		 "hollara",
 		 "hollaro!",
-	#ifndef DEBUG
+	#ifndef _DEBUG
 	     "Wir fahren mit der U-Bahn",
 		 "von hier nach anderswo",
 		 "Hollari",
@@ -102,7 +102,7 @@ void test_conn() {
 		 "hollaro!",
 		 "Und wenn ein Boesewicht",
 		 "was Ungezog'nes spricht",
-         "dann sag' ich's meinen Kaktus",
+         "dann sag' ich's meinem Kaktus",
 		 "und der sticht, sticht, sticht",
          "Mein kleiner gruener Kaktus",
 		 "faehrt gerne ins Buero",

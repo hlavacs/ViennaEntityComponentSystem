@@ -8,6 +8,7 @@
 namespace Console {
 
 	class Archetype;
+	//Representation of Entities for the Console
 	class Entity {
 	private:
 		size_t index;

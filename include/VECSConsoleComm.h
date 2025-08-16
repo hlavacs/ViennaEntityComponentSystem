@@ -3,7 +3,6 @@
 #ifdef WIN32
 extern "C" {
     //F'in Windows.h includes minwindef.h which overrides min, which collides with C++ std::min
-    // ... so suppress that.
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
@@ -13,7 +12,7 @@ extern "C" {
 
 #pragma comment(lib, "Ws2_32.lib")
 
-// VS and its posix warnings ... <sigh>
+// Still warnings here
 #define getpid() _getpid()
 
 }
@@ -56,22 +55,18 @@ namespace vecs {
             bool SetActive(bool onoff = true) { bool old = active; active = onoff; return old; }
             bool IsActive() const { return active; }
             bool Watch(std::set<Handle>& newSet) {
-                // determine handles to remove
                 std::set<Handle> toRemove;
                 for (auto& el : watched)
                     if (!newSet.contains(el.first))
                         toRemove.insert(el.first);
-                // add new handles
                 for (auto& el : newSet)
                     if (!watched.contains(el))
                         watched[el] = "";
-                // remove unwatched handles
                 for (auto& el : toRemove)
                     watched.erase(el);
-                return true; // needed?
+                return true; 
             }
 
-            // TODO: make these thread-safe. The listener thread might come in at any moment and fetch the changes.
             std::tuple<bool, std::string> getChangesJSON() {
                 if (!active || !registry)
                     return std::tuple<bool, std::string>(false, "");
@@ -130,8 +125,6 @@ namespace vecs {
 
         } liveView; //declare member variable
 
-        // design question ... do we want one comm object for each VECS registry, or one for all registries in the program?
-        // for now, let's assume a simple 1:1 relation - each registry gets its own connection object
         Registry* registry{ nullptr };
 
     public:
@@ -140,7 +133,7 @@ namespace vecs {
             cleanup();
         }
 
-        // simple variant: handle exactly one registry
+        //handle one registry
         void setRegistry(Registry* reg = nullptr) { registry = reg; liveView.setRegistry(reg); }
 
         SOCKET connectToServer(Registry* reg, std::string host = "127.0.0.1", int port = 2000) {
@@ -151,7 +144,6 @@ namespace vecs {
 
             if (ConnectSocket != INVALID_SOCKET)
                 return ConnectSocket;
-            // Alternate posibility: disconnectFromServer();
 
             ConnectSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
             if (ConnectSocket == INVALID_SOCKET)
@@ -202,7 +194,6 @@ namespace vecs {
                     break;
                 }
 
-                // Handle the received message (you can expand this!)
                 processMessage(msg);
             }
         }
@@ -238,7 +229,6 @@ namespace vecs {
                 return;
             }
 
-            // convert {"cmd":"..."} to enumeration
             enum {
                 cmdUnknown,
                 cmdHandshake,
@@ -259,7 +249,7 @@ namespace vecs {
             }
             // Console sent wrong or unknown command, ignore
             catch (...) {
-                // ignore, following switch simply won't do anything
+                // ignore
             }
 
             switch (cmd) {
@@ -278,7 +268,7 @@ namespace vecs {
                 {
                     std::string josnap = registry->getSnapshot();
                     sendMessage(josnap);
-                    if (josnap.size() > 80) // most likely ...
+                    if (josnap.size() > 80) 
                         josnap = josnap.substr(0, 77) + "...}";
                     std::cout << "Sending snapshot: " << josnap << "\n";
 
@@ -352,11 +342,10 @@ namespace vecs {
                 const timeval* ptmou = (tmou.tv_sec || tmou.tv_usec) ? &tmou : NULL;
                 fd_set fds;
                 do {
-                    // setup selector set (... of one ...)
                     FD_ZERO(&fds);
                     FD_SET(ConnectSocket, &fds);
                     selectrc = select(static_cast<int>(ConnectSocket + 1), &fds, NULL, NULL, ptmou);
-                    // then wait for activity (or lack thereof)
+                    // then wait for activity 
                     if (selectrc == 0) {
                         // no data read from the other side within timeout period
                         auto lv = liveView.getChangesJSON();
@@ -364,7 +353,7 @@ namespace vecs {
                             std::string lvchg = std::get<1>(lv);
                             sendMessage(lvchg);
                             // Debugging:
-                            if (lvchg.size() > 80) // most likely ...
+                            if (lvchg.size() > 80)
                                 lvchg = lvchg.substr(0, 77) + "...}";
                             std::cout << "Liveview changes: " << lvchg << "\n";
                         }
@@ -380,13 +369,9 @@ namespace vecs {
                     return std::string(buffer);
                 }
                 else if (received == 0) {
-                    // in all likelyhood, the connection was dropped from the other side, so ...
-                    // close from our side, too
                     disconnectFromServer();
                 }
                 else {
-                    // some network error or blocking would occur for non-blocking sockets
-                    // we don't do non-blocking socket opreations here, but why not capture it
 #ifdef _WINSOCKAPI_
                     if (WSAGetLastError() != WSAEWOULDBLOCK)
 #else

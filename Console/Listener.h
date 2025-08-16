@@ -24,14 +24,13 @@ public:
     ~Socket() { destroy(); }
     operator SOCKET() { return s; } // if the need arises to use the underlying SOCKET
 
-    // TODO: make this more intelligent. Copying transfers ownership!
     Socket& operator=(SOCKET const other) { s = other; return *this; }
     Socket& operator=(Socket& other) { s = other.s; other.detach(); return *this; }
 
-    static int getError();  // retrieve last (socket) error
+    static int getError(); 
     static int getProtoNumber(std::string proto = "");  // get number for a protocol name
     static int getServicePort(std::string service, std::string proto = "tcp");
-    static unsigned long getHostAddress(std::string hostName = "");  // TODO: this is IPv4-specific ATM!
+    static unsigned long getHostAddress(std::string hostName = ""); 
 
     SOCKET create(int sType = SOCK_STREAM, std::string proto = "");
     bool isCreated();
@@ -63,9 +62,8 @@ private:
 
 };
 
-// SocketThread : thread class for a TCP based connection
-
 class SocketListener;
+// SocketThread : thread class for a TCP based connection
 class SocketThread {
 public:
     SocketThread(SOCKET s, SocketListener* l) : sockClient(s), listener(l) {}
@@ -82,7 +80,7 @@ public:
     int sendData(const char* data, int datalen) { return sockClient.sendData(data, datalen); }
     int sendData(const std::string s) { return sockClient.sendData(s); }
 private:
-    virtual void ClientActivity() {} // has to be overridden for any meaningful activity!
+    virtual void ClientActivity() {}
 
 private:
     volatile bool terminateThread{ false };
@@ -92,7 +90,6 @@ private:
 };
 
 // SocketListener : base class for a socked based (TCP or UDP) listener
-
 class SocketListener {
 private:
     Socket sockListener;
@@ -129,21 +126,7 @@ private:
 
 };
 
-// UdpListener: base class for a socket-based UDP datagram listener
-
-class UdpListener : public SocketListener {
-public:
-    UdpListener(std::string service) { if (service.size()) Create(service); }
-    virtual ~UdpListener() {}
-
-public:
-    bool Create(std::string service) { return SocketListener::Create(service, SOCK_DGRAM); }
-
-private:
-};
-
 // TcpListener: base class for a socket-based TCP listener
-
 class TcpListener : public SocketListener {
 public:
     TcpListener(std::string service) { if (service.size()) Create(service); }
@@ -154,4 +137,19 @@ public:
 
 private:
 };
+
+#if 0
+// Optional: UdpListener base class for a socket-based UDP datagram listener
+// For now, only TCP is used
+class UdpListener : public SocketListener {
+public:
+    UdpListener(std::string service) { if (service.size()) Create(service); }
+    virtual ~UdpListener() {}
+
+public:
+    bool Create(std::string service) { return SocketListener::Create(service, SOCK_DGRAM); }
+
+private:
+};
+#endif
 

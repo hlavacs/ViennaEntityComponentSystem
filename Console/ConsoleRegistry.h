@@ -9,7 +9,7 @@
 
 namespace Console {
 
-    /// @brief  internal representation of a Registry from a VECS
+    // Representation of a Registry for the Console
     class Registry {
 
     private:
@@ -87,12 +87,12 @@ namespace Console {
             else return nullptr;
         }
 
-        // type name handling stuff
+        // type name handling 
         std::map<size_t, std::string>& GetTypes() { return types; }
         bool AddTypeName(size_t t, std::string name) {
-            if (HasTypeName(t))                 // if already there ...
-                return name != GetTypeName(t);  // report whether same (if not: two names for the same type are BAD!)
-            types[t] = name;                    // otherwise peacefully insert new type in map
+            if (HasTypeName(t))                 
+                return name != GetTypeName(t);  // report whether same
+            types[t] = name;                    // otherwise insert new type in map
             return true;
         }
         bool HasTypeName(size_t t) {
@@ -104,11 +104,11 @@ namespace Console {
             return it->second;
         }
 
-        // tag name handling stuff
+        // tag name handling 
         bool AddTag(size_t t, std::string name) {
-            if (HasTag(t))                     // if already there ...
-                return name != GetTagName(t);  // report whether same (if not: two names for the same tag are BAD!)
-            tags[t] = name;                    // otherwise peacefully insert new tag in map
+            if (HasTag(t))                     
+                return name != GetTagName(t);  // report whether same 
+            tags[t] = name;                    // otherwise insert new tag in map
             return true;
         }
         bool HasTag(size_t t) {
@@ -120,5 +120,5 @@ namespace Console {
             return it->second;
         }
 
-    }; // Snapshot
+    }; 
 }

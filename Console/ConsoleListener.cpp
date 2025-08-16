@@ -20,44 +20,32 @@ typedef struct hostent HOSTENT;
 
 #include "ConsoleListener.h"
 
-// if USING_SELECT is defined, all incoming socket events are handled through select()
-// if undefined, timeout loops are used (can be quite inefficient at times)
-// TODO: remove the possibility once the select() method works reliably on all target systems
+//all incoming socket events are handled through select()
 #define USING_SELECT
 
-
-// ConsoleSocketThread class members
-
 // ClientActivity : the handler for all incoming socket activity
-
 void ConsoleSocketThread::ClientActivity() {
 
     int waitrc;
 
     auto& s = getSocket();
 
-    // TEST - start by sending a welcome string to the other side
     std::string welcome("{\"cmd\":\"handshake\",\"pid\":" + std::to_string(getpid()) + ",\"compiled\":\"" __DATE__ " " __TIME__ "\"}");
     s.sendData(welcome);
 
-    std::string json;       // current json string
+    std::string json;       
     int brcs{ 0 };          // currently open braces
     int brks{ 0 };          // currently open brackets
     bool instr{ false };    // currently in string
-    bool inesc{ false };   // currently in escape sequence (\" , to be exact)
+    bool inesc{ false };   // currently in escape sequence
     char lchr{ 0 };         // last character
 
     // wait for incoming data with a timeout of 500 ms
     while ((waitrc = s.wait(500)) != SOCKET_ERROR) {
-        // check for timeout ...
         if (waitrc == 0) {
-            // if there's an external influence governing this thread,
-            // make it happen here
+            // if there's an external influence governing this thread
         }
         else if (waitrc > 0) {
-            // something HAPPENED!
-
-            // if no data there, the socket connection has presumably been closed from this or the other side
             if (!s.dataThere())
                 break;
 
@@ -69,9 +57,7 @@ void ConsoleSocketThread::ClientActivity() {
                 nLen -= rlen;
 
                 // process incoming buffers, which are supposed to be in JSON format
-                // refer to https://www.json.org/json-en.html for complete JSON specification
-
-                // quick and dirty parser - just good enough to capture complete json buffers
+                // capture complete json buffers
                 for (int i = 0; i < rlen; i++) {
                     bool complete{ false };
                     switch (sbuf[i]) {
@@ -91,8 +77,8 @@ void ConsoleSocketThread::ClientActivity() {
                         if (instr) break;
                         if (brcs)  // ignore badly formed buffers starting with a }
                             brcs--;
-                        if (!brcs && !brks)  // if outside any braces or brackets,
-                            complete = true;   // done with this one
+                        if (!brcs && !brks)  
+                            complete = true;  
                         break;
                     case '[':
                         if (inesc) {
@@ -110,11 +96,11 @@ void ConsoleSocketThread::ClientActivity() {
                         if (instr) break;
                         if (brks)  // ignore badly formed buffers starting with a ]
                             brks--;
-                        if (!brcs && !brks)  // if outside any braces or brackets,
-                            complete = true; // done with this one
+                        if (!brcs && !brks)  
+                            complete = true;
                         break;
                     case '\\':
-                        inesc = !inesc;  // assure that \\ is NOT starting an escape sequence
+                        inesc = !inesc; 
                         break;
                     case '\"':
                         if (inesc) {
@@ -122,19 +108,12 @@ void ConsoleSocketThread::ClientActivity() {
                             break;
                         }
                         instr = !instr;
-                        if (!instr && !brcs && !brks) // string closed and no open brackets or braces ?
+                        if (!instr && !brcs && !brks)
                             complete = true;
                         break;
                     default:
-                        if (inesc)  // anything else ends an escape sequence (good enough)
+                        if (inesc)  // anything else ends an escape sequence
                             inesc = false;
-                        // for a really complete JSON parser, we would need to deal with the fact that
-                        // a well-formed json buffer can also consist of ...
-                        // - a single number
-                        // - the strings true, false, null
-                        // - or even a single whitespace character (bonkers, but correct)
-                        // for now, however simply assume incoming objects and/or arrays.
-                        // after all, we KNOW the sender and his ways.
                         break;
                     }
                     lchr = sbuf[i];
@@ -148,13 +127,11 @@ void ConsoleSocketThread::ClientActivity() {
         }
     }
 }
-
-// Liberally sprinkling the source code with "nlohmann::" is a bit beside the point, so ...
 using namespace nlohmann;
 
 bool ConsoleSocketThread::ProcessJSON(std::string sjson) {
 
-    //Process JSon
+    //Process JSON
     json msgjson;
     try {
         msgjson = json::parse(sjson);
@@ -195,9 +172,6 @@ bool ConsoleSocketThread::ProcessJSON(std::string sjson) {
 
     switch (cmd) {
     case cmdHandshake:
-        // VECS information coming in
-        // This is where interaction with the main program has to happen.
-        // We got a new client! :)
         onHandshake(msgjson);
         break;
     case cmdSnapshot:
@@ -220,7 +194,7 @@ bool ConsoleSocketThread::onHandshake(json const& json) {
     catch (...) {
         return false;
     }
-    handShook = true;  // :-)
+    handShook = true;
     return true;
 }
 
@@ -230,14 +204,12 @@ bool ConsoleSocketThread::requestSnapshot() {
 
 bool ConsoleSocketThread::parseSnapshot(nlohmann::json const& json) {
     // clear potentially pre-existing snapshot
-    int newSnapIdx = snapidx ^ 1;  // switch to other snap
+    int newSnapIdx = snapidx ^ 1;  // switch to other snapshot to prevent conflicts
     snapshot[newSnapIdx].clear();
     snapshot[newSnapIdx].setJsonsnap(json.dump());
     // parse incoming snapshot, create internal structure for it that can be handled from GUI
     try {
         entitycount = json["entities"];
-        // get array of archetypes from JSON
-        // we need that first to determine what we got here ...
         auto& archs = json["archetypes"];
         for (auto& a : archs) {
             auto& a2 = a["archetype"]; 
@@ -245,8 +217,6 @@ bool ConsoleSocketThread::parseSnapshot(nlohmann::json const& json) {
             for (auto& m : maps) {
                 snapshot[newSnapIdx].AddTypeName(m["id"], m["name"]);
             }
-            // get set of types from JSON
-            // this also contains the tags assigned to this archetype
             auto& types = a2["types"];
             std::vector<size_t> tags;
             for (auto& t : types) {
@@ -260,14 +230,13 @@ bool ConsoleSocketThread::parseSnapshot(nlohmann::json const& json) {
             Console::Archetype ca(a2["hash"]);
             for (auto& tag : tags) ca.addTag(tag);
 
-            // now that we got all necessary details, fetch the entities 
             auto& entities = a2["entities"];
             for (auto& e : entities) {
                 Console::Entity ce(e["index"], e["version"], e["stgindex"], e["value"]);
                 auto& values = e["values"];
                 int i = 0;
                 for (auto& v : values) {
-                    std::string sv;  // in Console, we're content with strings for the moment
+                    std::string sv; 
                     // build string for expected primitive JSON types
                     if (v.is_number_integer())
                         sv = std::to_string(v.get<long long>());
@@ -360,7 +329,7 @@ bool ConsoleSocketThread::onLiveView(json const& json) {
                     auto coit = entity.getComponents().begin();
                     // walk through all components and look for changes
                     for (auto& v : values) {
-                        std::string sv;  // in Console, we're content with strings for the moment
+                        std::string sv; 
                         // build string for expected primitive JSON types
                         if (v.is_number_integer())
                             sv = std::to_string(v.get<long long>());
@@ -369,8 +338,6 @@ bool ConsoleSocketThread::onLiveView(json const& json) {
                         else
                             sv = v;
                         if (sv != coit->toString()) {
-                            // for now, assume that any type change automatically means a new archetype and thus
-                            // a deletion from the old archetype, so don't examine archetype type changes
                             coit->setString(sv);
                             changes = true;
                         }

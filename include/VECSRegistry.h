@@ -287,7 +287,7 @@ namespace vecs {
 			for( uint32_t i = 0; i < NUMBER_SLOTMAPS::value; ++i ) {
 				m_slotMaps.emplace_back( SlotMapAndMutex<typename Archetype::ArchetypeAndIndex>{ i, 6  } ); 
 			}
-			//if debug - connect to console
+			//If it is in Debug Mode - connect to Console
 #ifdef _DEBUG
 			getConsoleComm(this);
 #endif

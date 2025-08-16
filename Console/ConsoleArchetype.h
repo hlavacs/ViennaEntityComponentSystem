@@ -5,9 +5,10 @@
 
 #include "ConsoleEntity.h"
 
-namespace Console {
 
+namespace Console {
 	class Registry;
+	// Representation of Archetypes for the Console
 	class Archetype {
 	private:
 		std::map<size_t, Entity> entities;
