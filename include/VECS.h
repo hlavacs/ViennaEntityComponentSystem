@@ -164,6 +164,11 @@ using Size_t = std::size_t;
 using Size_t = std::atomic<std::size_t>;
 #endif
 
+namespace vecs {
+	class Registry;
+	class VECSConsoleComm;
+	VECSConsoleComm* getConsoleComm(Registry* reg = nullptr);
+}
 #include <VTLL.h>
 #include <VSTY.h>
 #include "VECSHandle.h"

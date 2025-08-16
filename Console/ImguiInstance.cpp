@@ -347,6 +347,16 @@ static void FramePresent(ImGui_ImplVulkanH_Window* wd)
     wd->SemaphoreIndex = (wd->SemaphoreIndex + 1) % wd->SemaphoreCount; // Now we can use the next set of semaphores
 }
 
+// Scaling functionality
+float GetContentScale()
+{
+#if USE_SCALING
+    return SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
+#else
+    return 1.f;
+#endif
+}
+
 // Main code
 int main(int, char**)
 {
@@ -360,11 +370,7 @@ int main(int, char**)
 
     // Create window with Vulkan graphics context
     SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_HIDDEN);
-#if USE_SCALING
-    float main_scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
-#else
-    const float main_scale = 1.f;
-#endif
+    float main_scale = GetContentScale();
     SDL_Window* window = SDL_CreateWindow("VECS Console", (int)(1290 * main_scale), (int)(730 * main_scale), window_flags);
     if (window == nullptr)
     {
@@ -519,9 +525,8 @@ int main(int, char**)
         //  static float f = 0.0f;
         //  static int counter = 0;
 
+        // call the (implementation agnostic) main loop
         MainLoop();
-
-
 
         // Rendering
         ImGui::Render();

@@ -32,13 +32,14 @@ namespace vecs {
 
     private:
         std::jthread commThread;
+        std::jthread initThread;
         std::mutex socketMutex;
         bool running = false;
 
         // LiveView : encapsulation for all LiveView-related data
         class LiveView {
 
-        private: 
+        private:
             Registry* registry{ nullptr };
             std::map<Handle, std::string> watched;
             bool active{ false };
@@ -47,8 +48,8 @@ namespace vecs {
             size_t estSize{ 0 };
 
         public:
-            LiveView() {}  
-            ~LiveView() {} 
+            LiveView() {}
+            ~LiveView() {}
 
             void setRegistry(Registry* reg = nullptr) { registry = reg; }
 
@@ -83,23 +84,23 @@ namespace vecs {
                 if (changes) {
                     json += std::string(",\"entities\":") + std::to_string(handles);
                 }
-                
-                float oldAvgComp = avgComp; 
+
+                float oldAvgComp = avgComp;
                 avgComp = registry->getAvgComp();
                 bool compChanges = oldAvgComp != avgComp;
                 if (compChanges) {
                     json += std::string(",\"avgComp\":") + std::to_string(avgComp);
-                    changes = true; 
+                    changes = true;
                 }
 
-                size_t oldEstSize = estSize; 
+                size_t oldEstSize = estSize;
                 estSize = registry->getEstSize();
                 compChanges = oldEstSize != estSize;
                 if (compChanges) {
                     json += std::string(",\"estSize\":") + std::to_string(estSize);
                     changes = true;
                 }
-                
+
 
                 size_t changedWatch = 0;
                 for (auto& entity : watched) {
@@ -175,7 +176,7 @@ namespace vecs {
             return ConnectSocket;
         }
         bool isConnected() {
-            return ConnectSocket != INVALID_SOCKET;
+            return ConnectSocket != INVALID_SOCKET && running;
         }
 
         int disconnectFromServer() {
@@ -204,6 +205,23 @@ namespace vecs {
                 // Handle the received message (you can expand this!)
                 processMessage(msg);
             }
+        }
+
+        void handleInitConnection(Registry* reg) {
+
+            while (!isConnected())
+            {
+                auto res = connectToServer(reg); // either socket or invalid socket
+#ifdef WIN32
+                Sleep(2000);
+#else
+                usleep(2000 * 1000);
+#endif
+            }
+        }
+
+        void startConnection(Registry* reg) {
+            initThread = std::jthread{ [=]() { handleInitConnection(reg); } };
         }
 
 
@@ -260,6 +278,8 @@ namespace vecs {
                 {
                     std::string josnap = registry->getSnapshot();
                     sendMessage(josnap);
+                    if (josnap.size() > 80) // most likely ...
+                        josnap = josnap.substr(0, 77) + "...}";
                     std::cout << "Sending snapshot: " << josnap << "\n";
 
                 }
@@ -274,10 +294,12 @@ namespace vecs {
                     auto& act = msgjson["active"];
                     if (act.is_boolean()) {
                         liveView.SetActive(act);
-                        
+
                         std::string jsonlive = registry->getLiveView();
                         sendMessage(jsonlive);
                         //Debugging: 
+                        if (jsonlive.size() > 80) // most likely ...
+                            jsonlive = jsonlive.substr(0, 77) + "...}";
                         std::cout << "Sending liveview: " << jsonlive << "\n";
 
                     } // else ignore
@@ -339,9 +361,12 @@ namespace vecs {
                         // no data read from the other side within timeout period
                         auto lv = liveView.getChangesJSON();
                         if (std::get<0>(lv)) {
+                            std::string lvchg = std::get<1>(lv);
+                            sendMessage(lvchg);
                             // Debugging:
-                            std::cout << "Liveview changes: " << std::get<1>(lv) << "\n";
-                            sendMessage(std::get<1>(lv));
+                            if (lvchg.size() > 80) // most likely ...
+                                lvchg = lvchg.substr(0, 77) + "...}";
+                            std::cout << "Liveview changes: " << lvchg << "\n";
                         }
                     }
                 } while (selectrc == 0);
@@ -398,5 +423,15 @@ namespace vecs {
             started = false;
         }
     };
+
+    inline VECSConsoleComm* getConsoleComm(Registry* reg) {
+        static VECSConsoleComm* comm = nullptr;
+        if (comm == nullptr) comm = new VECSConsoleComm;
+        if (comm && reg) {
+            comm->startConnection(reg);
+        }
+        return comm;
+    }
+
 
 }

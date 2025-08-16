@@ -14,6 +14,7 @@ namespace Console {
     private:
         Archetype arch;
         std::map<size_t, std::string> typeNames;
+        std::map<size_t, std::string> tags;
 
     public:
         WatchEntity() {}
@@ -24,6 +25,9 @@ namespace Console {
                 if (registry) {
                     for (auto& component : getComponents()) {
                         typeNames[component.getType()] = registry->GetTypeName(component.getType()).c_str();
+                    }
+                    for (auto& tag : org.GetArchetype()->getTags()) {
+                        tags[tag] = registry->GetTagName(tag);
                     }
                 }
             }
@@ -39,6 +43,9 @@ namespace Console {
                     for (auto& component : getComponents()) {
                         typeNames[component.getType()] = registry->GetTypeName(component.getType()).c_str();
                     }
+                    for (auto& tag : org.GetArchetype()->getTags()) {
+                        tags[tag] = registry->GetTagName(tag);
+                    }
                 }
             }
             SetArchetype(&arch);
@@ -48,6 +55,12 @@ namespace Console {
         std::string GetTypeName(size_t t) {
             auto it = typeNames.find(t);
             assert(it != typeNames.end());
+            return it->second;
+        }
+
+        std::string GetTagName(size_t t) {
+            auto it = tags.find(t);
+            assert(it != tags.end());
             return it->second;
         }
 
@@ -69,7 +82,7 @@ private:
     std::map<size_t, Console::WatchEntity> watchlist;
     bool isLive{ false };
     float avgComp{ 0.f };
-    size_t estSize{ 0 }; 
+    size_t estSize{ 0 };
 
     virtual void ClientActivity();
     bool ProcessJSON(std::string sjson);
