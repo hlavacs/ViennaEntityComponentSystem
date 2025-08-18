@@ -45,16 +45,20 @@ private:
     std::string filter_entity;
     std::string filter_comptype;
     std::string filter_tag;
+    using cacheTuple = std::tuple<Console::Archetype*, Console::Entity*, Console::Component*>;
+    std::vector<cacheTuple> comp_cache; 
+
 public:
     //return number of lines that are displayed based on current filter criteria
     size_t TableLines(Console::Registry& snap, std::string sel_archetype, std::string sel_entity, std::string sel_comptype, std::string sel_tag) {
         auto newStamp = snap.getJsonTS();
         if (tstamp != newStamp) {  // if snapshot changed, reset
             tstamp = newStamp;
-            filter_archetype = "-";
+            filter_archetype = "?"; //make sure to rebuild the cache
             filter_entity = "-";
             filter_comptype = "-";
             filter_tag = "-";
+            comp_cache.clear();
             tableLines = snap.GetComponentcount();
         }
         enum {
@@ -88,8 +92,37 @@ public:
             bool selectedComptype = (filter_comptype != "-");
             bool selectedTag = (filter_tag != "-");
 
-            if (!(selectedArchetype || selectedEntity || selectedComptype || selectedTag))
-                tableLines = snap.GetComponentcount();
+            comp_cache.clear();
+
+            if (!(selectedArchetype || selectedEntity || selectedComptype || selectedTag)) {
+                tableLines = 0;
+
+                for (auto& archetype : snap.getArchetypes()) {
+                    std::string aHash = archetype.second.toString();
+                    bool abortTag = (selectedTag && !archetype.second.getTags().size());
+                    for (auto& tag : archetype.second.getTags()) {
+                        std::string tagName = snap.GetTagName(tag);
+                        if (selectedTag && tagName != filter_tag)
+                            abortTag = true;
+                    }
+                    
+                    if (!archetype.second.getEntities().size()) {
+                        tableLines++;
+                        comp_cache.push_back(cacheTuple(&archetype.second, nullptr, nullptr));
+
+                    }
+                    else {
+                        for (auto& x : archetype.second.getEntities()) {
+                            auto& entity = x.second;
+                            for (auto& component : entity.getComponents()) {
+                                comp_cache.push_back(cacheTuple(&archetype.second, &entity, &component));
+                                tableLines++;
+                            }
+                        }
+                    }
+                }
+
+            }
             else {
                 tableLines = 0;
                 for (auto& archetype : snap.getArchetypes()) {
@@ -106,6 +139,7 @@ public:
                     if (!archetype.second.getEntities().size()) {
                         if (selectedEntity) continue;
                         tableLines++;
+                        comp_cache.push_back(cacheTuple(&archetype.second, nullptr, nullptr));
                     }
                     else {
                         for (auto& x : archetype.second.getEntities()) {
@@ -119,7 +153,7 @@ public:
                                 if (selectedComptype && actCompType != filter_comptype) {
                                     continue;
                                 }
-
+                                comp_cache.push_back(cacheTuple(&archetype.second, &entity,&component));
                                 tableLines++;
                             }
                         }
@@ -128,6 +162,9 @@ public:
             }
         }
         return tableLines;
+    }
+    cacheTuple operator[](size_t index) {
+        return comp_cache[index];
     }
 } snapshotDisplayCache;
 
@@ -346,6 +383,86 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
                 ImGuiListClipper clipper;
                 clipper.Begin(tableLines);
                 while (clipper.Step()) {
+                    for (int row = clipper.DisplayStart; row < clipper.DisplayEnd && row < tableLines; row++) {
+                        auto cacherow = snapshotDisplayCache[row];
+                        auto& archetype = *std::get<0>(cacherow);
+                        auto entity = std::get<1>(cacherow);
+                        auto component = std::get<2>(cacherow);
+                        // schnippeln wirs mal zusammen ...
+                        std::string aHash = archetype.toString();
+                        int archtagcount = 0;
+                        std::string tagstr;
+                        for (auto& tag : archetype.getTags()) {
+                            if (archtagcount++) tagstr += ",";
+                            std::string tagName = snap.GetTagName(tag);
+                            tagstr += tagName;
+                        }
+                        if (entity == nullptr) {
+                            ImGui::TableNextRow();
+                            ImGui::TableSetColumnIndex(0);
+                            ImGui::TextUnformatted(aHash.c_str());
+                            ImGui::TableSetColumnIndex(1);
+                            ImGui::TextUnformatted("-");
+                            ImGui::TableSetColumnIndex(2);
+                            ImGui::TextUnformatted("-");
+                            ImGui::TableSetColumnIndex(3);
+                            ImGui::TextUnformatted("-");
+                            ImGui::TableSetColumnIndex(4);
+                            ImGui::TextUnformatted("-");
+                        }
+                        else {
+                            std::string eIndex = entity->toString();
+                            std::string actCompType = snap.GetTypeName(component->getType());
+
+                            ImGui::TableNextRow();
+                            ImGui::TableSetColumnIndex(0);
+
+                            std::string cvalue = component->toString();
+                            // generate nice label for this table row; the "##" part is to guarantee unique labels while only displaying the hash
+                            std::string componentLabel = aHash + "##" + eIndex + "." + std::to_string(row);
+                            // make table row selectable
+                            const ImGuiSelectableFlags selectable_flags = ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap;
+                            const bool itemIsSelected = (component == selTableComponent);
+                            if (itemIsSelected) componentSelected = true;
+                            if (ImGui::Selectable(componentLabel.c_str(), itemIsSelected, selectable_flags)) {
+                                selTableComponent = component;
+                                selTableEntity = entity;
+                                componentSelected = true;
+                            }
+                            if (ImGui::BeginPopupContextItem()) {
+                                selTableComponent = component;
+                                selTableEntity = entity;
+                                componentSelected = true;
+                                bool watched = listening.getVecs(listening.cursel)->isWatched(selTableEntity->GetValue());
+                                if (!watched && ImGui::Button("Add to watchlist")) {
+                                    vecs->addWatch(selTableEntity->GetValue());
+                                    ImGui::CloseCurrentPopup();
+                                }
+                                if (watched && ImGui::Button("Remove from watchlist")) {
+                                    vecs->deleteWatch(selTableEntity->GetValue());
+                                    ImGui::CloseCurrentPopup();
+                                }
+                                ImGui::EndPopup();
+                            }
+
+                            ImGui::TableSetColumnIndex(1);
+                            ImGui::TextUnformatted(eIndex.c_str());
+                            ImGui::TableSetColumnIndex(2);
+                            ImGui::TextUnformatted(actCompType.c_str());
+                            ImGui::TableSetColumnIndex(3);
+                            ImGui::TextUnformatted(cvalue.c_str());
+                            ImGui::TableSetColumnIndex(4);
+                            ImGui::TextUnformatted(tagstr.c_str());
+
+                        }
+                    }
+                }
+#else
+
+#if WITH_CLIPPER
+                ImGuiListClipper clipper;
+                clipper.Begin(tableLines);
+                while (clipper.Step()) {
 #endif
                     bool selectedArchetype = (current_archetype != "-");
                     bool selectedEntity = (current_entity != "-");
@@ -475,6 +592,8 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
 
 #if WITH_CLIPPER
                 }   // while (clipper.Step())
+#endif
+
 #endif
                 ImGui::EndTable();
             }
