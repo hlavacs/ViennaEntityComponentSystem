@@ -75,7 +75,7 @@ class ConsoleSocketThread : public SocketThread {
 private:
     bool handShook{ false };
     int pid{ 0 };
-    int entitycount{ 0 }; 
+    int entitycount{ 0 };
     Console::Registry snapshot[2]; //we use only one snapshot, but alternating between two prevents conflicts wfile creating new snaphots
     int snapidx{ 0 };
     std::map<size_t, Console::WatchEntity> watchlist;
@@ -93,7 +93,7 @@ public:
     ConsoleSocketThread(SOCKET s, SocketListener* l) : SocketThread(s, l) {}
     virtual ~ConsoleSocketThread() {}
 
-    bool isConnected() { return handShook; } 
+    bool isConnected() { return handShook; }
     int getPid() { return pid; }
     void setPid(int newPid) { pid = newPid; handShook = pid != 0; }
     int getEntitycount() { return entitycount; }
@@ -106,9 +106,9 @@ public:
     size_t getEstSize() { return estSize; }
 
     bool requestSnapshot();
-    bool requestLiveView(bool active = true);  
+    bool requestLiveView(bool active = true);
     bool sendWatchlist(std::map<size_t, Console::WatchEntity>& watchlist);
-    bool getIsLive() { return isLive; } 
+    bool getIsLive() { return isLive; }
 
     bool selected{ false };
     bool parseSnapshot(nlohmann::json const& json);

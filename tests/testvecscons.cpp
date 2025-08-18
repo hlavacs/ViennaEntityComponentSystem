@@ -36,7 +36,7 @@ int _kbhit() {
 	// Unixoid approximation of the _kbhit() function available in MSVC -
 	// performs roughly the same by checking for input on file 0 (i.e., standard input) with select().
 	fd_set set;
-	struct timeval tv{0};
+	struct timeval tv { 0 };
 	initTermios(0);
 	FD_ZERO(&set);
 	FD_SET(0, &set);
@@ -52,17 +52,18 @@ int _getch() {
 	return c;
 }
 int _getche() {
-    initTermios(1);
+	initTermios(1);
 	int c = getchar();
 	restoreTermios();
 	return c;
 }
 #endif
 
-void check( bool b, std::string_view msg = "" ) {
-	if( b ) {
+void check(bool b, std::string_view msg = "") {
+	if (b) {
 		//std::cout << "\x1b[32m passed\n";
-	} else {
+	}
+	else {
 		std::cout << "\x1b[31m failed: " << msg << "\n";
 		exit(1);
 	}
@@ -95,16 +96,16 @@ void test_conn() {
 		 "hollara",
 		 "hollaro!",
 	#ifndef _DEBUG
-	     "Wir fahren mit der U-Bahn",
+		 "Wir fahren mit der U-Bahn",
 		 "von hier nach anderswo",
 		 "Hollari",
 		 "hollara",
 		 "hollaro!",
 		 "Und wenn ein Boesewicht",
 		 "was Ungezog'nes spricht",
-         "dann sag' ich's meinem Kaktus",
+		 "dann sag' ich's meinem Kaktus",
 		 "und der sticht, sticht, sticht",
-         "Mein kleiner gruener Kaktus",
+		 "Mein kleiner gruener Kaktus",
 		 "faehrt gerne ins Buero",
 		 "Hollari",
 		 "hollara",
@@ -128,7 +129,7 @@ void test_conn() {
 #endif
 
 	std::cout << "\x1b[37m isConnected: " << comm->isConnected() << "\n";
-	bool abortWait { false }, toldya { false };
+	bool abortWait{ false }, toldya{ false };
 	while (!comm->isConnected() && !abortWait) {
 		if (!toldya) {
 			std::cout << "not yet connected!! Press Escape to terminate" << "\n";
@@ -149,25 +150,35 @@ void test_conn() {
 	if (comm->isConnected()) {
 
 		// do nothing for 600 seconds, let background task work
-		for (int secs = 0; secs < 600; secs++) {
+		for (int secs = 0; secs < 600 && !abortWait; secs++) {
 
 			while (_kbhit()) {
-				switch (_getch()) {
+				char c = _getch();
+				auto t1 = std::chrono::high_resolution_clock::now();
+				switch (c) {
 				case 'a':
 					for (int i = 0; i < 100000; i++) {
 						handles.push_back(system.Insert(i + 100000, static_cast<float>(i * 7)));
 					}
 					break;
-				case 'd': 
+				case 'd':
 					if (handles.size() > 100000) {
 						for (int i = 0; i < 100000; i++) {
-							system.Erase(handles[1]); handles.erase(handles.begin() + 1);
+							system.Erase(handles[handles.size() - 1]); handles.erase(handles.end() - 1);
 						}
 					}
-					break; 
-				default: 
+					break;
+				case 'x':
+					abortWait = true;
+					break;
+				default:
 					break;
 				}
+				auto t2 = std::chrono::high_resolution_clock::now();
+
+				auto mics = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+				if (mics > 10)
+					std::cout << c << " duration: " << mics << " msecs\n";
 			}
 
 			// test for dynamic scaling of entity graph in Console LiveView
@@ -175,7 +186,8 @@ void test_conn() {
 				handles.push_back(system.Insert(secs + 1000, static_cast<float>(secs * 7)));
 				handles.push_back(system.Insert(secs + 1000, static_cast<float>(secs * 7), static_cast<double>(secs * 5)));
 
-			} else if (secs == 80) {
+			}
+			else if (secs == 80) {
 				for (auto hit = std::prev(handles.end()); hit > handles.begin() + 18; hit--)
 					system.Erase(*hit);
 				handles.erase(handles.begin() + 19, handles.end());

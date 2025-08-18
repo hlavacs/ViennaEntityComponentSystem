@@ -33,12 +33,13 @@ void ConsoleSocketThread::ClientActivity() {
     std::string welcome("{\"cmd\":\"handshake\",\"pid\":" + std::to_string(getpid()) + ",\"compiled\":\"" __DATE__ " " __TIME__ "\"}");
     s.sendData(welcome);
 
-    std::string json;       
+    std::string json;
     int brcs{ 0 };          // currently open braces
     int brks{ 0 };          // currently open brackets
     bool instr{ false };    // currently in string
     bool inesc{ false };   // currently in escape sequence
     char lchr{ 0 };         // last character
+    std::chrono::steady_clock::time_point tsStart;
 
     // wait for incoming data with a timeout of 500 ms
     while ((waitrc = s.wait(500)) != SOCKET_ERROR) {
@@ -77,8 +78,8 @@ void ConsoleSocketThread::ClientActivity() {
                         if (instr) break;
                         if (brcs)  // ignore badly formed buffers starting with a }
                             brcs--;
-                        if (!brcs && !brks)  
-                            complete = true;  
+                        if (!brcs && !brks)
+                            complete = true;
                         break;
                     case '[':
                         if (inesc) {
@@ -96,11 +97,11 @@ void ConsoleSocketThread::ClientActivity() {
                         if (instr) break;
                         if (brks)  // ignore badly formed buffers starting with a ]
                             brks--;
-                        if (!brcs && !brks)  
+                        if (!brcs && !brks)
                             complete = true;
                         break;
                     case '\\':
-                        inesc = !inesc; 
+                        inesc = !inesc;
                         break;
                     case '\"':
                         if (inesc) {
@@ -117,8 +118,18 @@ void ConsoleSocketThread::ClientActivity() {
                         break;
                     }
                     lchr = sbuf[i];
+                    if (json.empty()) {
+                        json.reserve(rlen);
+                        tsStart = std::chrono::high_resolution_clock::now();
+                    }
                     json += sbuf[i];
                     if (complete) {
+#if 1   // Debug statistics - remove if not needed any more
+                        std::chrono::steady_clock::time_point tsProcessed = std::chrono::high_resolution_clock::now();
+                        auto msecs = std::chrono::duration_cast<std::chrono::milliseconds>(tsProcessed - tsStart).count();
+                        if (msecs > 10)
+                            std::cout << "JSON receive time: " << msecs << " msecs\n";
+#endif
                         ProcessJSON(json);  // process completed json string
                         json.clear();
                     }
@@ -212,7 +223,7 @@ bool ConsoleSocketThread::parseSnapshot(nlohmann::json const& json) {
         entitycount = json["entities"];
         auto& archs = json["archetypes"];
         for (auto& a : archs) {
-            auto& a2 = a["archetype"]; 
+            auto& a2 = a["archetype"];
             auto& maps = a2["maps"];
             for (auto& m : maps) {
                 snapshot[newSnapIdx].AddTypeName(m["id"], m["name"]);
@@ -236,7 +247,7 @@ bool ConsoleSocketThread::parseSnapshot(nlohmann::json const& json) {
                 auto& values = e["values"];
                 int i = 0;
                 for (auto& v : values) {
-                    std::string sv; 
+                    std::string sv;
                     // build string for expected primitive JSON types
                     if (v.is_number_integer())
                         sv = std::to_string(v.get<long long>());
@@ -253,9 +264,10 @@ bool ConsoleSocketThread::parseSnapshot(nlohmann::json const& json) {
                 }
                 ca.addEntity(ce);
             }
-            snapshot[newSnapIdx].addArchetype(ca); 
-            snapidx = newSnapIdx;  
+            snapshot[newSnapIdx].addArchetype(ca);
         }
+        snapshot[newSnapIdx].setParsed();
+        snapidx = newSnapIdx;
     }
     catch (json::exception& e) {
         // for now, simply dump JSON errors
@@ -269,7 +281,7 @@ bool ConsoleSocketThread::parseSnapshot(nlohmann::json const& json) {
 
 }
 
-bool ConsoleSocketThread::requestLiveView(bool active) { 
+bool ConsoleSocketThread::requestLiveView(bool active) {
     isLive = active;
     return sendData(std::string("{\"cmd\":\"liveview\",\"active\":") + (active ? "true" : "false") + "}") > 0;
 }
@@ -289,7 +301,7 @@ bool ConsoleSocketThread::onLiveView(json const& json) {
     try {
         if (json.contains("entities")) {
             size_t entities = json["entities"];
-           
+
             std::cout << "LiveView entities: " << entities << "\n";
             int newMax = (int)entities;
             for (int i = 1; i < _countof(lvEntityCount); i++) {
@@ -308,12 +320,12 @@ bool ConsoleSocketThread::onLiveView(json const& json) {
                 lvEntityMax = newMax + ((lvEntityMax - newMax) / 2);
         }
         if (json.contains("avgComp")) {
-             avgComp = json["avgComp"]; 
+            avgComp = json["avgComp"];
         }
         if (json.contains("estSize")) {
             estSize = json["estSize"];
         }
-        
+
         if (json.contains("watched")) {
             for (auto& entityObject : json["watched"]) {
                 if (!entityObject.contains("entity") || !entityObject.contains("values"))
@@ -329,7 +341,7 @@ bool ConsoleSocketThread::onLiveView(json const& json) {
                     auto coit = entity.getComponents().begin();
                     // walk through all components and look for changes
                     for (auto& v : values) {
-                        std::string sv; 
+                        std::string sv;
                         // build string for expected primitive JSON types
                         if (v.is_number_integer())
                             sv = std::to_string(v.get<long long>());

@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <map>
 #include <string>
+#include <chrono>
 
 #include "ConsoleArchetype.h"
 
@@ -19,7 +20,8 @@ namespace Console {
         std::map<size_t, Archetype> archetypes;
         std::map<size_t, size_t> entities;
         std::string jsonsnap;
-
+        size_t entitycount{ 0 }, componentcount{ 0 };
+        std::chrono::high_resolution_clock::time_point tstampFetched, tstampParsed;
 
     public:
         Registry() {}
@@ -28,6 +30,10 @@ namespace Console {
             tags = org.tags;
             archetypes = org.archetypes;
             entities = org.entities;
+            entitycount = org.entitycount;
+            componentcount = org.componentcount;
+            tstampFetched = org.tstampFetched;
+            tstampParsed = org.tstampParsed;
             for (auto& a : archetypes) a.second.SetRegistry(this);
         }
         Registry& operator=(Registry const& org) {
@@ -36,6 +42,10 @@ namespace Console {
             tags = org.tags;
             archetypes = org.archetypes;
             entities = org.entities;
+            entitycount = org.entitycount;
+            componentcount = org.componentcount;
+            tstampFetched = org.tstampFetched;
+            tstampParsed = org.tstampParsed;
             for (auto& a : archetypes) a.second.SetRegistry(this);
             return *this;
         }
@@ -45,14 +55,23 @@ namespace Console {
             tags.clear();
             archetypes.clear();
             entities.clear();
+            entitycount = componentcount = 0;
+            tstampFetched = {};
+            tstampParsed = {};
         }
 
         void setJsonsnap(std::string json) {
+            tstampFetched = std::chrono::high_resolution_clock::now();
             jsonsnap = json;
         }
         std::string getJsonsnap() {
             return jsonsnap;
         }
+        void setParsed() {
+            tstampParsed = std::chrono::high_resolution_clock::now();
+        }
+        std::chrono::steady_clock::time_point getJsonTS() const { return tstampFetched; }
+        std::chrono::steady_clock::time_point getParsedTS() const { return tstampParsed; }
 
         // archetype handling
         std::map<size_t, Archetype>& getArchetypes() {
@@ -65,8 +84,10 @@ namespace Console {
             return 0;
         }
 
-        void addEntity(size_t entityhandle, size_t archetype) {
-            entities[entityhandle] = archetype;
+        void addEntity(Entity& e, size_t archetype) {
+            entitycount++;
+            componentcount += e.getComponents().size();
+            entities[e.GetValue()] = archetype;
         }
 
         Entity* findEntity(size_t handle) {
@@ -90,7 +111,7 @@ namespace Console {
         // type name handling 
         std::map<size_t, std::string>& GetTypes() { return types; }
         bool AddTypeName(size_t t, std::string name) {
-            if (HasTypeName(t))                 
+            if (HasTypeName(t))
                 return name != GetTypeName(t);  // report whether same
             types[t] = name;                    // otherwise insert new type in map
             return true;
@@ -106,7 +127,7 @@ namespace Console {
 
         // tag name handling 
         bool AddTag(size_t t, std::string name) {
-            if (HasTag(t))                     
+            if (HasTag(t))
                 return name != GetTagName(t);  // report whether same 
             tags[t] = name;                    // otherwise insert new tag in map
             return true;
@@ -120,5 +141,8 @@ namespace Console {
             return it->second;
         }
 
-    }; 
+        size_t GetEntitycount() const { return entitycount; }
+        size_t GetComponentcount() const { return componentcount; }
+
+    };
 }

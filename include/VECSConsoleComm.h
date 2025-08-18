@@ -64,7 +64,7 @@ namespace vecs {
                         watched[el] = "";
                 for (auto& el : toRemove)
                     watched.erase(el);
-                return true; 
+                return true;
             }
 
             std::tuple<bool, std::string> getChangesJSON() {
@@ -266,11 +266,18 @@ namespace vecs {
                 }
 #if 1 // Debugging:
                 {
+                    auto t1 = std::chrono::high_resolution_clock::now();
                     std::string josnap = registry->getSnapshot();
+                    auto t2 = std::chrono::high_resolution_clock::now();
                     sendMessage(josnap);
-                    if (josnap.size() > 80) 
-                        josnap = josnap.substr(0, 77) + "...}";
-                    std::cout << "Sending snapshot: " << josnap << "\n";
+                    auto t3 = std::chrono::high_resolution_clock::now();
+                    auto cmics = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+                    auto tmics = std::chrono::duration_cast<std::chrono::milliseconds>(t3 - t2).count();
+                    auto orgSize = josnap.size();
+                    if (orgSize > 40)
+                        josnap = josnap.substr(0, 37) + "...}";
+                    std::cout << "Sending snapshot: " << josnap << " len " << orgSize << ", creation time: " << cmics << " msecs, "
+                        "send time: " << tmics << " msecs\n";
 
                 }
 #else // release
