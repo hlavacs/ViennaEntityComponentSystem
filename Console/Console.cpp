@@ -47,8 +47,54 @@ private:
     std::string filter_tag;
     using cacheTuple = std::tuple<Console::Archetype*, Console::Entity*, Console::Component*>;
     std::vector<cacheTuple> comp_cache; 
+    std::vector<std::string> archetype_cache; 
+    std::vector<std::string> entity_cache; 
+    std::vector<std::string> component_cache; 
+    std::vector<std::string> tag_cache; 
 
 public:
+    
+   bool cache_filters(Console::Registry& snap) {
+       auto newStamp = snap.getJsonTS();
+       if (tstamp != newStamp) {
+           tstamp = newStamp;
+           filter_archetype = "?"; //make sure to rebuild the cache
+           filter_entity = "-";
+           filter_comptype = "-";
+           filter_tag = "-";
+           comp_cache.clear();
+           archetype_cache.clear();
+           entity_cache.clear();
+           component_cache.clear();
+           tag_cache.clear();
+           tableLines = snap.GetComponentcount();
+
+           archetype_cache.push_back("-");
+           entity_cache.push_back("-");
+           component_cache.push_back("-");
+           tag_cache.push_back("-");
+
+           std::set<std::string>tagNames;
+           for (auto& arch : snap.getArchetypes()) {
+               archetype_cache.push_back(arch.second.toString());
+               for (auto& tag : arch.second.getTags())
+                   tagNames.insert(snap.GetTagName(tag));
+               for (auto& ent : arch.second.getEntities())
+                   entity_cache.push_back(ent.second.toString());
+           }
+
+           for (auto& curtype : snap.GetTypes()) {
+               component_cache.push_back(curtype.second);
+           }
+
+           for (auto& curTag : tagNames) {
+               tag_cache.push_back(curTag);
+           }
+           return true; 
+       }
+       return false;
+   }
+
     //return number of lines that are displayed based on current filter criteria
     size_t TableLines(Console::Registry& snap, std::string sel_archetype, std::string sel_entity, std::string sel_comptype, std::string sel_tag) {
         auto newStamp = snap.getJsonTS();
@@ -166,6 +212,23 @@ public:
     cacheTuple operator[](size_t index) {
         return comp_cache[index];
     }
+
+    std::vector<std::string>& getArchetype_cache() {
+        return archetype_cache;
+    }
+
+    std::vector<std::string>& getEntity_cache() {
+        return entity_cache;
+    }
+
+    std::vector<std::string>& getComponent_cache() {
+        return component_cache;
+    }
+
+    std::vector<std::string>& getTag_cache() {
+        return tag_cache;
+    }
+
 } snapshotDisplayCache;
 
 #endif
@@ -255,6 +318,82 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
 
             ImGui::BeginChild("Filter", childFilterSz);
 
+#if WITH_CLIPPER
+            //cache filterlist
+            snapshotDisplayCache.cache_filters(snap);
+
+            //--------------Archetype Filter--------------
+            static std::string current_archetype = "-";
+            ImGui::Text("Archetype");
+            if (ImGui::BeginCombo("A", current_archetype.c_str())) {
+                for (auto& archetype : snapshotDisplayCache.getArchetype_cache()) {
+                    bool selected = (current_archetype == archetype);
+                    if (ImGui::Selectable(archetype.c_str(), selected))
+                        current_archetype = archetype;
+
+                    if (selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+
+
+            //-------------Entity Filter-------------------
+            ImGui::Text("Entity");
+            static std::string current_entity = "-";
+
+            if (ImGui::BeginCombo("E", current_entity.c_str())) {
+                for (auto& entity : snapshotDisplayCache.getEntity_cache()) {
+                    bool selected = (current_entity == entity);
+                    if (ImGui::Selectable(entity.c_str(), selected))
+                        current_entity = entity;
+
+                    if (selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+
+                ImGui::EndCombo();
+            }
+
+
+            //-------------Component Filter-------------------
+            ImGui::Text("Component Type");
+            static std::string current_comptype = "-";
+
+            if (ImGui::BeginCombo("C", current_entity.c_str())) {
+                for (auto& component : snapshotDisplayCache.getComponent_cache()) {
+                    bool selected = (current_comptype == component);
+                    if (ImGui::Selectable(component.c_str(), selected))
+                        current_comptype = component;
+
+                    if (selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+
+                ImGui::EndCombo();
+            }
+
+
+            //---------------Tag Filter--------------------
+
+
+            ImGui::Text("Tag");
+            static std::string current_tag = "-";
+
+            if (ImGui::BeginCombo("T", current_tag.c_str())) {
+                for (auto& tag : snapshotDisplayCache.getTag_cache()) {
+                    bool selected = (current_tag == tag);
+                    if (ImGui::Selectable(tag.c_str(), selected))
+                        current_tag = tag;
+
+                    if (selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+
+                ImGui::EndCombo();
+            }
+
+#else
             std::vector<std::string> archetypeNames;
             std::vector<std::string> entityNames;
             std::vector<std::string> componentTypes;
@@ -356,7 +495,7 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
             };
 
             //---------------------------------------------
-
+#endif
             ImGui::EndChild();
             ImGui::SameLine();
             ImGui::BeginChild("Snapshot", childSnapshotTableSz);
