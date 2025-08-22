@@ -326,13 +326,20 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
             static std::string current_archetype = "-";
             ImGui::Text("Archetype");
             if (ImGui::BeginCombo("A", current_archetype.c_str())) {
-                for (auto& archetype : snapshotDisplayCache.getArchetype_cache()) {
-                    bool selected = (current_archetype == archetype);
-                    if (ImGui::Selectable(archetype.c_str(), selected))
-                        current_archetype = archetype;
+                ImGuiListClipper clipper;
+                auto& cache = snapshotDisplayCache.getArchetype_cache();
+                auto archetypelines = cache.size();
+                clipper.Begin(archetypelines);
+                while (clipper.Step()) {
+                    for (int row = clipper.DisplayStart; row < clipper.DisplayEnd && row < archetypelines; row++) {
 
-                    if (selected)
-                        ImGui::SetItemDefaultFocus();
+                        bool selected = (current_archetype == cache[row]);
+                        if (ImGui::Selectable(cache[row].c_str(), selected))
+                            current_archetype = cache[row];
+
+                        if (selected)
+                            ImGui::SetItemDefaultFocus();
+                    }
                 }
                 ImGui::EndCombo();
             }
@@ -343,13 +350,22 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
             static std::string current_entity = "-";
 
             if (ImGui::BeginCombo("E", current_entity.c_str())) {
-                for (auto& entity : snapshotDisplayCache.getEntity_cache()) {
-                    bool selected = (current_entity == entity);
-                    if (ImGui::Selectable(entity.c_str(), selected))
-                        current_entity = entity;
 
-                    if (selected)
-                        ImGui::SetItemDefaultFocus();
+                ImGuiListClipper clipper;
+                auto& cache = snapshotDisplayCache.getEntity_cache(); 
+                auto entitylines = cache.size();
+                clipper.Begin(entitylines);
+                while (clipper.Step()) {
+                    for (int row = clipper.DisplayStart; row < clipper.DisplayEnd && row < entitylines; row++) {
+
+                            bool selected = (current_entity == cache[row]);
+                            if (ImGui::Selectable(cache[row].c_str(), selected))
+                                current_entity = cache[row];
+
+                            if (selected)
+                                ImGui::SetItemDefaultFocus();
+                        
+                    }
                 }
 
                 ImGui::EndCombo();
@@ -360,14 +376,22 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
             ImGui::Text("Component Type");
             static std::string current_comptype = "-";
 
-            if (ImGui::BeginCombo("C", current_entity.c_str())) {
-                for (auto& component : snapshotDisplayCache.getComponent_cache()) {
-                    bool selected = (current_comptype == component);
-                    if (ImGui::Selectable(component.c_str(), selected))
-                        current_comptype = component;
+            if (ImGui::BeginCombo("C", current_comptype.c_str())) {
 
-                    if (selected)
-                        ImGui::SetItemDefaultFocus();
+                ImGuiListClipper clipper;
+                auto& cache = snapshotDisplayCache.getComponent_cache();
+                auto componentlines = cache.size();
+                clipper.Begin(componentlines);
+                while (clipper.Step()) {
+                    for (int row = clipper.DisplayStart; row < clipper.DisplayEnd && row < componentlines; row++) {
+
+                        bool selected = (current_comptype == cache[row]);
+                        if (ImGui::Selectable(cache[row].c_str(), selected))
+                            current_comptype = cache[row];
+
+                        if (selected)
+                            ImGui::SetItemDefaultFocus();
+                    }
                 }
 
                 ImGui::EndCombo();
@@ -381,13 +405,21 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
             static std::string current_tag = "-";
 
             if (ImGui::BeginCombo("T", current_tag.c_str())) {
-                for (auto& tag : snapshotDisplayCache.getTag_cache()) {
-                    bool selected = (current_tag == tag);
-                    if (ImGui::Selectable(tag.c_str(), selected))
-                        current_tag = tag;
 
-                    if (selected)
-                        ImGui::SetItemDefaultFocus();
+                ImGuiListClipper clipper;
+                auto& cache = snapshotDisplayCache.getTag_cache();
+                auto taglines = cache.size();
+                clipper.Begin(taglines);
+                while (clipper.Step()) {
+                    for (int row = clipper.DisplayStart; row < clipper.DisplayEnd && row < taglines; row++) {
+
+                        bool selected = (current_tag == cache[row]);
+                        if (ImGui::Selectable(cache[row].c_str(), selected))
+                            current_tag = cache[row];
+
+                        if (selected)
+                            ImGui::SetItemDefaultFocus();
+                    }
                 }
 
                 ImGui::EndCombo();
