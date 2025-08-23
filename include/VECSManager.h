@@ -219,6 +219,16 @@ namespace vecs {
         }
 
 
+        /// @brief Test if an entity in the registry has a component.
+		/// @tparam T The type of the component.
+		/// @param handle The handle of the entity.
+		/// @return true if the entity has the component, else false.
+        template<typename T>
+        bool Has(Handle handle) {
+            return m_system->Has(handle);
+        }
+
+
     private:
         std::shared_ptr<vecs::Registry> m_system{nullptr};
         std::shared_ptr<IThreadPool> m_threadpool;
