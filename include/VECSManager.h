@@ -17,6 +17,11 @@ namespace vecs {
     class Manager {
     public:
 
+        Manager() {
+            m_threadpool = std::make_shared<vecs::ThreadPool>();
+            m_system = std::make_shared<vecs::Registry>();
+        }
+
         Manager(std::shared_ptr<IThreadPool> threadpool, std::shared_ptr<vecs::Registry> registry) {
             m_threadpool = std::move(threadpool);
             m_system = std::move(registry);
@@ -206,6 +211,12 @@ namespace vecs {
                 m_system->Clear();
             });
 		}
+
+
+        /// @brief Get the current size of the registry.
+        size_t Size() {
+            return m_system->Size();
+        }
 
 
     private:
