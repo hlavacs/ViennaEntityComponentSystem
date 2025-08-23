@@ -225,7 +225,7 @@ namespace vecs {
 		/// @return true if the entity has the component, else false.
         template<typename T>
         bool Has(Handle handle) {
-            return m_system->Has(handle);
+            return m_system->Has<T>(handle);
         }
 
 
