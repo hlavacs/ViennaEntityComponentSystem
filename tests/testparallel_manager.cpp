@@ -5,15 +5,14 @@
 #include <gtest/gtest.h>
 
 #include "VECSManager.h"
+#include "test_helper.cpp"
 
-std::shared_ptr<vecs::ThreadPool> pool = std::make_shared<vecs::ThreadPool>();
-std::shared_ptr<vecs::Registry> registry = std::make_shared<vecs::Registry>();
 
 class ManagerTest : public testing::Test {
     protected:
         ManagerTest(){}
 
-        vecs::Manager mng{pool, registry};
+        vecs::Manager mng{};
 };
 
 
@@ -135,4 +134,51 @@ TEST_F(ManagerTest, ClearWorks) {
     }
 
     ASSERT_EQ(size, 0);
+}
+
+
+/// TESTING GETVIEW
+
+//TODO: tests for getview
+/*
+change entities outside loop w/o archetype change
+
+*/
+
+TEST_F(ManagerTest, LoopViewChangeBasicDirectWithReference) {
+    // making sure entities are created properly
+    size_t created = fillRegistryBasic(mng);
+    ASSERT_EQ(mng.Size(), created);
+
+    std::map<vecs::Handle, double> origin;
+
+    // change values directly
+    for( auto [handle, d] : mng.GetView<vecs::Handle, double&>()) {
+        origin.insert({handle, d.Value()});
+        d += 1.0;
+    }
+
+    for( auto [h, d] : origin) {
+        ASSERT_EQ(d+1.0, mng.Get<double>(h));
+    }
+}
+
+
+TEST_F(ManagerTest, LoopViewChangeBasicDirectWithoutReference) {
+    // making sure entities are created properly
+    size_t created = fillRegistryBasic(mng);
+    ASSERT_EQ(mng.Size(), created);
+
+    std::map<vecs::Handle, float> origin;
+
+    // change values directly via Get
+    for( auto [handle, f] : mng.GetView<vecs::Handle, float>()) {
+        origin.insert({handle, f});
+        mng.Get<float&>(handle) += 1.0f;
+    }
+
+    for( auto [h, f] : origin) {
+        ASSERT_EQ(f+1.0f, mng.Get<float>(h));
+        //std::cout << "handle " << h << " old=" << f << ", new=" << mng.Get<float>(h);
+    }
 }
