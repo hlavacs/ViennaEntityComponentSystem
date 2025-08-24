@@ -119,6 +119,7 @@ namespace vecs {
 
 
         /// @brief Put new component values as a tuple to an entity.
+        /// @attention Do not use within a loop over a View.
 		/// @tparam Ts The types of the components.
 		/// @param handle The handle of the entity.
 		/// @param v The new values in a tuple
@@ -135,6 +136,7 @@ namespace vecs {
         }
 
         /// @brief Put new component values to an entity.
+        /// @attention Do not use within a loop over a View.
         /// @tparam Ts The types of the components.
         /// @param handle The handle of the entity.
         /// @param vs The new values.
