@@ -90,6 +90,23 @@ public:
            for (auto& curTag : tagNames) {
                tag_cache.push_back(curTag);
            }
+
+           struct { bool operator()(std::string& a, std::string& b) {
+               size_t sa, sb;
+               sscanf(a.c_str(), "%zu", &sa);
+               sscanf(b.c_str(), "%zu", &sb);
+               return sa < sb;
+            } 
+           }size_tComp ;
+
+           std::sort(archetype_cache.begin() + 1, archetype_cache.end(), size_tComp);
+
+           std::sort(entity_cache.begin() + 1, entity_cache.end(),size_tComp);
+
+           std::sort(component_cache.begin() + 1, component_cache.end());
+
+           std::sort(tag_cache.begin() + 1, tag_cache.end(),size_tComp);
+
            return true; 
        }
        return false;
