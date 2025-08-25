@@ -28,10 +28,10 @@ void ConsoleSocketThread::ClientActivity() {
 
     int waitrc;
 
-    auto& s = getSocket();
+    auto& s = GetSocket();
 
     std::string welcome("{\"cmd\":\"handshake\",\"pid\":" + std::to_string(getpid()) + ",\"compiled\":\"" __DATE__ " " __TIME__ "\"}");
-    s.sendData(welcome);
+    s.SendData(welcome);
 
     std::string json;
     int brcs{ 0 };          // currently open braces
@@ -42,19 +42,19 @@ void ConsoleSocketThread::ClientActivity() {
     std::chrono::steady_clock::time_point tsStart;
 
     // wait for incoming data with a timeout of 500 ms
-    while ((waitrc = s.wait(500)) != SOCKET_ERROR) {
+    while ((waitrc = s.Wait(500)) != SOCKET_ERROR) {
         if (waitrc == 0) {
             // if there's an external influence governing this thread
         }
         else if (waitrc > 0) {
-            if (!s.dataThere())
+            if (!s.DataThere())
                 break;
 
             int nLen;
-            while ((nLen = s.bytesBuffered()) > 0) {
+            while ((nLen = s.BytesBuffered()) > 0) {
                 char sbuf[4096];
                 int maxRd = min(sizeof(sbuf), nLen);
-                int rlen = s.receiveData(sbuf, maxRd);
+                int rlen = s.ReceiveData(sbuf, maxRd);
                 nLen -= rlen;
 
                 // process incoming buffers, which are supposed to be in JSON format
@@ -210,7 +210,7 @@ bool ConsoleSocketThread::OnHandshake(json const& json) {
 }
 
 bool ConsoleSocketThread::RequestSnapshot() {
-    return sendData("{\"cmd\":\"snapshot\"}") > 0;
+    return SendData("{\"cmd\":\"snapshot\"}") > 0;
 }
 
 bool ConsoleSocketThread::ParseSnapshot(nlohmann::json const& json) {
@@ -283,7 +283,7 @@ bool ConsoleSocketThread::ParseSnapshot(nlohmann::json const& json) {
 
 bool ConsoleSocketThread::RequestLiveView(bool active) {
     isLive = active;
-    return sendData(std::string("{\"cmd\":\"liveview\",\"active\":") + (active ? "true" : "false") + "}") > 0;
+    return SendData(std::string("{\"cmd\":\"liveview\",\"active\":") + (active ? "true" : "false") + "}") > 0;
 }
 
 bool ConsoleSocketThread::SendWatchlist(std::map<size_t, Console::WatchEntity>& watchlist) {
@@ -293,7 +293,7 @@ bool ConsoleSocketThread::SendWatchlist(std::map<size_t, Console::WatchEntity>& 
         if (count++) watchlistString += ",";
         watchlistString += std::to_string(id.first);
     }
-    return sendData(std::string("{\"cmd\":\"liveview\",\"watchlist\":[") + watchlistString + "]}") > 0;
+    return SendData(std::string("{\"cmd\":\"liveview\",\"watchlist\":[") + watchlistString + "]}") > 0;
 }
 
 bool ConsoleSocketThread::OnLiveView(json const& json) {

@@ -171,11 +171,11 @@ unsigned long Socket::GetHostAddress(std::string hostName)
     return *lpAdr;
 }
 
-bool Socket::isCreated() {
+bool Socket::IsCreated() {
     return (s != INVALID_SOCKET);
 }
 
-bool Socket::isSocket() {
+bool Socket::IsSocket() {
 
     if (s == INVALID_SOCKET)
         return false;
@@ -192,7 +192,7 @@ bool Socket::isSocket() {
 }
 
 // bind : binds socket to a server/port
-int Socket::bind(std::string server, std::string service, int bReuse) {
+int Socket::Bind(std::string server, std::string service, int bReuse) {
     struct sockaddr_in saiS;
 
     if (!sockStart() || s == INVALID_SOCKET)
@@ -204,14 +204,14 @@ int Socket::bind(std::string server, std::string service, int bReuse) {
     if (!rc) {
         if (service.size()) {
             // if binding to specific port, assure socket gets reused
-            setOpt(SOL_SOCKET, SO_REUSEADDR, (char*)&bReuse, sizeof(bReuse));
+            SetOpt(SOL_SOCKET, SO_REUSEADDR, (char*)&bReuse, sizeof(bReuse));
         }
     }
     return rc;
 
 }
 
-int Socket::connect(std::string server, std::string service) {
+int Socket::Connect(std::string server, std::string service) {
     struct sockaddr_in saiS;
     int rc;
 
@@ -225,27 +225,27 @@ int Socket::connect(std::string server, std::string service) {
     return rc;
 }
 
-int Socket::disconnect() {
+int Socket::Disconnect() {
     if (!sockStart() || s == INVALID_SOCKET)
         return SOCKET_ERROR;
 
     unsigned long ulNBIO{ 0 };
-    ioctl(FIONBIO, &ulNBIO);
+    Ioctl(FIONBIO, &ulNBIO);
 
     linger li{ TRUE, 20 };
-    setOpt(SOL_SOCKET, SO_LINGER, (char*)&li, sizeof(li));
+    SetOpt(SOL_SOCKET, SO_LINGER, (char*)&li, sizeof(li));
 
     shutdown(s, 2);
     return 0;
 }
 
-int Socket::destroy() {
+int Socket::Destroy() {
     int rc;
 
     if (!sockStart() || s == INVALID_SOCKET)
         return SOCKET_ERROR;
 
-    disconnect();
+    Disconnect();
 
 #ifdef _WINSOCKAPI_
     rc = closesocket(s);
@@ -258,7 +258,7 @@ int Socket::destroy() {
     return rc;
 }
 
-int Socket::getPort() {
+int Socket::GetPort() {
     if (!sockStart() || s == INVALID_SOCKET)
         return SOCKET_ERROR;
 
@@ -273,7 +273,7 @@ int Socket::getPort() {
     return ntohs(sain.sin_port);
 }
 
-int Socket::getOpt(int level, int optname, char* optval, size_t* optlen) {
+int Socket::GetOpt(int level, int optname, char* optval, size_t* optlen) {
     int rc;
 #ifdef _WINSOCKAPI_
     int iopt = optlen ? (int)*optlen : 0;
@@ -287,21 +287,21 @@ int Socket::getOpt(int level, int optname, char* optval, size_t* optlen) {
 }
 
 // setOpt : sets a socket option
-int Socket::setOpt(int level, int optname, const char* optval, int optlen) {
+int Socket::SetOpt(int level, int optname, const char* optval, int optlen) {
     return ::setsockopt(s, level, optname, optval, optlen);
 }
 
 // setSendTimeout : sets the send timeout on a socket in msecs
-int Socket::setSendTimeout(int msecs) {
-    return setOpt(IPPROTO_TCP, SO_SNDTIMEO, (char*)&msecs, sizeof(msecs));
+int Socket::SetSendTimeout(int msecs) {
+    return SetOpt(IPPROTO_TCP, SO_SNDTIMEO, (char*)&msecs, sizeof(msecs));
 }
 
 // setReceiveTimeout : sets the receive timeout on a socket in msecs
-int Socket::setReceiveTimeout(int msecs) {
-    return setOpt(IPPROTO_TCP, SO_RCVTIMEO, (char*)&msecs, sizeof(msecs));
+int Socket::SetReceiveTimeout(int msecs) {
+    return SetOpt(IPPROTO_TCP, SO_RCVTIMEO, (char*)&msecs, sizeof(msecs));
 }
 
-int Socket::sendData(const char* data, int datalen) {
+int Socket::SendData(const char* data, int datalen) {
     int iBSent;
     int nTimeout = 0;
     int nError;
@@ -335,7 +335,7 @@ int Socket::sendData(const char* data, int datalen) {
 }
 
 // receiveData: receives data from other side of the connection
-int Socket::receiveData(char* lpData, int cbData, bool UntilFull)
+int Socket::ReceiveData(char* lpData, int cbData, bool UntilFull)
 {
     int iBRecv;
     int iBTotal = 0;
@@ -365,12 +365,12 @@ int Socket::receiveData(char* lpData, int cbData, bool UntilFull)
 }
 
 // listen : make socket a listener
-int Socket::listen(int backlog) {
+int Socket::Listen(int backlog) {
     return ::listen(s, backlog);
 }
 
 // ioctl : perform an ioctl operation on the socket
-int Socket::ioctl(long cmd, unsigned long* argp) {
+int Socket::Ioctl(long cmd, unsigned long* argp) {
 #ifdef _WINSOCKAPI_
     return ioctlsocket(s, cmd, argp);
 #else
@@ -379,13 +379,13 @@ int Socket::ioctl(long cmd, unsigned long* argp) {
 }
 
 // accept : accepts a client connection and returns the resulting basic socket
-SOCKET Socket::accept(sockaddr* addr, int* addrlen) {
+SOCKET Socket::Accept(sockaddr* addr, int* addrlen) {
     SOCKET sClient = ::accept(s, addr, addrlen);
     return sClient;
 }
 
 // wait : waits for something to come in on socket
-int Socket::wait(int timeout) {
+int Socket::Wait(int timeout) {
     if (s == INVALID_SOCKET)
         return SOCKET_ERROR;
     
@@ -398,15 +398,15 @@ int Socket::wait(int timeout) {
 }
 
 // bytesBuffered : return number of buffered bytes available for reading
-int Socket::bytesBuffered() {
+int Socket::BytesBuffered() {
     unsigned long nLen{ 0 };
-    if (ioctl(FIONREAD, &nLen) == SOCKET_ERROR)
+    if (Ioctl(FIONREAD, &nLen) == SOCKET_ERROR)
         return -1;
     return static_cast<int>(nLen);  // could potentially overflow, but the probability is negligible
 }
 
 // dataThere : returns whether data can be received from the socket
-bool Socket::dataThere() {
+bool Socket::DataThere() {
     char dummy;
     return recv(s, &dummy, 1, MSG_PEEK) > 0;
 }
@@ -423,21 +423,21 @@ bool SocketListener::Create(std::string service, int sockType) {
     if (service.empty())
         return false;
 
-    if (sockListener.isCreated())
+    if (sockListener.IsCreated())
         return false;
 
     // create a listener socket
     sockListener.Create(sockType);
-    if (!sockListener.isCreated()) return false;
+    if (!sockListener.IsCreated()) return false;
     // assure socket gets reused
     linger li{ TRUE, 2 };
-    sockListener.setOpt(SOL_SOCKET, SO_LINGER, (char*)&li, sizeof(li));
+    sockListener.SetOpt(SOL_SOCKET, SO_LINGER, (char*)&li, sizeof(li));
 
     // try to bind it to the specified port
     int reuse{ TRUE };
 
-    if (sockListener.bind("", service)) {
-        sockListener.destroy();
+    if (sockListener.Bind("", service)) {
+        sockListener.Destroy();
         return false;
     }
 
@@ -446,8 +446,8 @@ bool SocketListener::Create(std::string service, int sockType) {
     {
     case SOCK_STREAM:
         // set socket to listening state
-        if (sockListener.listen(SOMAXCONN)) {
-            sockListener.destroy();
+        if (sockListener.Listen(SOMAXCONN)) {
+            sockListener.Destroy();
             return false;
         }
         break;
@@ -467,10 +467,10 @@ bool SocketListener::Create(std::string service, int sockType) {
 
     // now create and run the listener thread
     try {
-        thdListener = std::thread(&SocketListener::thdFuncListener, this);
+        thdListener = std::thread(&SocketListener::ThdFuncListener, this);
     }
     catch (...) {
-        sockListener.destroy();
+        sockListener.Destroy();
         return false;
     }
     return true;
@@ -489,7 +489,7 @@ void SocketListener::Terminate() {
 }
 
 // thdFuncListener : listener thread function
-void SocketListener::thdFuncListener() {
+void SocketListener::ThdFuncListener() {
 
     if (sockListener == INVALID_SOCKET)
         return; 
@@ -512,7 +512,7 @@ void SocketListener::thdFuncListener() {
 
     while (!terminateListener) {
 
-        removeEndedClients();
+        RemoveEndedClients();
 
 #ifdef USING_SELECT
         acceptfds = fds;
@@ -532,7 +532,7 @@ void SocketListener::thdFuncListener() {
 #else
             size_t lsaiClient = sizeof(saiClient);
 #endif
-            SOCKET sClient = sockListener.accept((sockaddr*)&saiClient, &lsaiClient);
+            SOCKET sClient = sockListener.Accept((sockaddr*)&saiClient, &lsaiClient);
             if (sClient == INVALID_SOCKET) {
                 continue;
             }
@@ -579,12 +579,12 @@ void SocketListener::thdFuncListener() {
         Sleep(10);
     }
 
-    sockListener.destroy();
+    sockListener.Destroy();
 
     // wait for all connections to go away
     int timeouts{ 0 };
     while (streamClient.size()) {
-        removeEndedClients();
+        RemoveEndedClients();
         if (++timeouts > 100)  
             break;
         Sleep(10);
@@ -618,7 +618,7 @@ bool SocketListener::RemoveClient(SocketThread* thd) {
 }
 
 // removeEndedClients : remove all ended clients from the client vector
-void SocketListener::removeEndedClients() {
+void SocketListener::RemoveEndedClients() {
 
     for (auto thd : streamClientGone) {
         if (thd->GetThread().joinable())
@@ -639,7 +639,7 @@ void SocketThread::Run() {
 
     ClientActivity();
 
-    sockClient.destroy();
+    sockClient.Destroy();
 
     listener->RemoveClient(this);
 }

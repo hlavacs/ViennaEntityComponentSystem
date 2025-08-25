@@ -21,11 +21,11 @@ private:
 
 public:
     Socket(SOCKET s = INVALID_SOCKET) : s(s) {}
-    ~Socket() { destroy(); }
+    ~Socket() { Destroy(); }
     operator SOCKET() { return s; } // if the need arises to use the underlying SOCKET
 
     Socket& operator=(SOCKET const other) { s = other; return *this; }
-    Socket& operator=(Socket& other) { s = other.s; other.detach(); return *this; }
+    Socket& operator=(Socket& other) { s = other.s; other.Detach(); return *this; }
 
     static int GetError(); 
     static int GetProtoNumber(std::string proto = "");  // get number for a protocol name
@@ -33,38 +33,44 @@ public:
     static unsigned long GetHostAddress(std::string hostName = ""); 
 
     SOCKET Create(int sType = SOCK_STREAM, std::string proto = "");
-    bool isCreated();
-    bool isSocket();
-    int bind(std::string server = "", std::string service = "", int bReuse = 1);
-    int connect(std::string server, std::string service);
-    int disconnect();
-    int destroy();
-    int getPort();
-    int getOpt(int level, int optname, char* optval, size_t* optlen);
-    int setOpt(int level, int optname, const char* optval, int optlen);
+    bool IsCreated();
+    bool IsSocket();
+    int Bind(std::string server = "", std::string service = "", int bReuse = 1);
+    int Connect(std::string server, std::string service);
+    int Disconnect();
+    int Destroy();
+    int GetPort();
+    int GetOpt(int level, int optname, char* optval, size_t* optlen);
+    int SetOpt(int level, int optname, const char* optval, int optlen);
 
-    int setSendTimeout(int msecs = 0);
-    int setReceiveTimeout(int msecs = 0);
-    int listen(int backlog);
-    int ioctl(long cmd, unsigned long* argp);
-    SOCKET accept(sockaddr* addr, int* addrlen);
-    int wait(int timeout = 0);
-    int bytesBuffered();
-    bool dataThere();
+    int SetSendTimeout(int msecs = 0);
+    int SetReceiveTimeout(int msecs = 0);
+    int Listen(int backlog);
+    int Ioctl(long cmd, unsigned long* argp);
+    SOCKET Accept(sockaddr* addr, int* addrlen);
+    int Wait(int timeout = 0);
+    int BytesBuffered();
+    bool DataThere();
 
-    int sendData(const char* data, int datalen);
-    int sendData(std::string const s) { return sendData(s.c_str(), static_cast<int>(s.size())); }
-    int receiveData(char* lpData, int cbData, bool UntilFull = false);
+    int SendData(const char* data, int datalen);
+    int SendData(std::string const s) { return SendData(s.c_str(), static_cast<int>(s.size())); }
+    int ReceiveData(char* lpData, int cbData, bool UntilFull = false);
 
 
 private:
-    void detach() { s = INVALID_SOCKET; }
+    void Detach() { s = INVALID_SOCKET; }
 
 };
 
 class SocketListener;
 // SocketThread : thread class for a TCP based connection
 class SocketThread {
+private:
+    volatile bool terminateThread{ false };
+    Socket sockClient;
+    SocketListener* listener;
+    std::thread thd;
+
 public:
     SocketThread(SOCKET s, SocketListener* l) : sockClient(s), listener(l) {}
     virtual ~SocketThread() {}
@@ -72,21 +78,17 @@ public:
     void SetThread(std::thread& allocThd) { thd.swap(allocThd); }
     std::thread& GetThread() { return thd; }
 
-    Socket& getSocket() { return sockClient; }
+    Socket& GetSocket() { return sockClient; }
 
     void Run();
     void Terminate() { terminateThread = true; }
 
-    int sendData(const char* data, int datalen) { return sockClient.sendData(data, datalen); }
-    int sendData(const std::string s) { return sockClient.sendData(s); }
+    int SendData(const char* data, int datalen) { return sockClient.SendData(data, datalen); }
+    int SendData(const std::string s) { return sockClient.SendData(s); }
+
 private:
     virtual void ClientActivity() {}
 
-private:
-    volatile bool terminateThread{ false };
-    Socket sockClient;
-    SocketListener* listener;
-    std::thread thd;
 };
 
 // SocketListener : base class for a socked based (TCP or UDP) listener
@@ -112,15 +114,15 @@ public:
     bool AddClient(SocketThread* thd);
     virtual bool RemoveClient(SocketThread* thd);
 
-    size_t streamClientSize() { return streamClient.size(); }
-    SocketThread* streamClientAt(size_t i) { return streamClient[i]; }
+    size_t StreamClientSize() { return streamClient.size(); }
+    SocketThread* StreamClientAt(size_t i) { return streamClient[i]; }
 
     void Terminate();
 
 private:
-    void thdFuncListener();
-    void removeEndedClients();
-    virtual void onDatagram(const char* data, int len) {}
+    void ThdFuncListener();
+    void RemoveEndedClients();
+    virtual void OnDatagram(const char* data, int len) {}
     virtual SocketThread* CreateSocketThread(SOCKET s, SocketListener* l) { return new SocketThread(s, l); }
 
 
@@ -134,8 +136,6 @@ public:
 
 public:
     bool Create(std::string service) { return SocketListener::Create(service, SOCK_STREAM); }
-
-private:
 };
 
 #if 0

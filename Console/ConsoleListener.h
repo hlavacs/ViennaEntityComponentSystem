@@ -137,8 +137,8 @@ public:
     }
 
     //there's a 1:1 relation between VECS and client connections
-    size_t VecsCount() { return streamClientSize(); }
-    ConsoleSocketThread* GetVecs(size_t i) { return static_cast<ConsoleSocketThread*>(streamClientAt(i)); }
+    size_t VecsCount() { return StreamClientSize(); }
+    ConsoleSocketThread* GetVecs(size_t i) { return static_cast<ConsoleSocketThread*>(StreamClientAt(i)); }
 
 private:
     virtual SocketThread* CreateSocketThread(SOCKET s, SocketListener* l) { return new ConsoleSocketThread(s, l); }
