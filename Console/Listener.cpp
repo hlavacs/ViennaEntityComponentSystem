@@ -72,19 +72,19 @@ void setSockAddr(struct sockaddr_in* pSA, std::string server, std::string servic
 #ifdef _AIX
     pSA->sin_len = sizeof(saiS);
 #endif
-    pSA->sin_addr.s_addr = server.size() ? Socket::getHostAddress(server) : INADDR_ANY;
-    pSA->sin_port = Socket::getServicePort(service);
+    pSA->sin_addr.s_addr = server.size() ? Socket::GetHostAddress(server) : INADDR_ANY;
+    pSA->sin_port = Socket::GetServicePort(service);
 }
 
 
 // ===============================================================================
 // Socket class members
 
-int Socket::getError() {
+int Socket::GetError() {
     return getSocketError();
 }
 
-int Socket::getProtoNumber(std::string proto) {
+int Socket::GetProtoNumber(std::string proto) {
     PROTOENT FAR* lpPE;
 
     if (!sockStart() || proto.empty())
@@ -103,15 +103,15 @@ int Socket::getProtoNumber(std::string proto) {
 }
 
 
-SOCKET Socket::create(int sType, std::string proto) {
+SOCKET Socket::Create(int sType, std::string proto) {
     if (!sockStart() || s != INVALID_SOCKET)
         return INVALID_SOCKET;
-    s = socket(AF_INET, sType, getProtoNumber(proto));
+    s = socket(AF_INET, sType, GetProtoNumber(proto));
     return s;
 }
 
 // servicePort : determine port number to use instead of a passed in service name
-int Socket::getServicePort(std::string service, std::string proto) {
+int Socket::GetServicePort(std::string service, std::string proto) {
     if (service.empty() || (!sockStart()))
         return 0;
     if (service[0] == '#')  // accept number with leading # to allow clear numeric indication
@@ -136,7 +136,7 @@ int Socket::getServicePort(std::string service, std::string proto) {
 }
 
 // getHostAddress : returns the host address for a given host name
-unsigned long Socket::getHostAddress(std::string hostName)
+unsigned long Socket::GetHostAddress(std::string hostName)
 {
     unsigned long* lpAdr;
     char szLocal[128];
@@ -427,7 +427,7 @@ bool SocketListener::Create(std::string service, int sockType) {
         return false;
 
     // create a listener socket
-    sockListener.create(sockType);
+    sockListener.Create(sockType);
     if (!sockListener.isCreated()) return false;
     // assure socket gets reused
     linger li{ TRUE, 2 };
@@ -539,7 +539,7 @@ void SocketListener::thdFuncListener() {
             SocketThread* thdData{ nullptr };
             try {
                 // allocate new thread for this client
-                thdData = createSocketThread(sClient, this);
+                thdData = CreateSocketThread(sClient, this);
                 std::thread newThd(&SocketThread::Run, thdData);
                 thdData->SetThread(newThd);
 

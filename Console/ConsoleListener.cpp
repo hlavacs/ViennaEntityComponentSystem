@@ -183,13 +183,13 @@ bool ConsoleSocketThread::ProcessJSON(std::string sjson) {
 
     switch (cmd) {
     case cmdHandshake:
-        onHandshake(msgjson);
+        OnHandshake(msgjson);
         break;
     case cmdSnapshot:
-        onSnapshot(msgjson);
+        OnSnapshot(msgjson);
         break;
     case cmdLiveView:
-        onLiveView(msgjson);
+        OnLiveView(msgjson);
         break;
     default:
         // keep the compiler happy
@@ -198,7 +198,7 @@ bool ConsoleSocketThread::ProcessJSON(std::string sjson) {
     return true;
 }
 
-bool ConsoleSocketThread::onHandshake(json const& json) {
+bool ConsoleSocketThread::OnHandshake(json const& json) {
     try {
         pid = json["pid"];
     }
@@ -209,15 +209,15 @@ bool ConsoleSocketThread::onHandshake(json const& json) {
     return true;
 }
 
-bool ConsoleSocketThread::requestSnapshot() {
+bool ConsoleSocketThread::RequestSnapshot() {
     return sendData("{\"cmd\":\"snapshot\"}") > 0;
 }
 
-bool ConsoleSocketThread::parseSnapshot(nlohmann::json const& json) {
+bool ConsoleSocketThread::ParseSnapshot(nlohmann::json const& json) {
     // clear potentially pre-existing snapshot
     int newSnapIdx = snapidx ^ 1;  // switch to other snapshot to prevent conflicts
-    snapshot[newSnapIdx].clear();
-    snapshot[newSnapIdx].setJsonsnap(json.dump());
+    snapshot[newSnapIdx].Clear();
+    snapshot[newSnapIdx].SetJsonsnap(json.dump());
     // parse incoming snapshot, create internal structure for it that can be handled from GUI
     try {
         entitycount = json["entities"];
@@ -239,7 +239,7 @@ bool ConsoleSocketThread::parseSnapshot(nlohmann::json const& json) {
             }
 
             Console::Archetype ca(a2["hash"]);
-            for (auto& tag : tags) ca.addTag(tag);
+            for (auto& tag : tags) ca.AddTag(tag);
 
             auto& entities = a2["entities"];
             for (auto& e : entities) {
@@ -257,16 +257,16 @@ bool ConsoleSocketThread::parseSnapshot(nlohmann::json const& json) {
                         sv = v;
 
                     Console::Component cc;
-                    cc.addData(std::tuple<size_t, std::string>(maps[i]["id"], sv));
-                    ce.addComponent(cc);
+                    cc.AddData(std::tuple<size_t, std::string>(maps[i]["id"], sv));
+                    ce.AddComponent(cc);
 
                     i++;
                 }
-                ca.addEntity(ce);
+                ca.AddEntity(ce);
             }
-            snapshot[newSnapIdx].addArchetype(ca);
+            snapshot[newSnapIdx].AddArchetype(ca);
         }
-        snapshot[newSnapIdx].setParsed();
+        snapshot[newSnapIdx].SetParsed();
         snapidx = newSnapIdx;
     }
     catch (json::exception& e) {
@@ -281,12 +281,12 @@ bool ConsoleSocketThread::parseSnapshot(nlohmann::json const& json) {
 
 }
 
-bool ConsoleSocketThread::requestLiveView(bool active) {
+bool ConsoleSocketThread::RequestLiveView(bool active) {
     isLive = active;
     return sendData(std::string("{\"cmd\":\"liveview\",\"active\":") + (active ? "true" : "false") + "}") > 0;
 }
 
-bool ConsoleSocketThread::sendWatchlist(std::map<size_t, Console::WatchEntity>& watchlist) {
+bool ConsoleSocketThread::SendWatchlist(std::map<size_t, Console::WatchEntity>& watchlist) {
     std::string watchlistString;
     int count = 0;
     for (auto& id : watchlist) {
@@ -296,7 +296,7 @@ bool ConsoleSocketThread::sendWatchlist(std::map<size_t, Console::WatchEntity>& 
     return sendData(std::string("{\"cmd\":\"liveview\",\"watchlist\":[") + watchlistString + "]}") > 0;
 }
 
-bool ConsoleSocketThread::onLiveView(json const& json) {
+bool ConsoleSocketThread::OnLiveView(json const& json) {
     // parse incoming live view data, create internal structure for it that can be handled from GUI
     try {
         if (json.contains("entities")) {
@@ -332,13 +332,13 @@ bool ConsoleSocketThread::onLiveView(json const& json) {
                     continue;
                 auto& entity = watchlist[entityObject["entity"]];
                 if (entityObject["values"].is_null()) {
-                    entity.setDeleted();
+                    entity.SetDeleted();
                 }
                 else {
                     auto& values = entityObject["values"];
                     int i = 0;
                     bool changes = false;
-                    auto coit = entity.getComponents().begin();
+                    auto coit = entity.GetComponents().begin();
                     // walk through all components and look for changes
                     for (auto& v : values) {
                         std::string sv;
@@ -349,8 +349,8 @@ bool ConsoleSocketThread::onLiveView(json const& json) {
                             sv = std::to_string(v.get<long double>());
                         else
                             sv = v;
-                        if (sv != coit->toString()) {
-                            coit->setString(sv);
+                        if (sv != coit->ToString()) {
+                            coit->SetString(sv);
                             changes = true;
                         }
                         i++;
@@ -358,7 +358,7 @@ bool ConsoleSocketThread::onLiveView(json const& json) {
                     }
 
                     if (changes)
-                        entity.setModified();
+                        entity.SetModified();
                 }
             }
         }

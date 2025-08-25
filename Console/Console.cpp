@@ -55,7 +55,7 @@ private:
 public:
     
    bool cache_filters(Console::Registry& snap) {
-       auto newStamp = snap.getJsonTS();
+       auto newStamp = snap.GetJsonTS();
        if (tstamp != newStamp) {
            tstamp = newStamp;
            filter_archetype = "?"; //make sure to rebuild the cache
@@ -67,7 +67,7 @@ public:
            entity_cache.clear();
            component_cache.clear();
            tag_cache.clear();
-           tableLines = snap.GetComponentcount();
+           tableLines = snap.GetComponentCount();
 
            archetype_cache.push_back("-");
            entity_cache.push_back("-");
@@ -75,12 +75,12 @@ public:
            tag_cache.push_back("-");
 
            std::set<std::string>tagNames;
-           for (auto& arch : snap.getArchetypes()) {
-               archetype_cache.push_back(arch.second.toString());
-               for (auto& tag : arch.second.getTags())
+           for (auto& arch : snap.GetArchetypes()) {
+               archetype_cache.push_back(arch.second.ToString());
+               for (auto& tag : arch.second.GetTags())
                    tagNames.insert(snap.GetTagName(tag));
-               for (auto& ent : arch.second.getEntities())
-                   entity_cache.push_back(ent.second.toString());
+               for (auto& ent : arch.second.GetEntities())
+                   entity_cache.push_back(ent.second.ToString());
            }
 
            for (auto& curtype : snap.GetTypes()) {
@@ -97,7 +97,7 @@ public:
 
     //return number of lines that are displayed based on current filter criteria
     size_t TableLines(Console::Registry& snap, std::string sel_archetype, std::string sel_entity, std::string sel_comptype, std::string sel_tag) {
-        auto newStamp = snap.getJsonTS();
+        auto newStamp = snap.GetJsonTS();
         if (tstamp != newStamp) {  // if snapshot changed, reset
             tstamp = newStamp;
             filter_archetype = "?"; //make sure to rebuild the cache
@@ -105,7 +105,7 @@ public:
             filter_comptype = "-";
             filter_tag = "-";
             comp_cache.clear();
-            tableLines = snap.GetComponentcount();
+            tableLines = snap.GetComponentCount();
         }
         enum {
             fcArchetype = 1,
@@ -143,24 +143,24 @@ public:
             if (!(selectedArchetype || selectedEntity || selectedComptype || selectedTag)) {
                 tableLines = 0;
 
-                for (auto& archetype : snap.getArchetypes()) {
-                    std::string aHash = archetype.second.toString();
-                    bool abortTag = (selectedTag && !archetype.second.getTags().size());
-                    for (auto& tag : archetype.second.getTags()) {
+                for (auto& archetype : snap.GetArchetypes()) {
+                    std::string aHash = archetype.second.ToString();
+                    bool abortTag = (selectedTag && !archetype.second.GetTags().size());
+                    for (auto& tag : archetype.second.GetTags()) {
                         std::string tagName = snap.GetTagName(tag);
                         if (selectedTag && tagName != filter_tag)
                             abortTag = true;
                     }
                     
-                    if (!archetype.second.getEntities().size()) {
+                    if (!archetype.second.GetEntities().size()) {
                         tableLines++;
                         comp_cache.push_back(cacheTuple(&archetype.second, nullptr, nullptr));
 
                     }
                     else {
-                        for (auto& x : archetype.second.getEntities()) {
+                        for (auto& x : archetype.second.GetEntities()) {
                             auto& entity = x.second;
-                            for (auto& component : entity.getComponents()) {
+                            for (auto& component : entity.GetComponents()) {
                                 comp_cache.push_back(cacheTuple(&archetype.second, &entity, &component));
                                 tableLines++;
                             }
@@ -171,31 +171,31 @@ public:
             }
             else {
                 tableLines = 0;
-                for (auto& archetype : snap.getArchetypes()) {
-                    std::string aHash = archetype.second.toString();
+                for (auto& archetype : snap.GetArchetypes()) {
+                    std::string aHash = archetype.second.ToString();
                     if (selectedArchetype && aHash != filter_archetype)
                         continue;
-                    bool abortTag = (selectedTag && !archetype.second.getTags().size());
-                    for (auto& tag : archetype.second.getTags()) {
+                    bool abortTag = (selectedTag && !archetype.second.GetTags().size());
+                    for (auto& tag : archetype.second.GetTags()) {
                         std::string tagName = snap.GetTagName(tag);
                         if (selectedTag && tagName != filter_tag)
                             abortTag = true;
                     }
                     if (abortTag) continue;
-                    if (!archetype.second.getEntities().size()) {
+                    if (!archetype.second.GetEntities().size()) {
                         if (selectedEntity) continue;
                         tableLines++;
                         comp_cache.push_back(cacheTuple(&archetype.second, nullptr, nullptr));
                     }
                     else {
-                        for (auto& x : archetype.second.getEntities()) {
+                        for (auto& x : archetype.second.GetEntities()) {
                             auto& entity = x.second;
-                            std::string eIndex = entity.toString();
+                            std::string eIndex = entity.ToString();
                             if (selectedEntity && eIndex != filter_entity) {
                                 continue;
                             }
-                            for (auto& component : entity.getComponents()) {
-                                std::string actCompType = snap.GetTypeName(component.getType());
+                            for (auto& component : entity.GetComponents()) {
+                                std::string actCompType = snap.GetTypeName(component.GetType());
                                 if (selectedComptype && actCompType != filter_comptype) {
                                     continue;
                                 }
@@ -282,12 +282,12 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
 
             // used in child window area calculation below
             ImVec2 initCursorPos = ImGui::GetCursorPos();
-            auto vecs = listening.getVecs(listening.cursel);
+            auto vecs = listening.GetVecs(listening.cursel);
             if (ImGui::Button("Get new Snapshot"))
             {
-                vecs->requestSnapshot();
+                vecs->RequestSnapshot();
             }
-            Console::Registry& snap = vecs->getSnapshot();
+            Console::Registry& snap = vecs->GetSnapshot();
 
             ImGui::SameLine();
             if (ImGui::Button("Save snapshot to file"))
@@ -300,7 +300,7 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
                 oss << savetime;
                 std::string saveName = std::string("snapshot") + oss.str() + ".json";
                 savefile.open(saveName);
-                savefile << snap.getJsonsnap();
+                savefile << snap.GetJsonsnap();
                 savefile.close();
             }
 
@@ -560,10 +560,10 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
                         auto entity = std::get<1>(cacherow);
                         auto component = std::get<2>(cacherow);
                         // schnippeln wirs mal zusammen ...
-                        std::string aHash = archetype.toString();
+                        std::string aHash = archetype.ToString();
                         int archtagcount = 0;
                         std::string tagstr;
-                        for (auto& tag : archetype.getTags()) {
+                        for (auto& tag : archetype.GetTags()) {
                             if (archtagcount++) tagstr += ",";
                             std::string tagName = snap.GetTagName(tag);
                             tagstr += tagName;
@@ -582,13 +582,13 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
                             ImGui::TextUnformatted("-");
                         }
                         else {
-                            std::string eIndex = entity->toString();
-                            std::string actCompType = snap.GetTypeName(component->getType());
+                            std::string eIndex = entity->ToString();
+                            std::string actCompType = snap.GetTypeName(component->GetType());
 
                             ImGui::TableNextRow();
                             ImGui::TableSetColumnIndex(0);
 
-                            std::string cvalue = component->toString();
+                            std::string cvalue = component->ToString();
                             // generate nice label for this table row; the "##" part is to guarantee unique labels while only displaying the hash
                             std::string componentLabel = aHash + "##" + eIndex + "." + std::to_string(row);
                             // make table row selectable
@@ -604,13 +604,13 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
                                 selTableComponent = component;
                                 selTableEntity = entity;
                                 componentSelected = true;
-                                bool watched = listening.getVecs(listening.cursel)->isWatched(selTableEntity->GetValue());
+                                bool watched = listening.GetVecs(listening.cursel)->IsWatched(selTableEntity->GetValue());
                                 if (!watched && ImGui::Button("Add to watchlist")) {
-                                    vecs->addWatch(selTableEntity->GetValue());
+                                    vecs->AddWatch(selTableEntity->GetValue());
                                     ImGui::CloseCurrentPopup();
                                 }
                                 if (watched && ImGui::Button("Remove from watchlist")) {
-                                    vecs->deleteWatch(selTableEntity->GetValue());
+                                    vecs->DeleteWatch(selTableEntity->GetValue());
                                     ImGui::CloseCurrentPopup();
                                 }
                                 ImGui::EndPopup();
@@ -774,22 +774,22 @@ void static showViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
             ImGui::NewLine();
             ImGui::BeginChild("Details", childDetailsSz);
             if (componentSelected && selTableComponent) {
-                std::string entityText = std::string("Entity Index: ") + selTableEntity->toString() +
+                std::string entityText = std::string("Entity Index: ") + selTableEntity->ToString() +
                     ", Version " + std::to_string(selTableEntity->GetVersion()) +
                     ", Storage Index " + std::to_string(selTableEntity->GetStorageIndex());
                 ImGui::TextUnformatted(entityText.c_str());
 
-                std::string componentText = std::string("Component Type: ") + snap.GetTypeName(selTableComponent->getType());
+                std::string componentText = std::string("Component Type: ") + snap.GetTypeName(selTableComponent->GetType());
                 ImGui::TextUnformatted(componentText.c_str());
-                ImGui::TextUnformatted(selTableComponent->toString().c_str());
+                ImGui::TextUnformatted(selTableComponent->ToString().c_str());
 
 
             }
             // this is for debugging purposes only and can be removed once the caching works reliably!
             else {
-                auto mics = std::chrono::duration_cast<std::chrono::milliseconds>(snap.getParsedTS() - snap.getJsonTS()).count();
-                std::string initText = std::string("Snapshot Entities: ") + std::to_string(snap.GetEntitycount()) +
-                    ", Components: " + std::to_string(snap.GetComponentcount()) +
+                auto mics = std::chrono::duration_cast<std::chrono::milliseconds>(snap.GetParsedTS() - snap.GetJsonTS()).count();
+                std::string initText = std::string("Snapshot Entities: ") + std::to_string(snap.GetEntityCount()) +
+                    ", Components: " + std::to_string(snap.GetComponentCount()) +
                     ", Parse time: " + std::to_string(mics) + " msecs";
                 ImGui::TextUnformatted(initText.c_str());
 #if WITH_CLIPPER
@@ -847,7 +847,7 @@ void static showConnectionWindow(ConsoleListener& listening, bool* p_open)
     {
         int cursel = -1;
         // special case : read from file
-        ConsoleSocketThread* thd = listening.getVecs(0);
+        ConsoleSocketThread* thd = listening.GetVecs(0);
         auto wasselected = thd->selected;
         ImGui::Selectable("Load from File", &thd->selected);
         //If loadFromfile is selected set showSnapshotFileList to true
@@ -872,7 +872,7 @@ void static showConnectionWindow(ConsoleListener& listening, bool* p_open)
                     std::ifstream loadfile(selectedSnapshotFile);
                     nlohmann::json inputjson = nlohmann::json::parse(loadfile);
                     loadfile.close();
-                    thd->parseSnapshot(inputjson);
+                    thd->ParseSnapshot(inputjson);
                     cursel = 0;
                 }
                 catch (...) {
@@ -884,10 +884,10 @@ void static showConnectionWindow(ConsoleListener& listening, bool* p_open)
             }
         }
 
-        for (size_t i = 1; i < listening.vecsCount(); i++) {
-            ConsoleSocketThread* thd = listening.getVecs(i);
+        for (size_t i = 1; i < listening.VecsCount(); i++) {
+            ConsoleSocketThread* thd = listening.GetVecs(i);
             if (thd) {
-                int pid = thd->getPid();
+                int pid = thd->GetPid();
                 if (pid > 0) {
                     std::string spid = "VECS PID " + std::to_string(pid);
                     auto wasselected = thd->selected;
@@ -903,8 +903,8 @@ void static showConnectionWindow(ConsoleListener& listening, bool* p_open)
         }
         if (cursel >= 0) {
             listening.cursel = cursel;
-            for (size_t i = 0; i < listening.vecsCount(); i++) {
-                ConsoleSocketThread* thd = listening.getVecs(i);
+            for (size_t i = 0; i < listening.VecsCount(); i++) {
+                ConsoleSocketThread* thd = listening.GetVecs(i);
                 if (thd) {
                     thd->selected = (i == cursel);
                 }
@@ -951,15 +951,15 @@ void static showLiveView(ConsoleListener& listening, bool* p_open)
         ImGui::BeginChild("LiveView", childLiveViewGraphSz);
 
         if (listening.cursel >= 0) {
-            auto vecs = listening.getVecs(listening.cursel);
-            bool isLive = vecs->getIsLive();
+            auto vecs = listening.GetVecs(listening.cursel);
+            bool isLive = vecs->GetIsLive();
             if (!isLive && ImGui::Button("Start LiveView"))
             {
-                vecs->requestLiveView();
+                vecs->RequestLiveView();
             }
             if (isLive && ImGui::Button("Stop LiveView"))
             {
-                vecs->requestLiveView(false);
+                vecs->RequestLiveView(false);
             }
 
             if (ImPlot::BeginPlot("TestPlot", ImVec2(-1, -1))) {
@@ -976,11 +976,11 @@ void static showLiveView(ConsoleListener& listening, bool* p_open)
         ImGui::BeginChild("Statistics", childStatsSz);
 
         if (listening.cursel >= 0) {
-            auto vecs = listening.getVecs(listening.cursel);
+            auto vecs = listening.GetVecs(listening.cursel);
             ImGui::Text("Number of Entities: %d", vecs->lvEntityCount[_countof(vecs->lvEntityCount) - 1]);
-            ImGui::Text("Average Number of Components: %.2f", vecs->getAvgComp());
+            ImGui::Text("Average Number of Components: %.2f", vecs->GetAvgComp());
             char s[128];
-            size_t estSize = vecs->getEstSize();
+            size_t estSize = vecs->GetEstSize();
             // primitive human-readable value
             if (estSize >= 1000000000L) // over a gigabyte
                 sprintf(s, "%.2lf GB", static_cast<double>(estSize) / 1000000000.0);
@@ -997,7 +997,7 @@ void static showLiveView(ConsoleListener& listening, bool* p_open)
 
         ImGui::BeginChild("Watchlist", childWatchlistSz);
         if (listening.cursel >= 0) {
-            auto vecs = listening.getVecs(listening.cursel);
+            auto vecs = listening.GetVecs(listening.cursel);
 
             // allow to single select a component
             static Console::Component* selTableComponent{ nullptr };
@@ -1013,28 +1013,28 @@ void static showLiveView(ConsoleListener& listening, bool* p_open)
                 ImGui::TableSetupColumn("Tag");
                 ImGui::TableHeadersRow();
 
-                auto& watchlist = vecs->getWatchlist();
+                auto& watchlist = vecs->GetWatchlist();
 
                 size_t entityIndex = 0;
                 for (auto& entityhandle : watchlist) {
                     auto& entity = entityhandle.second;
 
                     auto archetype = entity.GetArchetype();
-                    std::string aHash = archetype->toString();
-                    std::string eIndex = entity.toString();
+                    std::string aHash = archetype->ToString();
+                    std::string eIndex = entity.ToString();
                     int archtagcount = 0;
                     std::string tagstr;
-                    for (auto& tag : archetype->getTags()) {
+                    for (auto& tag : archetype->GetTags()) {
                         if (archtagcount++) tagstr += ",";
                         tagstr += entity.GetTagName(tag);
                     }
-                    ImVec4 color = entity.isModified() ? ImVec4(255, 255, 0, 255) :
-                        entity.isDeleted() ? ImVec4(255, 0, 0, 255) :
+                    ImVec4 color = entity.IsModified() ? ImVec4(255, 255, 0, 255) :
+                        entity.IsDeleted() ? ImVec4(255, 0, 0, 255) :
                         ImVec4(255, 255, 255, 255);
                     size_t componentIndex = 0;
-                    for (auto& component : entity.getComponents()) {
+                    for (auto& component : entity.GetComponents()) {
 
-                        std::string cvalue = component.toString();
+                        std::string cvalue = component.ToString();
 
                         ImGui::TableNextRow();
 
@@ -1043,7 +1043,7 @@ void static showLiveView(ConsoleListener& listening, bool* p_open)
                         ImGui::TableSetColumnIndex(1);
                         ImGui::TextColored(color, eIndex.c_str());
                         ImGui::TableSetColumnIndex(2);
-                        ImGui::TextColored(color, entity.GetTypeName(component.getType()).c_str());
+                        ImGui::TextColored(color, entity.GetTypeName(component.GetType()).c_str());
                         ImGui::TableSetColumnIndex(3);
                         ImGui::TextColored(color, cvalue.c_str());
                         ImGui::TableSetColumnIndex(4);
@@ -1090,7 +1090,7 @@ void static showWatchlistWindow(ConsoleListener& listening, bool* p_open) {
             static Console::Entity* selTableEntity{ nullptr };
             bool componentSelected{ false };
 
-            auto vecs = listening.getVecs(listening.cursel);
+            auto vecs = listening.GetVecs(listening.cursel);
             if (ImGui::BeginTable("Watchlist", 5, ImGuiTableFlags_RowBg)) {
 
                 ImGui::TableSetupColumn("Archetype");
@@ -1100,25 +1100,25 @@ void static showWatchlistWindow(ConsoleListener& listening, bool* p_open) {
                 ImGui::TableSetupColumn("Tag");
                 ImGui::TableHeadersRow();
 
-                auto& watchlist = vecs->getWatchlist();
+                auto& watchlist = vecs->GetWatchlist();
 
                 size_t entityIndex = 0;
                 size_t entidel = (size_t)-1;
                 for (auto& entityhandle : watchlist) {
                     auto& entity = entityhandle.second;
                     auto archetype = entity.GetArchetype();
-                    std::string aHash = archetype->toString();
-                    std::string eIndex = entity.toString();
+                    std::string aHash = archetype->ToString();
+                    std::string eIndex = entity.ToString();
                     int archtagcount = 0;
                     std::string tagstr;
-                    for (auto& tag : archetype->getTags()) {
+                    for (auto& tag : archetype->GetTags()) {
                         if (archtagcount++) tagstr += ",";
                         tagstr += entity.GetTagName(tag);
                     }
                     size_t componentIndex = 0;
-                    for (auto& component : entity.getComponents()) {
+                    for (auto& component : entity.GetComponents()) {
 
-                        std::string cvalue = component.toString();
+                        std::string cvalue = component.ToString();
 
                         ImGui::TableNextRow();
                         ImGui::TableSetColumnIndex(0);
@@ -1148,7 +1148,7 @@ void static showWatchlistWindow(ConsoleListener& listening, bool* p_open) {
                         ImGui::TableSetColumnIndex(1);
                         ImGui::TextUnformatted(eIndex.c_str());
                         ImGui::TableSetColumnIndex(2);
-                        ImGui::TextUnformatted(entity.GetTypeName(component.getType()).c_str());
+                        ImGui::TextUnformatted(entity.GetTypeName(component.GetType()).c_str());
                         ImGui::TableSetColumnIndex(3);
                         ImGui::TextUnformatted(cvalue.c_str());
                         ImGui::TableSetColumnIndex(4);
@@ -1159,7 +1159,7 @@ void static showWatchlistWindow(ConsoleListener& listening, bool* p_open) {
                     entityIndex++;
                 }
                 if (entidel != (size_t)-1)
-                    vecs->deleteWatch(entidel);
+                    vecs->DeleteWatch(entidel);
 
                 ImGui::EndTable();
             }

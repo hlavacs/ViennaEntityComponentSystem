@@ -27,12 +27,12 @@ public:
     Socket& operator=(SOCKET const other) { s = other; return *this; }
     Socket& operator=(Socket& other) { s = other.s; other.detach(); return *this; }
 
-    static int getError(); 
-    static int getProtoNumber(std::string proto = "");  // get number for a protocol name
-    static int getServicePort(std::string service, std::string proto = "tcp");
-    static unsigned long getHostAddress(std::string hostName = ""); 
+    static int GetError(); 
+    static int GetProtoNumber(std::string proto = "");  // get number for a protocol name
+    static int GetServicePort(std::string service, std::string proto = "tcp");
+    static unsigned long GetHostAddress(std::string hostName = ""); 
 
-    SOCKET create(int sType = SOCK_STREAM, std::string proto = "");
+    SOCKET Create(int sType = SOCK_STREAM, std::string proto = "");
     bool isCreated();
     bool isSocket();
     int bind(std::string server = "", std::string service = "", int bReuse = 1);
@@ -121,7 +121,7 @@ private:
     void thdFuncListener();
     void removeEndedClients();
     virtual void onDatagram(const char* data, int len) {}
-    virtual SocketThread* createSocketThread(SOCKET s, SocketListener* l) { return new SocketThread(s, l); }
+    virtual SocketThread* CreateSocketThread(SOCKET s, SocketListener* l) { return new SocketThread(s, l); }
 
 
 };

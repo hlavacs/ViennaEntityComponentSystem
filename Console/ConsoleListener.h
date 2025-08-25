@@ -19,13 +19,13 @@ namespace Console {
         //if a new WatchEntity is added to the watchlist the constructor collects all needed data from the registry
         WatchEntity(Entity const& org) : Entity(org) {
             if (org.GetArchetype()) {
-                arch.copyArchetype(*org.GetArchetype());
+                arch.CopyArchetype(*org.GetArchetype());
                 auto registry = org.GetArchetype()->GetRegistry();
                 if (registry) {
-                    for (auto& component : getComponents()) {
-                        typeNames[component.getType()] = registry->GetTypeName(component.getType()).c_str();
+                    for (auto& component : GetComponents()) {
+                        typeNames[component.GetType()] = registry->GetTypeName(component.GetType()).c_str();
                     }
-                    for (auto& tag : org.GetArchetype()->getTags()) {
+                    for (auto& tag : org.GetArchetype()->GetTags()) {
                         tags[tag] = registry->GetTagName(tag);
                     }
                 }
@@ -36,13 +36,13 @@ namespace Console {
         WatchEntity& operator=(Entity const& org) {
             Entity::operator=(org);
             if (org.GetArchetype()) {
-                arch.copyArchetype(*org.GetArchetype());
+                arch.CopyArchetype(*org.GetArchetype());
                 auto registry = org.GetArchetype()->GetRegistry();
                 if (registry) {
-                    for (auto& component : getComponents()) {
-                        typeNames[component.getType()] = registry->GetTypeName(component.getType()).c_str();
+                    for (auto& component : GetComponents()) {
+                        typeNames[component.GetType()] = registry->GetTypeName(component.GetType()).c_str();
                     }
-                    for (auto& tag : org.GetArchetype()->getTags()) {
+                    for (auto& tag : org.GetArchetype()->GetTags()) {
                         tags[tag] = registry->GetTagName(tag);
                     }
                 }
@@ -85,38 +85,38 @@ private:
 
     virtual void ClientActivity();
     bool ProcessJSON(std::string sjson);
-    bool onHandshake(nlohmann::json const& json);
-    bool onSnapshot(nlohmann::json const& json) { return parseSnapshot(json); }
-    bool onLiveView(nlohmann::json const& json);
+    bool OnHandshake(nlohmann::json const& json);
+    bool OnSnapshot(nlohmann::json const& json) { return ParseSnapshot(json); }
+    bool OnLiveView(nlohmann::json const& json);
 
 public:
     ConsoleSocketThread(SOCKET s, SocketListener* l) : SocketThread(s, l) {}
     virtual ~ConsoleSocketThread() {}
 
-    bool isConnected() { return handShook; }
-    int getPid() { return pid; }
-    void setPid(int newPid) { pid = newPid; handShook = pid != 0; }
-    int getEntitycount() { return entitycount; }
-    Console::Registry& getSnapshot() { return snapshot[snapidx]; }
+   /* bool IsConnected() { return handShook; }*/
+    int GetPid() { return pid; }
+    void SetPid(int newPid) { pid = newPid; handShook = pid != 0; }
+    /*int GetEntitycount() { return entitycount; }*/
+    Console::Registry& GetSnapshot() { return snapshot[snapidx]; }
 
     int lvEntityCount[200]{ 0 };
     int lvEntityMax = 1;
 
-    float getAvgComp() { return avgComp; }
-    size_t getEstSize() { return estSize; }
+    float GetAvgComp() { return avgComp; }
+    size_t GetEstSize() { return estSize; }
 
-    bool requestSnapshot();
-    bool requestLiveView(bool active = true);
-    bool sendWatchlist(std::map<size_t, Console::WatchEntity>& watchlist);
-    bool getIsLive() { return isLive; }
+    bool RequestSnapshot();
+    bool RequestLiveView(bool active = true);
+    bool SendWatchlist(std::map<size_t, Console::WatchEntity>& watchlist);
+    bool GetIsLive() { return isLive; }
 
     bool selected{ false };
-    bool parseSnapshot(nlohmann::json const& json);
+    bool ParseSnapshot(nlohmann::json const& json);
 
-    void addWatch(size_t handle) { watchlist[handle] = *snapshot[snapidx].findEntity(handle); sendWatchlist(watchlist); }
-    void deleteWatch(size_t handle) { watchlist.erase(handle); sendWatchlist(watchlist); }
-    bool isWatched(size_t handle) { return watchlist.contains(handle); }
-    std::map<size_t, Console::WatchEntity>& getWatchlist() { return watchlist; }
+    void AddWatch(size_t handle) { watchlist[handle] = *snapshot[snapidx].FindEntity(handle); SendWatchlist(watchlist); }
+    void DeleteWatch(size_t handle) { watchlist.erase(handle); SendWatchlist(watchlist); }
+    bool IsWatched(size_t handle) { return watchlist.contains(handle); }
+    std::map<size_t, Console::WatchEntity>& GetWatchlist() { return watchlist; }
 
 
 };
@@ -125,8 +125,8 @@ public:
 class ConsoleListener : public TcpListener {
 public:
     ConsoleListener(std::string service = "") : TcpListener(service) {
-        AddClient(createSocketThread(INVALID_SOCKET, this));  //create an empty Listener for "Load from File"
-        getVecs(0)->setPid(1); // force it to PID 1 (which will never come in from any socket)
+        AddClient(CreateSocketThread(INVALID_SOCKET, this));  //create an empty Listener for "Load from File"
+        GetVecs(0)->SetPid(1); // force it to PID 1 (which will never come in from any socket)
     }
 
     int cursel{ -1 };
@@ -137,10 +137,10 @@ public:
     }
 
     //there's a 1:1 relation between VECS and client connections
-    size_t vecsCount() { return streamClientSize(); }
-    ConsoleSocketThread* getVecs(size_t i) { return static_cast<ConsoleSocketThread*>(streamClientAt(i)); }
+    size_t VecsCount() { return streamClientSize(); }
+    ConsoleSocketThread* GetVecs(size_t i) { return static_cast<ConsoleSocketThread*>(streamClientAt(i)); }
 
 private:
-    virtual SocketThread* createSocketThread(SOCKET s, SocketListener* l) { return new ConsoleSocketThread(s, l); }
+    virtual SocketThread* CreateSocketThread(SOCKET s, SocketListener* l) { return new ConsoleSocketThread(s, l); }
 };
 

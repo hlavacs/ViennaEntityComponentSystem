@@ -20,7 +20,7 @@ namespace Console {
         std::map<size_t, Archetype> archetypes;
         std::map<size_t, size_t> entities;
         std::string jsonsnap;
-        size_t entitycount{ 0 }, componentcount{ 0 };
+        size_t entityCount{ 0 }, componentCount{ 0 };
         std::chrono::high_resolution_clock::time_point tstampFetched, tstampParsed;
 
     public:
@@ -30,77 +30,77 @@ namespace Console {
             tags = org.tags;
             archetypes = org.archetypes;
             entities = org.entities;
-            entitycount = org.entitycount;
-            componentcount = org.componentcount;
+            entityCount = org.entityCount;
+            componentCount = org.componentCount;
             tstampFetched = org.tstampFetched;
             tstampParsed = org.tstampParsed;
             for (auto& a : archetypes) a.second.SetRegistry(this);
         }
         Registry& operator=(Registry const& org) {
-            clear();
+            Clear();
             types = org.types;
             tags = org.tags;
             archetypes = org.archetypes;
             entities = org.entities;
-            entitycount = org.entitycount;
-            componentcount = org.componentcount;
+            entityCount = org.entityCount;
+            componentCount = org.componentCount;
             tstampFetched = org.tstampFetched;
             tstampParsed = org.tstampParsed;
             for (auto& a : archetypes) a.second.SetRegistry(this);
             return *this;
         }
 
-        void clear() {
+        void Clear() {
             types.clear();
             tags.clear();
             archetypes.clear();
             entities.clear();
-            entitycount = componentcount = 0;
+            entityCount = componentCount = 0;
             tstampFetched = {};
             tstampParsed = {};
         }
 
-        void setJsonsnap(std::string json) {
+        void SetJsonsnap(std::string json) {
             tstampFetched = std::chrono::high_resolution_clock::now();
             jsonsnap = json;
         }
-        std::string getJsonsnap() {
+        std::string GetJsonsnap() {
             return jsonsnap;
         }
-        void setParsed() {
+        void SetParsed() {
             tstampParsed = std::chrono::high_resolution_clock::now();
         }
-        std::chrono::steady_clock::time_point getJsonTS() const { return tstampFetched; }
-        std::chrono::steady_clock::time_point getParsedTS() const { return tstampParsed; }
+        std::chrono::steady_clock::time_point GetJsonTS() const { return tstampFetched; }
+        std::chrono::steady_clock::time_point GetParsedTS() const { return tstampParsed; }
 
         // archetype handling
-        std::map<size_t, Archetype>& getArchetypes() {
+        std::map<size_t, Archetype>& GetArchetypes() {
             return archetypes;
         }
 
-        int addArchetype(Archetype& a) {
-            archetypes[a.getHash()] = a;
-            archetypes[a.getHash()].SetRegistry(this);
+        int AddArchetype(Archetype& a) {
+            archetypes[a.GetHash()] = a;
+            archetypes[a.GetHash()].SetRegistry(this);
             return 0;
         }
 
-        void addEntity(Entity& e, size_t archetype) {
-            entitycount++;
-            componentcount += e.getComponents().size();
+        void AddEntity(Entity& e, size_t archetype) {
+            entityCount++;
+            componentCount += e.GetComponents().size();
             entities[e.GetValue()] = archetype;
         }
 
-        Entity* findEntity(size_t handle) {
+        Entity* FindEntity(size_t handle) {
             auto hashit = entities.find(handle);
             if (hashit != entities.end()) {
-                auto arch = findArchetype(hashit->second);
+                auto arch = FindArchetype(hashit->second);
                 if (arch != nullptr)
-                    return arch->findEntity(handle);
+                    return arch->FindEntity(handle);
             }
             return nullptr;
         }
 
-        Archetype* findArchetype(size_t hash) {
+        Archetype* FindArchetype(size_t hash) {
             auto i = archetypes.find(hash);
             if (i != archetypes.end()) {
                 return &i->second;
@@ -141,8 +141,8 @@ namespace Console {
             return it->second;
         }
 
-        size_t GetEntitycount() const { return entitycount; }
-        size_t GetComponentcount() const { return componentcount; }
+        size_t GetEntityCount() const { return entityCount; }
+        size_t GetComponentCount() const { return componentCount; }
 
     };
 }

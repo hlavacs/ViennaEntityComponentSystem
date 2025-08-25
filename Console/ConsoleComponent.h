@@ -20,21 +20,21 @@ namespace Console {
 			return *this;
 		}
 
-		int addData(std::tuple<size_t, std::string> x) {
+		int AddData(std::tuple<size_t, std::string> x) {
 			data = x;
 			return 0;
 		}
 
-		std::tuple<size_t, std::string>& getData() {
-			return data;
-		}
+		//std::tuple<size_t, std::string>& GetData() {
+		//	return data;
+		//}
 
-		size_t getType() { return std::get<0>(data); }
+		size_t GetType() { return std::get<0>(data); }
 
-		std::string toString() {
+		std::string ToString() {
 			return std::get<1>(data);
 		}
-		void setString(std::string s) {
+		void SetString(std::string s) {
 			std::get<1>(data) = s;
 		}
 	};

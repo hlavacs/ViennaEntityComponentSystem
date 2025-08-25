@@ -35,7 +35,7 @@ namespace Console {
 			components = org.components;
 		}
 		Entity& operator=(Entity const& org) {
-			clear();
+			Clear();
 			index = org.index;
 			version = org.version;
 			stgindex = org.stgindex;
@@ -52,39 +52,39 @@ namespace Console {
 		void SetArchetype(Archetype* a = nullptr) { archetype = a; }
 		Archetype* GetArchetype() const { return archetype; }
 
-		void clear() {
+		void Clear() {
 			index = version = stgindex = value = 0;
 			components.clear();
 		}
 
-		std::list<Component>& getComponents() {
+		std::list<Component>& GetComponents() {
 			return components;
 		}
 
-		int addComponent(Component& c) {
+		int AddComponent(Component& c) {
 			components.push_back(c);
 			return 0;
 		}
 
-		void setModified() {
+		void SetModified() {
 			flags |= modified; //set modified bit in flags
 		}
 
-		bool isModified() {
+		bool IsModified() {
 			return flags & modified; // return wether modified bit is set in flags
 		}
 
 
-		void setDeleted() {
+		void SetDeleted() {
 			flags |= deleted; //set deleted bit in flags
 		}
 
-		bool isDeleted() {
+		bool IsDeleted() {
 			return flags & deleted; // return wether deleted bit is set in flags
 		}
 
 
-		std::string toString() {
+		std::string ToString() {
 			return std::to_string(index);
 		}
 

@@ -20,17 +20,17 @@ namespace Console {
 	public:
 		Archetype(size_t hash = 0) : hash(hash) {}
 		Archetype(Archetype const& org) {
-			copyArchetype(org);
+			CopyArchetype(org);
 			entities = org.entities;
 			for (auto& e : entities) e.second.SetArchetype(this);
 		}
 		Archetype& operator=(Archetype const& org) {
-			copyArchetype(org);
+			CopyArchetype(org);
 			entities = org.entities;
 			for (auto& e : entities) e.second.SetArchetype(this);
 			return *this;
 		}
-		Archetype& copyArchetype(Archetype const& org) {
+		Archetype& CopyArchetype(Archetype const& org) {
 			clear();
 			dataTypes = org.dataTypes;
 			tags = org.tags;
@@ -48,14 +48,14 @@ namespace Console {
 			hash = 0;
 		}
 
-		std::map<size_t, Entity>& getEntities() {
+		std::map<size_t, Entity>& GetEntities() {
 			return entities;
 		}
 
-		int addEntity(Entity& e);
+		int AddEntity(Entity& e);
 
 
-		Entity* findEntity(size_t id) {
+		Entity* FindEntity(size_t id) {
 			auto i = entities.find(id);
 			if (i != entities.end()) {
 				return &i->second;
@@ -63,20 +63,20 @@ namespace Console {
 			else return nullptr;
 		}
 
-		std::list<std::size_t>& getTags() {
+		std::list<std::size_t>& GetTags() {
 			return tags;
 		}
 
-		int addTag(size_t tagid) {
+		int AddTag(size_t tagid) {
 			tags.push_back(tagid);
 			return 0;
 		}
 
-		size_t getHash() {
+		size_t GetHash() {
 			return hash;
 		}
 
-		std::string toString() {
+		std::string ToString() {
 			return std::to_string(hash);
 		}
 
