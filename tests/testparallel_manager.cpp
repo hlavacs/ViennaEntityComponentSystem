@@ -182,3 +182,24 @@ TEST_F(ManagerTest, LoopViewChangeBasicDirectWithoutReference) {
         //std::cout << "handle " << h << " old=" << f << ", new=" << mng.Get<float>(h);
     }
 }
+
+
+TEST_F(ManagerTest, LoopViewChangeComplexDirectWithReference) {
+    // making sure entities are created properly
+    size_t created = fillRegistryComplex(mng);
+    ASSERT_EQ(mng.Size(), created);
+
+    std::map<vecs::Handle, std::tuple<Position, Velocity>> origin;
+
+    // change values directly
+    for( auto [handle, p, v] : mng.GetView<vecs::Handle, Position&, Velocity&>()) {
+        origin.insert({handle, std::tuple(p.Value(), v.Value())});
+        p.Value().x += p.Value().x*v.Value().x;
+        p.Value().y += p.Value().y*v.Value().y;
+    }
+
+    for( auto [h, tup] : origin) {
+        ASSERT_EQ(std::get<Position>(tup).x + std::get<Position>(tup).x * std::get<Velocity>(tup).x, mng.Get<Position>(h).x);
+        ASSERT_EQ(std::get<Position>(tup).y + std::get<Position>(tup).y * std::get<Velocity>(tup).y, mng.Get<Position>(h).y);
+    }
+}
