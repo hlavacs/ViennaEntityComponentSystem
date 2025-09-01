@@ -572,7 +572,16 @@ void static ShowViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
 }
 
 void static ShowSnapshotFileListWindow(bool* p_open) {
-    if (!ImGui::Begin("SnapshotFileListWindow", p_open))
+    float scale = GetContentScale();
+    ImGui::SetNextWindowSize(ImVec2(350 * scale, 150 * scale), ImGuiCond_Once);
+    ImVec2 wpos(150 * scale, 20 * scale);
+    if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+        wpos.x += ImGui::GetMainViewport()->Pos.x;
+        wpos.y += ImGui::GetMainViewport()->Pos.y;
+    }
+    ImGui::SetNextWindowPos(wpos, ImGuiCond_Once);
+
+    if (!ImGui::Begin("Load Snapshot from File", p_open))
     {
         ImGui::End();
     }

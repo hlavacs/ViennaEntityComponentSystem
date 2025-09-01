@@ -289,7 +289,7 @@ namespace vecs {
 			}
 			//If it is in Debug Mode - connect to Console
 #ifdef _DEBUG
-			getConsoleComm(this);
+			GetConsoleComm(this);
 #endif
 		};
 
@@ -672,36 +672,36 @@ namespace vecs {
 	// Console Communication
 	public:
 
-		std::string getLiveView() {
+		std::string GetLiveView() {
 			std::string json = "{\"cmd\":\"liveview\",\"entities\":";
 			json += std::to_string(Size());
 			json += "}";
 			return json;
 		}
 
-		float getAvgComp() {
+		float GetAvgComp() {
 			float avgComp = 0.f;
 			for (auto& arch : m_archetypes) {
-				avgComp+=arch.second->getComponents();
+				avgComp+=arch.second->GetComponents();
 			}
 			return (Size()) ? (avgComp / Size()) : Size();
 		}
 
-		size_t getEstSize() {
+		size_t GetEstSize() {
 			size_t estSize = 0; 
 			for (auto& arch : m_archetypes) {
-				estSize += arch.second->getEstSize();
+				estSize += arch.second->GetEstSize();
 			}
 			return estSize; 
 		}
 
-		std::string toJSON(Handle h) {
+		std::string ToJSON(Handle h) {
 			if (!h.IsValid() || !Exists(h)) { return "null"; }
 			auto& archAndIndex = GetArchetypeAndIndex(h);
-			return archAndIndex.m_arch->toJSON(archAndIndex.m_index);
+			return archAndIndex.m_arch->ToJSON(archAndIndex.m_index);
 		}
 
-		std::string getSnapshot() {
+		std::string GetSnapshot() {
 			std::string json = "{\"cmd\":\"snapshot\",\"entities\":";
 			json += std::to_string(Size()) + ",";
 			json += "\"archetypes\":[";
@@ -710,7 +710,7 @@ namespace vecs {
 			for (auto& it : m_archetypes) {
 				if (art) json += ",";
 				json += "{\"hash\":\"" + std::to_string(it.first) + "\"" +
-					"," + it.second->toJSON() + "}";
+					"," + it.second->ToJSON() + "}";
 				art++;
 			}
 			m_mutex.unlock();

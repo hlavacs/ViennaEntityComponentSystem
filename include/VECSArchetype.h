@@ -276,7 +276,7 @@ namespace vecs {
 
 //methods for Console communication
 public:
-		std::string toJSON(size_t aindex) {
+		std::string ToJSON(size_t aindex) {
 			// retrieve the values of the entity components
 			std::string json = "[";
 			size_t count = 0;
@@ -289,19 +289,19 @@ public:
 			return json + "]";
 
 		}
-		size_t getComponents() {
+		size_t GetComponents() {
 			return Size() * m_maps.size();
 		}
 
-		size_t getEstSize() {
+		size_t GetEstSize() {
 			size_t elemSize = 0; 
 			for (auto& map : m_maps) {
-				elemSize += map.second->elemSize();
+				elemSize += map.second->ElemSize();
 			}
 			return elemSize * Size();
 		}
 
-		std::string toJSON() {
+		std::string ToJSON() {
 			std::string json = "\"archetype\":{\"hash\":" + std::to_string(Hash(m_types)) + ",\"types\":[";
 			size_t count = 0;
 			for (auto ti : m_types) {
@@ -314,7 +314,7 @@ public:
 			count = 0;
 			for (auto& map : m_maps) {
 				if (count++) json += ",";
-				json += map.second->toJSON();
+				json += map.second->ToJSON();
 			}
 			json += "],";
 			json += "\"entities\":[";
@@ -326,9 +326,9 @@ public:
 				if (aindex) json += ",";
 				auto eindex = handle.GetIndex(); // entity index in registry
 				// write out basic entity information
-				json += handle.toJSON();
+				json += handle.ToJSON();
 				// retrieve the values of the entity components
-				json += toJSON(aindex) + "}";
+				json += ToJSON(aindex) + "}";
 
 				aindex++;
 			}

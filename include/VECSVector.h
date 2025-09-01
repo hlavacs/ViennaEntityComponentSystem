@@ -33,10 +33,10 @@ namespace vecs {
 		virtual void clear() = 0;
 		virtual void print() = 0;
 
-		virtual auto toJSON() -> std::string = 0;
+		virtual auto ToJSON() -> std::string = 0;
 		virtual auto toJSON(size_t index) -> std::string = 0;
-		virtual size_t getType() = 0;
-		virtual size_t elemSize() = 0;
+		virtual size_t GetType() = 0;
+		virtual size_t ElemSize() = 0;
 	}; //end of VectorBase
 
 
@@ -173,15 +173,15 @@ namespace vecs {
 
 	//Methods for Console communication
 	public:
-		auto toJSON(size_t index) -> std::string override { return ::vecs::toJSON(operator[](index)); }
+		auto toJSON(size_t index) -> std::string override { return ::vecs::ToJSON(operator[](index)); }
 
-		auto toJSON() -> std::string override {
+		auto ToJSON() -> std::string override {
 			std::string json = std::string("{\"name\":\"") + typeid(T).name() + "\",\"id\":" + std::to_string(Type<T>());
 			json += "}";
 			return json;
 		}
-		virtual size_t getType() { return Type<T>(); }
-		size_t elemSize() override { return sizeof(T); }
+		virtual size_t GetType() { return Type<T>(); }
+		size_t ElemSize() override { return sizeof(T); }
 
 	}; //end of Vector
 

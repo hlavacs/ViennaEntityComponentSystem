@@ -73,7 +73,7 @@ namespace vecs {
 
 
 	/// @brief convert a string into a transmittable JSON string
-	inline std::string toJSONString(std::string s) {
+	inline std::string ToJSONString(std::string s) {
 		std::string d("\"");
 		// mini-massager to get a string into JSON format
 		for (auto c : s) {
@@ -117,11 +117,11 @@ namespace vecs {
 
 	/// @brief convert a value into a transmittable JSON string
 	template<typename T>
-	std::string toJSON(const T& value) {
+	std::string ToJSON(const T& value) {
 		// to my knowledge, there's no better way to get the template types and hence the data
 		// handle primitive types
 		if constexpr (std::is_same_v<T, char> || std::is_same_v<T, unsigned char>)
-			return toJSONString(std::string(1, value));
+			return ToJSONString(std::string(1, value));
 		else if constexpr (std::is_same_v<T, int> ||
 			std::is_same_v<T, unsigned int> ||
 			std::is_same_v<T, long> ||
@@ -134,18 +134,18 @@ namespace vecs {
 			return std::to_string(value);
 		// handle strings themselves
 		else if constexpr (std::is_same_v<T, std::string>)
-			return toJSONString(value);
+			return ToJSONString(value);
 		// handle objects with a to_string member
 		else if constexpr (HasToString<T>)
-			return toJSONString(value.to_string());
+			return ToJSONString(value.to_string());
 		// handle objects that can be serialized to a stream
 		else if constexpr (Streamable<T>) {
 			std::ostringstream oss;
 			oss << value;
-			return toJSONString(oss.str());
+			return ToJSONString(oss.str());
 		}
 		// anything else, sadly, cannot be JSONified
-		return toJSONString("<unknown>");
+		return ToJSONString("<unknown>");
 	}
 
 
@@ -164,7 +164,7 @@ using Size_t = std::atomic<std::size_t>;
 namespace vecs {
 	class Registry;
 	class VECSConsoleComm;
-	VECSConsoleComm* getConsoleComm(Registry* reg = nullptr);
+	VECSConsoleComm* GetConsoleComm(Registry* reg = nullptr);
 }
 #include <VTLL.h>
 #include <VSTY.h>

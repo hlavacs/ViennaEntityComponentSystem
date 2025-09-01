@@ -59,17 +59,8 @@ int _getche() {
 }
 #endif
 
-void check(bool b, std::string_view msg = "") {
-	if (b) {
-		//std::cout << "\x1b[32m passed\n";
-	}
-	else {
-		std::cout << "\x1b[31m failed: " << msg << "\n";
-		exit(1);
-	}
-}
 
-void test_conn() {
+void TestConn() {
 	std::cout << "\x1b[37m testing Connection!...\n";
 
 	// 
@@ -123,14 +114,14 @@ void test_conn() {
 	handles.erase(handles.begin() + 4);
 
 #ifdef _DEBUG
-	auto comm = vecs::getConsoleComm();
+	auto comm = vecs::GetConsoleComm();
 #else
-	auto comm = vecs::getConsoleComm(&system);
+	auto comm = vecs::GetConsoleComm(&system);
 #endif
 
-	std::cout << "\x1b[37m isConnected: " << comm->isConnected() << "\n";
+	std::cout << "\x1b[37m isConnected: " << comm->IsConnected() << "\n";
 	bool abortWait{ false }, toldya{ false };
-	while (!comm->isConnected() && !abortWait) {
+	while (!comm->IsConnected() && !abortWait) {
 		if (!toldya) {
 			std::cout << "not yet connected!! Press Escape to terminate" << "\n";
 			toldya = true;
@@ -145,9 +136,9 @@ void test_conn() {
 		usleep(250 * 1000);
 #endif
 	}
-	std::cout << "\x1b[37m isConnected: " << comm->isConnected() << "\n";
+	std::cout << "\x1b[37m isConnected: " << comm->IsConnected() << "\n";
 
-	if (comm->isConnected()) {
+	if (comm->IsConnected()) {
 
 		// do nothing for 600 seconds, let background task work
 		for (int secs = 0; secs < 600 && !abortWait; secs++) {
@@ -212,18 +203,18 @@ void test_conn() {
 			usleep(1000 * 1000);
 #endif
 			// ... but get out if console has decided to leave the building
-			if (!comm->isConnected())
+			if (!comm->IsConnected())
 				break;
 		}
 
-		comm->disconnectFromServer();
+		comm->DisconnectFromServer();
 	}
 	std::cout << "\x1b[37m I hope it works? ...\n";
 }
 
 int main() {
 	std::cout << "testing VECS Console communication...\n";
-	test_conn();
+	TestConn();
 	return 0;
 }
 

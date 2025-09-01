@@ -85,7 +85,7 @@ namespace vecs {
                 }
 
                 float oldAvgComp = avgComp;
-                avgComp = registry->getAvgComp();
+                avgComp = registry->GetAvgComp();
                 bool compChanges = oldAvgComp != avgComp;
                 if (compChanges) {
                     json += std::string(",\"avgComp\":") + std::to_string(avgComp);
@@ -93,7 +93,7 @@ namespace vecs {
                 }
 
                 size_t oldEstSize = estSize;
-                estSize = registry->getEstSize();
+                estSize = registry->GetEstSize();
                 compChanges = oldEstSize != estSize;
                 if (compChanges) {
                     json += std::string(",\"estSize\":") + std::to_string(estSize);
@@ -103,7 +103,7 @@ namespace vecs {
 
                 size_t changedWatch = 0;
                 for (auto& entity : watched) {
-                    std::string entityJSON = registry->toJSON(entity.first);
+                    std::string entityJSON = registry->ToJSON(entity.first);
                     if (entityJSON != entity.second) {
 
                         entity.second = entityJSON;
@@ -133,18 +133,18 @@ namespace vecs {
 
     public:
         ~VECSConsoleComm() {
-            disconnectFromServer();
-            cleanup();
+            DisconnectFromServer();
+            Cleanup();
         }
 
         //handle one registry
-        void setRegistry(Registry* reg = nullptr) { registry = reg; liveView.setRegistry(reg); }
+        void SetRegistry(Registry* reg = nullptr) { registry = reg; liveView.setRegistry(reg); }
 
-        SOCKET connectToServer(Registry* reg, std::string host = "127.0.0.1", int port = 2000) {
-            if (!startup())
+        SOCKET ConnectToServer(Registry* reg, std::string host = "127.0.0.1", int port = 2000) {
+            if (!Startup())
                 return INVALID_SOCKET;
 
-            setRegistry(reg);
+            SetRegistry(reg);
 
             if (ConnectSocket != INVALID_SOCKET)
                 return ConnectSocket;
@@ -164,18 +164,18 @@ namespace vecs {
             int returnval = connect(ConnectSocket, (const struct sockaddr*)&clientService, sizeof(clientService));
             if (returnval == 0) {
                 running = true;
-                commThread = std::jthread(&VECSConsoleComm::handleConnection, this);
+                commThread = std::jthread(&VECSConsoleComm::HandleConnection, this);
             }
             else if (returnval < 0) {
-                disconnectFromServer();
+                DisconnectFromServer();
             }
             return ConnectSocket;
         }
-        bool isConnected() {
+        bool IsConnected() {
             return ConnectSocket != INVALID_SOCKET && running;
         }
 
-        int disconnectFromServer() {
+        int DisconnectFromServer() {
             if (ConnectSocket != INVALID_SOCKET) {
 #ifdef _WINSOCKAPI_
                 int irc = closesocket(ConnectSocket);
@@ -187,9 +187,9 @@ namespace vecs {
             return 0;
         }
 
-        void handleConnection() {
+        void HandleConnection() {
             while (running) {
-                std::string msg = receiveMessage();
+                std::string msg = ReceiveMessage();
 
                 // If message is empty, it could mean a disconnect or error
                 if (msg.empty()) {
@@ -198,15 +198,15 @@ namespace vecs {
                     break;
                 }
 
-                processMessage(msg);
+                ProcessMessage(msg);
             }
         }
 
-        void handleInitConnection(Registry* reg) {
+        void HandleInitConnection(Registry* reg) {
 
-            while (!isConnected())
+            while (!IsConnected())
             {
-                auto res = connectToServer(reg); // either socket or invalid socket
+                auto res = ConnectToServer(reg); // either socket or invalid socket
 #ifdef WIN32
                 Sleep(2000);
 #else
@@ -215,13 +215,13 @@ namespace vecs {
             }
         }
 
-        void startConnection(Registry* reg) {
-            initThread = std::jthread{ [=, this]() { handleInitConnection(reg); } };
+        void StartConnection(Registry* reg) {
+            initThread = std::jthread{ [=, this]() { HandleInitConnection(reg); } };
         }
 
 
     private:
-        void processMessage(std::string msg) {
+        void ProcessMessage(std::string msg) {
 
             //Process JSon
             nlohmann::json msgjson;
@@ -261,19 +261,19 @@ namespace vecs {
                 //print for testing
                 std::cout << "Hello from Console pid " << msgjson["pid"] << " built " << msgjson["compiled"] << "!\n";
                 // prepare a nice "Hello yourself!" to tell Console about us
-                sendMessage("{\"cmd\":\"handshake\", \"pid\":" + std::to_string(getpid()) + " }");
+                SendMessage("{\"cmd\":\"handshake\", \"pid\":" + std::to_string(getpid()) + " }");
                 break;
             case cmdSnapshot:
                 // snapshot
                 if (!registry) {       // if no registry there,
-                    sendMessage("{}"); // send empty object (maybe some kind of error object would be better?)
+                    SendMessage("{}"); // send empty object (maybe some kind of error object would be better?)
                 }
 #if 1 // Debugging:
                 {
                     auto t1 = std::chrono::high_resolution_clock::now();
-                    std::string josnap = registry->getSnapshot();
+                    std::string josnap = registry->GetSnapshot();
                     auto t2 = std::chrono::high_resolution_clock::now();
-                    sendMessage(josnap);
+                    SendMessage(josnap);
                     auto t3 = std::chrono::high_resolution_clock::now();
                     auto cmics = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
                     auto tmics = std::chrono::duration_cast<std::chrono::milliseconds>(t3 - t2).count();
@@ -296,8 +296,8 @@ namespace vecs {
                     if (act.is_boolean()) {
                         liveView.SetActive(act);
 
-                        std::string jsonlive = registry->getLiveView();
-                        sendMessage(jsonlive);
+                        std::string jsonlive = registry->GetLiveView();
+                        SendMessage(jsonlive);
                         //Debugging: 
                         if (jsonlive.size() > 80) // most likely ...
                             jsonlive = jsonlive.substr(0, 77) + "...}";
@@ -335,12 +335,12 @@ namespace vecs {
 
         }
 
-        int sendMessage(std::string sendmessage) const {
+        int SendMessage(std::string sendmessage) const {
             const char* csendmessage = sendmessage.c_str();
             return send(ConnectSocket, csendmessage, static_cast<int>(sendmessage.length()), 0);
         }
 
-        std::string receiveMessage() {
+        std::string ReceiveMessage() {
             char buffer[1024];
             int received = 0;
 
@@ -362,7 +362,7 @@ namespace vecs {
                         auto lv = liveView.getChangesJSON();
                         if (std::get<0>(lv)) {
                             std::string lvchg = std::get<1>(lv);
-                            sendMessage(lvchg);
+                            SendMessage(lvchg);
                             // Debugging:
                             if (lvchg.size() > 80)
                                 lvchg = lvchg.substr(0, 77) + "...}";
@@ -380,7 +380,7 @@ namespace vecs {
                     return std::string(buffer);
                 }
                 else if (received == 0) {
-                    disconnectFromServer();
+                    DisconnectFromServer();
                 }
                 else {
 #ifdef _WINSOCKAPI_
@@ -388,7 +388,7 @@ namespace vecs {
 #else
                     if (errno != EAGAIN && errno != EWOULDBLOCK)
 #endif
-                        disconnectFromServer();
+                        DisconnectFromServer();
                 }
             }
             return "";
@@ -398,7 +398,7 @@ namespace vecs {
         bool started{ false };
         SOCKET ConnectSocket{ INVALID_SOCKET };
 
-        bool startup() {
+        bool Startup() {
 #ifdef _WINSOCKAPI_
             if (!started) {
                 WSADATA wsaData;
@@ -410,7 +410,7 @@ namespace vecs {
             started = true;
             return true;
         }
-        void cleanup() {
+        void Cleanup() {
 #ifdef _WINSOCKAPI_
             if (started) {
                 WSACleanup();
@@ -420,11 +420,11 @@ namespace vecs {
         }
     };
 
-    inline VECSConsoleComm* getConsoleComm(Registry* reg) {
+    inline VECSConsoleComm* GetConsoleComm(Registry* reg) {
         static VECSConsoleComm* comm = nullptr;
         if (comm == nullptr) comm = new VECSConsoleComm;
         if (comm && reg) {
-            comm->startConnection(reg);
+            comm->StartConnection(reg);
         }
         return comm;
     }
