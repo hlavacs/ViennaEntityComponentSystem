@@ -126,6 +126,8 @@ namespace vecs {
 		template<typename... Ts>
         requires (vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<std::decay_t<Ts>...>, Handle>::value)
         void Put(Handle handle, std::tuple<Ts...>& v) {
+
+
             m_threadpool->enqueue( [&] {
                 std::scoped_lock lock(m_system->GetArchetypeMutex(handle));
                 //TODO: add lock for potential new archetype
@@ -229,6 +231,18 @@ namespace vecs {
         bool Has(Handle handle) {
             return m_system->Has<T>(handle);
         }
+
+        
+        /// @brief Test if an entity in the registry has multiple components.
+        /// @tparam ...Ts Types of the components to check
+        /// @param handle Handle of the entity.
+        /// @return True if the entity has all components, else false.
+        template<typename... Ts>
+            requires ((vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<std::decay_t<Ts>...>, Handle>::value)
+        bool HasAll(Handle handle, Ts&&... vs) {
+            return m_system->HasAll(handle, std::forward<Ts>(vs)...);
+        }
+
 
 
     private:

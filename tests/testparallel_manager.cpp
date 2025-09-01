@@ -137,13 +137,38 @@ TEST_F(ManagerTest, ClearWorks) {
 }
 
 
-/// TESTING GETVIEW
+TEST_F(ManagerTest, HasAllWorks) {
+    fillRegistryBasic(mng);
 
-//TODO: tests for getview
-/*
-change entities outside loop w/o archetype change
+    auto threeCompView = mng.GetView<vecs::Handle, int, double, float>();
+    auto twoCompView = mng.GetView<vecs::Handle, int, double>();
 
-*/
+    // num of entities with components int, double and float
+    size_t countThreeComp = 0;
+    // num of entities with components int and double
+    size_t countTwoComp = 0;
+
+    for(auto [handle, i, d, f] : threeCompView) {
+        ASSERT_TRUE(mng.HasAll(handle, i, d, f));
+        countThreeComp += 1;
+        ASSERT_TRUE(mng.HasAll(handle, i, d));
+        countTwoComp += 1;
+    }
+
+    std::cout << "threeCompView has counted:\n    " << countThreeComp << " entities with components int, double and float.\n"
+                << "    " << countTwoComp << " entities with components int and double.\n";
+
+    countTwoComp = 0;
+    for(auto [handle, i, d] : twoCompView) {
+        ASSERT_TRUE(mng.HasAll(handle, i, d));
+        countTwoComp += 1;
+    }
+
+    std::cout << "twoCompView has counted:\n    " << countTwoComp << " entities with components int and double.\n";
+}
+
+
+////////// TESTING GETVIEW //////////
 
 TEST_F(ManagerTest, LoopViewChangeBasicDirectWithReference) {
     // making sure entities are created properly

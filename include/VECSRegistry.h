@@ -341,6 +341,18 @@ namespace vecs {
 			return arch->Has(ti);
 		}
 
+        /// @brief Test if an entity in the registry has multiple components.
+        /// @tparam ...Ts Types of the components to check
+        /// @param handle Handle of the entity.
+        /// @return True if the entity has all components, else false.
+        template<typename... Ts>
+            requires ((vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<std::decay_t<Ts>...>, Handle>::value)
+        bool HasAll(Handle handle, Ts&&... vs) {
+			assert(Exists(handle));
+            auto arch = GetArchetypeAndIndex(handle).m_arch;
+            return (arch->Types().contains(Type<Ts>()) && ...);
+        }
+
 		/// @brief Get the types of the components of an entity.
 		/// @param handle The handle of the entity.
 		/// @return A vector of type indices of the components.
