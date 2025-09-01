@@ -7,7 +7,6 @@ extern "C" {
 #define NOMINMAX
 #endif
 #include <winsock2.h>
-#include <thread>
 #include <ws2tcpip.h>
 
 #pragma comment(lib, "Ws2_32.lib")
@@ -18,11 +17,16 @@ extern "C" {
 }
 
 #else
+#include <sys/socket.h>
+#include <sys/select.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 typedef int SOCKET;
 #define INVALID_SOCKET  (SOCKET)(~0)    // copied from winsock.h
 #define SOCKET_ERROR            (-1)
 #endif
 
+#include <thread>
 #include <nlohmann/json.hpp> 
 
 namespace vecs {
@@ -157,7 +161,7 @@ namespace vecs {
             //----------------------
             // Connect to server.
 
-            int returnval = connect(ConnectSocket, (SOCKADDR*)&clientService, sizeof(clientService));
+            int returnval = connect(ConnectSocket, (const struct sockaddr*)&clientService, sizeof(clientService));
             if (returnval == 0) {
                 running = true;
                 commThread = std::jthread(&VECSConsoleComm::handleConnection, this);
@@ -212,7 +216,7 @@ namespace vecs {
         }
 
         void startConnection(Registry* reg) {
-            initThread = std::jthread{ [=]() { handleInitConnection(reg); } };
+            initThread = std::jthread{ [=, this]() { handleInitConnection(reg); } };
         }
 
 
@@ -346,7 +350,7 @@ namespace vecs {
 
                 int selectrc;
                 timeval tmou{ .tv_usec = 200L * 1000L };  // that's 200 ms, i.e., 5 times per second
-                const timeval* ptmou = (tmou.tv_sec || tmou.tv_usec) ? &tmou : NULL;
+                timeval* ptmou = (tmou.tv_sec || tmou.tv_usec) ? &tmou : NULL;
                 fd_set fds;
                 do {
                     FD_ZERO(&fds);

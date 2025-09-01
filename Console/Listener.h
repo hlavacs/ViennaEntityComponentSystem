@@ -8,6 +8,10 @@
 #define NOMINMAX
 #include <winsock2.h>
 #else
+#include <sys/socket.h>
+#include <sys/select.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 typedef int SOCKET;
 #define INVALID_SOCKET  (SOCKET)(~0)    // copied from winsock.h
 #define SOCKET_ERROR            (-1)
@@ -27,10 +31,10 @@ public:
     Socket& operator=(SOCKET const other) { s = other; return *this; }
     Socket& operator=(Socket& other) { s = other.s; other.Detach(); return *this; }
 
-    static int GetError(); 
+    static int GetError();
     static int GetProtoNumber(std::string proto = "");  // get number for a protocol name
     static int GetServicePort(std::string service, std::string proto = "tcp");
-    static unsigned long GetHostAddress(std::string hostName = ""); 
+    static unsigned long GetHostAddress(std::string hostName = "");
 
     SOCKET Create(int sType = SOCK_STREAM, std::string proto = "");
     bool IsCreated();
@@ -85,10 +89,8 @@ public:
 
     int SendData(const char* data, int datalen) { return sockClient.SendData(data, datalen); }
     int SendData(const std::string s) { return sockClient.SendData(s); }
-
 private:
     virtual void ClientActivity() {}
-
 };
 
 // SocketListener : base class for a socked based (TCP or UDP) listener
@@ -136,6 +138,7 @@ public:
 
 public:
     bool Create(std::string service) { return SocketListener::Create(service, SOCK_STREAM); }
+
 };
 
 #if 0

@@ -1,5 +1,9 @@
 
 #ifdef WIN32
+//F'in Windows.h includes minwindef.h which overrides min, which collides with C++ std::min
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <winsock2.h>
 #else
 #include <sys/ioctl.h>
@@ -17,6 +21,13 @@ typedef struct hostent HOSTENT;
 #include <algorithm>
 
 #include <errno.h>
+
+#ifndef _countof
+// Linux doesn't have _countof()
+template <typename _CountofType, size_t _SizeOfArray>
+char (*__countof_helper(_CountofType(&_Array)[_SizeOfArray]))[_SizeOfArray];
+#define _countof(_Array) (sizeof(*__countof_helper(_Array)) + 0)
+#endif
 
 #include "ConsoleListener.h"
 
@@ -39,7 +50,7 @@ void ConsoleSocketThread::ClientActivity() {
     bool instr{ false };    // currently in string
     bool inesc{ false };   // currently in escape sequence
     char lchr{ 0 };         // last character
-    std::chrono::steady_clock::time_point tsStart;
+    std::chrono::high_resolution_clock::time_point tsStart;
 
     // wait for incoming data with a timeout of 500 ms
     while ((waitrc = s.Wait(500)) != SOCKET_ERROR) {
@@ -53,7 +64,7 @@ void ConsoleSocketThread::ClientActivity() {
             int nLen;
             while ((nLen = s.BytesBuffered()) > 0) {
                 char sbuf[4096];
-                int maxRd = min(sizeof(sbuf), nLen);
+                int maxRd = std::min((int)sizeof(sbuf), nLen);
                 int rlen = s.ReceiveData(sbuf, maxRd);
                 nLen -= rlen;
 
@@ -125,7 +136,7 @@ void ConsoleSocketThread::ClientActivity() {
                     json += sbuf[i];
                     if (complete) {
 #if 1   // Debug statistics - remove if not needed any more
-                        std::chrono::steady_clock::time_point tsProcessed = std::chrono::high_resolution_clock::now();
+                        auto tsProcessed = std::chrono::high_resolution_clock::now();
                         auto msecs = std::chrono::duration_cast<std::chrono::milliseconds>(tsProcessed - tsStart).count();
                         if (msecs > 10)
                             std::cout << "JSON receive time: " << msecs << " msecs\n";

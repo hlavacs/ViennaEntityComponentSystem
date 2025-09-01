@@ -70,8 +70,8 @@ namespace Console {
         void SetParsed() {
             tstampParsed = std::chrono::high_resolution_clock::now();
         }
-        std::chrono::steady_clock::time_point GetJsonTS() const { return tstampFetched; }
-        std::chrono::steady_clock::time_point GetParsedTS() const { return tstampParsed; }
+        std::chrono::high_resolution_clock::time_point GetJsonTS() const { return tstampFetched; }
+        std::chrono::high_resolution_clock::time_point GetParsedTS() const { return tstampParsed; }
 
         // archetype handling
         std::map<size_t, Archetype>& GetArchetypes() {

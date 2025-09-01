@@ -31,7 +31,7 @@ namespace Console {
 			return *this;
 		}
 		Archetype& CopyArchetype(Archetype const& org) {
-			clear();
+			Clear();
 			dataTypes = org.dataTypes;
 			tags = org.tags;
 			hash = org.hash;
@@ -41,7 +41,7 @@ namespace Console {
 		void SetRegistry(Registry* r = nullptr);
 		Registry* GetRegistry() { return registry; }
 
-		void clear() {
+		void Clear() {
 			entities.clear();
 			dataTypes.clear();
 			tags.clear();

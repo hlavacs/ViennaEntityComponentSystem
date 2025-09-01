@@ -12,6 +12,13 @@
 // Console Listener
 #include "ConsoleListener.h"
 
+#ifndef _countof
+// Linux doesn't have _countof()
+template <typename _CountofType, size_t _SizeOfArray>
+char (*__countof_helper(_CountofType(&_Array)[_SizeOfArray]))[_SizeOfArray];
+#define _countof(_Array) (sizeof(*__countof_helper(_Array)) + 0)
+#endif
+
 ConsoleListener listening;
 std::string service = "2000";
 
@@ -36,78 +43,78 @@ void TerminateListener() {
 static class SnapshotDisplayCache
 {
 private:
-    std::chrono::steady_clock::time_point tstamp;
+    std::chrono::high_resolution_clock::time_point tstamp;
     size_t tableLines{ 0 };
     std::string filterArchetype;
     std::string filterEntity;
     std::string filterCompType;
     std::string filterTag;
     using cacheTuple = std::tuple<Console::Archetype*, Console::Entity*, Console::Component*>;
-    std::vector<cacheTuple> compCache; 
-    std::vector<std::string> archetypeCache; 
-    std::vector<std::string> entityCache; 
-    std::vector<std::string> componentCache; 
-    std::vector<std::string> tagCache; 
+    std::vector<cacheTuple> compCache;
+    std::vector<std::string> archetypeCache;
+    std::vector<std::string> entityCache;
+    std::vector<std::string> componentCache;
+    std::vector<std::string> tagCache;
 
 public:
-    
-   bool CacheFilters(Console::Registry& snap) {
-       auto newStamp = snap.GetJsonTS();
-       if (tstamp != newStamp) {
-           tstamp = newStamp;
-           filterArchetype = "?"; //make sure to rebuild the cache
-           filterEntity = "-";
-           filterCompType = "-";
-           filterTag = "-";
-           compCache.clear();
-           archetypeCache.clear();
-           entityCache.clear();
-           componentCache.clear();
-           tagCache.clear();
-           tableLines = snap.GetComponentCount();
 
-           archetypeCache.push_back("-");
-           entityCache.push_back("-");
-           componentCache.push_back("-");
-           tagCache.push_back("-");
+    bool CacheFilters(Console::Registry& snap) {
+        auto newStamp = snap.GetJsonTS();
+        if (tstamp != newStamp) {
+            tstamp = newStamp;
+            filterArchetype = "?"; //make sure to rebuild the cache
+            filterEntity = "-";
+            filterCompType = "-";
+            filterTag = "-";
+            compCache.clear();
+            archetypeCache.clear();
+            entityCache.clear();
+            componentCache.clear();
+            tagCache.clear();
+            tableLines = snap.GetComponentCount();
 
-           std::set<std::string>tagNames;
-           for (auto& arch : snap.GetArchetypes()) {
-               archetypeCache.push_back(arch.second.ToString());
-               for (auto& tag : arch.second.GetTags())
-                   tagNames.insert(snap.GetTagName(tag));
-               for (auto& ent : arch.second.GetEntities())
-                   entityCache.push_back(ent.second.ToString());
-           }
+            archetypeCache.push_back("-");
+            entityCache.push_back("-");
+            componentCache.push_back("-");
+            tagCache.push_back("-");
 
-           for (auto& curtype : snap.GetTypes()) {
-               componentCache.push_back(curtype.second);
-           }
+            std::set<std::string>tagNames;
+            for (auto& arch : snap.GetArchetypes()) {
+                archetypeCache.push_back(arch.second.ToString());
+                for (auto& tag : arch.second.GetTags())
+                    tagNames.insert(snap.GetTagName(tag));
+                for (auto& ent : arch.second.GetEntities())
+                    entityCache.push_back(ent.second.ToString());
+            }
 
-           for (auto& curTag : tagNames) {
-               tagCache.push_back(curTag);
-           }
+            for (auto& curtype : snap.GetTypes()) {
+                componentCache.push_back(curtype.second);
+            }
 
-           struct { bool operator()(std::string& a, std::string& b) {
-               size_t sa, sb;
-               sscanf(a.c_str(), "%zu", &sa);
-               sscanf(b.c_str(), "%zu", &sb);
-               return sa < sb;
-            } 
-           }size_tComp ;
+            for (auto& curTag : tagNames) {
+                tagCache.push_back(curTag);
+            }
 
-           std::sort(archetypeCache.begin() + 1, archetypeCache.end(), size_tComp);
+            struct {
+                bool operator()(std::string& a, std::string& b) {
+                    size_t sa, sb;
+                    sscanf(a.c_str(), "%zu", &sa);
+                    sscanf(b.c_str(), "%zu", &sb);
+                    return sa < sb;
+                }
+            } size_tComp;
 
-           std::sort(entityCache.begin() + 1, entityCache.end(),size_tComp);
+            std::sort(archetypeCache.begin() + 1, archetypeCache.end(), size_tComp);
 
-           std::sort(componentCache.begin() + 1, componentCache.end());
+            std::sort(entityCache.begin() + 1, entityCache.end(), size_tComp);
 
-           std::sort(tagCache.begin() + 1, tagCache.end(),size_tComp);
+            std::sort(componentCache.begin() + 1, componentCache.end());
 
-           return true; 
-       }
-       return false;
-   }
+            std::sort(tagCache.begin() + 1, tagCache.end(), size_tComp);
+            return true;
+        }
+        return false;
+    }
 
     //return number of lines that are displayed based on current filter criteria
     size_t TableLines(Console::Registry& snap, std::string sel_archetype, std::string sel_entity, std::string sel_comptype, std::string sel_tag) {
@@ -165,7 +172,7 @@ public:
                         if (selectedTag && tagName != filterTag)
                             abortTag = true;
                     }
-                    
+
                     if (!archetype.second.GetEntities().size()) {
                         tableLines++;
                         compCache.push_back(cacheTuple(&archetype.second, nullptr, nullptr));
@@ -213,7 +220,7 @@ public:
                                 if (selectedComptype && actCompType != filterCompType) {
                                     continue;
                                 }
-                                compCache.push_back(cacheTuple(&archetype.second, &entity,&component));
+                                compCache.push_back(cacheTuple(&archetype.second, &entity, &component));
                                 tableLines++;
                             }
                         }
@@ -245,9 +252,12 @@ public:
 
 } snapshotDisplayCache;
 
+
+
 void static ShowViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
 {
     float scale = GetContentScale();
+
     /* Initial window layout:  1135x700 at offset 150,20 - potentially scaled to main screen scale
                                             x (init 1135, min. 900)
     +-------------------------------------------------------------------------------------------------+
@@ -356,19 +366,19 @@ void static ShowViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
             if (ImGui::BeginCombo("E", currentEntity.c_str())) {
 
                 ImGuiListClipper clipper;
-                auto& cache = snapshotDisplayCache.GetEntityCache(); 
+                auto& cache = snapshotDisplayCache.GetEntityCache();
                 auto entityLines = cache.size();
                 clipper.Begin(entityLines);
                 while (clipper.Step()) {
                     for (int row = clipper.DisplayStart; row < clipper.DisplayEnd && row < entityLines; row++) {
 
-                            bool selected = (currentEntity == cache[row]);
-                            if (ImGui::Selectable(cache[row].c_str(), selected))
-                                currentEntity = cache[row];
+                        bool selected = (currentEntity == cache[row]);
+                        if (ImGui::Selectable(cache[row].c_str(), selected))
+                            currentEntity = cache[row];
 
-                            if (selected)
-                                ImGui::SetItemDefaultFocus();
-                        
+                        if (selected)
+                            ImGui::SetItemDefaultFocus();
+
                     }
                 }
 
@@ -432,7 +442,6 @@ void static ShowViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
             ImGui::EndChild();
             ImGui::SameLine();
             ImGui::BeginChild("Snapshot", childSnapshotTableSz);
-
 
             size_t tableLines = snapshotDisplayCache.TableLines(snap, currentArchetype, currentEntity, currentCompType, currentTag);
 
@@ -553,7 +562,6 @@ void static ShowViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
                     ", Components: " + std::to_string(snap.GetComponentCount()) +
                     ", Parse time: " + std::to_string(mics) + " msecs";
                 ImGui::TextUnformatted(initText.c_str());
-
                 initText = std::string("Table lines: ") + std::to_string(tableLines);
                 ImGui::TextUnformatted(initText.c_str());
             }

@@ -21,6 +21,13 @@ typedef struct hostent HOSTENT;
 
 #include "Listener.h"
 
+#ifndef TRUE
+#define TRUE (1==1)
+#endif
+#ifndef FALSE
+#define FALSE (1==0)
+#endif
+
 //all incoming socket events are handled through select()
 #define USING_SELECT
 
@@ -85,7 +92,7 @@ int Socket::GetError() {
 }
 
 int Socket::GetProtoNumber(std::string proto) {
-    PROTOENT FAR* lpPE;
+    PROTOENT* lpPE;
 
     if (!sockStart() || proto.empty())
         return 0;
@@ -352,8 +359,8 @@ int Socket::ReceiveData(char* lpData, int cbData, bool UntilFull)
             else
                 iBRecv = 0;
         }
-        else if (!iBRecv) {            
-            break; 
+        else if (!iBRecv) {
+            break;
         }
 
         iBTotal += iBRecv;
@@ -380,7 +387,7 @@ int Socket::Ioctl(long cmd, unsigned long* argp) {
 
 // accept : accepts a client connection and returns the resulting basic socket
 SOCKET Socket::Accept(sockaddr* addr, int* addrlen) {
-    SOCKET sClient = ::accept(s, addr, addrlen);
+    SOCKET sClient = ::accept(s, addr, (socklen_t*)addrlen);
     return sClient;
 }
 
@@ -388,11 +395,11 @@ SOCKET Socket::Accept(sockaddr* addr, int* addrlen) {
 int Socket::Wait(int timeout) {
     if (s == INVALID_SOCKET)
         return SOCKET_ERROR;
-    
+
     fd_set fds;
     FD_ZERO(&fds);
     FD_SET(s, &fds);
-   
+
     timeval to{ .tv_usec = timeout * 1000L };
     return select(static_cast<int>(s + 1), &fds, NULL, NULL, (to.tv_sec || to.tv_usec) ? &to : NULL);
 }
@@ -492,7 +499,7 @@ void SocketListener::Terminate() {
 void SocketListener::ThdFuncListener() {
 
     if (sockListener == INVALID_SOCKET)
-        return; 
+        return;
 
     int dgrambufLen{ 0 };
 
@@ -527,7 +534,8 @@ void SocketListener::ThdFuncListener() {
 
         if (typeListener == SOCK_STREAM) {
             sockaddr_in saiClient{ 0 };
-#ifdef _WINSOCKAPI_
+            //#ifdef _WINSOCKAPI_
+#if 1
             int lsaiClient = sizeof(saiClient);
 #else
             size_t lsaiClient = sizeof(saiClient);
@@ -585,7 +593,7 @@ void SocketListener::ThdFuncListener() {
     int timeouts{ 0 };
     while (streamClient.size()) {
         RemoveEndedClients();
-        if (++timeouts > 100)  
+        if (++timeouts > 100)
             break;
         Sleep(10);
     }
