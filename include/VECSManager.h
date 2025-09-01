@@ -127,14 +127,18 @@ namespace vecs {
         requires (vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<std::decay_t<Ts>...>, Handle>::value)
         void Put(Handle handle, std::tuple<Ts...>& v) {
 
-
-            m_threadpool->enqueue( [&] {
-                std::scoped_lock lock(m_system->GetArchetypeMutex(handle));
-                //TODO: add lock for potential new archetype
-                // if archetype with types of handle + v exists, lock it,
-                // else lock slotmap
-                m_system->Put(handle, v);
-            });
+            if (m_system->HasAll(handle, std::forward<Ts>(std::get<Ts>(v))...)){
+                m_threadpool->enqueue( [&] {
+                    std::scoped_lock lock(m_system->GetArchetypeMutex(handle));
+                    m_system->Put(handle, v);
+                });
+            } else {
+                m_threadpool->enqueue( [&] {
+                    std::scoped_lock lock(m_system->GetMutex());
+                    m_system->Put(handle, v);
+                });
+                waitIdle();
+            }
         }
 
         /// @brief Put new component values to an entity.
@@ -145,11 +149,19 @@ namespace vecs {
         template<typename... Ts>
             requires ((vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<std::decay_t<Ts>...>, Handle>::value)
         void Put(Handle handle, Ts&&... vs) {
-            m_threadpool->enqueue( [&] {
-                std::scoped_lock lock(m_system->GetArchetypeMutex(handle));
-                //TODO: same as above
-                m_system->Put(handle, std::forward<Ts>(vs)...);
-            });
+
+            if (m_system->HasAll(handle, std::forward<Ts>(vs)...)) {
+                m_threadpool->enqueue( [&] {
+                    std::scoped_lock lock(m_system->GetArchetypeMutex(handle));
+                    m_system->Put(handle, std::forward<Ts>(vs)...);
+                });
+            } else {
+                m_threadpool->enqueue( [&] {
+                    std::scoped_lock lock(m_system->GetMutex());
+                    m_system->Put(handle, std::forward<Ts>(vs)...);
+                });
+                waitIdle();
+            }
         }
 
 
