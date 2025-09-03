@@ -1,4 +1,3 @@
-
 cmake_minimum_required (VERSION 3.5.0)
 project (  
   "ViennaEntityComponentSystem"
@@ -46,6 +45,8 @@ FetchContent_MakeAvailable(viennatypelistlibrary)
 
 include_directories (${viennatypelistlibrary_SOURCE_DIR}/include)
 
+add_library(ViennaEntityComponentSystem INTERFACE)
+target_include_directories(ViennaEntityComponentSystem INTERFACE ${PROJECT_SOURCE_DIR}/include)
 
 # Testing
 
