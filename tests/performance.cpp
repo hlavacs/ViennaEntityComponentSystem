@@ -16,28 +16,31 @@ void create_containers(size_t size, std::vector<vecs::Vector<T>> & containers) {
 	for( size_t i = 0; i<=1.1*size; ++i ) {
 		size_t j = 0;
 		for( auto & container : containers ) {
-			container.push_back(T{.value = i + (j++)});
+			size_t r = (size * rand()) / RAND_MAX;
+			container.push_back(T{.value = r});
 		}
 	}
 }
 
 template<typename T>
-void p1(size_t components, size_t size, std::vector<vecs::Vector<T>> & containers, bool seq = true) {
-	for( size_t j = 0; j < components; j++) {
-		for( size_t i = 0; i < size; i++) {
-			volatile size_t r = size * rand() / RAND_MAX;
-			volatile size_t k = seq ? i : r;
-						
-			containers[j][k].value++;
+auto p1(size_t components, size_t size, std::vector<vecs::Vector<T>> & containers, bool seq = true) {
+	volatile size_t sum = 0;
+	for( size_t i = 0; i < size; i++) {
+		volatile size_t index = i;
+		for( size_t j = 0; j < components; j++) {			
+			volatile size_t value = containers[j][index].value;
+			sum += value;
+			index = seq ? i : value;
 		}
 	}
+	return sum;
 }
 
-void p2(size_t size) {
+auto p2(size_t size) {
 
 }
 
-void p3(size_t size) {
+auto p3(size_t size) {
 
 }
 
@@ -45,28 +48,40 @@ void p3(size_t size) {
 template<typename data>
 void run() {
 	size_t max_size = 100000;
+	size_t repetitions = 200;
 
 	std::vector<vecs::Vector<data>> containers {
-		vecs::Vector<data>(), vecs::Vector<data>(), vecs::Vector<data>(), vecs::Vector<data>(), vecs::Vector<data>(),
-		vecs::Vector<data>(), vecs::Vector<data>(), vecs::Vector<data>(), vecs::Vector<data>(), vecs::Vector<data>()
+		vecs::Vector<data>(10), vecs::Vector<data>(10), vecs::Vector<data>(10), vecs::Vector<data>(10), vecs::Vector<data>(10),
+		vecs::Vector<data>(10), vecs::Vector<data>(10), vecs::Vector<data>(10), vecs::Vector<data>(10), vecs::Vector<data>(10)
 	};
 
 	create_containers(max_size, containers);
 
+	std::cout << "subgroup,dataset,x,y" << std::endl;
 	size_t factor = 5;
-
-	std::cout << "SEQ COMPONENTS SIZE NS\n";
+	volatile size_t sum = 0;
 	for( size_t size = 100; size <= max_size;  ) {
-		for( size_t components = 1; components<=10; components++) {
+		size_t components = 1;
+		size_t cdelta = 5;
+		
+		for( ; components<=10; ) {
 
-			auto t1 = std::chrono::high_resolution_clock::now();
-			p1(components, size, containers, true);
-			auto t2 = std::chrono::high_resolution_clock::now();
-			p1(components, size, containers, false);
-			auto t3 = std::chrono::high_resolution_clock::now();
-			std::cout << "Sequential " << components << " " << size << " " << std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count() << "\n";
-			std::cout << "Random " << components << " " << size << " " << std::chrono::duration_cast<std::chrono::nanoseconds>(t3 - t2).count() << "\n";
+			for( size_t rep = 1; rep <= repetitions; ++rep) {
 
+				auto t1 = std::chrono::high_resolution_clock::now();
+				sum += p1(components, size, containers, true);
+				auto t2 = std::chrono::high_resolution_clock::now();
+				sum += p1(components, size, containers, false);
+				auto t3 = std::chrono::high_resolution_clock::now();
+
+				if( rep>=10 ) {
+					std::cout << "Seq," << components << "C," << size << "," << std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count() << std::endl;
+					std::cout << "Rnd," << components << "C," << size << "," << std::chrono::duration_cast<std::chrono::nanoseconds>(t3 - t2).count() << std::endl;
+				}
+			}
+
+			components*=cdelta;
+			cdelta = 2;
 		}
 		size *= factor;
 		factor = factor == 5 ? 2 : 5;
