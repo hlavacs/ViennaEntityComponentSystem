@@ -25,8 +25,8 @@ void create_containers(size_t size, std::vector<vecs::Vector<T>> & containers) {
 template<typename T>
 auto p1(size_t components, size_t size, std::vector<vecs::Vector<T>> & containers, bool seq = true) {
 	volatile size_t sum = 0;
+	volatile size_t index = 0;
 	for( size_t i = 0; i < size; i++) {
-		volatile size_t index = i;
 		for( size_t j = 0; j < components; j++) {			
 			volatile size_t value = containers[j][index].value;
 			sum += value;
@@ -89,11 +89,20 @@ void run() {
 }
 
 int main(int argc, char** argv) {
-	struct data {
+	struct data8 {
 		size_t value;
 	};
+	struct data32 {
+		size_t value;
+		size_t pad[3];
+	};
+	struct data64 {
+		size_t value;
+		size_t pad[7];
+	};
 
-	run<data>();
+	run<data8>();
+	//run<data32>();
 	return 0;
 }
 
