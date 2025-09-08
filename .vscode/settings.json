@@ -89,6 +89,7 @@
 		"stack": "cpp",
 		"unordered_set": "cpp",
 		"random": "cpp",
-		"print": "cpp"
+		"print": "cpp",
+		"xstddef": "cpp"
 	}
 }

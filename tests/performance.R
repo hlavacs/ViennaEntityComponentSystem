@@ -23,7 +23,7 @@ summary_data <- all_data %>%
 
 # Method 1: All datasets and subgroups on one plot
 p1 <- ggplot(summary_data, aes(x = x, color = dataset, linetype = subgroup)) +
-  geom_ribbon(aes(ymin = ci_lower, ymax = ci_upper, fill = dataset), alpha = 0.2) +
+  #geom_ribbon(aes(ymin = ci_lower, ymax = ci_upper, fill = dataset), alpha = 0.2) +
   geom_line(aes(y = mean_y), size = 0.8) +
   geom_point(aes(y = mean_y), size = 1.5) +
   labs(title = "Runtime depending on #Components with Seq/Rnd Subgroups",
@@ -34,9 +34,11 @@ p1 <- ggplot(summary_data, aes(x = x, color = dataset, linetype = subgroup)) +
   theme(legend.position = "right") + 
   scale_x_log10() +
   scale_y_log10() +
-  labs(x = "Number of Entities", y = "Time (ns)")
+  labs(x = "Number of Entities", y = "Time (us)")
 
 
 # Display plots
 print(p1)
+ggsave("my_plot.png", plot = p1, bg = "white", width = 10, height = 6, dpi = 300)
+
 

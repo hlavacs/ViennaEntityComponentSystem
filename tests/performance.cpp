@@ -1,12 +1,16 @@
 #include <iostream>
 #include <utility>
-#include <ranges>
 #include <utility>
 #include <random>
 #include <iostream>
 #include <string>
 #include <random>
 #include <chrono>
+#include <algorithm>
+#include <ranges>
+#include <functional>
+#include <numeric>
+#include <vector>
 
 #include "VECS.h"
 
@@ -14,13 +18,23 @@ template<typename T>
 void refill_containers(size_t size, std::vector<vecs::Vector<T>> & containers) {
     std::random_device rd;  // Hardware-based random seed
 	std::mt19937 gen(rd()); // Mersenne Twister generator   
-    std::uniform_int_distribution<size_t> int_dist(0ul, (size_t)100*size);
 
-	size_t i = 0;
+	/*size_t i = 0;
 	for( size_t i = 0; i<size; ++i ) {
 		size_t j = 0;
 		for( auto & container : containers ) {
 			container.push_back(T{.value = (size_t)int_dist(gen)%size});
+		}
+	}*/
+
+
+	for( auto & container : containers ) {
+		container.clear();
+		std::vector<size_t> indices(size);
+    	std::iota(indices.begin(), indices.end(), 0);
+		std::ranges::shuffle(indices, gen);
+		for( size_t i=0; i<size; ++i) {
+			container.push_back(T{.value = indices[i]});
 		}
 	}
 }
@@ -42,7 +56,7 @@ auto p1(size_t components, size_t size, std::vector<vecs::Vector<T>> & container
 template<typename data>
 void run() {
 	size_t max_size = 102400;
-	size_t repetitions = 200;
+	size_t repetitions = 100;
 
 	constexpr size_t BITS = 10ul;
 	std::vector<vecs::Vector<data>> containers {
@@ -60,11 +74,10 @@ void run() {
 	
 		for( size_t rep = 1; rep <= repetitions; ++rep) {
 			
-			refill_containers(size, containers);
-		
 			size_t cdelta = 3;
 
 			for( size_t components = 1; components<=10; ) {
+				refill_containers(size, containers);
 
 				auto t1 = std::chrono::high_resolution_clock::now();
 				sum += p1(components, size, containers, true);
@@ -73,8 +86,8 @@ void run() {
 				auto t3 = std::chrono::high_resolution_clock::now();
 
 				if( rep>=20 ) {
-					std::cout << "Seq," << std::setw(2) << components << "C," << size << "," << std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count() << std::endl;
-					std::cout << "Rnd," << std::setw(2) << components << "C," << size << "," << std::chrono::duration_cast<std::chrono::nanoseconds>(t3 - t2).count() << std::endl;
+					std::cout << "Seq," << std::setw(2) << components << "C," << size << "," << std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count()/1000.0 << std::endl;
+					std::cout << "Rnd," << std::setw(2) << components << "C," << size << "," << std::chrono::duration_cast<std::chrono::nanoseconds>(t3 - t2).count()/1000.0 << std::endl;
 				}
 
 				components+=cdelta;
@@ -102,4 +115,3 @@ int main(int argc, char** argv) {
 	//run<data32>();
 	return 0;
 }
-
