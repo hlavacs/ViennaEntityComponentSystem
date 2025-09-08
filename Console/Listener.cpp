@@ -33,7 +33,9 @@ typedef struct hostent HOSTENT;
 
 
 static bool sockStarted = false;
-static bool sockStart(void) {
+/// @brief Socket functionality startup. Only for Windows.
+/// @return Returns whether WinSock functionality could be started, or simply true if not compiled for Windows.
+static bool SockStart(void) {
 #ifdef _WINSOCKAPI_ 
 
     WSADATA wsaData;
@@ -53,8 +55,8 @@ static bool sockStart(void) {
 #endif
 }
 
-// sockEnd : terminates WinSock
-static void sockEnd(void) {
+/// @brief Socket functionality termination. Only for Windows.
+static void SockEnd(void) {
 #ifdef _WINSOCKAPI_ 
     if (!sockStarted)
         return;
@@ -64,7 +66,9 @@ static void sockEnd(void) {
 #endif
 }
 
-inline int getSocketError(void)
+/// @brief Return error of last socket operation.
+/// @return Last error code.
+static inline int GetSocketError(void)
 {
 #ifdef _WINSOCKAPI_
     return WSAGetLastError();
@@ -73,8 +77,11 @@ inline int getSocketError(void)
 #endif
 }
 
-// setSockAddr : setup a sockaddr_in structure from the passed server/port
-void setSockAddr(struct sockaddr_in* pSA, std::string server, std::string service = "") {
+/// @brief Set up a sockaddr_in structure from the passed server/port.
+/// @param pSA sockaddr_in structure to be filled.
+/// @param server Server name (either DNS or numeric "xxx.xxx.xxx.xxx"). "" implies INADDR_ANY, used to bind to all interfaces.
+/// @param service Service name. "#nnn" is accepted, too, and just converts nnn to a port number.
+static void SetSockAddr(struct sockaddr_in* pSA, std::string server, std::string service = "") {
     pSA->sin_family = AF_INET;
 #ifdef _AIX
     pSA->sin_len = sizeof(saiS);
@@ -88,13 +95,13 @@ void setSockAddr(struct sockaddr_in* pSA, std::string server, std::string servic
 // Socket class members
 
 int Socket::GetError() {
-    return getSocketError();
+    return GetSocketError();
 }
 
 int Socket::GetProtoNumber(std::string proto) {
     PROTOENT* lpPE;
 
-    if (!sockStart() || proto.empty())
+    if (!SockStart() || proto.empty())
         return 0;
 
     lpPE = getprotobyname(proto.c_str());
@@ -111,7 +118,7 @@ int Socket::GetProtoNumber(std::string proto) {
 
 
 SOCKET Socket::Create(int sType, std::string proto) {
-    if (!sockStart() || s != INVALID_SOCKET)
+    if (!SockStart() || s != INVALID_SOCKET)
         return INVALID_SOCKET;
     s = socket(AF_INET, sType, GetProtoNumber(proto));
     return s;
@@ -119,7 +126,7 @@ SOCKET Socket::Create(int sType, std::string proto) {
 
 // servicePort : determine port number to use instead of a passed in service name
 int Socket::GetServicePort(std::string service, std::string proto) {
-    if (service.empty() || (!sockStart()))
+    if (service.empty() || (!SockStart()))
         return 0;
     if (service[0] == '#')  // accept number with leading # to allow clear numeric indication
         return htons(stoi(service.substr(1)));
@@ -154,7 +161,7 @@ unsigned long Socket::GetHostAddress(std::string hostName)
         hostName = szLocal;
     }
 
-    if (!sockStart())
+    if (!SockStart())
         return INADDR_NONE;
 #if 1
     HOSTENT* lpH = gethostbyname(hostName.c_str());
@@ -198,14 +205,13 @@ bool Socket::IsSocket() {
     return !getsockname(s, (struct sockaddr*)&sain, &len);
 }
 
-// bind : binds socket to a server/port
 int Socket::Bind(std::string server, std::string service, int bReuse) {
     struct sockaddr_in saiS;
 
-    if (!sockStart() || s == INVALID_SOCKET)
+    if (!SockStart() || s == INVALID_SOCKET)
         return SOCKET_ERROR;
 
-    setSockAddr(&saiS, server, service);
+    SetSockAddr(&saiS, server, service);
 
     int rc = ::bind(s, (const struct sockaddr*)&saiS, sizeof(saiS));
     if (!rc) {
@@ -222,18 +228,18 @@ int Socket::Connect(std::string server, std::string service) {
     struct sockaddr_in saiS;
     int rc;
 
-    if (!sockStart() || s == INVALID_SOCKET)
+    if (!SockStart() || s == INVALID_SOCKET)
         return SOCKET_ERROR;
 
-    setSockAddr(&saiS, server, service);
+    SetSockAddr(&saiS, server, service);
     rc = ::connect(s, (const struct sockaddr*)&saiS, sizeof(saiS));
     if (rc != 0)
-        rc = getSocketError();
+        rc = GetSocketError();
     return rc;
 }
 
 int Socket::Disconnect() {
-    if (!sockStart() || s == INVALID_SOCKET)
+    if (!SockStart() || s == INVALID_SOCKET)
         return SOCKET_ERROR;
 
     unsigned long ulNBIO{ 0 };
@@ -249,7 +255,7 @@ int Socket::Disconnect() {
 int Socket::Destroy() {
     int rc;
 
-    if (!sockStart() || s == INVALID_SOCKET)
+    if (!SockStart() || s == INVALID_SOCKET)
         return SOCKET_ERROR;
 
     Disconnect();
@@ -266,7 +272,7 @@ int Socket::Destroy() {
 }
 
 int Socket::GetPort() {
-    if (!sockStart() || s == INVALID_SOCKET)
+    if (!SockStart() || s == INVALID_SOCKET)
         return SOCKET_ERROR;
 
     sockaddr_in sain{ 0 };
@@ -293,17 +299,14 @@ int Socket::GetOpt(int level, int optname, char* optval, size_t* optlen) {
     return rc;
 }
 
-// setOpt : sets a socket option
 int Socket::SetOpt(int level, int optname, const char* optval, int optlen) {
     return ::setsockopt(s, level, optname, optval, optlen);
 }
 
-// setSendTimeout : sets the send timeout on a socket in msecs
 int Socket::SetSendTimeout(int msecs) {
     return SetOpt(IPPROTO_TCP, SO_SNDTIMEO, (char*)&msecs, sizeof(msecs));
 }
 
-// setReceiveTimeout : sets the receive timeout on a socket in msecs
 int Socket::SetReceiveTimeout(int msecs) {
     return SetOpt(IPPROTO_TCP, SO_RCVTIMEO, (char*)&msecs, sizeof(msecs));
 }
@@ -341,7 +344,6 @@ int Socket::SendData(const char* data, int datalen) {
     return 0;
 }
 
-// receiveData: receives data from other side of the connection
 int Socket::ReceiveData(char* lpData, int cbData, bool UntilFull)
 {
     int iBRecv;
@@ -371,12 +373,10 @@ int Socket::ReceiveData(char* lpData, int cbData, bool UntilFull)
     return iBTotal;
 }
 
-// listen : make socket a listener
 int Socket::Listen(int backlog) {
     return ::listen(s, backlog);
 }
 
-// ioctl : perform an ioctl operation on the socket
 int Socket::Ioctl(long cmd, unsigned long* argp) {
 #ifdef _WINSOCKAPI_
     return ioctlsocket(s, cmd, argp);
@@ -385,13 +385,11 @@ int Socket::Ioctl(long cmd, unsigned long* argp) {
 #endif
 }
 
-// accept : accepts a client connection and returns the resulting basic socket
 SOCKET Socket::Accept(sockaddr* addr, int* addrlen) {
     SOCKET sClient = ::accept(s, addr, (socklen_t*)addrlen);
     return sClient;
 }
 
-// wait : waits for something to come in on socket
 int Socket::Wait(int timeout) {
     if (s == INVALID_SOCKET)
         return SOCKET_ERROR;
@@ -404,15 +402,13 @@ int Socket::Wait(int timeout) {
     return select(static_cast<int>(s + 1), &fds, NULL, NULL, (to.tv_sec || to.tv_usec) ? &to : NULL);
 }
 
-// bytesBuffered : return number of buffered bytes available for reading
 int Socket::BytesBuffered() {
     unsigned long nLen{ 0 };
     if (Ioctl(FIONREAD, &nLen) == SOCKET_ERROR)
         return -1;
-    return static_cast<int>(nLen);  // could potentially overflow, but the probability is negligible
+    return static_cast<int>(nLen);  // could overflow in theory, but the probability is negligible
 }
 
-// dataThere : returns whether data can be received from the socket
 bool Socket::DataThere() {
     char dummy;
     return recv(s, &dummy, 1, MSG_PEEK) > 0;

@@ -72,7 +72,9 @@ namespace vecs {
 	}
 
 
-	/// @brief convert a string into a transmittable JSON string
+	/// @brief convert a C++ string into a transmittable JSON string
+	/// @param s String to be converted
+	/// @return String converted into JSON format
 	inline std::string ToJSONString(std::string s) {
 		std::string d("\"");
 		// mini-massager to get a string into JSON format
@@ -115,7 +117,10 @@ namespace vecs {
 		{ os << a } -> std::same_as<std::ostream&>;
 	};
 
-	/// @brief convert a value into a transmittable JSON string
+	/// @brief Convert a value into a transmittable JSON string.
+	/// @tparam T Type of the value to be converted.
+	/// @param value Value to be converted.
+	/// @return String with best possible JSON representation of the value, or "<unknown>" if conversion impossible.
 	template<typename T>
 	std::string ToJSON(const T& value) {
 		// to my knowledge, there's no better way to get the template types and hence the data
@@ -161,11 +166,16 @@ using Size_t = std::size_t;
 using Size_t = std::atomic<std::size_t>;
 #endif
 
+// Console communication functionality
 namespace vecs {
 	class Registry;
 	class VECSConsoleComm;
-	VECSConsoleComm* GetConsoleComm(Registry* reg = nullptr);
+	/// @brief Retrieve Console Communication object for a Registry.
+	/// @param reg Registry to connect to Console.
+	/// @return Console communication object.
+	VECSConsoleComm* GetConsoleComm(Registry* reg = nullptr, std::string host = "127.0.0.1", int port = 2000);
 }
+
 #include <VTLL.h>
 #include <VSTY.h>
 #include "VECSHandle.h"

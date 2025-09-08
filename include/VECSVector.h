@@ -33,10 +33,22 @@ namespace vecs {
 		virtual void clear() = 0;
 		virtual void print() = 0;
 
+		//Methods for Console communication
+	public:
+		/// @brief Generates JSON representation of the Vector.
+		/// @return JSON string.
 		virtual auto ToJSON() -> std::string = 0;
-		virtual auto toJSON(size_t index) -> std::string = 0;
+		/// @brief Generates JSON representation of an element in the Vector.
+		/// @param index element index.
+		/// @return JSON string.
+		virtual auto ToJSON(size_t index) -> std::string = 0;
+		/// @brief get the Type hash for the Vector's elements.
+		/// @return Type hash.
 		virtual size_t GetType() = 0;
+		/// @brief get the base size of an element in the Vector.
+		/// @return element size.
 		virtual size_t ElemSize() = 0;
+
 	}; //end of VectorBase
 
 
@@ -171,16 +183,26 @@ namespace vecs {
 		Vector_t m_segments{ 10 };	///< Vector holding unique pointers to the segments.
 
 
-	//Methods for Console communication
+		//Methods for Console communication
 	public:
-		auto toJSON(size_t index) -> std::string override { return ::vecs::ToJSON(operator[](index)); }
+		/// @brief Generates JSON representation of an element in the Vector.
+		/// @param index element index.
+		/// @return JSON string.
+		auto ToJSON(size_t index) -> std::string override { return ::vecs::ToJSON(operator[](index)); }
 
+		/// @brief Generates JSON representation of the Vector.
+		/// @return JSON string.
 		auto ToJSON() -> std::string override {
 			std::string json = std::string("{\"name\":\"") + typeid(T).name() + "\",\"id\":" + std::to_string(Type<T>());
 			json += "}";
 			return json;
 		}
+
+		/// @brief get the Type hash for the Vector's elements.
+		/// @return Type hash.
 		virtual size_t GetType() { return Type<T>(); }
+		/// @brief get the base size of an element in the Vector.
+		/// @return base element size; if the element allocates further data, this is not accounted for.
 		size_t ElemSize() override { return sizeof(T); }
 
 	}; //end of Vector

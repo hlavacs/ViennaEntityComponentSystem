@@ -39,6 +39,10 @@ namespace vecs {
 
 	//Method for Console communication
 	public:
+		/// @brief Generates JSON representation of the Handle.
+		/// @return Incomplete JSON string.
+		///         This is generally used in conjunction with other functions
+		///         that return an entity's component values.
 		std::string ToJSON() {
 			std::string json = "{\"index\":" + std::to_string(GetIndex()) + ",\"version\":" + std::to_string(GetVersion()) +
 				",\"stgindex\":" + std::to_string(GetStorageIndex()) + ",\"value\":" + std::to_string(GetValue()) + ",\"values\":";

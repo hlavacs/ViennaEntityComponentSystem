@@ -66,3 +66,5 @@ vc140.pdb
 #[Dd]ebug/
 #[Rr]elease/
 #**/*.ini
+
+CopySDL3.bat

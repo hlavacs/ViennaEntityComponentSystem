@@ -59,13 +59,16 @@ int _getche() {
 }
 #endif
 
-
-void TestConn() {
+void TestConn(std::string consoleHost = "127.0.0.1", int consolePort = 2000) {
 	std::cout << "\x1b[37m testing Connection!...\n";
 
 	// 
 	// create a populated registry
 	vecs::Registry system;
+
+	// this test module needs a direct connection to the console communication
+	auto comm = vecs::GetConsoleComm(&system, consoleHost, consolePort);
+
 	vecs::Handle h1 = system.Insert(5, 3.0f, 4.0);
 	vecs::Handle h2 = system.Insert(1, 23.0f, 3.0);
 
@@ -112,12 +115,6 @@ void TestConn() {
 	// erase one of them, leaving 19
 	system.Erase(handles[4]);
 	handles.erase(handles.begin() + 4);
-
-#ifdef _DEBUG
-	auto comm = vecs::GetConsoleComm();
-#else
-	auto comm = vecs::GetConsoleComm(&system);
-#endif
 
 	std::cout << "\x1b[37m isConnected: " << comm->IsConnected() << "\n";
 	bool abortWait{ false }, toldya{ false };
@@ -212,9 +209,37 @@ void TestConn() {
 	std::cout << "\x1b[37m I hope it works? ...\n";
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+	std::string host = "127.0.0.1";
+	std::string port = "2000";
+	for (int i = 1; i < argc; i++) {
+		if (argv[i][0] == '-')
+			for (int j = 1; argv[i][j]; j++)
+				switch (argv[i][j]) {
+				case 'H':
+				case 'h':
+					host = argv[i] + j + 1;
+					{
+						auto colPos = host.find(':');
+						if (colPos != std::string::npos) {
+							port = host.substr(colPos + 1);
+							host = host.substr(0, colPos);
+						}
+						j = (int)strlen(argv[i]) - 1;
+					}
+					break;
+				case 'P':
+				case 'p':
+					port = argv[i] + j + 1;
+					j = (int)strlen(argv[i]) - 1;
+					break;
+				default:
+					// simply ignore unknown command line parameters
+					break;
+				}
+	}
 	std::cout << "testing VECS Console communication...\n";
-	TestConn();
+	TestConn(host, std::stoi(port));
 	return 0;
 }
 

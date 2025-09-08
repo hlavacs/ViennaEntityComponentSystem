@@ -31,15 +31,19 @@ typedef int SOCKET;
 
 namespace vecs {
 
+    /// @brief TCP/IP Communication class to exchange data with the Console.
     class VECSConsoleComm {
 
     private:
         std::jthread commThread;
         std::jthread initThread;
         std::mutex socketMutex;
-        bool running = false;
+        bool volatile running = false;
+        std::string connectingToHost;
+        int connectingToPort{ 0 };
 
         // LiveView : encapsulation for all LiveView-related data
+        /// @brief Internal class to handle all LiveView related communication.
         class LiveView {
 
         private:
@@ -54,10 +58,21 @@ namespace vecs {
             LiveView() {}
             ~LiveView() {}
 
-            void setRegistry(Registry* reg = nullptr) { registry = reg; }
+            /// @brief connects to a VECS registry.
+            /// @param reg Address of the Registry.
+            void SetRegistry(Registry* reg = nullptr) { registry = reg; }
 
+            /// @brief sets LiveView communication active.
+            /// @param onoff Flag whether to perform LiveView data transfer.
+            /// @return previous state of the setting.
             bool SetActive(bool onoff = true) { bool old = active; active = onoff; return old; }
+
+            /// @brief returns whether LiveView communication is active.
             bool IsActive() const { return active; }
+
+            /// @brief set entities to watch for changes.
+            /// @param newSet - new set of VECS Handles to watch.
+            /// @return Currently always true.
             bool Watch(std::set<Handle>& newSet) {
                 std::set<Handle> toRemove;
                 for (auto& el : watched)
@@ -71,7 +86,9 @@ namespace vecs {
                 return true;
             }
 
-            std::tuple<bool, std::string> getChangesJSON() {
+            /// @brief examines the VECS registry for changes to watched entities.
+            /// @return tuple with a boolean for whether something has changed and, if so, a JSON string containing the changes.
+            std::tuple<bool, std::string> GetChangesJSON() {
                 if (!active || !registry)
                     return std::tuple<bool, std::string>(false, "");
 
@@ -138,19 +155,26 @@ namespace vecs {
         }
 
         //handle one registry
-        void SetRegistry(Registry* reg = nullptr) { registry = reg; liveView.setRegistry(reg); }
+        /// @brief connects to a VECS registry.
+        /// @param reg Address of the Registry.
+        void SetRegistry(Registry* reg = nullptr) { registry = reg; liveView.SetRegistry(reg); }
 
+        /// @brief Initiates a tcp/ip connection to the Console.
+        /// @param reg Address of the processed VECS registry.
+        /// @param host optional address of the machine the Console is running on.
+        /// @param port optional port number the Console is listening on.
+        /// @return socket if connected or INVALID_SOCKET if communication cannot be established.
         SOCKET ConnectToServer(Registry* reg, std::string host = "127.0.0.1", int port = 2000) {
             if (!Startup())
                 return INVALID_SOCKET;
 
             SetRegistry(reg);
 
-            if (ConnectSocket != INVALID_SOCKET)
-                return ConnectSocket;
+            if (connectSocket != INVALID_SOCKET)
+                return connectSocket;
 
-            ConnectSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-            if (ConnectSocket == INVALID_SOCKET)
+            connectSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+            if (connectSocket == INVALID_SOCKET)
                 return INVALID_SOCKET;
 
             sockaddr_in clientService;
@@ -161,7 +185,7 @@ namespace vecs {
             //----------------------
             // Connect to server.
 
-            int returnval = connect(ConnectSocket, (const struct sockaddr*)&clientService, sizeof(clientService));
+            int returnval = connect(connectSocket, (const struct sockaddr*)&clientService, sizeof(clientService));
             if (returnval == 0) {
                 running = true;
                 commThread = std::jthread(&VECSConsoleComm::HandleConnection, this);
@@ -169,24 +193,28 @@ namespace vecs {
             else if (returnval < 0) {
                 DisconnectFromServer();
             }
-            return ConnectSocket;
+            return connectSocket;
         }
+        /// @brief returns whether Console communication is established.
         bool IsConnected() {
-            return ConnectSocket != INVALID_SOCKET && running;
+            return connectSocket != INVALID_SOCKET && running;
         }
 
+        /// @brief terminates tcp/ip connection to the Console.
+        /// @return currently always 0.
         int DisconnectFromServer() {
-            if (ConnectSocket != INVALID_SOCKET) {
+            if (connectSocket != INVALID_SOCKET) {
 #ifdef _WINSOCKAPI_
-                int irc = closesocket(ConnectSocket);
+                int irc = closesocket(connectSocket);
 #else
-                int irc = close(ConnectSocket);
+                int irc = close(connectSocket);
 #endif
-                ConnectSocket = INVALID_SOCKET;
+                connectSocket = INVALID_SOCKET;
             }
             return 0;
         }
 
+        /// @brief thread function that handles background communication with the Console.
         void HandleConnection() {
             while (running) {
                 std::string msg = ReceiveMessage();
@@ -202,11 +230,19 @@ namespace vecs {
             }
         }
 
+        /// @brief thread function to automatically initiate connection to the Console.
         void HandleInitConnection(Registry* reg) {
+
+            // let a little time pass so that connectingToHost / port can be overridden
+#ifdef WIN32
+            Sleep(50);
+#else
+            usleep(100 * 1000);
+#endif
 
             while (!IsConnected())
             {
-                auto res = ConnectToServer(reg); // either socket or invalid socket
+                auto res = ConnectToServer(reg, connectingToHost, connectingToPort); // either socket or invalid socket
 #ifdef WIN32
                 Sleep(2000);
 #else
@@ -215,12 +251,22 @@ namespace vecs {
             }
         }
 
-        void StartConnection(Registry* reg) {
-            initThread = std::jthread{ [=, this]() { HandleInitConnection(reg); } };
+        /// @brief function to automatically initiate communication with the Console. 
+        /// Starts a background thread to periodically try a connection.
+        /// @param reg Address of the processed VECS registry.
+        /// @param host optional address of the machine the Console is running on.
+        /// @param port optional port number the Console is listening on.
+        void StartConnection(Registry* reg, std::string host = "127.0.0.1", int port = 2000) {
+            connectingToHost = host;
+            connectingToPort = port;
+            if (!initThread.joinable())
+                initThread = std::jthread{ [=, this]() { HandleInitConnection(reg); } };
         }
 
 
     private:
+        /// @brief Handle an incoming message from the Console.
+        /// @param msg complete JSON object.
         void ProcessMessage(std::string msg) {
 
             //Process JSon
@@ -335,17 +381,23 @@ namespace vecs {
 
         }
 
+        /// @brief sends a message to the Console.
+        /// @param msg JSON string to send.
+        /// @return number of sent bytes or SOCKET_ERROR.
         int SendMessage(std::string sendmessage) const {
             const char* csendmessage = sendmessage.c_str();
-            return send(ConnectSocket, csendmessage, static_cast<int>(sendmessage.length()), 0);
+            return send(connectSocket, csendmessage, static_cast<int>(sendmessage.length()), 0);
         }
 
+        /// @brief receives bytes from the Console.
+        /// Periodically checks for and sends LiveView data to the Console.
+        /// @return socket if connected or INVALID_SOCKET if communication cannot be established.
         std::string ReceiveMessage() {
             char buffer[1024];
             int received = 0;
 
             while (running) {
-                if (ConnectSocket == INVALID_SOCKET)
+                if (connectSocket == INVALID_SOCKET)
                     return "";
 
                 int selectrc;
@@ -354,12 +406,12 @@ namespace vecs {
                 fd_set fds;
                 do {
                     FD_ZERO(&fds);
-                    FD_SET(ConnectSocket, &fds);
-                    selectrc = select(static_cast<int>(ConnectSocket + 1), &fds, NULL, NULL, ptmou);
+                    FD_SET(connectSocket, &fds);
+                    selectrc = select(static_cast<int>(connectSocket + 1), &fds, NULL, NULL, ptmou);
                     // then wait for activity 
                     if (selectrc == 0) {
                         // no data read from the other side within timeout period
-                        auto lv = liveView.getChangesJSON();
+                        auto lv = liveView.GetChangesJSON();
                         if (std::get<0>(lv)) {
                             std::string lvchg = std::get<1>(lv);
                             SendMessage(lvchg);
@@ -371,7 +423,7 @@ namespace vecs {
                     }
                 } while (selectrc == 0);
                 if (selectrc != INVALID_SOCKET)
-                    received = recv(ConnectSocket, buffer, sizeof(buffer) - 1, 0);
+                    received = recv(connectSocket, buffer, sizeof(buffer) - 1, 0);
                 else
                     received = -1;
 
@@ -396,8 +448,11 @@ namespace vecs {
 
     private:
         bool started{ false };
-        SOCKET ConnectSocket{ INVALID_SOCKET };
+        SOCKET connectSocket{ INVALID_SOCKET };
 
+        /// @brief Starts WinSock support on Windows;
+        /// does nothing on other platforms.
+        /// @return whether WinSock communication could be started.
         bool Startup() {
 #ifdef _WINSOCKAPI_
             if (!started) {
@@ -410,6 +465,8 @@ namespace vecs {
             started = true;
             return true;
         }
+        /// @brief Terminates WinSock support on Windows;
+        /// does nothing on other platforms.
         void Cleanup() {
 #ifdef _WINSOCKAPI_
             if (started) {
@@ -420,11 +477,11 @@ namespace vecs {
         }
     };
 
-    inline VECSConsoleComm* GetConsoleComm(Registry* reg) {
+    inline VECSConsoleComm* GetConsoleComm(Registry* reg, std::string host, int port) {
         static VECSConsoleComm* comm = nullptr;
         if (comm == nullptr) comm = new VECSConsoleComm;
         if (comm && reg) {
-            comm->StartConnection(reg);
+            comm->StartConnection(reg, host, port);
         }
         return comm;
     }

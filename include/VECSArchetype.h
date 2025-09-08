@@ -274,8 +274,13 @@ namespace vecs {
 		inline static thread_local size_t m_iteratingIndex{ std::numeric_limits<size_t>::max() }; //current iterator index
 		inline static thread_local std::vector<size_t> m_gaps{}; //gaps from previous erasures that must be filled
 
-//methods for Console communication
-public:
+		//methods for Console communication
+	public:
+		/// @brief Get an entity's contents in JSON format.
+		/// @param aindex index of the entity inside the archetype.
+		/// @return The entity's values in JSON array representation.
+		///         This is used in conjunction with Archetype::ToJSON() and HandleT::ToJSON()
+		///         that create the surrounding JSON object.
 		std::string ToJSON(size_t aindex) {
 			// retrieve the values of the entity components
 			std::string json = "[";
@@ -283,24 +288,31 @@ public:
 
 			for (auto& map : m_maps) {
 				if (count++)json += ",";
-				std::string sub = map.second->toJSON(aindex);
+				std::string sub = map.second->ToJSON(aindex);
 				json += sub;
 			}
 			return json + "]";
 
 		}
+
+		/// @brief Get the number of components stored in this archetype.
+		/// @return Number of components.
 		size_t GetComponents() {
 			return Size() * m_maps.size();
 		}
 
+		/// @brief Get the estimated size of all entities in his archetype.
+		/// @return The estimated number of bytes, not including private data allocated by the entities or management overhead.
 		size_t GetEstSize() {
-			size_t elemSize = 0; 
+			size_t elemSize = 0;
 			for (auto& map : m_maps) {
 				elemSize += map.second->ElemSize();
 			}
 			return elemSize * Size();
 		}
 
+		/// @brief Get an archetype's contents in JSON format.
+		/// @return (potentially very large) JSON string.
 		std::string ToJSON() {
 			std::string json = "\"archetype\":{\"hash\":" + std::to_string(Hash(m_types)) + ",\"types\":[";
 			size_t count = 0;

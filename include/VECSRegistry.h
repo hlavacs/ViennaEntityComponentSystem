@@ -669,9 +669,11 @@ namespace vecs {
 		inline static thread_local size_t m_slotMapIndex = NUMBER_SLOTMAPS::value - 1; //for new entities
 
 
-	// Console Communication
+		// Console Communication
 	public:
 
+		/// @brief Get LiveView data.
+		/// @return Basic LiveView information as a JSON string.
 		std::string GetLiveView() {
 			std::string json = "{\"cmd\":\"liveview\",\"entities\":";
 			json += std::to_string(Size());
@@ -679,41 +681,50 @@ namespace vecs {
 			return json;
 		}
 
+		/// @brief Return the average number of components over the Registry's entities.
+		/// @return The average number of components.
 		float GetAvgComp() {
 			float avgComp = 0.f;
 			for (auto& arch : m_archetypes) {
-				avgComp+=arch.second->GetComponents();
+				avgComp += arch.second->GetComponents();
 			}
 			return (Size()) ? (avgComp / Size()) : Size();
 		}
 
+		/// @brief Get the estimated size of all entities.
+		/// @return The estimated number of bytes, not including private data allocated by the entities or archetype management overhead.
 		size_t GetEstSize() {
-			size_t estSize = 0; 
+			size_t estSize = 0;
 			for (auto& arch : m_archetypes) {
 				estSize += arch.second->GetEstSize();
 			}
-			return estSize; 
+			return estSize;
 		}
 
+		/// @brief Get an entity's contents in JSON format.
+		/// @param h Handle of the entity.
+		/// @return The entity's JSON representation.
 		std::string ToJSON(Handle h) {
 			if (!h.IsValid() || !Exists(h)) { return "null"; }
 			auto& archAndIndex = GetArchetypeAndIndex(h);
 			return archAndIndex.m_arch->ToJSON(archAndIndex.m_index);
 		}
 
+		/// @brief Return a complete snapshot of the current registry contents.
+		/// @return The registry's JSON representation.
 		std::string GetSnapshot() {
 			std::string json = "{\"cmd\":\"snapshot\",\"entities\":";
+			GetMutex().lock();
 			json += std::to_string(Size()) + ",";
 			json += "\"archetypes\":[";
-			size_t art {0};
-			m_mutex.lock();
+			size_t art{ 0 };
 			for (auto& it : m_archetypes) {
 				if (art) json += ",";
 				json += "{\"hash\":\"" + std::to_string(it.first) + "\"" +
 					"," + it.second->ToJSON() + "}";
 				art++;
 			}
-			m_mutex.unlock();
+			GetMutex().unlock();
 			json += "]";
 			json += "}";
 			return json;
@@ -724,6 +735,7 @@ namespace vecs {
 	using Ref = Registry::Ref<T>;
 
 } //end of namespace vecs
+
 
 
 
