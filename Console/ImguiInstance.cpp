@@ -1,4 +1,6 @@
 // Console Application for VECS using Dear ImGui with SDL3 / Vulkan
+// This class is built using the ImGui Example code and modified to use the functions and Loop in Console.cpp
+// original code: build\_deps\imgui-src\examples\example_sdl3_vulkan\main.cpp
 
 // Learn about Dear ImGui:
 // - FAQ                  https://dearimgui.com/faq

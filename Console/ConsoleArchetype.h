@@ -52,7 +52,7 @@ namespace Console {
 			return entities;
 		}
 
-		int AddEntity(Entity& e);
+		void AddEntity(Entity& e);
 
 
 		Entity* FindEntity(size_t id) {

@@ -34,7 +34,7 @@ char (*__countof_helper(_CountofType(&_Array)[_SizeOfArray]))[_SizeOfArray];
 //all incoming socket events are handled through select()
 #define USING_SELECT
 
-// ClientActivity : the handler for all incoming socket activity
+/// @brief handles all incoming client activity
 void ConsoleSocketThread::ClientActivity() {
 
     int waitrc;
@@ -151,6 +151,9 @@ void ConsoleSocketThread::ClientActivity() {
 }
 using namespace nlohmann;
 
+/// @brief processes incoming json strings
+/// @param sjson String representing json data
+/// @return true if valid json
 bool ConsoleSocketThread::ProcessJSON(std::string sjson) {
 
     //Process JSON
@@ -209,6 +212,9 @@ bool ConsoleSocketThread::ProcessJSON(std::string sjson) {
     return true;
 }
 
+/// @brief handle incoming handshake commands
+/// @param json Json containing handshake data
+/// @return true if valid json
 bool ConsoleSocketThread::OnHandshake(json const& json) {
     try {
         pid = json["pid"];
@@ -220,10 +226,15 @@ bool ConsoleSocketThread::OnHandshake(json const& json) {
     return true;
 }
 
+/// @brief request a snapshot from the connected vecs
+/// @return true if request was sent
 bool ConsoleSocketThread::RequestSnapshot() {
     return SendData("{\"cmd\":\"snapshot\"}") > 0;
 }
 
+/// @brief parse incoming snapshots
+/// @param json Json containing snapshot data
+/// @return true if valid json
 bool ConsoleSocketThread::ParseSnapshot(nlohmann::json const& json) {
     // clear potentially pre-existing snapshot
     int newSnapIdx = snapidx ^ 1;  // switch to other snapshot to prevent conflicts
@@ -292,11 +303,18 @@ bool ConsoleSocketThread::ParseSnapshot(nlohmann::json const& json) {
 
 }
 
+/// @brief request live view communication from the connected vecs
+/// @param active Bool to activate or deactivate the live view
+/// @return true if request was sent
 bool ConsoleSocketThread::RequestLiveView(bool active) {
     isLive = active;
     return SendData(std::string("{\"cmd\":\"liveview\",\"active\":") + (active ? "true" : "false") + "}") > 0;
 }
 
+
+/// @brief send watchlist to the connected vecs
+/// @param watchlist map of watched entities with their handles
+/// @return true if request was sent
 bool ConsoleSocketThread::SendWatchlist(std::map<size_t, Console::WatchEntity>& watchlist) {
     std::string watchlistString;
     int count = 0;
@@ -307,8 +325,11 @@ bool ConsoleSocketThread::SendWatchlist(std::map<size_t, Console::WatchEntity>& 
     return SendData(std::string("{\"cmd\":\"liveview\",\"watchlist\":[") + watchlistString + "]}") > 0;
 }
 
+
+/// @brief parse incoming live view data, create internal structure for it that can be handled from GUI
+/// @param json Json containing live view data
+/// @return true if valid json
 bool ConsoleSocketThread::OnLiveView(json const& json) {
-    // parse incoming live view data, create internal structure for it that can be handled from GUI
     try {
         if (json.contains("entities")) {
             size_t entities = json["entities"];

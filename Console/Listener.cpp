@@ -94,6 +94,7 @@ static void SetSockAddr(struct sockaddr_in* pSA, std::string server, std::string
 // ===============================================================================
 // Socket class members
 
+
 int Socket::GetError() {
     return GetSocketError();
 }

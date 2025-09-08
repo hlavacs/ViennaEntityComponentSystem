@@ -31,10 +31,13 @@ std::string selectedSnapshotFile;
 
 float GetContentScale();
 
+/// @brief set up the listening thread
+/// @return true if listener thread was created
 bool SetupListener() {
     return listening.Create(service);
 }
 
+/// @brief terminate the listening thread
 void TerminateListener() {
     listening.Terminate();
 }
@@ -57,7 +60,9 @@ private:
     std::vector<std::string> tagCache;
 
 public:
-
+    /// @brief Cache the filterlists for the snapshot window filters
+    /// @param snap Saved snapshot of current thread.
+    /// @return true when filterlists are changed, false if nothing changed.
     bool CacheFilters(Console::Registry& snap) {
         auto newStamp = snap.GetJsonTS();
         if (tstamp != newStamp) {
@@ -116,7 +121,14 @@ public:
         return false;
     }
 
-    //return number of lines that are displayed based on current filter criteria
+
+    /// @brief Cache the displayed table lines for the snapshot window 
+    /// @param snap Saved snapshot of current thread.
+    /// @param sel_archetype selected archetype from filtering.
+    /// @param sel_entity selected entity from filtering.
+    /// @param sel_comptype selected component type from filtering.
+    /// @param sel_tag selected tag from filtering.
+    /// @return number of lines that are displayed based on current filter criteria
     size_t TableLines(Console::Registry& snap, std::string sel_archetype, std::string sel_entity, std::string sel_comptype, std::string sel_tag) {
         auto newStamp = snap.GetJsonTS();
         if (tstamp != newStamp) {  // if snapshot changed, reset
@@ -234,18 +246,25 @@ public:
         return compCache[index];
     }
 
+    /// @brief return cached archetypes
+    /// @return string vector of cached archetypes
     std::vector<std::string>& GetArchetypeCache() {
         return archetypeCache;
     }
 
+    /// @brief return cached entities
+    /// @return string vector of cached entities
     std::vector<std::string>& GetEntityCache() {
         return entityCache;
     }
-
+    /// @brief return cached components
+    /// @return string vector of cached components
     std::vector<std::string>& GetComponentCache() {
         return componentCache;
     }
 
+    /// @brief return cached tags
+    /// @return string vector of cached tags
     std::vector<std::string>& GetTagCache() {
         return tagCache;
     }
@@ -254,6 +273,9 @@ public:
 
 
 
+/// @brief Display the snapshot window
+/// @param listening Listening thread containing data.
+/// @param p_open bool for opening and closing the window
 void static ShowViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
 {
     float scale = GetContentScale();
@@ -571,6 +593,8 @@ void static ShowViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
     }
 }
 
+/// @brief Display the snapshot file selection window
+/// @param p_open bool for opening and closing the window
 void static ShowSnapshotFileListWindow(bool* p_open) {
     float scale = GetContentScale();
     ImGui::SetNextWindowSize(ImVec2(350 * scale, 150 * scale), ImGuiCond_Once);
@@ -606,6 +630,9 @@ void static ShowSnapshotFileListWindow(bool* p_open) {
     }
 }
 
+/// @brief Display the connection window
+/// @param listening Listening thread containing data.
+/// @param p_open bool for opening and closing the window
 void static ShowConnectionWindow(ConsoleListener& listening, bool* p_open)
 {
     float scale = GetContentScale();
@@ -691,6 +718,9 @@ void static ShowConnectionWindow(ConsoleListener& listening, bool* p_open)
     }
 }
 
+/// @brief Display the live view window
+/// @param listening Listening thread containing data.
+/// @param p_open bool for opening and closing the window
 void static ShowLiveView(ConsoleListener& listening, bool* p_open)
 {
     float scale = GetContentScale();
@@ -840,6 +870,9 @@ void static ShowLiveView(ConsoleListener& listening, bool* p_open)
     }
 }
 
+/// @brief Display the watchlist window
+/// @param listening Listening thread containing data.
+/// @param p_open bool for opening and closing the window
 void static ShowWatchlistWindow(ConsoleListener& listening, bool* p_open) {
     float scale = GetContentScale();
 
@@ -946,6 +979,7 @@ void static ShowWatchlistWindow(ConsoleListener& listening, bool* p_open) {
 
 }
 
+/// @brief Main Loop continually called by ImGui to display the selected windows of the console
 void MainLoop() {
     if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("Connections")) {
