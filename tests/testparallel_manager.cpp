@@ -228,3 +228,27 @@ TEST_F(ManagerTest, LoopViewChangeComplexDirectWithReference) {
         ASSERT_EQ(std::get<Position>(tup).y + std::get<Position>(tup).y * std::get<Velocity>(tup).y, mng.Get<Position>(h).y);
     }
 }
+
+TEST_F(ManagerTest, LoopForEachView) {
+    size_t created = fillRegistryComplex(mng);
+    ASSERT_EQ(mng.Size(), created);
+
+    // saving the original View result to a vector of tuples
+    std::vector<std::tuple<vecs::Handle, Position, Velocity>> origin;
+    for (auto [h, p, v] : mng.GetView<vecs::Handle, Position, Velocity>()) {
+        origin.push_back(std::tuple(h,p,v));
+    }
+
+    // applying a function on all components, splitting work onto threads 
+    mng.ForEachView<vecs::Handle, Position&, const Velocity&>(
+        [](auto h, auto& pos, const auto& vel) {
+        pos.x += vel.x * static_cast<float>(0.1);
+        pos.y += vel.y * static_cast<float>(0.1);
+      });
+
+    for(auto [h, p, v] : origin){
+        ASSERT_EQ(p.x + v.x * static_cast<float>(0.1), mng.Get<Position>(h).x);
+        ASSERT_EQ(p.y + v.y * static_cast<float>(0.1), mng.Get<Position>(h).y);
+    }
+    
+}
