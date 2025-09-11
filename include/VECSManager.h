@@ -153,6 +153,29 @@ namespace vecs {
         }
 
 
+        /// @brief Create multiple entities with default-initialized components.
+        /// @tparam ...Ts The types of the components.
+        /// @param out The vector for newly inserted handles.
+        /// @return Vector of newly inserted handles.
+        template <typename... Ts>
+          requires((sizeof...(Ts) > 0) && (vtll::unique<vtll::tl<Ts...>>::value) &&
+                   !vtll::has_type<vtll::tl<Ts...>, Handle>::value)
+        [[nodiscard]] auto InsertBulk(std::vector<Handle>& out) -> std::vector<Handle> {
+          std::vector<std::future<Handle>> futures;
+          futures.reserve(out.size());
+
+          for (size_t i = 0; i < out.size(); ++i) {
+            futures.push_back(Insert(Ts{}...));
+          }
+
+          for (size_t i = 0; i < out.size(); ++i) {
+            out[i] = futures[i].get();
+          }
+   
+          return out;
+        }
+
+
         /// @brief Put new component values as a tuple to an entity.
         /// @attention Do not use within a loop over a View.
 		/// @tparam Ts The types of the components.
