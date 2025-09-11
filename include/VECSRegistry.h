@@ -268,6 +268,8 @@ namespace vecs {
 				return Iterator<Ts...>{m_system, m_archetypes, m_archetypes.size()};
 			}
 
+			auto GetArchetypes() -> std::vector<ArchetypeAndSize>& { return m_archetypes; }
+
 		private:
 
 			Registry& 				m_system;	///< Reference to the registry system.
