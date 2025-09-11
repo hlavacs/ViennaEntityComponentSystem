@@ -52,6 +52,33 @@ namespace vecs {
             return res;
 		}
 
+
+        /// @brief Apply a function on specific components of entities.
+        /// @tparam ...Ts The types of the components.
+        template<typename... Ts, typename Func>
+          requires(vtll::unique<vtll::tl<Ts...>>::value)
+        void ForEachView(Func&& func, std::vector<size_t>&& yes = {}, std::vector<size_t>&& no = {}) {
+          // Get the view
+          Registry::View<Ts...> view = GetView<Ts...>(std::move(yes), std::move(no));
+
+          // m_archetypes gets initialized whenever an iterator is created for View
+            view.begin();
+
+          // Loop over archetypes and split workload among threads
+          for (auto& archs : view.GetArchetypes()) {
+            m_threadpool->enqueue([&, arch = archs.m_arch, size = archs.m_size] {
+              for (size_t i = 0; i < size; ++i) {
+                if constexpr (sizeof...(Ts) == 1) {         // only one component
+                  func((*arch->template Map<Ts>())[i]...);
+                } else {                                    // multiple components
+                  std::apply(func, std::tuple<Ts...>{(*arch->template Map<Ts>())[i]...});   // unpack the tuple of components for func
+                }
+              }
+            });
+          }
+          // wait for all threads to finish work
+          m_threadpool->waitForIdle();
+        }
         
         /// @brief Get a single component value of an entity.
 		/// @tparam T The type of the component.
