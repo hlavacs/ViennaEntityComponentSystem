@@ -10,20 +10,20 @@ size_t fillRegistryBasic(vecs::Manager& mng, int oneComp = 5, int twoComp = 5, i
     size_t totalNew = 0;
 
     for (size_t i = 0; i < oneComp; ++i) {
-        auto a = mng.Insert(integers[i]);
-        auto b = mng.Insert(doubles[i]);
+        auto a = mng.Insert(integers[i]).get();
+        auto b = mng.Insert(doubles[i]).get();
         totalNew += 2;
     }
 
     for (size_t i = 0; i < twoComp; ++i) {
-        auto a = mng.Insert(integers[i], doubles[i]);
-        auto b = mng.Insert(integers[(i+1)%integers.size()], floats[i]);
-        auto c = mng.Insert(doubles[(i+1)%doubles.size()], floats[(i+1)%floats.size()]);
+        auto a = mng.Insert(integers[i], doubles[i]).get();
+        auto b = mng.Insert(integers[(i+1)%integers.size()], floats[i]).get();
+        auto c = mng.Insert(doubles[(i+1)%doubles.size()], floats[(i+1)%floats.size()]).get();
         totalNew += 3;
     }
 
     for (size_t i = 0; i < threeComp; ++i) {
-        auto h = mng.Insert(integers[i], doubles[i], floats[i]);
+        auto h = mng.Insert(integers[i], doubles[i], floats[i]).get();
         totalNew += 1;
     }
 
@@ -42,20 +42,20 @@ size_t fillRegistryComplex(vecs::Manager& mng, int oneComp = 5, int twoComp = 5,
     size_t totalNew = 0;
 
     for (size_t i = 0; i < oneComp; ++i) {
-        auto h = mng.Insert(sprites[i]);
+        auto h = mng.Insert(sprites[i]).get();
         totalNew += 1;
     }
 
     for (size_t i = 0; i < twoComp; ++i) {
-        auto a = mng.Insert(sprites[i], positions[i]);
-        auto b = mng.Insert(sprites[(i+1)%sprites.size()], positions[i]);
-        auto c = mng.Insert(positions[(i+1)%positions.size()], velocities[(i+1)%velocities.size()]);
+        auto a = mng.Insert(sprites[i], positions[i]).get();
+        auto b = mng.Insert(sprites[(i+1)%sprites.size()], positions[i]).get();
+        auto c = mng.Insert(positions[(i+1)%positions.size()], velocities[(i+1)%velocities.size()]).get();
         totalNew += 3;
     }
 
     for (size_t i = 0; i < threeComp; ++i) {
-        auto a = mng.Insert(sprites[i], positions[i], velocities[i]);
-        auto b = mng.Insert(sprites[(i+1)%sprites.size()], positions[i], velocities[(i+1)%velocities.size()]);
+        auto a = mng.Insert(sprites[i], positions[i], velocities[i]).get();
+        auto b = mng.Insert(sprites[(i+1)%sprites.size()], positions[i], velocities[(i+1)%velocities.size()]).get();
         totalNew += 2;
     }
 

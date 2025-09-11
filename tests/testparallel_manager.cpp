@@ -17,7 +17,7 @@ class ManagerTest : public testing::Test {
 
 
 TEST_F(ManagerTest, CreateAndChangeEntityWorks) {
-    vecs::Handle h1 = mng.Insert(5, 7.6f, 3.2);
+    vecs::Handle h1 = mng.Insert(5, 7.6f, 3.2).get();
 
     ASSERT_EQ(mng.Get<int>(h1), 5);
     ASSERT_EQ(mng.Get<float>(h1), 7.6f);
@@ -33,7 +33,7 @@ TEST_F(ManagerTest, CreateAndChangeEntityWorks) {
 
 
 TEST_F(ManagerTest, PutWorks) {
-    vecs::Handle h2 = mng.Insert(5);
+    vecs::Handle h2 = mng.Insert(5).get();
     mng.Put(h2, 6.4);
 
     ASSERT_EQ(mng.Get<double>(h2), 6.4);
@@ -48,9 +48,9 @@ TEST_F(ManagerTest, PutWorks) {
 
 
 TEST_F(ManagerTest, AddTagsWorks) {
-    vecs::Handle h3 = mng.Insert(4, 5.5, 6.6f);
-    vecs::Handle h4 = mng.Insert(9, 8.8, 7.7f);
-    vecs::Handle h5 = mng.Insert(7, 6.6, 5.5f);
+    vecs::Handle h3 = mng.Insert(4, 5.5, 6.6f).get();
+    vecs::Handle h4 = mng.Insert(9, 8.8, 7.7f).get();
+    vecs::Handle h5 = mng.Insert(7, 6.6, 5.5f).get();
 
     mng.AddTags(h3, 1ul, 3ul);
     mng.AddTags(h4, 2ul, 3ul, 1ul);
@@ -78,7 +78,7 @@ TEST_F(ManagerTest, AddTagsWorks) {
 
 
 TEST_F(ManagerTest, EraseTagsWorks) {
-    vecs::Handle h6 = mng.Insert(4, 5.5, 6.6f);
+    vecs::Handle h6 = mng.Insert(4, 5.5, 6.6f).get();
 
     mng.AddTags(h6, 4ul, 5ul, 6ul);
 
@@ -95,8 +95,8 @@ TEST_F(ManagerTest, EraseTagsWorks) {
 
 
 TEST_F(ManagerTest, EraseComponentAndEntityWorks) {
-    vecs::Handle h7 = mng.Insert(5);
-    vecs::Handle h8 = mng.Insert(4, 5.5f);
+    vecs::Handle h7 = mng.Insert(5).get();
+    vecs::Handle h8 = mng.Insert(4, 5.5f).get();
 
     mng.Erase(h7);
     mng.Erase<int>(h8);
@@ -113,8 +113,8 @@ TEST_F(ManagerTest, EraseComponentAndEntityWorks) {
 
 
 TEST_F(ManagerTest, ClearWorks) {
-    vecs::Handle h9 = mng.Insert(5);
-    vecs::Handle h10 = mng.Insert(4, 5.5f);
+    vecs::Handle h9 = mng.Insert(5).get();
+    vecs::Handle h10 = mng.Insert(4, 5.5f).get();
 
     int size = 0;
     auto resa = mng.GetView<vecs::Handle>();

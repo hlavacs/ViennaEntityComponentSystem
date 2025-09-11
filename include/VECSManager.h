@@ -17,6 +17,7 @@ namespace vecs {
     class Manager {
     public:
 
+    ////////// CONSTRUCTORS //////////
         Manager() {
             m_threadpool = std::make_shared<vecs::ThreadPool>();
             m_system = std::make_shared<vecs::Registry>();
@@ -29,10 +30,16 @@ namespace vecs {
 
         ~Manager() = default;  // Destructor
 
+
+
+    ////////// CONVENIENCE THREADPOOL //////////
         void waitIdle() {
             m_threadpool->waitForIdle();
         }
 
+
+
+    ////////// ACCESSING VIEWS/ENTITIES //////////
 		/// @brief Get a view of entities with specific components.
 		/// @tparam ...Ts The types of the components.
 		/// @return A view of the entity components
@@ -80,6 +87,7 @@ namespace vecs {
           m_threadpool->waitForIdle();
         }
         
+
         /// @brief Get a single component value of an entity.
 		/// @tparam T The type of the component.
 		/// @param handle The handle of the entity.
@@ -122,26 +130,26 @@ namespace vecs {
 
 
 
+    ////////// ADDING/CHANGING ENTITIES/COMPONENTS/TAGS //////////
         //TODO: check GetNewSlotmapIndex() if different idx when in parallel
 
         /// @brief Create an entity with components.
 		/// @tparam ...Ts The types of the components.
 		/// @param ...component The new values.
-		/// @return Handle of new entity.
+		/// @return Future Handle of new entity.
 		template<typename... Ts>
 			requires ((sizeof...(Ts) > 0) && (vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
-		[[nodiscard]] auto Insert( Ts&&... component ) -> Handle {
+		[[nodiscard]] auto Insert( Ts&&... component ) -> std::future<Handle> {
 
-            std::promise<vecs::Handle> res_prom;
-            std::future<vecs::Handle> res_fut = res_prom.get_future();
-            m_threadpool->enqueue( [&] {
+            auto res_prom = std::make_shared<std::promise<Handle>>();
+            std::future<vecs::Handle> res_fut = res_prom->get_future();
+
+            m_threadpool->enqueue( [res_prom, this, ...component = std::forward<Ts>(component)]() mutable {
                     std::scoped_lock lock(m_system->GetMutex());
-                    res_prom.set_value(m_system->Insert(std::forward<Ts>(component)...));
+                    res_prom->set_value(m_system->Insert(std::forward<Ts>(component)...));
             });
-            
-            vecs::Handle res = res_fut.get();
 
-            return res;
+            return res_fut;
         }
 
 
@@ -167,6 +175,7 @@ namespace vecs {
                 waitIdle();
             }
         }
+
 
         /// @brief Put new component values to an entity.
         /// @attention Do not use within a loop over a View.
@@ -207,6 +216,8 @@ namespace vecs {
         }
 
 
+
+    ////////// ERASING REGISTRY/ENTITIES/COMPONENTS/TAGS //////////
         /// @brief Erase tags from an entity.
         /// @tparam ...Ts The types of the tags.
         /// @param handle The handle of the entity.
@@ -256,6 +267,8 @@ namespace vecs {
 		}
 
 
+
+    ////////// CONVENIENCE REGISTRY //////////
         /// @brief Get the current size of the registry.
         size_t Size() {
             return m_system->Size();
@@ -285,15 +298,16 @@ namespace vecs {
 
 
     private:
-        std::shared_ptr<vecs::Registry> m_system{nullptr};
-        std::shared_ptr<IThreadPool> m_threadpool;
-
         /// @brief Convenience print function for synchronous printing
         /// @param id The current thread id.
         /// @param std The string to print.
         void PrintSync(std::thread::id id, std::string str) {
             std::osyncstream(std::cout) << id << str << "\n";
         }
+
+
+        std::shared_ptr<vecs::Registry> m_system{nullptr};
+        std::shared_ptr<IThreadPool> m_threadpool;
     };
 
 }
