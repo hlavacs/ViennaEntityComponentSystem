@@ -16,6 +16,8 @@ class ManagerTest : public testing::Test {
 };
 
 
+////////// CREATING/CHANGING //////////
+
 TEST_F(ManagerTest, CreateAndChangeEntityWorks) {
     vecs::Handle h1 = mng.Insert(5, 7.6f, 3.2).get();
 
@@ -77,6 +79,8 @@ TEST_F(ManagerTest, AddTagsWorks) {
 }
 
 
+////////// ERASING //////////
+
 TEST_F(ManagerTest, EraseTagsWorks) {
     vecs::Handle h6 = mng.Insert(4, 5.5, 6.6f).get();
 
@@ -112,6 +116,29 @@ TEST_F(ManagerTest, EraseComponentAndEntityWorks) {
 }
 
 
+TEST_F(ManagerTest, EraseBulkWorks) {
+    // fill Registry with different entities
+    fillRegistryBasic(mng);
+
+
+    // get all handles in a view
+    auto allHandles = mng.GetView<vecs::Handle>();
+
+    // pick half of the handles for erasure
+    std::vector<vecs::Handle> eraseHandles;
+    for (auto h : allHandles) {
+        eraseHandles.push_back(h);
+    }
+    
+    mng.EraseBulk(eraseHandles);
+
+    for(auto h : eraseHandles) {
+        ASSERT_EQ(mng.Exists(h), false);
+    }
+
+}
+
+
 TEST_F(ManagerTest, ClearWorks) {
     vecs::Handle h9 = mng.Insert(5).get();
     vecs::Handle h10 = mng.Insert(4, 5.5f).get();
@@ -136,6 +163,8 @@ TEST_F(ManagerTest, ClearWorks) {
     ASSERT_EQ(size, 0);
 }
 
+
+////////// CONVENIENCE //////////
 
 TEST_F(ManagerTest, HasAllWorks) {
     fillRegistryBasic(mng);
@@ -228,6 +257,7 @@ TEST_F(ManagerTest, LoopViewChangeComplexDirectWithReference) {
         ASSERT_EQ(std::get<Position>(tup).y + std::get<Position>(tup).y * std::get<Velocity>(tup).y, mng.Get<Position>(h).y);
     }
 }
+
 
 TEST_F(ManagerTest, LoopForEachView) {
     size_t created = fillRegistryComplex(mng);
