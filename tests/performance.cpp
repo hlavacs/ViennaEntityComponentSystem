@@ -44,6 +44,7 @@ auto p1(size_t components, size_t size, std::vector<vecs::Vector<T>> & container
 	volatile size_t sum = 0;
 	volatile size_t index = 0;
 	for( size_t i = 0; i < size; i++) {
+		if( components > 1 ) index = i;
 		for( size_t j = 0; j < components; j++) {			
 			volatile size_t value = containers[j][index].value;
 			sum += value;

@@ -26,11 +26,12 @@ p1 <- ggplot(summary_data, aes(x = x, color = dataset, linetype = subgroup)) +
   #geom_ribbon(aes(ymin = ci_lower, ymax = ci_upper, fill = dataset), alpha = 0.2) +
   geom_line(aes(y = mean_y), size = 0.8) +
   geom_point(aes(y = mean_y), size = 1.5) +
-  labs(title = "Runtime depending on #Components with Seq/Rnd Subgroups",
-       subtitle = "Lines show means, ribbons show 95% confidence intervals",
+  labs(title = "Avg. runtime depending on #Components with Seq/Rnd Subgroups",
+       #subtitle = "Lines show means", #, ribbons show 95% confidence intervals",
        x = "X Variable", y = "Y Variable",
        color = "Dataset", fill = "Dataset", linetype = "Subgroup") +
   theme_minimal() +
+  theme_bw(base_size = 16) +
   theme(legend.position = "right") + 
   scale_x_log10() +
   scale_y_log10() +
