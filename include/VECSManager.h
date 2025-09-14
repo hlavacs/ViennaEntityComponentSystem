@@ -283,7 +283,7 @@ namespace vecs {
 
         /// @brief Erase multiple entities from the registry.
         /// @param handles The handles of the entities.
-        void EraseBulk(std::vector<Handle> handles) {
+        void EraseBulk(std::vector<Handle>& handles) {
 
             // get all Handles ordered into archetypes
             std::unordered_map<size_t, std::vector<vecs::Ref<vecs::Handle>>> archs{};
@@ -297,15 +297,14 @@ namespace vecs {
                 }
             }
 
-
             // Erase the handles, split by archetypes amongst threads
             for (auto& arch : archs) {
-                for (auto& handle : arch.second) {
-                    m_threadpool->enqueue([&] {
+                m_threadpool->enqueue([&] {
+                    for (auto& handle : arch.second) {
                         std::scoped_lock lock(m_system->GetArchetypeMutex(handle.Get()));
                         m_system->Erase(handle.Get());
-                    });
-                }
+                    }
+                });
             }
             // wait for all threads to finish work
             m_threadpool->waitForIdle();
