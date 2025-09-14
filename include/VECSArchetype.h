@@ -234,6 +234,13 @@ namespace vecs {
 			return it->second.get();
 		}
 
+
+		/// @brief Get the hash value of the archetype.
+		/// @return Hashed archetype.
+		auto GetHash() -> size_t {
+			return Hash(m_types);
+		}
+
 	private:
 
 		/// @brief Erase an entity. To ensure thet consistency of the entity indices, the last entity is moved to the erased one.

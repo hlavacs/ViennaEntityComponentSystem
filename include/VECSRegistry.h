@@ -531,6 +531,18 @@ namespace vecs {
 			return true;
 		}
 
+		/// @brief Get the archetype.
+		/// @return Reference to the archetype.
+		[[nodiscard]] inline auto GetArchetypeHash(Handle handle) -> size_t {
+			return GetArchetypeAndIndex(handle).m_arch->GetHash();
+		}
+
+		/// @brief Get a Ref to a handle.
+		/// @return Ref to handle.
+		[[nodiscard]] inline auto GetRef(Handle handle) -> Ref<Handle> {
+			return Ref<Handle>(handle, GetSlot(handle));
+		}
+
 		/// @brief Fill gaps from previous erasures.
 		// This is necessary when an entity is erased during iteration. The last entity is moved to the erased one
 		// after Iteration is finished. This is triggered by the iterator.

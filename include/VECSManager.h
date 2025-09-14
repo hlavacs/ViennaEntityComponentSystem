@@ -281,6 +281,37 @@ namespace vecs {
         }
 
 
+        /// @brief Erase multiple entities from the registry.
+        /// @param handles The handles of the entities.
+        void EraseBulk(std::vector<Handle> handles) {
+
+            // get all Handles ordered into archetypes
+            std::unordered_map<size_t, std::vector<vecs::Ref<vecs::Handle>>> archs{};
+            for (auto h : handles) {
+                auto arch = m_system->GetArchetypeHash(h);
+                auto ref = m_system->GetRef(h);
+                if (archs.contains(arch)) {
+                    archs.at(arch).push_back(ref);
+                } else {
+                    archs.insert({arch, std::vector<Ref<vecs::Handle>>({ref})});
+                }
+            }
+
+
+            // Erase the handles, split by archetypes amongst threads
+            for (auto& arch : archs) {
+                for (auto& handle : arch.second) {
+                    m_threadpool->enqueue([&] {
+                        std::scoped_lock lock(m_system->GetArchetypeMutex(handle.Get()));
+                        m_system->Erase(handle.Get());
+                    });
+                }
+            }
+            // wait for all threads to finish work
+            m_threadpool->waitForIdle();
+        }
+
+
         /// @brief Clear the registry by removing all entities.
 		void Clear() {
             m_threadpool->enqueue( [&] {
@@ -295,6 +326,14 @@ namespace vecs {
         /// @brief Get the current size of the registry.
         size_t Size() {
             return m_system->Size();
+        }
+
+
+        /// @brief Test if an entity exists.
+        /// @param handle The handle of the entity.
+        /// @return true if the entity exists, else false.
+        bool Exists(Handle handle) {
+            return m_system->Exists(handle);
         }
 
 
