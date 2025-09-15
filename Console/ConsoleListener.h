@@ -7,7 +7,7 @@
 
 
 namespace Console {
-    //Entity specialization for the watchlist.
+    /// @brief Entity specialization for the watchlist.
     class WatchEntity : public Entity {
     private:
         Archetype arch;
@@ -16,7 +16,7 @@ namespace Console {
 
     public:
         WatchEntity() {}
-        //if a new WatchEntity is added to the watchlist the constructor collects all needed data from the registry
+        /// @brief if a new WatchEntity is added to the watchlist the constructor collects all needed data from the registry
         WatchEntity(Entity const& org) : Entity(org) {
             if (org.GetArchetype()) {
                 arch.CopyArchetype(*org.GetArchetype());
@@ -50,13 +50,18 @@ namespace Console {
             SetArchetype(&arch);
             return *this;
         }
-
+        /// @brief get name for a specific type
+        /// @param t type as hash
+        /// @return typename as string
         std::string GetTypeName(size_t t) {
             auto it = typeNames.find(t);
             assert(it != typeNames.end());
             return it->second;
         }
 
+        /// @brief get name for a specific tag
+        /// @param t tag as number
+        /// @return tagname as string
         std::string GetTagName(size_t t) {
             auto it = tags.find(t);
             assert(it != tags.end());
@@ -72,11 +77,16 @@ namespace Console {
 // ConsoleSocketThread : socket client thread for the Console
 
 class ConsoleSocketThread : public SocketThread {
+public:
+    int lvEntityCount[200]{ 0 };
+    int lvEntityMax = 1;
+    bool selected{ false };
+
 private:
     bool handShook{ false };
     int pid{ 0 };
     int entitycount{ 0 };
-    Console::Registry snapshot[2]; //we use only one snapshot, but alternating between two prevents conflicts wfile creating new snaphots
+    Console::Registry snapshot[2]; //we use only one snapshot, but alternating between two prevents conflicts while creating new snaphots
     int snapidx{ 0 };
     std::map<size_t, Console::WatchEntity> watchlist;
     bool isLive{ false };
@@ -84,63 +94,111 @@ private:
     size_t estSize{ 0 };
 
     virtual void ClientActivity();
+    
+    /// @brief processes incoming json strings
+    /// @param sjson String representing json data
+    /// @return true if valid json
     bool ProcessJSON(std::string sjson);
+
+    /// @brief handle incoming handshake commands
+    /// @param json Json containing handshake data
+    /// @return true if valid json
     bool OnHandshake(nlohmann::json const& json);
+
+    /// @brief parse incoming snapshots
+    /// @param json Json containing snapshot data
+    /// @return true if valid json
     bool OnSnapshot(nlohmann::json const& json) { return ParseSnapshot(json); }
+
+    /// @brief parse incoming live view data, create internal structure for it that can be handled from GUI
+    /// @param json Json containing live view data
+    /// @return true if valid json
     bool OnLiveView(nlohmann::json const& json);
 
 public:
     ConsoleSocketThread(SOCKET s, SocketListener* l) : SocketThread(s, l) {}
     virtual ~ConsoleSocketThread() {}
 
-   /* bool IsConnected() { return handShook; }*/
     int GetPid() { return pid; }
     void SetPid(int newPid) { pid = newPid; handShook = pid != 0; }
-    /*int GetEntitycount() { return entitycount; }*/
     Console::Registry& GetSnapshot() { return snapshot[snapidx]; }
-
-    int lvEntityCount[200]{ 0 };
-    int lvEntityMax = 1;
 
     float GetAvgComp() { return avgComp; }
     size_t GetEstSize() { return estSize; }
 
+    /// @brief request a snapshot from the connected vecs
+    /// @return true if request was sent
     bool RequestSnapshot();
+
+    /// @brief request live view communication from the connected vecs
+    /// @param active Bool to activate or deactivate the live view
+    /// @return true if request was sent
     bool RequestLiveView(bool active = true);
+
+    /// @brief send watchlist to the connected vecs
+    /// @param watchlist map of watched entities with their handles
+    /// @return true if request was sent
     bool SendWatchlist(std::map<size_t, Console::WatchEntity>& watchlist);
+
+    /// @brief returs true if live view is live
     bool GetIsLive() { return isLive; }
 
-    bool selected{ false };
+    /// @brief parse incoming snapshots
+    /// @param json Json containing snapshot data
+    /// @return true if valid json
     bool ParseSnapshot(nlohmann::json const& json);
 
+    /// @brief add a entity to be watched and send updated watchlist to vecs
     void AddWatch(size_t handle) { watchlist[handle] = *snapshot[snapidx].FindEntity(handle); SendWatchlist(watchlist); }
+    
+    /// @brief delete a entity to be watched and send updated watchlist to vecs
     void DeleteWatch(size_t handle) { watchlist.erase(handle); SendWatchlist(watchlist); }
+   
+    /// @brief returns whether an entity is in the watchlist
+    /// @return true if entity is in watchlist
     bool IsWatched(size_t handle) { return watchlist.contains(handle); }
+
+    /// @brief get the watchlist
+    /// @return watchlist as map consisting of WatchEntity with their handles
     std::map<size_t, Console::WatchEntity>& GetWatchlist() { return watchlist; }
 
 
 };
 
-// ConsoleListener : derived Listener for the Console.
+/// @brief derived Listener for the Console.
 class ConsoleListener : public TcpListener {
 public:
+    int cursel{ -1 };
+
+    /// @brief ConsoleListener contructor
     ConsoleListener(std::string service = "") : TcpListener(service) {
         AddClient(CreateSocketThread(INVALID_SOCKET, this));  //create an empty Listener for "Load from File"
         GetVecs(0)->SetPid(1); // force it to PID 1 (which will never come in from any socket)
-    }
+    }   
 
-    int cursel{ -1 };
+    /// @brief remove a Client
+    /// @param thd SocketThread to be removed
+    /// @return true if successfull
     virtual bool RemoveClient(SocketThread* thd) {
         if (static_cast<ConsoleSocketThread*>(thd)->selected)
             cursel = -1; // reset selection
         return TcpListener::RemoveClient(thd);
     }
 
-    //there's a 1:1 relation between VECS and client connections
+    /// @brief get number of connected vecs (plus empty thread for loading from file)
+    /// @return number of connected vecs
     size_t VecsCount() { return StreamClientSize(); }
+
+    /// @brief get a specific vecs
+    /// @param i index 
+    /// @return vecs connection handling thread
     ConsoleSocketThread* GetVecs(size_t i) { return static_cast<ConsoleSocketThread*>(StreamClientAt(i)); }
 
 private:
+    /// @brief create a Console Socket thread
+    /// @param s Socket
+    /// @param l SocketListener
+    /// @return SocketThread
     virtual SocketThread* CreateSocketThread(SOCKET s, SocketListener* l) { return new ConsoleSocketThread(s, l); }
 };
 

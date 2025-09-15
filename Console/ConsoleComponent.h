@@ -20,20 +20,24 @@ namespace Console {
 			return *this;
 		}
 
-		int AddData(std::tuple<size_t, std::string> x) {
+		/// @brief add Data to a component
+		/// @param x tuple consisting of type as a hash and the value
+		void AddData(std::tuple<size_t, std::string> x) {
 			data = x;
-			return 0;
 		}
 
-		//std::tuple<size_t, std::string>& GetData() {
-		//	return data;
-		//}
-
+		/// @brief retrieve datatype
+		/// @return datatype as hash
 		size_t GetType() { return std::get<0>(data); }
 
+		/// @brief retrieve data
+		/// @return data as string
 		std::string ToString() {
 			return std::get<1>(data);
 		}
+
+		/// @brief set data 
+		/// @param s string value
 		void SetString(std::string s) {
 			std::get<1>(data) = s;
 		}

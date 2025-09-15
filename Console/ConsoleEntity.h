@@ -43,47 +43,67 @@ namespace Console {
 			components = org.components;
 			return *this;
 		}
-
+		/// @brief get entity index
 		size_t GetIndex() { return index; }
+
+		/// @brief get entity version
 		size_t GetVersion() { return version; }
+
+		/// @brief get entity storage index
 		size_t GetStorageIndex() { return stgindex; }
+
+		/// @brief get entity value, the handle of the entity
 		size_t GetValue() { return value; }
 
+		/// @brief set the archetype of the entity
+		/// @param a archetype pointer or default nullptr
 		void SetArchetype(Archetype* a = nullptr) { archetype = a; }
+
+		/// @brief get the archetype of the entity
+		/// @return archetype or nullptr
 		Archetype* GetArchetype() const { return archetype; }
 
+		/// @brief clear entity data
 		void Clear() {
 			index = version = stgindex = value = 0;
 			components.clear();
 		}
 
+		/// @brief get the components of the entity
+		/// @return list of components
 		std::list<Component>& GetComponents() {
 			return components;
 		}
 
-		int AddComponent(Component& c) {
+		/// @brief add a component to the entity
+		/// @param c component to be added
+		void AddComponent(Component& c) {
 			components.push_back(c);
-			return 0;
 		}
 
+		//Live view utility
+
+		/// @brief set modified bit in flags
 		void SetModified() {
-			flags |= modified; //set modified bit in flags
+			flags |= modified; 
 		}
 
+		/// @brief return whether modified bit is set in flags
 		bool IsModified() {
-			return flags & modified; // return wether modified bit is set in flags
+			return flags & modified; 
 		}
 
-
+		/// @brief set deleted bit in flags
 		void SetDeleted() {
-			flags |= deleted; //set deleted bit in flags
+			flags |= deleted; 
 		}
 
+		/// @brief return whether deleted bit is set in flags
 		bool IsDeleted() {
-			return flags & deleted; // return wether deleted bit is set in flags
+			return flags & deleted;
 		}
 
-
+		/// @brief return entity index as string
 		std::string ToString() {
 			return std::to_string(index);
 		}

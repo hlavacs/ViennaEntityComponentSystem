@@ -218,7 +218,15 @@ public:
     void Run();
     void Terminate() { terminateThread = true; }
 
+    /// @brief Send a block of Data
+    /// @param data Address of data block to send
+    /// @param datalen length of data block in bytes
+    /// @return 0 if successful or an error code
     int SendData(const char* data, int datalen) { return sockClient.SendData(data, datalen); }
+
+    /// @brief Send a block of Data
+    /// @param s textstring to send
+    /// @return 0 if successful or an error code
     int SendData(const std::string s) { return sockClient.SendData(s); }
 private:
     virtual void ClientActivity() {}
@@ -238,24 +246,52 @@ private:
     std::vector<SocketThread*> streamClientGone;
 
 public:
+    /// @brief SocketListener Constructor
     SocketListener(std::string service = "", int sockType = SOCK_STREAM) { if (service.size()) Create(service, sockType); }
     virtual ~SocketListener();
 
 public:
+    /// @brief Create SocketListener
+    /// @param service service name or port number
+    /// @sockType Socket type,normally Stream
     bool Create(std::string service, int sockType = SOCK_STREAM);
 
+    /// @brief add a Client thread
+    /// @param thd SocketThread
+    /// @return true if successfull
     bool AddClient(SocketThread* thd);
+
+    /// @brief remove a Client thread
+    /// @param thd SocketThread
+    /// @return true if successfull
     virtual bool RemoveClient(SocketThread* thd);
 
+    /// @brief get number of stream clients
+    /// @return size of streamClient vector
     size_t StreamClientSize() { return streamClient.size(); }
+
+    /// @brief get a specific stream client
+    /// @param i index in streamClient vector
+    /// @return SocketThread 
     SocketThread* StreamClientAt(size_t i) { return streamClient[i]; }
 
+    /// @brief terminate the SocketListener
     void Terminate();
 
 private:
+    /// @brief the listener thread function
     void ThdFuncListener();
+
+    /// @brief remove all ended clients from the client vector
     void RemoveEndedClients();
+
+    /// @brief function to handle Datagram if used as a UDP Listener
     virtual void OnDatagram(const char* data, int len) {}
+
+    /// @brief create a Socket thread
+    /// @param s Socket
+    /// @param l SocketListener
+    /// @return SocketThread
     virtual SocketThread* CreateSocketThread(SOCKET s, SocketListener* l) { return new SocketThread(s, l); }
 
 
@@ -268,6 +304,9 @@ public:
     virtual ~TcpListener() {}
 
 public:
+    /// @brief create a TcpListener
+    /// @param service service name or portnumber
+    /// @return true if successfull
     bool Create(std::string service) { return SocketListener::Create(service, SOCK_STREAM); }
 
 };
@@ -281,6 +320,9 @@ public:
     virtual ~UdpListener() {}
 
 public:
+    /// @brief create a UdpListener
+/// @param service service name or portnumber
+/// @return true if successfull
     bool Create(std::string service) { return SocketListener::Create(service, SOCK_DGRAM); }
 
 private:

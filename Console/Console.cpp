@@ -31,6 +31,7 @@ std::string selectedSnapshotFile;
 float GetContentScale();
 
 /// @brief set up the listening thread
+/// @param cmdService service name or portnumber
 /// @return true if listener thread was created
 bool SetupListener(std::string cmdService) {
     return listening.Create(cmdService);
@@ -269,7 +270,6 @@ public:
     }
 
 } snapshotDisplayCache;
-
 
 
 /// @brief Display the snapshot window

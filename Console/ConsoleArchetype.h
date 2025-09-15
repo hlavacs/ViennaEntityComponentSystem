@@ -30,6 +30,9 @@ namespace Console {
 			for (auto& e : entities) e.second.SetArchetype(this);
 			return *this;
 		}
+		/// @brief copy another archetype
+		/// @param org original Archetype
+		/// @return reference to copy of archetype
 		Archetype& CopyArchetype(Archetype const& org) {
 			Clear();
 			dataTypes = org.dataTypes;
@@ -37,10 +40,15 @@ namespace Console {
 			hash = org.hash;
 			return *this;
 		}
-
+		/// @brief set the used registry
+		/// @param r Pointer to the registry
 		void SetRegistry(Registry* r = nullptr);
+
+		/// @brief get the registry
+		/// @return registry pointer
 		Registry* GetRegistry() { return registry; }
 
+		/// @brief Clear Archetype contents
 		void Clear() {
 			entities.clear();
 			dataTypes.clear();
@@ -48,13 +56,19 @@ namespace Console {
 			hash = 0;
 		}
 
+		/// @brief get entities of archetype
+		/// @return map of entities with their handles
 		std::map<size_t, Entity>& GetEntities() {
 			return entities;
 		}
 
+		/// @brief add an entity to the archetype
+		/// @param e entity 
 		void AddEntity(Entity& e);
 
-
+		/// @brief find an entity in the archetype
+		/// @param id handle of the entity
+		/// @returns entity pointer if found, else nullptr
 		Entity* FindEntity(size_t id) {
 			auto i = entities.find(id);
 			if (i != entities.end()) {
@@ -63,19 +77,25 @@ namespace Console {
 			else return nullptr;
 		}
 
+		/// @brief get tags of the archetype
+		/// @returns list of tags
 		std::list<std::size_t>& GetTags() {
 			return tags;
 		}
 
+		/// @brief add a tag to the archetype
+		/// @param tagid entity 
 		int AddTag(size_t tagid) {
 			tags.push_back(tagid);
 			return 0;
 		}
 
+		/// @brief get hash of the archetype
 		size_t GetHash() {
 			return hash;
 		}
 
+		/// @brief get hash of the archetype as a string
 		std::string ToString() {
 			return std::to_string(hash);
 		}
