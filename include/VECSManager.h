@@ -1,4 +1,5 @@
 #pragma once
+#define REGISTRYTYPE_PARALLEL
 
 #include <VECS.h>
 #include <VECSRegistry.h>
@@ -55,8 +56,7 @@ namespace vecs {
                     res_prom.set_value(m_system->GetView<Ts...>(std::forward<std::vector<size_t>>(yes), std::forward<std::vector<size_t>>(no)));
                 });
             
-            Registry::View<Ts...> res = res_fut.get();
-            return res;
+            return res_fut.get();
 		}
 
 
@@ -99,12 +99,11 @@ namespace vecs {
             std::future<Registry::to_ref_t<T>> res_fut = res_prom.get_future();
 
             m_threadpool->enqueue( [&] {
-                std::shared_lock lock(m_system->GetArchetypeMutex(handle));
+                std::shared_lock lock(m_system->GetSlotMapMutex(handle.GetStorageIndex()));
                 res_prom.set_value(m_system->Get<T>(handle));
             });
-            Registry::to_ref_t<T> res = res_fut.get();
 
-            return res;
+            return res_fut.get();
         }
 
 
@@ -120,12 +119,11 @@ namespace vecs {
             std::future<std::tuple<Registry::to_ref_t<Ts>...>> res_fut = res_prom.get_future();
 
             m_threadpool->enqueue( [&] {
-                    std::shared_lock lock(m_system->GetArchetypeMutex(handle));
+                    std::shared_lock lock(m_system->GetSlotMapMutex(handle.GetStorageIndex()));
                     res_prom.set_value(m_system->Get<Ts...>(handle));
             });
-            std::tuple<Registry::to_ref_t<Ts>...> res = res_fut.get();
 
-            return res;
+            return res_fut.get();
         }
 
 

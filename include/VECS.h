@@ -73,7 +73,7 @@ namespace vecs {
 	}
 }
 
-#if !defined(REGISTRYTYPE_SEQUENTIAL) || !defined(REGISTRYTYPE_PARALLEL)
+#if !defined(REGISTRYTYPE_PARALLEL) && !defined(REGISTRYTYPE_SEQUENTIAL)
 	#define REGISTRYTYPE_SEQUENTIAL
 #endif
 

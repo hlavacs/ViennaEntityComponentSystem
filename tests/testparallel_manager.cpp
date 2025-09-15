@@ -1,5 +1,3 @@
-#define REGISTRYTYPE_PARALLEL
-
 #include <iostream>
 #include <string>
 #include <gtest/gtest.h>
