@@ -20,7 +20,6 @@ char (*__countof_helper(_CountofType(&_Array)[_SizeOfArray]))[_SizeOfArray];
 #endif
 
 ConsoleListener listening;
-std::string service = "2000";
 
 static bool connectionWindow = true;
 static bool viewSnapshotWindow = false;
@@ -33,8 +32,8 @@ float GetContentScale();
 
 /// @brief set up the listening thread
 /// @return true if listener thread was created
-bool SetupListener() {
-    return listening.Create(service);
+bool SetupListener(std::string cmdService) {
+    return listening.Create(cmdService);
 }
 
 /// @brief terminate the listening thread

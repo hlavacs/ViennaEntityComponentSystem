@@ -360,8 +360,24 @@ float GetContentScale()
 }
 
 // Main code
-int main(int, char**)
+int main(int argc, char* argv[])
 {
+    std::string servicePort = "2000";
+    for (int i = 1; i < argc; i++) {
+        if (argv[i][0] == '-')
+            for (int j = 1; argv[i][j]; j++)
+                switch (argv[i][j]) {
+                case 'P':
+                case 'p':
+                    servicePort = argv[i] + j + 1;
+                    j = (int)strlen(argv[i]) - 1;
+                    break;
+                default:
+                    // simply ignore unknown command line parameters
+                    break;
+                }
+    }
+
     // Setup SDL
     // [If using SDL_MAIN_USE_CALLBACKS: all code below until the main loop starts would likely be your SDL_AppInit() function]
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD))
@@ -480,7 +496,7 @@ int main(int, char**)
     // Main loop
     bool done = false;
 
-    if (!SetupListener())
+    if (!SetupListener(servicePort))
         done = true;
 
     while (!done)
