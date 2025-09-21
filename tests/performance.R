@@ -10,7 +10,7 @@ df <- read.csv("out.csv", fileEncoding = "UTF-16",header=TRUE,sep=",", stringsAs
 df$subgroup <- trimws(df$subgroup)
 df$dataset <- trimws(df$dataset)
 #df <- df[df$dataset == "1C",]
-df <- df[df$dataset == "1C" | df$subgroup == "Rnd",]
+#df <- df[df$dataset == "1C" | df$subgroup == "Rnd",]
 df$subgroup <- factor(df$subgroup)
 df$dataset <- factor(df$dataset, levels = mixedsort(unique(df$dataset)))
 all_data <- df
@@ -45,14 +45,14 @@ p1 <- ggplot(summary_data, aes(x = x, color = dataset, linetype = subgroup)) +
   theme(legend.position = "right") + 
   ylim(0.001, 10000) +
   scale_x_log10() +
-  scale_y_log10() +
+  scale_y_log10(limits = c(1, 10000)) +
   labs(x = "Number of Entities", y = "Time (us)")
 
 
 # Display plots
 print(p1)
 #ggsave("my_plot1.png", plot = p1, bg = "white", width = 10, height = 6, dpi = 300)
-ggsave("my_plot5.png", plot = p1, bg = "white", width = 10, height = 6, dpi = 300)
-#ggsave("my_plot10.png", plot = p1, bg = "white", width = 10, height = 6, dpi = 300)
+#ggsave("my_plot5.png", plot = p1, bg = "white", width = 10, height = 6, dpi = 300)
+ggsave("my_plot10.png", plot = p1, bg = "white", width = 10, height = 6, dpi = 300)
 
 
