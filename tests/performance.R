@@ -1,10 +1,20 @@
 # Load required libraries
 library(ggplot2)
 library(dplyr)
+library(gtools)
 
 
-df <- read.csv("out.csv", fileEncoding = "UTF-16",header=TRUE,sep=",", stringsAsFactors =TRUE)
+#df <- read.csv("out.csv", fileEncoding = "UTF-16",header=TRUE,sep=",", stringsAsFactors =TRUE)
+df <- read.csv("out.csv", fileEncoding = "UTF-16",header=TRUE,sep=",", stringsAsFactors =FALSE)
+
+df$subgroup <- trimws(df$subgroup)
+df$dataset <- trimws(df$dataset)
+#df <- df[df$dataset == "1C",]
+df <- df[df$dataset == "1C" | df$subgroup == "Rnd",]
+df$subgroup <- factor(df$subgroup)
+df$dataset <- factor(df$dataset, levels = mixedsort(unique(df$dataset)))
 all_data <- df
+
 
 # Calculate summary statistics for confidence intervals
 summary_data <- all_data %>%
@@ -33,6 +43,7 @@ p1 <- ggplot(summary_data, aes(x = x, color = dataset, linetype = subgroup)) +
   theme_minimal() +
   theme_bw(base_size = 16) +
   theme(legend.position = "right") + 
+  ylim(0.001, 10000) +
   scale_x_log10() +
   scale_y_log10() +
   labs(x = "Number of Entities", y = "Time (us)")
@@ -40,6 +51,8 @@ p1 <- ggplot(summary_data, aes(x = x, color = dataset, linetype = subgroup)) +
 
 # Display plots
 print(p1)
-ggsave("my_plot.png", plot = p1, bg = "white", width = 10, height = 6, dpi = 300)
+#ggsave("my_plot1.png", plot = p1, bg = "white", width = 10, height = 6, dpi = 300)
+ggsave("my_plot5.png", plot = p1, bg = "white", width = 10, height = 6, dpi = 300)
+#ggsave("my_plot10.png", plot = p1, bg = "white", width = 10, height = 6, dpi = 300)
 
 
