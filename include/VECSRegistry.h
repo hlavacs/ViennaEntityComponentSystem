@@ -531,10 +531,34 @@ namespace vecs {
 			return true;
 		}
 
-		/// @brief Get the archetype.
-		/// @return Reference to the archetype.
+		/// @brief Get the archetype hash.
+		/// @return Hash of the archetype.
 		[[nodiscard]] inline auto GetArchetypeHash(Handle handle) -> size_t {
 			return GetArchetypeAndIndex(handle).m_arch->GetHash();
+		}
+
+		/// @brief Get the archetype if it exists.
+		/// @return The pointer to the archetype or nullptr.
+		template<typename... Ts>
+		auto GetArchetypeIfExists(const std::vector<size_t>&& tags = {}, const std::vector<size_t>&& ignore = {}) {
+			auto hs = CreateTypeListHash<Ts...>(std::forward<decltype(tags)>(tags), std::forward<decltype(ignore)>(ignore));
+			if( m_archetypes.contains( hs ) ) { return m_archetypes[hs].get(); }
+			else {
+				Archetype* noArch {nullptr};
+				return noArch;
+			}
+		}
+
+		/// @brief Get the current index of the slotmap for the current thread.
+		/// @return Index of the slotmap.
+		size_t GetSlotmapIndex() {
+			return m_slotMapIndex;
+		}
+
+		/// @brief Get the next index of the slotmap for the current thread.
+		/// @return Next index of the slotmap.
+		size_t GetNextSlotmapIndex() {
+			return (m_slotMapIndex + 1) & (NUMBER_SLOTMAPS::value - 1);;
 		}
 
 		/// @brief Get a Ref to a handle.
@@ -604,6 +628,16 @@ namespace vecs {
 			(AddType(all, Type<Ts>()), ...);
 			if(arch) { for( auto type : arch->Types() ) { if(!ContainsType(ignore, type)) { AddType(all, type); } } }
 			return all;
+		}
+
+		/// @brief Get a hash for a type list.
+		/// @param tags Use these tag hashes
+		/// @return A hash of type hashes
+		template<typename... Ts>
+		auto CreateTypeListHash(const std::vector<size_t>&& tags, const std::vector<size_t>&& ignore) -> size_t {
+			std::vector<size_t> all{ tags.begin(), tags.end() };
+			(AddType(all, Type<Ts>()), ...);
+			return Hash(all);
 		}
 
 		/// @brief Get an archetype with components.
