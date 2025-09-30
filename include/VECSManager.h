@@ -47,16 +47,9 @@ namespace vecs {
 		template<typename... Ts>
 			requires (vtll::unique<vtll::tl<Ts...>>::value)
 		[[nodiscard]] auto GetView(std::vector<size_t>&& yes={}, std::vector<size_t>&& no={}) -> Registry::View<Ts...> {
-            
-            std::promise<Registry::View<Ts...>> res_prom;
-            std::future<Registry::View<Ts...>> res_fut = res_prom.get_future();
-
-            m_threadpool->enqueue( [&] {
-                    std::shared_lock lock(m_system->GetMutex());
-                    res_prom.set_value(m_system->GetView<Ts...>(std::forward<std::vector<size_t>>(yes), std::forward<std::vector<size_t>>(no)));
-                });
-            
-            return res_fut.get();
+            std::shared_lock lock(m_system->GetMutex());
+            auto view = m_system->GetView<Ts...>(std::forward<std::vector<size_t>>(yes), std::forward<std::vector<size_t>>(no));
+            return view;
 		}
 
 
@@ -94,16 +87,9 @@ namespace vecs {
 		/// @return The component value or reference to it.
         template<typename T>
         auto Get(Handle handle) -> Registry::to_ref_t<T> {
-
-            std::promise<Registry::to_ref_t<T>> res_prom;
-            std::future<Registry::to_ref_t<T>> res_fut = res_prom.get_future();
-
-            m_threadpool->enqueue( [&] {
-                std::shared_lock lock(m_system->GetSlotMapMutex(handle.GetStorageIndex()));
-                res_prom.set_value(m_system->Get<T>(handle));
-            });
-
-            return res_fut.get();
+            std::shared_lock lock(m_system->GetSlotMapMutex(handle.GetStorageIndex()));
+            auto comp = m_system->Get<T>(handle);
+            return comp;
         }
 
 
@@ -114,22 +100,14 @@ namespace vecs {
         template<typename... Ts>
             requires (sizeof...(Ts)>1 && vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<Ts...>, Handle&>::value)
         auto Get(Handle handle) -> std::tuple<Registry::to_ref_t<Ts>...> {
-            
-            std::promise<std::tuple<Registry::to_ref_t<Ts>...>> res_prom;
-            std::future<std::tuple<Registry::to_ref_t<Ts>...>> res_fut = res_prom.get_future();
-
-            m_threadpool->enqueue( [&] {
-                    std::shared_lock lock(m_system->GetSlotMapMutex(handle.GetStorageIndex()));
-                    res_prom.set_value(m_system->Get<Ts...>(handle));
-            });
-
-            return res_fut.get();
+            std::shared_lock lock(m_system->GetSlotMapMutex(handle.GetStorageIndex()));
+            auto comps = m_system->Get<Ts...>(handle);
+            return comps;
         }
 
 
 
     ////////// ADDING/CHANGING ENTITIES/COMPONENTS/TAGS //////////
-        //TODO: check GetNewSlotmapIndex() if different idx when in parallel
 
         /// @brief Create an entity with components.
 		/// @tparam ...Ts The types of the components.
@@ -189,11 +167,14 @@ namespace vecs {
                     m_system->Put(handle, v);
                 });
             } else {
-                m_threadpool->enqueue( [&] {
-                    std::scoped_lock lock(m_system->GetMutex());
+                auto arch = m_system->GetArchetypeIfExists<Ts...>();
+                if (arch) {
+                    std::scoped_lock lock(arch->GetMutex(), m_system->GetArchetypeMutex(handle));
                     m_system->Put(handle, v);
-                });
-                waitIdle();
+                } else {
+                    std::scoped_lock lock(m_system->GetArchetypeMutex(handle));
+                    m_system->Put(handle, v);
+                }
             }
         }
 
@@ -213,11 +194,14 @@ namespace vecs {
                     m_system->Put(handle, std::forward<Ts>(vs)...);
                 });
             } else {
-                m_threadpool->enqueue( [&] {
-                    std::scoped_lock lock(m_system->GetMutex());
+                auto arch = m_system->GetArchetypeIfExists<Ts...>();
+                if (arch) {
+                    std::scoped_lock lock(arch->GetMutex(), m_system->GetArchetypeMutex(handle));
                     m_system->Put(handle, std::forward<Ts>(vs)...);
-                });
-                waitIdle();
+                } else {
+                    std::scoped_lock lock(m_system->GetArchetypeMutex(handle));
+                    m_system->Put(handle, std::forward<Ts>(vs)...);
+                }
             }
         }
 
@@ -229,11 +213,8 @@ namespace vecs {
 		template<typename... Ts>
         requires (std::is_integral_v<std::decay_t<Ts>> && ...)
         void AddTags(Handle handle, Ts... tags) {
-            m_threadpool->enqueue( [&] {
-                std::scoped_lock lock(m_system->GetArchetypeMutex(handle));
-                m_system->AddTags(handle, std::forward<Ts>(tags)...);
-            }); 
-            waitIdle();
+            std::scoped_lock lock(m_system->GetArchetypeMutex(handle));
+            m_system->AddTags(handle, std::forward<Ts>(tags)...);
         }
 
 
@@ -246,11 +227,8 @@ namespace vecs {
         template<typename... Ts>
             requires (std::is_integral_v<std::decay_t<Ts>> && ...)
         void EraseTags(Handle handle, Ts... tags) {
-            m_threadpool->enqueue( [&] {
-                std::scoped_lock lock(m_system->GetArchetypeMutex(handle));
-                m_system->EraseTags(handle,std::forward<Ts>(tags)...);
-            });
-            waitIdle();
+            std::scoped_lock lock(m_system->GetArchetypeMutex(handle));
+            m_system->EraseTags(handle,std::forward<Ts>(tags)...);
         }
 
 
@@ -260,22 +238,16 @@ namespace vecs {
 		template<typename... Ts>
             requires (vtll::unique<vtll::tl<Ts...>>::value && !vtll::has_type< vtll::tl<Ts...>, Handle>::value)
         void Erase(Handle handle) {
-            m_threadpool->enqueue( [&] {
-                std::scoped_lock lock(m_system->GetArchetypeMutex(handle));
-                m_system->Erase<Ts...>(handle);
-            });
-            waitIdle();
+            std::scoped_lock lock(m_system->GetArchetypeMutex(handle));
+            m_system->Erase<Ts...>(handle);
         }
 
 
         /// @brief Erase an entity from the registry.
 		/// @param handle The handle of the entity.
         void Erase(Handle handle) {
-            m_threadpool->enqueue( [&] {
-                std::scoped_lock lock(m_system->GetSlotMapMutex(handle.GetStorageIndex()));
-                m_system->Erase(handle);
-            });
-            waitIdle();
+            std::scoped_lock lock(m_system->GetSlotMapMutex(handle.GetStorageIndex()));
+            m_system->Erase(handle);
         }
 
 
@@ -311,10 +283,8 @@ namespace vecs {
 
         /// @brief Clear the registry by removing all entities.
 		void Clear() {
-            m_threadpool->enqueue( [&] {
-                std::scoped_lock lock(m_system->GetMutex());
-                m_system->Clear();
-            });
+            std::scoped_lock lock(m_system->GetMutex());
+            m_system->Clear();
 		}
 
 
@@ -322,6 +292,7 @@ namespace vecs {
     ////////// CONVENIENCE REGISTRY //////////
         /// @brief Get the current size of the registry.
         size_t Size() {
+            std::shared_lock lock(m_system->GetMutex());
             return m_system->Size();
         }
 
@@ -330,6 +301,7 @@ namespace vecs {
         /// @param handle The handle of the entity.
         /// @return true if the entity exists, else false.
         bool Exists(Handle handle) {
+            std::shared_lock lock(m_system->GetSlotMapMutex(handle.GetStorageIndex()));
             return m_system->Exists(handle);
         }
 
@@ -340,9 +312,18 @@ namespace vecs {
 		/// @return true if the entity has the component, else false.
         template<typename T>
         bool Has(Handle handle) {
+            std::shared_lock lock(m_system->GetSlotMapMutex(handle.GetStorageIndex()));
             return m_system->Has<T>(handle);
         }
 
+        /// @brief Test if an entity has a tag.
+		/// @param handle The handle of the entity.
+		/// @param tag The tag to test.
+		/// @return true if the entity has the tag, else false.
+		bool Has(Handle handle, size_t ti) {
+            std::shared_lock lock(m_system->GetSlotMapMutex(handle.GetStorageIndex()));
+			return m_system->Has(handle, ti);
+		}
         
         /// @brief Test if an entity in the registry has multiple components.
         /// @tparam ...Ts Types of the components to check
@@ -351,6 +332,7 @@ namespace vecs {
         template<typename... Ts>
             requires ((vtll::unique<vtll::tl<Ts...>>::value) && !vtll::has_type< vtll::tl<std::decay_t<Ts>...>, Handle>::value)
         bool HasAll(Handle handle, Ts&&... vs) {
+            std::shared_lock lock(m_system->GetArchetypeMutex(handle));
             return m_system->HasAll(handle, std::forward<Ts>(vs)...);
         }
 
