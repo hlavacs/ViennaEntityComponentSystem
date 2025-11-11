@@ -319,6 +319,9 @@ namespace vecs {
                     auto t1 = std::chrono::high_resolution_clock::now();
                     std::string josnap = registry->GetSnapshot();
                     auto t2 = std::chrono::high_resolution_clock::now();
+                    std::string ststmps = ",\"gst1\":" + std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(t1.time_since_epoch()).count()) +
+                        ",\"gst2\":" + std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(t2.time_since_epoch()).count());
+                    josnap.insert(josnap.size() - 1, ststmps);
                     SendMessage(josnap);
                     auto t3 = std::chrono::high_resolution_clock::now();
                     auto cmics = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
