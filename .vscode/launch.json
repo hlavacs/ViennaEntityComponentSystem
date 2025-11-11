@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "MSVC Launch Debug",
+            "name": "MSVC Test Debug",
             "type": "cppvsdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/tests/Debug/testvecs.exe",  
@@ -16,7 +16,7 @@
             "externalConsole": false
         },
         {
-            "name": "MSVC Launch Release",
+            "name": "MSVC Test Release",
             "type": "cppvsdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/tests/Release/testvecs.exe",  
@@ -27,7 +27,7 @@
             "externalConsole": false
         },
         {
-            "name": "Clang Launch",
+            "name": "Clang Test",
             "type": "cppvsdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/tests/testvecs.exe",  
@@ -38,10 +38,54 @@
             "externalConsole": false
         },
         {
-            "name": "Ubuntu Clang Launch",
+            "name": "Ubuntu Clang Test",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/tests/testvecs",  
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false
+        },
+        {
+            "name": "MSVC Perf Debug",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/tests/Debug/performance.exe",  
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false
+        },
+        {
+            "name": "MSVC Perf Release",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/tests/Release/performance.exe",  
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false
+        },
+        {
+            "name": "Clang Perf",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/tests/performance.exe",  
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false
+        },
+        {
+            "name": "Ubuntu Clang Perf",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/tests/performance",  
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

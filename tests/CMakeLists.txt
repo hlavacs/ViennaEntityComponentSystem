@@ -16,4 +16,8 @@ set(HEADERS
 
 add_executable(${TARGET} ${SOURCE} ${HEADERS})
 
+
+add_executable(performance performance.cpp ${HEADERS})
+
+
 add_executable(testvecscons testvecscons.cpp ${HEADERS})
