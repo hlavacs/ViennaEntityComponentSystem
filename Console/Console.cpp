@@ -31,7 +31,6 @@ std::string selectedSnapshotFile;
 float GetContentScale();
 
 /// @brief set up the listening thread
-/// @param cmdService service name or portnumber
 /// @return true if listener thread was created
 bool SetupListener(std::string cmdService) {
     return listening.Create(cmdService);
@@ -102,7 +101,7 @@ public:
 
             struct {
                 bool operator()(std::string& a, std::string& b) {
-                    size_t sa, sb;
+                    size_t sa = 0, sb = 0;
                     sscanf(a.c_str(), "%zu", &sa);
                     sscanf(b.c_str(), "%zu", &sb);
                     return sa < sb;
@@ -272,6 +271,7 @@ public:
 } snapshotDisplayCache;
 
 
+
 /// @brief Display the snapshot window
 /// @param listening Listening thread containing data.
 /// @param p_open bool for opening and closing the window
@@ -364,7 +364,7 @@ void static ShowViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
                 ImGuiListClipper clipper;
                 auto& cache = snapshotDisplayCache.GetArchetypeCache();
                 auto archetypeLines = cache.size();
-                clipper.Begin(archetypeLines);
+                clipper.Begin(static_cast<int>(archetypeLines));
                 while (clipper.Step()) {
                     for (int row = clipper.DisplayStart; row < clipper.DisplayEnd && row < archetypeLines; row++) {
 
@@ -389,7 +389,7 @@ void static ShowViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
                 ImGuiListClipper clipper;
                 auto& cache = snapshotDisplayCache.GetEntityCache();
                 auto entityLines = cache.size();
-                clipper.Begin(entityLines);
+                clipper.Begin(static_cast<int>(entityLines));
                 while (clipper.Step()) {
                     for (int row = clipper.DisplayStart; row < clipper.DisplayEnd && row < entityLines; row++) {
 
@@ -416,7 +416,7 @@ void static ShowViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
                 ImGuiListClipper clipper;
                 auto& cache = snapshotDisplayCache.GetComponentCache();
                 auto componentLines = cache.size();
-                clipper.Begin(componentLines);
+                clipper.Begin(static_cast<int>(componentLines));
                 while (clipper.Step()) {
                     for (int row = clipper.DisplayStart; row < clipper.DisplayEnd && row < componentLines; row++) {
 
@@ -444,7 +444,7 @@ void static ShowViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
                 ImGuiListClipper clipper;
                 auto& cache = snapshotDisplayCache.GetTagCache();
                 auto tagLines = cache.size();
-                clipper.Begin(tagLines);
+                clipper.Begin(static_cast<int>(tagLines));
                 while (clipper.Step()) {
                     for (int row = clipper.DisplayStart; row < clipper.DisplayEnd && row < tagLines; row++) {
 
@@ -578,10 +578,20 @@ void static ShowViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
             }
             // this is for debugging purposes only and can be removed once the caching works reliably!
             else {
-                auto mics = std::chrono::duration_cast<std::chrono::milliseconds>(snap.GetParsedTS() - snap.GetJsonTS()).count();
                 std::string initText = std::string("Snapshot Entities: ") + std::to_string(snap.GetEntityCount()) +
-                    ", Components: " + std::to_string(snap.GetComponentCount()) +
-                    ", Parse time: " + std::to_string(mics) + " msecs";
+                    ", Components: " + std::to_string(snap.GetComponentCount());
+#if CONSOLE_XF_METRICS
+                auto milsGather = std::chrono::duration_cast<std::chrono::milliseconds>(snap.GetSentTS() - snap.GetRequestedTS()).count();
+                auto milsSend = std::chrono::duration_cast<std::chrono::milliseconds>(snap.GetReceivedEndTS() - snap.GetSentTS()).count();
+                auto milsJson = std::chrono::duration_cast<std::chrono::milliseconds>(snap.GetJsonTS() - snap.GetReceivedEndTS()).count();
+                auto milsParse = std::chrono::duration_cast<std::chrono::milliseconds>(snap.GetParsedTS() - snap.GetJsonTS()).count();
+                auto milsTotal = std::chrono::duration_cast<std::chrono::milliseconds>(snap.GetParsedTS() - snap.GetRequestedTS()).count();
+                initText += ", Gather time: " + std::to_string(milsGather) + " msecs" +
+                    ", Send Time: " + std::to_string(milsSend) + " msecs" +
+                    ", JSON time: " + std::to_string(milsJson) + " msecs" +
+                    ", Parse time: " + std::to_string(milsParse) + " msecs" +
+                    ", Total time: " + std::to_string(milsTotal) + " msecs";
+#endif
                 ImGui::TextUnformatted(initText.c_str());
                 initText = std::string("Table lines: ") + std::to_string(tableLines);
                 ImGui::TextUnformatted(initText.c_str());
@@ -768,7 +778,7 @@ void static ShowLiveView(ConsoleListener& listening, bool* p_open)
                 vecs->RequestLiveView(false);
             }
 
-            if (ImPlot::BeginPlot("TestPlot", ImVec2(-1, -1))) {
+            if (ImPlot::BeginPlot("Live View", ImVec2(-1, -1))) {
 
                 ImPlot::SetupAxisLimits(ImAxis_X1, 0, _countof(vecs->lvEntityCount));
                 ImPlot::SetupAxisLimits(ImAxis_Y1, 0, vecs->lvEntityMax, ImPlotCond_Always);

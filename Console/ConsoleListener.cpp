@@ -18,6 +18,7 @@ typedef struct hostent HOSTENT;
 #endif
 
 #include <iostream>
+#include <fstream>
 #include <algorithm>
 
 #include <errno.h>
@@ -135,11 +136,14 @@ void ConsoleSocketThread::ClientActivity() {
                     }
                     json += sbuf[i];
                     if (complete) {
-#if 1   // Debug statistics - remove if not needed any more
+#if CONSOLE_XF_METRICS  // metrics - remove when not necessary
                         auto tsProcessed = std::chrono::high_resolution_clock::now();
                         auto msecs = std::chrono::duration_cast<std::chrono::milliseconds>(tsProcessed - tsStart).count();
                         if (msecs > 10)
                             std::cout << "JSON receive time: " << msecs << " msecs\n";
+                        std::string ststmps = ",\"gst3\":" + std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(tsStart.time_since_epoch()).count()) +
+                            ",\"gst4\":" + std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(tsProcessed.time_since_epoch()).count());
+                        json.insert(json.size() - 1, ststmps);
 #endif
                         ProcessJSON(json);  // process completed json string
                         json.clear();
@@ -197,13 +201,13 @@ bool ConsoleSocketThread::ProcessJSON(std::string sjson) {
 
     switch (cmd) {
     case cmdHandshake:
-        OnHandshake(msgjson);
+        OnHandshake(sjson, msgjson);
         break;
     case cmdSnapshot:
-        OnSnapshot(msgjson);
+        OnSnapshot(sjson, msgjson);
         break;
     case cmdLiveView:
-        OnLiveView(msgjson);
+        OnLiveView(sjson, msgjson);
         break;
     default:
         // keep the compiler happy
@@ -215,7 +219,7 @@ bool ConsoleSocketThread::ProcessJSON(std::string sjson) {
 /// @brief handle incoming handshake commands
 /// @param json Json containing handshake data
 /// @return true if valid json
-bool ConsoleSocketThread::OnHandshake(json const& json) {
+bool ConsoleSocketThread::OnHandshake(std::string& sjson, json& json) {
     try {
         pid = json["pid"];
     }
@@ -235,11 +239,12 @@ bool ConsoleSocketThread::RequestSnapshot() {
 /// @brief parse incoming snapshots
 /// @param json Json containing snapshot data
 /// @return true if valid json
-bool ConsoleSocketThread::ParseSnapshot(nlohmann::json const& json) {
-    // clear potentially pre-existing snapshot
+bool ConsoleSocketThread::ParseSnapshot(nlohmann::json& json, std::string* psjson) {
     int newSnapIdx = snapidx ^ 1;  // switch to other snapshot to prevent conflicts
-    snapshot[newSnapIdx].Clear();
-    snapshot[newSnapIdx].SetJsonsnap(json.dump());
+    auto& snap = snapshot[newSnapIdx];
+
+    // clear potentially pre-existing snapshot
+    snap.Clear();
     // parse incoming snapshot, create internal structure for it that can be handled from GUI
     try {
         entitycount = json["entities"];
@@ -248,14 +253,14 @@ bool ConsoleSocketThread::ParseSnapshot(nlohmann::json const& json) {
             auto& a2 = a["archetype"];
             auto& maps = a2["maps"];
             for (auto& m : maps) {
-                snapshot[newSnapIdx].AddTypeName(m["id"], m["name"]);
+                snap.AddTypeName(m["id"], m["name"]);
             }
             auto& types = a2["types"];
             std::vector<size_t> tags;
             for (auto& t : types) {
                 // this is a bit unsafe, as there are no constraints defined for tags.
-                if (!snapshot[newSnapIdx].HasTypeName(t)) {  // if it s not a type, it is a tag.
-                    snapshot[newSnapIdx].AddTag(t, std::to_string(t.get<size_t>()));
+                if (!snap.HasTypeName(t)) {  // if it s not a type, it is a tag.
+                    snap.AddTag(t, std::to_string(t.get<size_t>()));
                     tags.push_back(t); // remember as one of the tags to add to the entities in this archetype
                 }
             }
@@ -286,9 +291,71 @@ bool ConsoleSocketThread::ParseSnapshot(nlohmann::json const& json) {
                 }
                 ca.AddEntity(ce);
             }
-            snapshot[newSnapIdx].AddArchetype(ca);
+            snap.AddArchetype(ca);
         }
-        snapshot[newSnapIdx].SetParsed();
+#if CONSOLE_XF_METRICS
+        snap.SetParsed();
+        auto gst = json.find("gst1"); // look for snapshot fetch start timestamp
+        if (gst != json.end() && gst->is_number())
+            snap.SetRequested(std::chrono::high_resolution_clock::time_point(std::chrono::microseconds(*gst)));
+        gst = json.find("gst2"); // look for snapshot sent timestamp
+        if (gst != json.end() && gst->is_number())
+            snap.SetSent(std::chrono::high_resolution_clock::time_point(std::chrono::microseconds(*gst)));
+        gst = json.find("gst3"); // look for snapshot received start timestamp
+        if (gst != json.end() && gst->is_number())
+            snap.SetReceivedStart(std::chrono::high_resolution_clock::time_point(std::chrono::microseconds(*gst)));
+        gst = json.find("gst4"); // look for snapshot received end timestamp
+        if (gst != json.end() && gst->is_number())
+            snap.SetReceivedEnd(std::chrono::high_resolution_clock::time_point(std::chrono::microseconds(*gst)));
+        gst = json.find("gst5"); // look for JSON fetched timestamp
+        if (gst != json.end() && gst->is_number())
+            snap.SetFetched(std::chrono::high_resolution_clock::time_point(std::chrono::microseconds(*gst)));
+        else {
+            // if no parsed timestamp available, be sure to add one!
+            if (psjson) {// either to string, if one has been passed in
+                std::string ststmp = ",\"gst5\":" + std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(snap.GetJsonTS().time_since_epoch()).count());
+                psjson->insert(psjson->size() - 1, ststmp);
+            }
+            else  // or to the json object otherwise
+                json += { "gst5", std::chrono::duration_cast<std::chrono::microseconds>(snap.GetJsonTS().time_since_epoch()).count() };
+        }
+        gst = json.find("gst6"); // look for snapshot parsed timestamp
+        if (gst != json.end() && gst->is_number())
+            snap.SetParsed(std::chrono::high_resolution_clock::time_point(std::chrono::microseconds(*gst)));
+        else {
+            // if no parsed timestamp available, be sure to add one!
+            if (psjson) {// either to string, if one has been passed in
+                std::string ststmp = ",\"gst6\":" + std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(snap.GetParsedTS().time_since_epoch()).count());
+                psjson->insert(psjson->size() - 1, ststmp);
+            }
+            else  // or to the json object otherwise
+                json += { "gst6", std::chrono::duration_cast<std::chrono::microseconds>(snap.GetParsedTS().time_since_epoch()).count() };
+        }
+#if 0  // ONLY ACTIVATE IF YOU WANT TO CREATE STATISTICS FILE!
+        try {
+            auto milsGather = std::chrono::duration_cast<std::chrono::milliseconds>(snap.GetSentTS() - snap.GetRequestedTS()).count();
+            auto milsSend = std::chrono::duration_cast<std::chrono::milliseconds>(snap.GetReceivedEndTS() - snap.GetSentTS()).count();
+            auto milsJson = std::chrono::duration_cast<std::chrono::milliseconds>(snap.GetJsonTS() - snap.GetReceivedEndTS()).count();
+            auto milsParse = std::chrono::duration_cast<std::chrono::milliseconds>(snap.GetParsedTS() - snap.GetJsonTS()).count();
+            auto milsTotal = std::chrono::duration_cast<std::chrono::milliseconds>(snap.GetParsedTS() - snap.GetRequestedTS()).count();
+            // this creates a .csv file. Each line contains:
+            // Entities,Components,Gather(ms),Send(ms),JSON(ms),Parse(ms),Total(ms)
+            std::string initText = std::to_string(snap.GetEntityCount()) +
+                "," + std::to_string(snap.GetComponentCount()) +
+                "," + std::to_string(milsGather) +
+                "," + std::to_string(milsSend) +
+                "," + std::to_string(milsJson) +
+                "," + std::to_string(milsParse) +
+                "," + std::to_string(milsTotal) +
+                "\n";
+            std::ofstream("snapshotmetrics.csv", std::ios::app) << initText;
+        }
+        catch (...) {
+            // ignore. If the disk is full or defective, that's the smallest of our problems.
+        }
+#endif
+#endif
+        snap.SetJsonsnap(psjson ? *psjson : json.dump());
         snapidx = newSnapIdx;
     }
     catch (json::exception& e) {
@@ -329,7 +396,7 @@ bool ConsoleSocketThread::SendWatchlist(std::map<size_t, Console::WatchEntity>& 
 /// @brief parse incoming live view data, create internal structure for it that can be handled from GUI
 /// @param json Json containing live view data
 /// @return true if valid json
-bool ConsoleSocketThread::OnLiveView(json const& json) {
+bool ConsoleSocketThread::OnLiveView(std::string& sjson, json& json) {
     try {
         if (json.contains("entities")) {
             size_t entities = json["entities"];

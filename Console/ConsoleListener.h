@@ -50,6 +50,7 @@ namespace Console {
             SetArchetype(&arch);
             return *this;
         }
+
         /// @brief get name for a specific type
         /// @param t type as hash
         /// @return typename as string
@@ -94,26 +95,29 @@ private:
     size_t estSize{ 0 };
 
     virtual void ClientActivity();
-    
+
     /// @brief processes incoming json strings
     /// @param sjson String representing json data
     /// @return true if valid json
     bool ProcessJSON(std::string sjson);
 
     /// @brief handle incoming handshake commands
+    /// @param sjson string containing the Json object
     /// @param json Json containing handshake data
     /// @return true if valid json
-    bool OnHandshake(nlohmann::json const& json);
+    bool OnHandshake(std::string& sjson, nlohmann::json& json);
 
     /// @brief parse incoming snapshots
+    /// @param sjson string containing the Json object
     /// @param json Json containing snapshot data
     /// @return true if valid json
-    bool OnSnapshot(nlohmann::json const& json) { return ParseSnapshot(json); }
+    bool OnSnapshot(std::string& sjson, nlohmann::json& json) { return ParseSnapshot(json, &sjson); }
 
     /// @brief parse incoming live view data, create internal structure for it that can be handled from GUI
+    /// @param sjson string containing the Json object
     /// @param json Json containing live view data
     /// @return true if valid json
-    bool OnLiveView(nlohmann::json const& json);
+    bool OnLiveView(std::string& sjson, nlohmann::json& json);
 
 public:
     ConsoleSocketThread(SOCKET s, SocketListener* l) : SocketThread(s, l) {}
@@ -140,20 +144,21 @@ public:
     /// @return true if request was sent
     bool SendWatchlist(std::map<size_t, Console::WatchEntity>& watchlist);
 
-    /// @brief returs true if live view is live
+    /// @brief returns true if live view is live
     bool GetIsLive() { return isLive; }
 
     /// @brief parse incoming snapshots
     /// @param json Json containing snapshot data
+    /// @param psjson (optional) pointer to string containing the Json object
     /// @return true if valid json
-    bool ParseSnapshot(nlohmann::json const& json);
+    bool ParseSnapshot(nlohmann::json& json, std::string* psjson = nullptr);
 
     /// @brief add a entity to be watched and send updated watchlist to vecs
     void AddWatch(size_t handle) { watchlist[handle] = *snapshot[snapidx].FindEntity(handle); SendWatchlist(watchlist); }
-    
+
     /// @brief delete a entity to be watched and send updated watchlist to vecs
     void DeleteWatch(size_t handle) { watchlist.erase(handle); SendWatchlist(watchlist); }
-   
+
     /// @brief returns whether an entity is in the watchlist
     /// @return true if entity is in watchlist
     bool IsWatched(size_t handle) { return watchlist.contains(handle); }
@@ -174,7 +179,7 @@ public:
     ConsoleListener(std::string service = "") : TcpListener(service) {
         AddClient(CreateSocketThread(INVALID_SOCKET, this));  //create an empty Listener for "Load from File"
         GetVecs(0)->SetPid(1); // force it to PID 1 (which will never come in from any socket)
-    }   
+    }
 
     /// @brief remove a Client
     /// @param thd SocketThread to be removed

@@ -84,26 +84,22 @@ void TestConn(std::string consoleHost = "127.0.0.1", int consolePort = 2000) {
 
 	//Test to see changes in the liveview
 	static const char* letsjam[] = {
-		 "Mein kleiner gruener Kaktus",
-		 "faehrt morgen ins Buero -",
-		 "Hollari",
-		 "hollara",
-		 "hollaro!",
+		 "string 1",
+		 "string 2",
+		 "string 3",
+		 "string 4",
+		 "string 5",
 	#ifndef _DEBUG
-		 "Wir fahren mit der U-Bahn",
-		 "von hier nach anderswo",
-		 "Hollari",
-		 "hollara",
-		 "hollaro!",
-		 "Und wenn ein Boesewicht",
-		 "was Ungezog'nes spricht",
-		 "dann sag' ich's meinem Kaktus",
-		 "und der sticht, sticht, sticht",
-		 "Mein kleiner gruener Kaktus",
-		 "faehrt gerne ins Buero",
-		 "Hollari",
-		 "hollara",
-		 "hollaro!",
+		 "string 6",
+		 "string 7",
+		 "string 8",
+		 "string 9",
+		 "string 10",
+		 "string 11",
+		 "string 12",
+		 "string 13",
+		 "string 14",
+		 "string 15",
 	#endif
 	};
 
