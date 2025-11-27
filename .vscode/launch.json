@@ -27,6 +27,17 @@
             "externalConsole": false
         },
         {
+            "name": "MSVC Test RelWithDebInfo",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/tests/RelWithDebInfo/testvecs.exe",  
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false
+        },
+        {
             "name": "Clang Test",
             "type": "cppvsdbg",
             "request": "launch",

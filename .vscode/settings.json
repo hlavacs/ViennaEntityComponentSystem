@@ -90,6 +90,12 @@
 		"unordered_set": "cpp",
 		"random": "cpp",
 		"print": "cpp",
-		"xstddef": "cpp"
+		"xstddef": "cpp",
+		"codecvt": "cpp",
+		"csignal": "cpp",
+		"filesystem": "cpp",
+		"regex": "cpp",
+		"source_location": "cpp",
+		"valarray": "cpp"
 	}
 }
