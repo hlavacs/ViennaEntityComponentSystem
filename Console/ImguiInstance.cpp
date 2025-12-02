@@ -15,6 +15,11 @@
 //   the backend itself (imgui_impl_vulkan.cpp), but should PROBABLY NOT be used by your own engine/app code.
 // Read comments in imgui_impl_vulkan.h.
 
+#ifdef IMGUI_IMPL_VULKAN_NO_PROTOTYPES
+// the Vienna Vulkan Engine defines that, but it interferes with Console!
+#undef IMGUI_IMPL_VULKAN_NO_PROTOTYPES
+#endif
+
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_vulkan.h"

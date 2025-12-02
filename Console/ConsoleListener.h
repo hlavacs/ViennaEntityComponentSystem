@@ -2,7 +2,12 @@
 
 #include "Listener.h"
 #include "ConsoleRegistry.h"
+#if 1
+// Include NLohmann JSON directly instead of using a submodule
+#include "json.hpp"
+#else
 #include <nlohmann/json.hpp> 
+#endif
 #include <set>
 
 

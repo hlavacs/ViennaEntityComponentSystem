@@ -6,9 +6,9 @@ extern "C" {
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
 #include <winsock2.h>
 #include <ws2tcpip.h>
-
 #pragma comment(lib, "Ws2_32.lib")
 
 // Still warnings here
@@ -27,7 +27,12 @@ typedef int SOCKET;
 #endif
 
 #include <thread>
+#if 1
+// Include NLohmann JSON directly instead of using a submodule
+#include "json.hpp"
+#else
 #include <nlohmann/json.hpp> 
+#endif
 
 namespace vecs {
 
@@ -491,3 +496,11 @@ namespace vecs {
 
 
 }
+
+#ifdef WIN32
+// minwindef.h also defines near and far - and that collides with the Vienna Vulkan Engine (VERendererShadow11.cpp/.h)
+#ifdef near
+#undef near
+#undef far
+#endif
+#endif
