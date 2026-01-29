@@ -205,9 +205,106 @@ void TestConn(std::string consoleHost = "127.0.0.1", int consolePort = 2000) {
 	std::cout << "\x1b[37m I hope it works? ...\n";
 }
 
+void TestConnComplex(std::string consoleHost = "127.0.0.1", int consolePort = 2000) {
+	std::cout << "\x1b[37m testing Connection!...\n";
+
+	// create a populated registry
+	vecs::Registry system;
+
+	struct struct1 { int i; double d; };
+	struct struct2 { int i; int j; std::string s; };
+	struct struct3 { float f; double d; char c; int i; };
+	struct struct4 { std::string s; std::string t; };
+
+
+
+	// this test module needs a direct connection to the console communication
+	auto comm = vecs::GetConsoleComm(&system, consoleHost, consolePort);
+
+	std::cout << "\x1b[37m isConnected: " << comm->IsConnected() << "\n";
+	bool abortWait{ false }, toldya{ false };
+	while (!comm->IsConnected() && !abortWait) {
+		if (!toldya) {
+			std::cout << "not yet connected!! Press Escape to terminate" << "\n";
+			toldya = true;
+		}
+		while (_kbhit()) {
+			if (_getch() == 0x1b)
+				abortWait = true;
+		}
+#ifdef WIN32
+		Sleep(250);
+#else
+		usleep(250 * 1000);
+#endif
+	}
+	std::cout << "\x1b[37m isConnected: " << comm->IsConnected() << "\n";
+
+	if (comm->IsConnected()) {
+		std::vector<vecs::Handle> handles;
+		std::cout << "Complex test - use the following keys:\n"
+			"  a - add 100000 comple entities\n"
+			"  d - delete 100000 comple entities\n"
+			"  x - terminate the test\n";
+		while (comm->IsConnected() && !abortWait) {
+			while (_kbhit()) {
+				char c = _getch();
+				auto t1 = std::chrono::high_resolution_clock::now();
+				switch (c) {
+				case 'a':
+					for (int i = 0; i < 100000; i++) {
+						//handles.push_back(system.Insert(i + 100000, static_cast<float>(i * 7)));
+						switch (i % 4) {
+						case 0:
+							handles.push_back(system.Insert(i, struct1{ i,0.0 }, struct2{ i + 2, i + 3, "still struct 1" }, std::string("this is arch1")));
+							break;
+						case 1:
+							handles.push_back(system.Insert(i, struct2{ i, i + 1, "struct2 string" }, struct3{ 0.2f, 66.6, 'a', i + 9 }, 13.f, 33.2));
+							break;
+						case 2:
+							handles.push_back(system.Insert(i, struct3{ 0.1f, 0.0, 'c', i }, std::string("arch3 rules"), 'r', 1.3));
+							break;
+						case 3:
+							handles.push_back(system.Insert(i, struct4{ "struct4 1", "struct4 2" }, struct1{ i + 6, 9.9 }, struct3{ 17.f, 8.1, 't', i + 78 }, std::string("arch4"), 63.f, 5.5, '6'));
+							break;
+						default:
+							break;
+						}
+					}
+					break;
+				case 'd':
+					if (handles.size() >= 100000) {
+						for (int i = 0; i < 100000; i++) {
+							system.Erase(handles[handles.size() - 1]); handles.erase(handles.end() - 1);
+						}
+					}
+					break;
+				case 'x':
+					abortWait = true;
+					break;
+				default:
+					break;
+				}
+				auto t2 = std::chrono::high_resolution_clock::now();
+
+				auto mics = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+				if (mics > 10)
+					std::cout << c << " duration: " << mics << " msecs\n";
+			}
+
+			Sleep(250);
+		}
+
+
+		comm->DisconnectFromServer();
+	}
+
+}
+
 int main(int argc, char* argv[]) {
 	std::string host = "127.0.0.1";
 	std::string port = "2000";
+	bool complexMode = false;
 	for (int i = 1; i < argc; i++) {
 		if (argv[i][0] == '-')
 			for (int j = 1; argv[i][j]; j++)
@@ -229,13 +326,18 @@ int main(int argc, char* argv[]) {
 					port = argv[i] + j + 1;
 					j = (int)strlen(argv[i]) - 1;
 					break;
+				case 'C':
+				case 'c':
+					complexMode = !complexMode;
+					break;
 				default:
 					// simply ignore unknown command line parameters
 					break;
 				}
 	}
 	std::cout << "testing VECS Console communication...\n";
-	TestConn(host, std::stoi(port));
+	if (complexMode) TestConnComplex(host, std::stoi(port));
+	else TestConn(host, std::stoi(port));
 	return 0;
 }
 
