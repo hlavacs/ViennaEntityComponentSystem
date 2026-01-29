@@ -2,13 +2,13 @@
 
 #ifdef WIN32
 extern "C" {
-    //F'in Windows.h includes minwindef.h which overrides min, which collides with C++ std::min
+    // Windows.h includes minwindef.h which overrides min, which collides with C++ std::min
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
 #include <winsock2.h>
 #include <ws2tcpip.h>
-
 #pragma comment(lib, "Ws2_32.lib")
 
 // Still warnings here
@@ -27,7 +27,12 @@ typedef int SOCKET;
 #endif
 
 #include <thread>
+#if 1
+// Include NLohmann JSON directly instead of using a submodule
+#include "json.hpp"
+#else
 #include <nlohmann/json.hpp> 
+#endif
 
 namespace vecs {
 
@@ -41,6 +46,25 @@ namespace vecs {
         bool volatile running = false;
         std::string connectingToHost;
         int connectingToPort{ 0 };
+
+        /// @brief synchronized monotonic clock, microsecond acuracy
+        class SyncClock {
+            std::chrono::system_clock::time_point system_start;
+            std::chrono::steady_clock::time_point steady_start;
+        public:
+            /// @brief Initialize both system and steady clock.
+            SyncClock() {
+                system_start = std::chrono::system_clock::now();
+                steady_start = std::chrono::steady_clock::now();
+            }
+            /// @brief Get timestamp in microseconds since 1970-01-01 00:00:00 UTC.
+            int64_t NowMicro() {
+                auto now_steady = std::chrono::steady_clock::now();
+                auto delta = now_steady - steady_start;
+                auto global = system_start + delta;
+                return std::chrono::duration_cast<std::chrono::microseconds>(global.time_since_epoch()).count();
+            }
+        } clock;
 
         // LiveView : encapsulation for all LiveView-related data
         /// @brief Internal class to handle all LiveView related communication.
@@ -159,6 +183,71 @@ namespace vecs {
         /// @param reg Address of the Registry.
         void SetRegistry(Registry* reg = nullptr) { registry = reg; liveView.SetRegistry(reg); }
 
+
+    private:
+        /// @brief scores a passed IPv4 address. Score: loopback < LAN < public
+        /// @param addr IPv4 address in network format
+        inline int scoreIPv4(const in_addr& addr) {
+            uint32_t ip = ntohl(addr.s_addr);
+
+            // Loopback 127.0.0.0/8 -> best
+            if ((ip >> 24) == 127)
+                return 0;
+
+            // LAN 10.0.0.0/8 -> second best
+            if ((ip >> 24) == 10)
+                return 100;
+            // LAN 172.16.0.0/12 -> second best
+            if ((ip & 0xFFF00000) == 0xAC100000)
+                return 100;
+            // LAN 192.168.0.0/16 -> second best
+            if ((ip & 0xFFFF0000) == 0xC0A80000)
+                return 100;
+
+#if 0  // not really interesting in VECS context
+            // Carrier-grade NAT 100.64.0.0/10 -> treat as public
+            if ((ip & 0xFFC00000) == 0x64400000)
+                return 500;
+#endif
+            // Everything else = public IP -> fallback
+            return 500;
+        }
+
+        /// @brief resolve passed host name to best available IP address (loopback, then LAN, then public)
+        /// @param hostname host name or dotted IPv4 address
+        inline in_addr ResolveToIPv4(const std::string& hostname) {
+            in_addr none; none.S_un.S_addr = INADDR_NONE;
+            addrinfo hints{};
+            hints.ai_family = AF_INET;        // IPv4 only for now
+            hints.ai_socktype = SOCK_STREAM;  // TCP
+
+            addrinfo* result = nullptr;
+            int ret = getaddrinfo(hostname.c_str(), nullptr, &hints, &result);
+            if (ret != 0 || !result) {
+                return none;
+            }
+
+            std::vector<std::pair<int, in_addr>> scored;
+
+            for (addrinfo* ptr = result; ptr; ptr = ptr->ai_next) {
+                auto* ipv4 = reinterpret_cast<sockaddr_in*>(ptr->ai_addr);
+                int score = scoreIPv4(ipv4->sin_addr);
+                scored.emplace_back(score, ipv4->sin_addr);
+            }
+
+            freeaddrinfo(result);
+
+            if (scored.empty())
+                return none;
+
+            std::sort(scored.begin(), scored.end(),
+                [](auto& a, auto& b) { return a.first < b.first; });
+
+            return scored.front().second;
+        }
+
+
+    public:
         /// @brief Initiates a tcp/ip connection to the Console.
         /// @param reg Address of the processed VECS registry.
         /// @param host optional address of the machine the Console is running on.
@@ -179,7 +268,8 @@ namespace vecs {
 
             sockaddr_in clientService;
             clientService.sin_family = AF_INET;
-            clientService.sin_addr.s_addr = inet_addr(host.c_str());
+            // clientService.sin_addr.s_addr = inet_addr(host.c_str());
+            clientService.sin_addr = ResolveToIPv4(host);
             clientService.sin_port = htons(port);
 
             //----------------------
@@ -314,24 +404,25 @@ namespace vecs {
                 if (!registry) {       // if no registry there,
                     SendMessage("{}"); // send empty object (maybe some kind of error object would be better?)
                 }
-#if 1 // Debugging:
+#if 1 // With timestamps:
                 {
-                    auto t1 = std::chrono::high_resolution_clock::now();
+                    auto t1 = clock.NowMicro();
                     std::string josnap = registry->GetSnapshot();
-                    auto t2 = std::chrono::high_resolution_clock::now();
-                    std::string ststmps = ",\"gst1\":" + std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(t1.time_since_epoch()).count()) +
-                        ",\"gst2\":" + std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(t2.time_since_epoch()).count());
+                    auto t2 = clock.NowMicro();
+                    std::string ststmps = ",\"gst1\":" + std::to_string(t1) +
+                        ",\"gst2\":" + std::to_string(t2);
                     josnap.insert(josnap.size() - 1, ststmps);
                     SendMessage(josnap);
-                    auto t3 = std::chrono::high_resolution_clock::now();
-                    auto cmics = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
-                    auto tmics = std::chrono::duration_cast<std::chrono::milliseconds>(t3 - t2).count();
+#if 1 // Debug message output:
+                    auto t3 = clock.NowMicro();
+                    auto cmils = (t2 - t1) / 1000;
+                    auto tmils = (t3 - t2) / 1000;
                     auto orgSize = josnap.size();
                     if (orgSize > 40)
                         josnap = josnap.substr(0, 37) + "...}";
-                    std::cout << "Sending snapshot: " << josnap << " len " << orgSize << ", creation time: " << cmics << " msecs, "
-                        "send time: " << tmics << " msecs\n";
-
+                    std::cout << "Sending snapshot: " << josnap << " len " << orgSize << ", creation time: " << cmils << " msecs, "
+                        "send time: " << tmils << " msecs\n";
+#endif
                 }
 #else // release
                 sendMessage(registry->getSnapshot());
@@ -491,3 +582,11 @@ namespace vecs {
 
 
 }
+
+#ifdef WIN32
+// minwindef.h also defines near and far - and that collides with the Vienna Vulkan Engine (VERendererShadow11.cpp/.h)
+#ifdef near
+#undef near
+#undef far
+#endif
+#endif

@@ -32,6 +32,8 @@ char (*__countof_helper(_CountofType(&_Array)[_SizeOfArray]))[_SizeOfArray];
 
 #include "ConsoleListener.h"
 
+SyncClock syncClock;  // we only need one.
+
 //all incoming socket events are handled through select()
 #define USING_SELECT
 
@@ -51,7 +53,7 @@ void ConsoleSocketThread::ClientActivity() {
     bool instr{ false };    // currently in string
     bool inesc{ false };   // currently in escape sequence
     char lchr{ 0 };         // last character
-    std::chrono::high_resolution_clock::time_point tsStart;
+    int64_t tsStart;
 
     // wait for incoming data with a timeout of 500 ms
     while ((waitrc = s.Wait(500)) != SOCKET_ERROR) {
@@ -132,17 +134,17 @@ void ConsoleSocketThread::ClientActivity() {
                     lchr = sbuf[i];
                     if (json.empty()) {
                         json.reserve(rlen);
-                        tsStart = std::chrono::high_resolution_clock::now();
+                        tsStart = syncClock.NowMicro();
                     }
                     json += sbuf[i];
                     if (complete) {
 #if CONSOLE_XF_METRICS  // metrics - remove when not necessary
-                        auto tsProcessed = std::chrono::high_resolution_clock::now();
-                        auto msecs = std::chrono::duration_cast<std::chrono::milliseconds>(tsProcessed - tsStart).count();
+                        auto tsProcessed = syncClock.NowMicro();
+                        auto msecs = (tsProcessed - tsStart) / 1000;
                         if (msecs > 10)
                             std::cout << "JSON receive time: " << msecs << " msecs\n";
-                        std::string ststmps = ",\"gst3\":" + std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(tsStart.time_since_epoch()).count()) +
-                            ",\"gst4\":" + std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(tsProcessed.time_since_epoch()).count());
+                        std::string ststmps = ",\"gst3\":" + std::to_string(tsStart) +
+                            ",\"gst4\":" + std::to_string(tsProcessed);
                         json.insert(json.size() - 1, ststmps);
 #endif
                         ProcessJSON(json);  // process completed json string
@@ -297,47 +299,47 @@ bool ConsoleSocketThread::ParseSnapshot(nlohmann::json& json, std::string* psjso
         snap.SetParsed();
         auto gst = json.find("gst1"); // look for snapshot fetch start timestamp
         if (gst != json.end() && gst->is_number())
-            snap.SetRequested(std::chrono::high_resolution_clock::time_point(std::chrono::microseconds(*gst)));
+            snap.SetRequested(*gst);
         gst = json.find("gst2"); // look for snapshot sent timestamp
         if (gst != json.end() && gst->is_number())
-            snap.SetSent(std::chrono::high_resolution_clock::time_point(std::chrono::microseconds(*gst)));
+            snap.SetSent(*gst);
         gst = json.find("gst3"); // look for snapshot received start timestamp
         if (gst != json.end() && gst->is_number())
-            snap.SetReceivedStart(std::chrono::high_resolution_clock::time_point(std::chrono::microseconds(*gst)));
+            snap.SetReceivedStart(*gst);
         gst = json.find("gst4"); // look for snapshot received end timestamp
         if (gst != json.end() && gst->is_number())
-            snap.SetReceivedEnd(std::chrono::high_resolution_clock::time_point(std::chrono::microseconds(*gst)));
+            snap.SetReceivedEnd(*gst);
         gst = json.find("gst5"); // look for JSON fetched timestamp
         if (gst != json.end() && gst->is_number())
-            snap.SetFetched(std::chrono::high_resolution_clock::time_point(std::chrono::microseconds(*gst)));
+            snap.SetFetched(*gst);
         else {
             // if no parsed timestamp available, be sure to add one!
             if (psjson) {// either to string, if one has been passed in
-                std::string ststmp = ",\"gst5\":" + std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(snap.GetJsonTS().time_since_epoch()).count());
+                std::string ststmp = ",\"gst5\":" + std::to_string(snap.GetJsonTS());
                 psjson->insert(psjson->size() - 1, ststmp);
             }
             else  // or to the json object otherwise
-                json += { "gst5", std::chrono::duration_cast<std::chrono::microseconds>(snap.GetJsonTS().time_since_epoch()).count() };
+                json += { "gst5", snap.GetJsonTS() };
         }
         gst = json.find("gst6"); // look for snapshot parsed timestamp
         if (gst != json.end() && gst->is_number())
-            snap.SetParsed(std::chrono::high_resolution_clock::time_point(std::chrono::microseconds(*gst)));
+            snap.SetParsed(*gst);
         else {
             // if no parsed timestamp available, be sure to add one!
             if (psjson) {// either to string, if one has been passed in
-                std::string ststmp = ",\"gst6\":" + std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(snap.GetParsedTS().time_since_epoch()).count());
+                std::string ststmp = ",\"gst6\":" + std::to_string(snap.GetParsedTS());
                 psjson->insert(psjson->size() - 1, ststmp);
             }
             else  // or to the json object otherwise
-                json += { "gst6", std::chrono::duration_cast<std::chrono::microseconds>(snap.GetParsedTS().time_since_epoch()).count() };
+                json += { "gst6", snap.GetParsedTS() };
         }
 #if 0  // ONLY ACTIVATE IF YOU WANT TO CREATE STATISTICS FILE!
         try {
-            auto milsGather = std::chrono::duration_cast<std::chrono::milliseconds>(snap.GetSentTS() - snap.GetRequestedTS()).count();
-            auto milsSend = std::chrono::duration_cast<std::chrono::milliseconds>(snap.GetReceivedEndTS() - snap.GetSentTS()).count();
-            auto milsJson = std::chrono::duration_cast<std::chrono::milliseconds>(snap.GetJsonTS() - snap.GetReceivedEndTS()).count();
-            auto milsParse = std::chrono::duration_cast<std::chrono::milliseconds>(snap.GetParsedTS() - snap.GetJsonTS()).count();
-            auto milsTotal = std::chrono::duration_cast<std::chrono::milliseconds>(snap.GetParsedTS() - snap.GetRequestedTS()).count();
+            auto milsGather = (snap.GetSentTS() - snap.GetRequestedTS()) / 1000;
+            auto milsSend = (snap.GetReceivedEndTS() - snap.GetSentTS()) / 1000;
+            auto milsJson = (snap.GetJsonTS() - snap.GetReceivedEndTS()) / 1000;
+            auto milsParse = (snap.GetParsedTS() - snap.GetJsonTS()) / 1000;
+            auto milsTotal = (snap.GetParsedTS() - snap.GetRequestedTS()) / 1000;
             // this creates a .csv file. Each line contains:
             // Entities,Components,Gather(ms),Send(ms),JSON(ms),Parse(ms),Total(ms)
             std::string initText = std::to_string(snap.GetEntityCount()) +

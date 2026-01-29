@@ -45,7 +45,7 @@ void TerminateListener() {
 static class SnapshotDisplayCache
 {
 private:
-    std::chrono::high_resolution_clock::time_point tstamp;
+    int64_t tstamp;
     size_t tableLines{ 0 };
     std::string filterArchetype;
     std::string filterEntity;
@@ -581,11 +581,11 @@ void static ShowViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
                 std::string initText = std::string("Snapshot Entities: ") + std::to_string(snap.GetEntityCount()) +
                     ", Components: " + std::to_string(snap.GetComponentCount());
 #if CONSOLE_XF_METRICS
-                auto milsGather = std::chrono::duration_cast<std::chrono::milliseconds>(snap.GetSentTS() - snap.GetRequestedTS()).count();
-                auto milsSend = std::chrono::duration_cast<std::chrono::milliseconds>(snap.GetReceivedEndTS() - snap.GetSentTS()).count();
-                auto milsJson = std::chrono::duration_cast<std::chrono::milliseconds>(snap.GetJsonTS() - snap.GetReceivedEndTS()).count();
-                auto milsParse = std::chrono::duration_cast<std::chrono::milliseconds>(snap.GetParsedTS() - snap.GetJsonTS()).count();
-                auto milsTotal = std::chrono::duration_cast<std::chrono::milliseconds>(snap.GetParsedTS() - snap.GetRequestedTS()).count();
+                auto milsGather = (snap.GetSentTS() - snap.GetRequestedTS()) / 1000;
+                auto milsSend = (snap.GetReceivedEndTS() - snap.GetSentTS()) / 1000;
+                auto milsJson = (snap.GetJsonTS() - snap.GetReceivedEndTS()) / 1000;
+                auto milsParse = (snap.GetParsedTS() - snap.GetJsonTS()) / 1000;
+                auto milsTotal = (snap.GetParsedTS() - snap.GetRequestedTS()) / 1000;
                 initText += ", Gather time: " + std::to_string(milsGather) + " msecs" +
                     ", Send Time: " + std::to_string(milsSend) + " msecs" +
                     ", JSON time: " + std::to_string(milsJson) + " msecs" +

@@ -11,6 +11,28 @@
 // set to 1 for transfer metrics, or 0 otherwise
 #define CONSOLE_XF_METRICS 1
 
+
+/// @brief synchronized monotonic clock, microsecond acuracy
+class SyncClock {
+    std::chrono::system_clock::time_point system_start;
+    std::chrono::steady_clock::time_point steady_start;
+public:
+    /// @brief Initialize both system and steady clock.
+    SyncClock() {
+        system_start = std::chrono::system_clock::now();
+        steady_start = std::chrono::steady_clock::now();
+    }
+    /// @brief Get timestamp in microseconds since 1970-01-01 00:00:00 UTC.
+    int64_t NowMicro() {
+        auto now_steady = std::chrono::steady_clock::now();
+        auto delta = now_steady - steady_start;
+        auto global = system_start + delta;
+        return std::chrono::duration_cast<std::chrono::microseconds>(global.time_since_epoch()).count();
+    }
+};
+extern SyncClock syncClock;  // we only need one.
+
+
 namespace Console {
 
     // Representation of a Registry for the Console
@@ -25,8 +47,7 @@ namespace Console {
         std::string jsonsnap;
         size_t entityCount{ 0 }, componentCount{ 0 };
 #if CONSOLE_XF_METRICS  // metrics - remove when not necessary
-        std::chrono::high_resolution_clock::time_point tstampRequested, tstampSent, tstampRcvStart, tstampRcvEnd;
-        std::chrono::high_resolution_clock::time_point tstampFetched, tstampParsed;
+        int64_t tstampRequested, tstampSent, tstampRcvStart, tstampRcvEnd, tstampFetched, tstampParsed;
 #endif
 
     public:
@@ -70,7 +91,7 @@ namespace Console {
             entities.clear();
             entityCount = componentCount = 0;
 #if CONSOLE_XF_METRICS
-            auto now = std::chrono::high_resolution_clock::now();
+            auto now = syncClock.NowMicro();
             SetRequested(now);
             SetSent(now);
             SetReceivedStart(now);
@@ -92,38 +113,38 @@ namespace Console {
         }
 
 #if CONSOLE_XF_METRICS
-        void SetRequested(std::chrono::high_resolution_clock::time_point ts) { tstampRequested = ts; }
-        void SetSent(std::chrono::high_resolution_clock::time_point ts) { tstampSent = ts; }
-        void SetReceivedStart(std::chrono::high_resolution_clock::time_point ts) { tstampRcvStart = ts; }
-        void SetReceivedEnd(std::chrono::high_resolution_clock::time_point ts) { tstampRcvEnd = ts; }
+        void SetRequested(int64_t ts) { tstampRequested = ts; }
+        void SetSent(int64_t ts) { tstampSent = ts; }
+        void SetReceivedStart(int64_t ts) { tstampRcvStart = ts; }
+        void SetReceivedEnd(int64_t ts) { tstampRcvEnd = ts; }
 
         /// @brief get timestamp when json has been processed
-        void SetFetched(std::chrono::high_resolution_clock::time_point ts) { tstampFetched = ts; }
+        void SetFetched(int64_t ts) { tstampFetched = ts; }
 
         /// @brief set timestamp when json has been parsed into internal structures
         /// @param ts timestamp to use.
-        void SetParsed(std::chrono::high_resolution_clock::time_point ts) { tstampParsed = ts; }
+        void SetParsed(int64_t ts) { tstampParsed = ts; }
 
         /// @brief set timestamp when json has been parsed into internal structures
-        void SetParsed() { SetParsed(std::chrono::high_resolution_clock::now()); }
+        void SetParsed() { SetParsed(syncClock.NowMicro()); }
 
         /// @brief get timestamp when snapshot has been requested
-        std::chrono::high_resolution_clock::time_point GetRequestedTS() const { return tstampRequested; }
+        int64_t GetRequestedTS() const { return tstampRequested; }
 
         /// @brief get timestamp when snapshot has been sent by VECS
-        std::chrono::high_resolution_clock::time_point GetSentTS() const { return tstampSent; }
+        int64_t GetSentTS() const { return tstampSent; }
 
         /// @brief get timestamp when reception of snapshot has been started
-        std::chrono::high_resolution_clock::time_point GetReceivedStartTS() const { return tstampRcvStart; }
+        int64_t GetReceivedStartTS() const { return tstampRcvStart; }
 
         /// @brief get timestamp when reception of snapshot has been ended
-        std::chrono::high_resolution_clock::time_point GetReceivedEndTS() const { return tstampRcvEnd; }
+        int64_t GetReceivedEndTS() const { return tstampRcvEnd; }
 
         /// @brief get timestamp when json has been processed
-        std::chrono::high_resolution_clock::time_point GetJsonTS() const { return tstampFetched; }
+        int64_t GetJsonTS() const { return tstampFetched; }
 
         /// @brief get timestamp when json has been parsed into internal structures
-        std::chrono::high_resolution_clock::time_point GetParsedTS() const { return tstampParsed; }
+        int64_t GetParsedTS() const { return tstampParsed; }
 #endif
 
         // archetype handling

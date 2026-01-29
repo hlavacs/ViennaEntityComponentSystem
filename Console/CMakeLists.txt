@@ -16,27 +16,40 @@ FetchContent_MakeAvailable(imgui)
 
 # SDL3
 
-# Detect platform
-if(WIN32)
-# on Windows, fetch from Github into _deps
-    message(STATUS "Configuring SDL3 via FetchContent for Windows")
-
+# use same settings as VVE:
+set(SDL_STATIC ON)
+set(SDL_SHARED OFF)
 FetchContent_Declare(sdl3
-                     GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
-                     GIT_TAG main)
-
+					GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
+                    GIT_TAG main
+)
 FetchContent_MakeAvailable(sdl3)
+include_directories (${sdl3_SOURCE_DIR}/include)
+include_directories (${sdl3_SOURCE_DIR}/include/SDL3)
+# That one's not in VVE:
 set(SDL3_LIB SDL3::SDL3)
-elseif(UNIX AND NOT APPLE)
-# on Linux, use pre-installed package
-    message(STATUS "Using system-installed SDL3 on Linux")
 
-    find_package(SDL3 REQUIRED CONFIG)
-    if(NOT SDL3_FOUND)
-        message(FATAL_ERROR "SDL3 not found. Please install libsdl3-dev or equivalent.")
-    endif()
-    set(SDL3_LIB SDL3::SDL3)
-endif()
+## Detect platform
+#if(WIN32)
+## on Windows, fetch from Github into _deps
+#    message(STATUS "Configuring SDL3 via FetchContent for Windows")
+#
+#FetchContent_Declare(sdl3
+#                     GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
+#                     GIT_TAG main)
+#
+#FetchContent_MakeAvailable(sdl3)
+#set(SDL3_LIB SDL3::SDL3)
+#elseif(UNIX AND NOT APPLE)
+## on Linux, use pre-installed package
+#    message(STATUS "Using system-installed SDL3 on Linux")
+#
+#    find_package(SDL3 REQUIRED CONFIG)
+#    if(NOT SDL3_FOUND)
+#        message(FATAL_ERROR "SDL3 not found. Please install libsdl3-dev or equivalent.")
+#    endif()
+#    set(SDL3_LIB SDL3::SDL3)
+#endif()
 
 
 # IMGui - fetch from Github into _deps
