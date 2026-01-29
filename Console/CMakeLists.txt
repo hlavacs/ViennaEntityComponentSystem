@@ -14,6 +14,30 @@ FetchContent_Declare(imgui
 
 FetchContent_MakeAvailable(imgui)
 
+# copied from VVE and expanded a bit -
+if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+  	add_compile_options(/DIMGUI_IMPL_VULKAN_NO_PROTOTYPES)
+  	add_compile_options(/DIMGUI_IMPL_VULKAN_USE_VOLK)
+	add_compile_options(/D_CRT_SECURE_NO_WARNINGS) #for assimp
+	add_compile_options(/EHsc /DEBUG /Zi /Istb) #for assimp
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+	add_compile_options(-DIMGUI_IMPL_VULKAN_NO_PROTOTYPES)
+  	add_compile_options(-DIMGUI_IMPL_VULKAN_USE_VOLK)
+	add_compile_options(-Wno-nullability-completeness)
+	add_compile_options(-D_CRT_SECURE_NO_WARNINGS) #for assimp
+	add_compile_options(-fexperimental-library)
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+	add_compile_options(-DIMGUI_IMPL_VULKAN_NO_PROTOTYPES)
+  	add_compile_options(-DIMGUI_IMPL_VULKAN_USE_VOLK)
+	add_compile_options(-Wno-nullability-completeness)
+	add_compile_options(-D_CRT_SECURE_NO_WARNINGS) #for assimp
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+	add_compile_options(-DIMGUI_IMPL_VULKAN_NO_PROTOTYPES)
+  	add_compile_options(-DIMGUI_IMPL_VULKAN_USE_VOLK)
+	add_compile_options(-Wno-nullability-completeness)
+	add_compile_options(-D_CRT_SECURE_NO_WARNINGS) #for assimp
+endif()
+
 # SDL3
 
 # use same settings as VVE:
@@ -66,8 +90,24 @@ message(STATUS "Using system-installed Vulkan SDK")
 find_package(Vulkan REQUIRED)
 
 set(VULKAN $ENV{VULKAN_SDK})
+set(VULKAN_SDK $ENV{VULKAN_SDK})
 
-include_directories (${Vulkan_INCLUDE_DIRS})
+#include_directories (${Vulkan_INCLUDE_DIRS})
+if (WIN32)
+	set(VULKAN_INCLUDE Include)
+	set(VULKAN_LIB Lib)
+elseif (APPLE)
+	set(VULKAN_INCLUDE include)
+    set(VULKAN_LIB lib)
+elseif (UNIX AND NOT APPLE)
+	set(VULKAN_INCLUDE include)
+	set(VULKAN_LIB lib)
+endif()
+
+include_directories(${VULKAN_SDK}/${VULKAN_INCLUDE})
+include_directories(${VULKAN_SDK}/${VULKAN_INCLUDE}/volk)
+include_directories(${VULKAN_SDK}/${VULKAN_INCLUDE}/vma)
+link_directories(${VULKAN_SDK}/lib)
 
 
 ##########################################################################
