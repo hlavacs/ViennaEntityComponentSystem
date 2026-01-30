@@ -12,6 +12,11 @@
 #include <termios.h>
 static struct termios termios_org;
 
+// define _countof for non-Windows platforms (https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/countof-macro)
+#ifndef _countof
+#define _countof(array) (sizeof(array)/sizeof(array[0]))
+#endif
+
 // Replacement for _kbhit(), _getche() and _getch() in unixoid environments
 // Idea gleaned from https://askubuntu.com/questions/1185926/how-can-i-use-kbhit-function-while-using-gcc-compiler-as-it-does-not-contains
 // and https://stackoverflow.com/questions/7469139/what-is-the-equivalent-to-getch-getche-in-linux
@@ -30,7 +35,7 @@ static void initTermios(int echo)
 /* reset terminal I/O settings to previous setup*/
 static void restoreTermios(void)
 {
-	tcsetattr(0, TCSANOW, &termios_or);
+	tcsetattr(0, TCSANOW, &termios_org);
 }
 int _kbhit() {
 	// Unixoid approximation of the _kbhit() function available in MSVC -
