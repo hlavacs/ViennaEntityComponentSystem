@@ -200,7 +200,7 @@ namespace vecs {
 
 		/// @brief get the Type hash for the Vector's elements.
 		/// @return Type hash.
-		virtual size_t GetType() { return Type<T>(); }
+		virtual size_t GetType() override { return Type<T>(); }
 		/// @brief get the base size of an element in the Vector.
 		/// @return base element size; if the element allocates further data, this is not accounted for.
 		size_t ElemSize() override { return sizeof(T); }

@@ -17,7 +17,9 @@ extern "C" {
 }
 
 #else
+#include <sys/types.h>
 #include <sys/socket.h>
+#include <netdb.h>
 #include <sys/select.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -216,7 +218,11 @@ namespace vecs {
         /// @brief resolve passed host name to best available IP address (loopback, then LAN, then public)
         /// @param hostname host name or dotted IPv4 address
         inline in_addr ResolveToIPv4(const std::string& hostname) {
+#ifdef WIN32
             in_addr none; none.S_un.S_addr = INADDR_NONE;
+#else
+            in_addr none; none.s_addr = INADDR_NONE;
+#endif
             addrinfo hints{};
             hints.ai_family = AF_INET;        // IPv4 only for now
             hints.ai_socktype = SOCK_STREAM;  // TCP

@@ -481,7 +481,7 @@ void static ShowViewSnapshotWindow(ConsoleListener& listening, bool* p_open)
                 ImGui::TableHeadersRow();
 
                 ImGuiListClipper clipper;
-                clipper.Begin(tableLines);
+                clipper.Begin((int)tableLines);
                 while (clipper.Step()) {
                     for (int row = clipper.DisplayStart; row < clipper.DisplayEnd && row < tableLines; row++) {
                         auto cacheRow = snapshotDisplayCache[row];
@@ -634,7 +634,7 @@ void static ShowSnapshotFileListWindow(bool* p_open) {
             showSnapshotFileList = false;
         }
         ImGui::SameLine();
-        ImGui::Text(selectedSnapshotFile.c_str());
+        ImGui::TextUnformatted(selectedSnapshotFile.c_str());
         ImGui::End();
     }
 }
@@ -805,7 +805,7 @@ void static ShowLiveView(ConsoleListener& listening, bool* p_open)
             else if (estSize >= 1000L) // over a kilobyte
                 sprintf(s, "%.2lf KB", static_cast<double>(estSize) / 1000.0);
             else  // below a kilobyte
-                sprintf(s, "%ld B", (int)estSize);
+                sprintf(s, "%ld B", (long)estSize);
             ImGui::Text("Estimated Memory usage: %s", s);
         }
         ImGui::EndChild();
@@ -855,15 +855,15 @@ void static ShowLiveView(ConsoleListener& listening, bool* p_open)
                         ImGui::TableNextRow();
 
                         ImGui::TableSetColumnIndex(0);
-                        ImGui::TextColored(color, aHash.c_str());
+                        ImGui::TextColored(color, "%s", aHash.c_str());
                         ImGui::TableSetColumnIndex(1);
-                        ImGui::TextColored(color, eIndex.c_str());
+                        ImGui::TextColored(color, "%s", eIndex.c_str());
                         ImGui::TableSetColumnIndex(2);
-                        ImGui::TextColored(color, entity.GetTypeName(component.GetType()).c_str());
+                        ImGui::TextColored(color, "%s", entity.GetTypeName(component.GetType()).c_str());
                         ImGui::TableSetColumnIndex(3);
-                        ImGui::TextColored(color, cValue.c_str());
+                        ImGui::TextColored(color, "%s", cValue.c_str());
                         ImGui::TableSetColumnIndex(4);
-                        ImGui::TextColored(color, tagstr.c_str());
+                        ImGui::TextColored(color, "%s", tagstr.c_str());
 
                         componentIndex++;
                     }

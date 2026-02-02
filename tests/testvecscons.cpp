@@ -6,9 +6,19 @@
 
 #include "VECS.h"
 
+#ifndef _countof
+// _countof() isn't universally available
+template <typename _CountofType, size_t _SizeOfArray>
+char (*__countof_helper(_CountofType(&_Array)[_SizeOfArray]))[_SizeOfArray];
+#define _countof(_Array) (sizeof(*__countof_helper(_Array)) + 0)
+#endif
+
 #ifdef WIN32
 #include <conio.h>
 #else
+// milliseconds are good enough, so resort to these where necessary
+#define Sleep(a) usleep((a) * 1000)
+
 #include <termios.h>
 static struct termios termios_org;
 
@@ -30,7 +40,7 @@ static void initTermios(int echo)
 /* reset terminal I/O settings to previous setup*/
 static void restoreTermios(void)
 {
-	tcsetattr(0, TCSANOW, &termios_or);
+	tcsetattr(0, TCSANOW, &termios_org);
 }
 int _kbhit() {
 	// Unixoid approximation of the _kbhit() function available in MSVC -
