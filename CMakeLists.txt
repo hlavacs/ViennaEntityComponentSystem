@@ -42,13 +42,15 @@ FetchContent_MakeAvailable(viennatypelistlibrary)
 include_directories (${viennatypelistlibrary_SOURCE_DIR}/include)
 
 
-FetchContent_Declare(json
-                     GIT_REPOSITORY https://github.com/nlohmann/json.git
-                     GIT_TAG develop)
-
-FetchContent_MakeAvailable(json)
-
-include_directories (${json_SOURCE_DIR}/single_include)
+# VVE doesn't support that, and since VECS is included there, the simplest way to get that
+# working is to include NLohmann's JSON header file directly.
+#FetchContent_Declare(json
+#                     GIT_REPOSITORY https://github.com/nlohmann/json.git
+#                     GIT_TAG develop)
+#
+#FetchContent_MakeAvailable(json)
+#
+#include_directories (${json_SOURCE_DIR}/single_include)
 
 # Testing
 
